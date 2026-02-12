@@ -1,0 +1,159 @@
+import Foundation
+import UIKit
+import Combine
+
+@MainActor
+final class LocalPolaroidStore: ObservableObject {
+    
+    @Published private(set) var entries: [PolaroidEntry] = []
+    
+    private let fileManager = FileManager.default
+    private let entriesFileName = "polaroid_entries.json"
+    private let imagesDirectoryName = "polaroid_images"
+    
+    private var documentsDirectory: URL {
+        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
+    private var entriesFileURL: URL {
+        documentsDirectory.appendingPathComponent(entriesFileName)
+    }
+    
+    private var imagesDirectory: URL {
+        documentsDirectory.appendingPathComponent(imagesDirectoryName)
+    }
+    
+    init() {
+        createImagesDirectoryIfNeeded()
+        loadEntries()
+    }
+    
+    private func createImagesDirectoryIfNeeded() {
+        if !fileManager.fileExists(atPath: imagesDirectory.path) {
+            try? fileManager.createDirectory(at: imagesDirectory, withIntermediateDirectories: true)
+        }
+    }
+    
+    private func loadEntries() {
+        guard fileManager.fileExists(atPath: entriesFileURL.path),
+              let data = try? Data(contentsOf: entriesFileURL),
+              let decoded = try? JSONDecoder().decode([PolaroidEntry].self, from: data) else {
+            entries = []
+            return
+        }
+        entries = decoded
+    }
+    
+    private func saveEntries() {
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        try? data.write(to: entriesFileURL)
+    }
+    
+    func savePhoto(_ image: UIImage) -> PolaroidEntry? {
+        let id = UUID()
+        let fileName = "\(id.uuidString).jpg"
+        let fileURL = imagesDirectory.appendingPathComponent(fileName)
+        
+        guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return nil }
+        
+        do {
+            try jpegData.write(to: fileURL)
+            let entry = PolaroidEntry(
+                id: id,
+                capturedAt: Date(),
+                imageFileName: fileName,
+                released: false
+            )
+            entries.append(entry)
+            saveEntries()
+            return entry
+        } catch {
+            return nil
+        }
+    }
+    
+    func loadImage(for entry: PolaroidEntry) -> UIImage? {
+        let fileURL = imagesDirectory.appendingPathComponent(entry.imageFileName)
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return UIImage(data: data)
+    }
+    
+    func todaysCaptureCount() -> Int {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
+        let now = Date()
+        let currentDayStart = getDayStartAt5AM(for: now, calendar: laCalendar)
+        
+        return entries.filter { entry in
+            let entryDayStart = getDayStartAt5AM(for: entry.capturedAt, calendar: laCalendar)
+            return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart)
+        }.count
+    }
+    
+    func todaysUnreleasedEntries() -> [PolaroidEntry] {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
+        let now = Date()
+        let currentDayStart = getDayStartAt5AM(for: now, calendar: laCalendar)
+        
+        return entries.filter { entry in
+            let entryDayStart = getDayStartAt5AM(for: entry.capturedAt, calendar: laCalendar)
+            return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart) && !entry.released
+        }
+    }
+    
+    func releaseEntries(_ entriesToRelease: [PolaroidEntry]) {
+        let idsToRelease = Set(entriesToRelease.map { $0.id })
+        for index in entries.indices {
+            if idsToRelease.contains(entries[index].id) {
+                entries[index].released = true
+            }
+        }
+        saveEntries()
+    }
+    
+    func getUnreleasedEntriesReadyForRelease() -> [PolaroidEntry] {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
+        let now = Date()
+        
+        return entries.filter { entry in
+            guard !entry.released else { return false }
+            
+            let captureDay = laCalendar.startOfDay(for: entry.capturedAt)
+            
+            var releaseComponents = laCalendar.dateComponents([.year, .month, .day], from: captureDay)
+            releaseComponents.hour = 21
+            releaseComponents.minute = 0
+            releaseComponents.second = 0
+            
+            guard let releaseTime = laCalendar.date(from: releaseComponents) else { return false }
+            
+            return now >= releaseTime
+        }
+    }
+    
+    private func getDayStartAt5AM(for date: Date, calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+        guard let hour = components.hour else { return date }
+        
+        var dayStart = calendar.startOfDay(for: date)
+        
+        if hour < 5 {
+            dayStart = calendar.date(byAdding: .day, value: -1, to: dayStart) ?? dayStart
+        }
+        
+        var startComponents = calendar.dateComponents([.year, .month, .day], from: dayStart)
+        startComponents.hour = 5
+        startComponents.minute = 0
+        startComponents.second = 0
+        
+        return calendar.date(from: startComponents) ?? dayStart
+    }
+}
