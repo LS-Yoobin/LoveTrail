@@ -55,6 +55,43 @@ struct ContentView: View {
                     officialPhoto = official
                     homeViewModel.pinnedFirstMet = firstMet
                     homeViewModel.pinnedOfficial = official
+                    
+                    // Create pinned moments for the first two memories
+                    var onboardingMoments: [Moment] = []
+                    let now = Date()
+                    
+                    // Add "When we became official" as first pinned moment
+                    let officialMoment = Moment(
+                        id: UUID(),
+                        dateTaken: now,
+                        assetIdentifier: nil,
+                        thumbnail: official,
+                        placeName: "When we became official",
+                        caption: nil,
+                        voiceNotePath: nil,
+                        isPinned: true,
+                        pinnedAt: now
+                    )
+                    onboardingMoments.append(officialMoment)
+                    
+                    // Add "When we first met" as second pinned moment (if provided)
+                    if let firstMet = firstMet {
+                        let firstMetMoment = Moment(
+                            id: UUID(),
+                            dateTaken: now.addingTimeInterval(-1), // Slightly earlier so it appears second
+                            assetIdentifier: nil,
+                            thumbnail: firstMet,
+                            placeName: "When we first met",
+                            caption: nil,
+                            voiceNotePath: nil,
+                            isPinned: true,
+                            pinnedAt: now.addingTimeInterval(-1)
+                        )
+                        onboardingMoments.append(firstMetMoment)
+                    }
+                    
+                    homeViewModel.addMoments(onboardingMoments)
+                    
                     withAnimation(.easeInOut(duration: 0.4)) {
                         screen = .howItWorks
                     }
@@ -78,7 +115,17 @@ struct ContentView: View {
                             screen = .selectPhotos
                         }
                     },
-                    onOpenPhotoViewer: { _, _ in }
+                    onOpenPhotoViewer: { _, _ in },
+                    onResetApp: {
+                        DataPersistenceManager.shared.clearAllData()
+                        homeViewModel.moments = []
+                        homeViewModel.promptMemories = []
+                        homeViewModel.pinnedFirstMet = nil
+                        homeViewModel.pinnedOfficial = UIImage(systemName: "heart.fill")!
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .welcome
+                        }
+                    }
                 )
                 .transition(.opacity)
                 .onAppear {

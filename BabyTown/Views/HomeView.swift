@@ -12,8 +12,11 @@ struct HomeView: View {
 
     var onSelectPhotos: () -> Void
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
+    var onResetApp: (() -> Void)? = nil
     
     @State private var showCameraSheet = false
+    @State private var showSettings = false
+    @State private var showSearch = false
     @State private var firstMetPickerItem: PhotosPickerItem?
     @State private var officialPickerItem: PhotosPickerItem?
     @State private var showingPinnedViewer: PinnedMemoryType?
@@ -29,7 +32,8 @@ struct HomeView: View {
         pinnedOfficial: UIImage,
         moments: [Moment] = [],
         onSelectPhotos: @escaping () -> Void,
-        onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void
+        onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void,
+        onResetApp: (() -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
             pinnedFirstMet: pinnedFirstMet,
@@ -38,16 +42,19 @@ struct HomeView: View {
         ))
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
+        self.onResetApp = onResetApp
     }
 
     init(
         viewModel: HomeViewModel,
         onSelectPhotos: @escaping () -> Void = {},
-        onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void = { _, _ in }
+        onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void = { _, _ in },
+        onResetApp: (() -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
+        self.onResetApp = onResetApp
     }
 
     var body: some View {
@@ -57,7 +64,9 @@ struct HomeView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    BabyTownHeader()
+                    BabyTownHeader(onSettingsTap: {
+                        showSettings = true
+                    })
                     StickyActionBar(
                         onSelectPhotos: onSelectPhotos,
                         onPrompt: {
@@ -121,11 +130,13 @@ struct HomeView: View {
                         }
                     },
                     onUpdateMoments: { updatedMoments in
+                        var newMoments = viewModel.moments
                         for moment in updatedMoments {
-                            if let index = viewModel.moments.firstIndex(where: { $0.id == moment.id }) {
-                                viewModel.moments[index] = moment
+                            if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
+                                newMoments[index] = moment
                             }
                         }
+                        viewModel.moments = newMoments
                     }
                 )
                 .transition(.opacity)
@@ -161,6 +172,41 @@ struct HomeView: View {
                 }
             )
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet(onResetApp: {
+                onResetApp?()
+            })
+        }
+        .fullScreenCover(isPresented: $showSearch) {
+            MemorySearchView(
+                allMoments: viewModel.moments,
+                onOpenPhoto: { moment, allMoments in
+                    showSearch = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        viewerMoments = allMoments
+                        if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                            viewerInitialIndex = idx
+                        }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showingMomentViewer = true
+                        }
+                    }
+                },
+                onEditCaption: { momentId, caption, voiceNotePath in
+                    viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                },
+                onRemove: { section in
+                    withAnimation {
+                        viewModel.removeMoments(from: section)
+                    }
+                },
+                onTogglePin: { section in
+                    withAnimation {
+                        viewModel.togglePin(for: section)
+                    }
+                }
+            )
+        }
         }
         .onAppear {
             viewModel.checkAndReleasePhotos()
@@ -172,45 +218,38 @@ struct HomeView: View {
     private var pinnedSection: some View {
         VStack(spacing: 12) {
             sectionLabel("Pinned Memories", icon: "pin.fill")
-
-            HStack(spacing: 12) {
-                PinnedMemoryCard(
-                    title: "First Photo Taken Together",
-                    image: viewModel.pinnedFirstMet,
-                    isPlaceholder: viewModel.pinnedFirstMet == nil,
-                    onTap: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showingPinnedViewer = .firstMet
+                .padding(.horizontal, 20)
+            
+            if !viewModel.pinnedMoments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.pinnedMoments) { moment in
+                            PinnedMemoryCard(
+                                moment: moment,
+                                onTap: {
+                                    viewerMoments = [moment]
+                                    viewerInitialIndex = 0
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        showingMomentViewer = true
+                                    }
+                                },
+                                onUnpin: {
+                                    withAnimation {
+                                        viewModel.unpinMoment(moment)
+                                    }
+                                }
+                            )
+                            .frame(width: 180)
                         }
                     }
-                )
-
-                PinnedMemoryCard(
-                    title: "First Photo As Official Jinkies",
-                    image: viewModel.pinnedOfficial,
-                    onTap: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showingPinnedViewer = .official
-                        }
-                    }
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-        .onChange(of: firstMetPickerItem) { _, newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    viewModel.updatePinnedFirstMet(image)
+                    .padding(.horizontal, 20)
                 }
-            }
-        }
-        .onChange(of: officialPickerItem) { _, newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    viewModel.updatePinnedOfficial(image)
-                }
+            } else {
+                Text("No pinned memories yet")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
             }
         }
     }
@@ -265,6 +304,16 @@ struct HomeView: View {
                                 },
                                 onEditCaption: { momentId, caption, voiceNotePath in
                                     viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                                },
+                                onRemove: { section in
+                                    withAnimation {
+                                        viewModel.removeMoments(from: section)
+                                    }
+                                },
+                                onTogglePin: { section in
+                                    withAnimation {
+                                        viewModel.togglePin(for: section)
+                                    }
                                 }
                             )
                             .padding(

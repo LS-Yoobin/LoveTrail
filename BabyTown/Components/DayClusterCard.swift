@@ -5,9 +5,13 @@ struct DayClusterCard: View {
     let section: DaySection
     var onOpenPhoto: (Moment, [Moment]) -> Void
     var onEditCaption: ((UUID, String, String?) -> Void)? = nil
+    var onRemove: ((DaySection) -> Void)? = nil
+    var onTogglePin: ((DaySection) -> Void)? = nil
     var isLeftAligned: Bool = true
     
     @State private var showCaptionEditor = false
+    @State private var showMenu = false
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ZStack(alignment: isLeftAligned ? .trailing : .leading) {
@@ -43,29 +47,63 @@ struct DayClusterCard: View {
     // MARK: - Header
 
     private var headerRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(section.displayTitle)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.black)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(section.displayTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
 
-            Text(locationText)
-                .font(.system(size: 12))
-                .foregroundStyle(.black)
-            
-            Button {
-                showCaptionEditor = true
-            } label: {
-                Text(captionText)
+                Text(locationText)
                     .font(.system(size: 12))
-                    .foregroundStyle(.black.opacity(0.7))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.black)
+                
+                captionView
             }
-            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            Menu {
+                Button {
+                    onTogglePin?(section)
+                } label: {
+                    Label(isPinned ? "Unpin Memory" : "Pin Memory", systemImage: isPinned ? "pin.slash" : "pin")
+                }
+                
+                Button {
+                    showCaptionEditor = true
+                } label: {
+                    Label("Edit Memory", systemImage: "pencil")
+                }
+                
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Remove Memory", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black.opacity(0.6))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
         }
         .sheet(isPresented: $showCaptionEditor) {
             CaptionEditorSheet(section: section, onSave: { momentId, newCaption, voicePath in
                 onEditCaption?(momentId, newCaption, voicePath)
             })
+        }
+        .confirmationDialog(
+            "Remove this memory?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Memory", role: .destructive) {
+                onRemove?(section)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
         }
     }
     
@@ -81,6 +119,56 @@ struct DayClusterCard: View {
             return caption
         }
         return "Add Love Note or Spunky Will Bite"
+    }
+    
+    private var isPinned: Bool {
+        section.moments.first?.isPinned ?? false
+    }
+    
+    @ViewBuilder
+    private var captionView: some View {
+        let hasCaption = section.moments.first?.caption != nil && !(section.moments.first?.caption?.isEmpty ?? true)
+        
+        Button {
+            showCaptionEditor = true
+        } label: {
+            if hasCaption {
+                // State 2: Caption exists - show text with edit icon
+                HStack(spacing: 0) {
+                    Text(captionText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.black.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.black.opacity(0.4))
+                        .frame(width: 32, height: 32)
+                }
+            } else {
+                // State 1: Empty - appealing generate prompt
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.accent)
+                    
+                    Text("Generate Love Note")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(BabyTownTheme.accent)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(BabyTownTheme.accent.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(BabyTownTheme.accent.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Collage

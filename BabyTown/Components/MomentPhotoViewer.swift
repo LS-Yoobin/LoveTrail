@@ -11,8 +11,6 @@ struct MomentPhotoViewer: View {
     
     @State private var currentIndex: Int
     @State private var editMode = false
-    @State private var editingCaption = false
-    @State private var captionText = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var updatedMoments: [Moment]
     
@@ -51,6 +49,8 @@ struct MomentPhotoViewer: View {
                 Spacer()
                 if editMode {
                     editControls
+                } else if updatedMoments.count > 1 {
+                    photoPreviewStrip
                 }
             }
         }
@@ -106,37 +106,64 @@ struct MomentPhotoViewer: View {
         .padding(.horizontal, 20)
     }
     
+    // MARK: - Photo Preview Strip
+    
+    private var photoPreviewStrip: some View {
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(updatedMoments.enumerated()), id: \.element.id) { index, moment in
+                            thumbnailView(for: moment, at: index)
+                                .id(index)
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        currentIndex = index
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                }
+                .onChange(of: currentIndex) { _, newIndex in
+                    withAnimation {
+                        proxy.scrollTo(newIndex, anchor: .center)
+                    }
+                }
+            }
+        }
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0), Color.black.opacity(0.7)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .padding(.bottom, 20)
+    }
+    
+    private func thumbnailView(for moment: Moment, at index: Int) -> some View {
+        let isSelected = index == currentIndex
+        
+        return Image(uiImage: moment.thumbnail)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isSelected ? Color.white : Color.white.opacity(0.3), lineWidth: isSelected ? 3 : 1.5)
+            )
+            .scaleEffect(isSelected ? 1.1 : 1.0)
+            .shadow(color: .black.opacity(isSelected ? 0.5 : 0.3), radius: isSelected ? 8 : 4, y: 2)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+    
     // MARK: - Edit Controls
     
     private var editControls: some View {
         VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Caption")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.7))
-                
-                HStack {
-                    Text(currentMoment.caption ?? "Add Love Note or Spunky Will Bite")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    Button {
-                        captionText = currentMoment.caption ?? ""
-                        editingCaption = true
-                    } label: {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.15))
-                )
-            }
-            
             PhotosPicker(
                 selection: $selectedPhotos,
                 maxSelectionCount: 1,
@@ -159,55 +186,6 @@ struct MomentPhotoViewer: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
-        .sheet(isPresented: $editingCaption) {
-            captionEditorSheet
-        }
-    }
-    
-    // MARK: - Caption Editor
-    
-    private var captionEditorSheet: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Edit your love note")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.black)
-                    
-                    TextField("Type your caption here...", text: $captionText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 15))
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemGray6))
-                        )
-                        .lineLimit(3...6)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                
-                Spacer()
-            }
-            .navigationTitle("Edit Caption")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        editingCaption = false
-                    }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        updatedMoments[currentIndex].caption = captionText.isEmpty ? nil : captionText
-                        editingCaption = false
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-        }
-        .presentationDetents([.height(280)])
     }
     
     // MARK: - Photo Selection

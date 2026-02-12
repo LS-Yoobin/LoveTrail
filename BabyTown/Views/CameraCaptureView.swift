@@ -32,6 +32,9 @@ struct CameraCaptureView: View {
             VStack(spacing: 0) {
                 topBar
                 
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
                 if canCapture {
                     captureSection
                 } else {
@@ -40,16 +43,22 @@ struct CameraCaptureView: View {
                 
                 if hasUnreleasedToday && todaysCount > 0 {
                     manualReleaseButton
-                        .padding(.top, 16)
+                        .padding(.top, 12)
                 }
             }
             .background(
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(BabyTownTheme.background)
-                    .shadow(color: .black.opacity(0.15), radius: 20, y: -5)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.95, green: 0.26, blue: 0.35), Color(red: 0.88, green: 0.22, blue: 0.32)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .black.opacity(0.2), radius: 20, y: -5)
             )
         }
-        .presentationDetents([.height(280)])
+        .presentationDetents([.height(300)])
         .presentationDragIndicator(.visible)
         .sheet(isPresented: $showCamera) {
             CameraPickerView(image: $capturedImage)
@@ -64,119 +73,118 @@ struct CameraCaptureView: View {
     
     private var topBar: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Daily Polaroids")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
                 
                 Text("\(todaysCount) of \(dailyLimit) for today")
-                    .font(.system(size: 12))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
             }
             
             Spacer()
             
             Button(action: { dismiss() }) {
-                Text("Close")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.accent)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white.opacity(0.9))
             }
         }
         .padding(.horizontal, 24)
         .padding(.top, 20)
-        .padding(.bottom, 12)
+        .padding(.bottom, 16)
     }
     
     private var captureSection: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Capture a moment")
-                        .font(.system(size: 18, weight: .medium, design: .serif))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white)
                     
-                    Text("Photos reveal at 9:00 PM • Resets at 5:00 AM")
-                        .font(.system(size: 13))
-                        .foregroundStyle(BabyTownTheme.textSecondary)
+                    Text("Capture a moment")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
                 
-                Spacer()
+                Text("Photos reveal at 9:00 PM • Resets at 5:00 AM")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.leading, 40)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
+            .padding(.top, 16)
             
             Button {
                 showCamera = true
             } label: {
                 Text("Take Photo")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.88, green: 0.22, blue: 0.32))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 16)
                     .background(
                         Capsule()
-                            .fill(BabyTownTheme.accentGradient)
-                            .shadow(color: BabyTownTheme.buttonShadow, radius: 8, y: 3)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
                     )
             }
             .padding(.horizontal, 24)
             
             if showNotification {
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     HStack(spacing: 8) {
-                        Image(systemName: "clock.fill")
-                            .foregroundStyle(BabyTownTheme.accent)
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.white)
                         Text(notificationMessage)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(BabyTownTheme.textPrimary)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
                     }
                     Text("Take another photo if you'd like")
-                        .font(.system(size: 11))
-                        .foregroundStyle(BabyTownTheme.textSecondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(BabyTownTheme.accentSoft)
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(.white.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                        )
                 )
+                .padding(.horizontal, 24)
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.bottom, 20)
+        .padding(.bottom, 24)
     }
     
     private var limitReachedSection: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "heart.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.6))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("That's 5 for today")
-                    .font(.system(size: 18, weight: .medium, design: .serif))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white)
                 
-                Text("See you at 9:00 PM when your photos reveal\nLimit resets at 5:00 AM")
-                    .font(.system(size: 13))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(2)
+                Text("That's 5 for today")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             
-            Spacer()
+            Text("See you at 9:00 PM when your photos reveal\nLimit resets at 5:00 AM")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.vertical, 24)
     }
     
     private var manualReleaseButton: some View {
@@ -184,14 +192,14 @@ struct CameraCaptureView: View {
             releaseNow()
         } label: {
             Text("Add to Baby Town Now")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(BabyTownTheme.accent)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
                 .background(
                     Capsule()
-                        .strokeBorder(BabyTownTheme.accent, lineWidth: 1.5)
-                        .background(Capsule().fill(BabyTownTheme.accentSoft))
+                        .strokeBorder(.white, lineWidth: 2)
+                        .background(Capsule().fill(.white.opacity(0.15)))
                 )
         }
         .padding(.horizontal, 24)

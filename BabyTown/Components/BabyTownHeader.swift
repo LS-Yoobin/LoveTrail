@@ -2,19 +2,34 @@ import SwiftUI
 import Combine
 
 struct BabyTownHeader: View {
+    
+    var onSettingsTap: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "heart.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(BabyTownTheme.accent)
-
-            Text("Baby Town")
-                .font(.system(size: 22, weight: .light, design: .serif))
-                .foregroundStyle(BabyTownTheme.textPrimary)
+        ZStack {
+            Image("BabyTownLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 120)
+            
+            HStack {
+                if let onSettingsTap = onSettingsTap {
+                    Button {
+                        onSettingsTap()
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.leading, 8)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, maxHeight: 56)
         .background(BabyTownTheme.background.opacity(0.96))
     }
 }

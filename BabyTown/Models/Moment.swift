@@ -8,12 +8,14 @@ struct Moment: Identifiable, Codable {
     var placeName: String?
     var caption: String?
     var voiceNotePath: String?
+    var isPinned: Bool
+    var pinnedAt: Date?
     
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath
+        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, isPinned, pinnedAt
     }
     
-    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil) {
+    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil) {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
@@ -21,6 +23,8 @@ struct Moment: Identifiable, Codable {
         self.placeName = placeName
         self.caption = caption
         self.voiceNotePath = voiceNotePath
+        self.isPinned = isPinned
+        self.pinnedAt = pinnedAt
     }
     
     init(from decoder: Decoder) throws {
@@ -31,6 +35,8 @@ struct Moment: Identifiable, Codable {
         placeName = try container.decodeIfPresent(String.self, forKey: .placeName)
         caption = try container.decodeIfPresent(String.self, forKey: .caption)
         voiceNotePath = try container.decodeIfPresent(String.self, forKey: .voiceNotePath)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        pinnedAt = try container.decodeIfPresent(Date.self, forKey: .pinnedAt)
         
         if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
            let image = UIImage(data: thumbnailData) {
@@ -48,6 +54,8 @@ struct Moment: Identifiable, Codable {
         try container.encodeIfPresent(placeName, forKey: .placeName)
         try container.encodeIfPresent(caption, forKey: .caption)
         try container.encodeIfPresent(voiceNotePath, forKey: .voiceNotePath)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(pinnedAt, forKey: .pinnedAt)
         
         if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
             try container.encode(thumbnailData, forKey: .thumbnailData)

@@ -6,20 +6,27 @@ struct FullScreenPhotoViewer: View {
     let assets: [PHAsset]
     let initialIndex: Int
     let imageManager: PHCachingImageManager
+    var selectedAssets: Set<String>
+    var onToggleSelection: ((PHAsset) -> Void)?
     var onDismiss: () -> Void
 
     @State private var currentIndex: Int
     @State private var loadedImages: [String: UIImage] = [:]
+    @State private var showSelectButton = true
 
     init(
         assets: [PHAsset],
         initialIndex: Int,
         imageManager: PHCachingImageManager,
+        selectedAssets: Set<String> = [],
+        onToggleSelection: ((PHAsset) -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.assets = assets
         self.initialIndex = initialIndex
         self.imageManager = imageManager
+        self.selectedAssets = selectedAssets
+        self.onToggleSelection = onToggleSelection
         self.onDismiss = onDismiss
         _currentIndex = State(initialValue: initialIndex)
     }
@@ -39,8 +46,23 @@ struct FullScreenPhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showSelectButton.toggle()
+                }
+            }
 
-            closeButton
+            VStack {
+                closeButton
+                Spacer()
+                if showSelectButton, onToggleSelection != nil {
+                    selectButton
+                }
+            }
+            
+            if isCurrentPhotoSelected {
+                heartIndicator
+            }
         }
         .statusBarHidden(true)
     }
@@ -64,14 +86,67 @@ struct FullScreenPhotoViewer: View {
     // MARK: - Close
 
     private var closeButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 30))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white.opacity(0.85))
+        HStack {
+            Spacer()
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 30))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
         }
         .padding(.top, 12)
         .padding(.trailing, 20)
+        .opacity(showSelectButton ? 1 : 0)
+    }
+    
+    private var selectButton: some View {
+        Button {
+            if let asset = currentAsset {
+                onToggleSelection?(asset)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isCurrentPhotoSelected ? "heart.fill" : "heart")
+                    .font(.system(size: 16, weight: .semibold))
+                Text(isCurrentPhotoSelected ? "Deselect" : "Select")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 14)
+            .background(
+                Capsule()
+                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.white.opacity(0.2))
+                    .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+            )
+        }
+        .padding(.bottom, 40)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+    
+    private var heartIndicator: some View {
+        VStack {
+            HStack {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(BabyTownTheme.accent)
+                    .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+                    .padding(16)
+                Spacer()
+            }
+            Spacer()
+        }
+    }
+    
+    private var currentAsset: PHAsset? {
+        guard currentIndex < assets.count else { return nil }
+        return assets[currentIndex]
+    }
+    
+    private var isCurrentPhotoSelected: Bool {
+        guard let asset = currentAsset else { return false }
+        return selectedAssets.contains(asset.localIdentifier)
     }
 
     // MARK: - Loading

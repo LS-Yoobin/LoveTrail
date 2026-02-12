@@ -64,7 +64,7 @@ struct MemorySelectionCard: View {
             HStack(spacing: 6) {
                 Text(title)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(.black)
 
                 if isOptional {
                     Text("Optional")
@@ -81,7 +81,7 @@ struct MemorySelectionCard: View {
 
             Text(subtitle)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(.secondaryLabel))
+                .foregroundStyle(.black.opacity(0.6))
         }
     }
 

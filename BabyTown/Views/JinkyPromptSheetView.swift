@@ -40,7 +40,13 @@ struct JinkyPromptSheetView: View {
             
             continueButton
         }
-        .background(BabyTownTheme.background)
+        .background(
+            ZStack {
+                Color.red.opacity(0.75)
+                    .background(.ultraThinMaterial)
+            }
+            .ignoresSafeArea()
+        )
         .onAppear {
             promptOfDay = generator.getPromptOfTheDay()
             selectedPrompt = promptOfDay
@@ -54,7 +60,7 @@ struct JinkyPromptSheetView: View {
     
     private var handle: some View {
         RoundedRectangle(cornerRadius: 3)
-            .fill(Color(.systemGray4))
+            .fill(Color.white)
             .frame(width: 36, height: 5)
             .padding(.top, 12)
             .padding(.bottom, 8)
@@ -211,7 +217,7 @@ struct JinkyPromptSheetView: View {
             .padding(.bottom, 40)
         }
         .background(
-            BabyTownTheme.background
+            Color.red.opacity(0.75)
                 .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
         )
     }

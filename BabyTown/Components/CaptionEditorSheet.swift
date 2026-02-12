@@ -17,11 +17,12 @@ struct CaptionEditorSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Add a love note for this memory")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                     
                     TextField("Type your caption here...", text: $captionText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 15))
+                        .foregroundStyle(.white)
                         .padding(12)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
@@ -77,7 +78,7 @@ struct CaptionEditorSheet: View {
                     .foregroundStyle(BabyTownTheme.accent)
                 Text("Voice Love Note")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
             }
             
             HStack(spacing: 12) {

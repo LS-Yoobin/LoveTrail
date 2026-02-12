@@ -1,57 +1,44 @@
 import SwiftUI
 import Photos
 
-struct SelectPhotosView: View {
-
+struct PromptPhotoSelectionView: View {
+    
     @StateObject private var viewModel = SelectPhotosViewModel()
-    @State private var showAnimation = false
-    @State private var photoSelectedInViewer = false
     
     var onBack: () -> Void
-    var onSaveMoments: ([Moment]) -> Void
-
+    var onSavePhotos: ([PromptPhoto]) -> Void
+    
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     private let monthSymbols = Calendar.current.shortMonthSymbols
-
+    
     var body: some View {
         ZStack {
             BabyTownTheme.backgroundGradient.ignoresSafeArea()
-
+            
             VStack(spacing: 0) {
                 topBar
                 yearChips
                 monthChips
-
+                
                 Divider().padding(.horizontal, 20)
-
+                
                 content
             }
-
-            // Full-screen viewer
+            
             if let index = viewModel.viewerIndex {
                 FullScreenPhotoViewer(
                     assets: viewModel.assets,
                     initialIndex: index,
-                    imageManager: viewModel.imageManager,
-                    selectedAssets: viewModel.selectedAssets,
-                    onToggleSelection: { asset in
-                        viewModel.toggleSelection(asset)
-                        photoSelectedInViewer = true
-                    }
+                    imageManager: viewModel.imageManager
                 ) {
                     withAnimation(.easeOut(duration: 0.25)) {
                         viewModel.viewerIndex = nil
-                        if photoSelectedInViewer && !viewModel.selectionMode {
-                            viewModel.selectionMode = true
-                            photoSelectedInViewer = false
-                        }
                     }
                 }
                 .transition(.opacity)
                 .zIndex(1)
             }
             
-            // Floating Save Button
             if viewModel.selectionMode && viewModel.selectedCount > 0 {
                 VStack {
                     Spacer()
@@ -60,18 +47,11 @@ struct SelectPhotosView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(2)
             }
-            
-            // Heart Animation Overlay
-            if showAnimation {
-                HeartSaveAnimationOverlay {
-                    onBack()
-                }
-                .zIndex(3)
-            }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.viewerIndex != nil)
         .task {
             await viewModel.checkAuthorization()
+            viewModel.selectionMode = true
         }
         .onChange(of: viewModel.selectedYear) { _, _ in
             Task { await viewModel.fetchAssets() }
@@ -80,9 +60,9 @@ struct SelectPhotosView: View {
             Task { await viewModel.fetchAssets() }
         }
     }
-
+    
     // MARK: - Top Bar
-
+    
     private var topBar: some View {
         ZStack {
             HStack {
@@ -95,29 +75,16 @@ struct SelectPhotosView: View {
                     }
                     .foregroundStyle(BabyTownTheme.accent)
                 }
-
+                
                 Spacer()
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.selectionMode.toggle()
-                        if !viewModel.selectionMode {
-                            viewModel.selectedAssets.removeAll()
-                        }
-                    }
-                } label: {
-                    Text(viewModel.selectionMode ? "Cancel" : "Select")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(BabyTownTheme.accent)
-                }
             }
-
+            
             VStack(spacing: 2) {
                 Text("Select Photos")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(BabyTownTheme.textPrimary)
-
-                if viewModel.selectionMode && viewModel.selectedCount > 0 {
+                
+                if viewModel.selectedCount > 0 {
                     Text("\(viewModel.selectedCount) selected")
                         .font(.system(size: 11))
                         .foregroundStyle(BabyTownTheme.accent)
@@ -129,86 +96,68 @@ struct SelectPhotosView: View {
         .padding(.vertical, 12)
         .background(BabyTownTheme.background)
     }
-
+    
     // MARK: - Year Chips
-
+    
     private var yearChips: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.availableYears, id: \.self) { year in
-                        chipButton(
-                            label: String(year),
-                            isActive: viewModel.selectedYear == year
-                        ) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.availableYears, id: \.self) { year in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.selectedYear = year
                         }
-                        .id(year)
+                    } label: {
+                        Text(String(year))
+                            .font(.system(size: 14, weight: viewModel.selectedYear == year ? .semibold : .regular))
+                            .foregroundStyle(viewModel.selectedYear == year ? .white : BabyTownTheme.textPrimary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(viewModel.selectedYear == year ? BabyTownTheme.accentGradient : LinearGradient(colors: [Color(.systemGray6)], startPoint: .leading, endPoint: .trailing))
+                            )
                     }
                 }
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 20)
             .padding(.vertical, 8)
-            .onAppear {
-                proxy.scrollTo(viewModel.selectedYear, anchor: .center)
-            }
         }
     }
-
+    
     // MARK: - Month Chips
-
+    
     private var monthChips: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(1...12, id: \.self) { month in
-                        chipButton(
-                            label: monthSymbols[month - 1],
-                            isActive: viewModel.selectedMonth == month
-                        ) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(1...12, id: \.self) { month in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.selectedMonth = month
                         }
-                        .id(month)
+                    } label: {
+                        Text(monthSymbols[month - 1])
+                            .font(.system(size: 13, weight: viewModel.selectedMonth == month ? .semibold : .regular))
+                            .foregroundStyle(viewModel.selectedMonth == month ? .white : BabyTownTheme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(viewModel.selectedMonth == month ? BabyTownTheme.accentGradient : LinearGradient(colors: [Color(.systemGray6)], startPoint: .leading, endPoint: .trailing))
+                            )
                     }
                 }
-                .padding(.horizontal, 20)
             }
-            .padding(.bottom, 10)
-            .onAppear {
-                proxy.scrollTo(viewModel.selectedMonth, anchor: .center)
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
         }
     }
-
-    // MARK: - Chip
-
-    private func chipButton(
-        label: String,
-        isActive: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                .foregroundStyle(isActive ? .white : BabyTownTheme.textPrimary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(isActive
-                              ? AnyShapeStyle(BabyTownTheme.accentGradient)
-                              : AnyShapeStyle(BabyTownTheme.accentSoft))
-                )
-        }
-        .animation(.easeInOut(duration: 0.2), value: isActive)
-    }
-
+    
     // MARK: - Content
-
+    
     @ViewBuilder
     private var content: some View {
-        if viewModel.authorizationStatus == .denied
-            || viewModel.authorizationStatus == .restricted {
+        if viewModel.authorizationStatus == .denied || viewModel.authorizationStatus == .restricted {
             deniedState
         } else if viewModel.isLoading {
             loadingState
@@ -218,9 +167,9 @@ struct SelectPhotosView: View {
             photoGrid
         }
     }
-
+    
     // MARK: - Photo Grid
-
+    
     private var photoGrid: some View {
         ScrollView(showsIndicators: false) {
             LazyVGrid(columns: columns, spacing: 2) {
@@ -247,7 +196,7 @@ struct SelectPhotosView: View {
                 }
             }
             .padding(2)
-            .padding(.bottom, viewModel.selectionMode && viewModel.selectedCount > 0 ? 100 : 0)
+            .padding(.bottom, viewModel.selectedCount > 0 ? 100 : 0)
         }
     }
     
@@ -256,11 +205,8 @@ struct SelectPhotosView: View {
     private var saveButton: some View {
         Button {
             Task {
-                let moments = await viewModel.saveMoments()
-                onSaveMoments(moments)
-                withAnimation(.easeIn(duration: 0.2)) {
-                    showAnimation = true
-                }
+                let promptPhotos = await convertToPromptPhotos()
+                onSavePhotos(promptPhotos)
             }
         } label: {
             HStack(spacing: 8) {
@@ -272,7 +218,7 @@ struct SelectPhotosView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16, weight: .semibold))
                 }
-                Text("Save (\(viewModel.selectedCount))")
+                Text("Continue (\(viewModel.selectedCount))")
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.white)
@@ -287,71 +233,108 @@ struct SelectPhotosView: View {
         .disabled(viewModel.isSaving)
         .padding(.bottom, 40)
     }
-
+    
     // MARK: - States
-
+    
     private var loadingState: some View {
-        VStack {
-            Spacer()
+        VStack(spacing: 16) {
             ProgressView()
+                .scaleEffect(1.2)
                 .tint(BabyTownTheme.accent)
-                .scaleEffect(1.1)
-            Text("Loading photos…")
-                .font(.system(size: 13))
-                .foregroundStyle(BabyTownTheme.textTertiary)
-                .padding(.top, 10)
-            Spacer()
-        }
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 38, weight: .thin))
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.3))
-            Text("No photos this month")
+            Text("Loading photos...")
                 .font(.system(size: 15))
                 .foregroundStyle(BabyTownTheme.textSecondary)
-            Text("Try a different month or year")
-                .font(.system(size: 13))
-                .foregroundStyle(BabyTownTheme.textTertiary)
-            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-
-    private var deniedState: some View {
+    
+    private var emptyState: some View {
         VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "lock.shield")
-                .font(.system(size: 38, weight: .thin))
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
-            Text("Photo Access Needed")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(BabyTownTheme.textPrimary)
-            Text("Allow photo access in Settings\nso we can build your timeline.")
-                .font(.system(size: 14))
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 48))
+                .foregroundStyle(BabyTownTheme.textTertiary)
+            Text("No photos for this period")
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(BabyTownTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private var deniedState: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "photo.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(BabyTownTheme.accent)
+            
+            VStack(spacing: 8) {
+                Text("Photos Access Required")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                
+                Text("Please enable photo access in Settings to select photos for your memory.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
             Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             } label: {
                 Text("Open Settings")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 28)
+                    .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Capsule().fill(BabyTownTheme.accentGradient))
+                    .background(
+                        Capsule()
+                            .fill(BabyTownTheme.accentGradient)
+                    )
             }
-            .padding(.top, 4)
-            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
+    }
+    
+    // MARK: - Helpers
+    
+    private func convertToPromptPhotos() async -> [PromptPhoto] {
+        var promptPhotos: [PromptPhoto] = []
+        
+        for assetId in viewModel.selectedAssets {
+            if let asset = viewModel.assets.first(where: { $0.localIdentifier == assetId }) {
+                let image = await loadFullImage(for: asset)
+                if let image = image {
+                    let photo = PromptPhoto(
+                        dateTaken: asset.creationDate ?? Date(),
+                        thumbnail: image,
+                        assetIdentifier: assetId
+                    )
+                    promptPhotos.append(photo)
+                }
+            }
+        }
+        
+        return promptPhotos.sorted { $0.dateTaken > $1.dateTaken }
+    }
+    
+    private func loadFullImage(for asset: PHAsset) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            let options = PHImageRequestOptions()
+            options.deliveryMode = .highQualityFormat
+            options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
+            
+            viewModel.imageManager.requestImage(
+                for: asset,
+                targetSize: CGSize(width: 1000, height: 1000),
+                contentMode: .aspectFill,
+                options: options
+            ) { image, _ in
+                continuation.resume(returning: image)
+            }
         }
     }
-}
-
-#Preview {
-    SelectPhotosView(onBack: {}, onSaveMoments: { _ in })
 }

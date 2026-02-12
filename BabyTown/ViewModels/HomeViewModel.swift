@@ -32,7 +32,12 @@ final class HomeViewModel: ObservableObject {
     private var isInitializing = true
 
     var daySections: [DaySection] {
-        DaySection.grouped(from: moments)
+        let unpinnedMoments = moments.filter { !$0.isPinned }
+        return DaySection.grouped(from: unpinnedMoments)
+    }
+    
+    var pinnedMoments: [Moment] {
+        moments.filter { $0.isPinned }.sorted { ($0.pinnedAt ?? Date.distantPast) > ($1.pinnedAt ?? Date.distantPast) }
     }
 
     var isEmpty: Bool {
@@ -105,18 +110,57 @@ final class HomeViewModel: ObservableObject {
     
     func updateCaption(for momentId: UUID, caption: String, voiceNotePath: String? = nil) {
         if let index = moments.firstIndex(where: { $0.id == momentId }) {
-            var updatedMoment = moments[index]
+            var newMoments = moments
+            var updatedMoment = newMoments[index]
             updatedMoment.caption = caption.isEmpty ? nil : caption
             if let voicePath = voiceNotePath {
                 updatedMoment.voiceNotePath = voicePath
             }
-            moments[index] = updatedMoment
+            newMoments[index] = updatedMoment
+            moments = newMoments
         }
     }
     
     func addPromptMemory(_ memory: PromptMemory) {
         promptMemories.append(memory)
         promptMemories.sort { $0.date > $1.date }
+    }
+    
+    func removeMoments(from section: DaySection) {
+        let momentIdsToRemove = Set(section.moments.map { $0.id })
+        moments.removeAll { momentIdsToRemove.contains($0.id) }
+    }
+    
+    func togglePin(for section: DaySection) {
+        guard let firstMoment = section.moments.first else { return }
+        
+        if firstMoment.isPinned {
+            moments.removeAll { $0.id == firstMoment.id }
+        } else {
+            let pinnedCopy = Moment(
+                id: UUID(),
+                dateTaken: firstMoment.dateTaken,
+                assetIdentifier: firstMoment.assetIdentifier,
+                thumbnail: firstMoment.thumbnail,
+                placeName: firstMoment.placeName,
+                caption: firstMoment.caption,
+                voiceNotePath: firstMoment.voiceNotePath,
+                isPinned: true,
+                pinnedAt: Date()
+            )
+            moments.append(pinnedCopy)
+        }
+    }
+    
+    func unpinMoment(_ moment: Moment) {
+        guard let index = moments.firstIndex(where: { $0.id == moment.id }) else { return }
+        
+        var newMoments = moments
+        var updatedMoment = newMoments[index]
+        updatedMoment.isPinned = false
+        updatedMoment.pinnedAt = nil
+        newMoments[index] = updatedMoment
+        moments = newMoments
     }
     
     func releasePolaroids(_ entries: [PolaroidEntry]) {

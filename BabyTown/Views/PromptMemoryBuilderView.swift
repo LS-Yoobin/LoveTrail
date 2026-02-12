@@ -13,8 +13,7 @@ struct PromptMemoryBuilderView: View {
     @State private var placeName: String = "Somewhere with you"
     @State private var loveNote: String = ""
     @State private var selectedPhotos: [PromptPhoto] = []
-    @State private var showPhotoPicker = false
-    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showPhotoSelection = false
     @State private var isLoadingLocation = false
     @FocusState private var isNoteFieldFocused: Bool
     
@@ -48,10 +47,22 @@ struct PromptMemoryBuilderView: View {
         .safeAreaInset(edge: .bottom) {
             saveButton
         }
-        .onChange(of: photoPickerItems) { _, newItems in
-            Task {
-                await loadPhotos(from: newItems)
-            }
+        .navigationDestination(isPresented: $showPhotoSelection) {
+            PromptPhotoSelectionView(
+                onBack: {
+                    showPhotoSelection = false
+                },
+                onSavePhotos: { photos in
+                    selectedPhotos = photos
+                    if let firstPhoto = photos.first {
+                        Task {
+                            await extractLocationFromAsset(firstPhoto.assetIdentifier)
+                        }
+                    }
+                    showPhotoSelection = false
+                }
+            )
+            .navigationBarBackButtonHidden(true)
         }
     }
     
@@ -190,11 +201,9 @@ struct PromptMemoryBuilderView: View {
     }
     
     private var selectPhotosButton: some View {
-        PhotosPicker(
-            selection: $photoPickerItems,
-            maxSelectionCount: 10,
-            matching: .images
-        ) {
+        Button {
+            showPhotoSelection = true
+        } label: {
             HStack {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 18))
@@ -244,11 +253,9 @@ struct PromptMemoryBuilderView: View {
     }
     
     private var addMoreButton: some View {
-        PhotosPicker(
-            selection: $photoPickerItems,
-            maxSelectionCount: 10,
-            matching: .images
-        ) {
+        Button {
+            showPhotoSelection = true
+        } label: {
             HStack {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 16))
@@ -294,49 +301,23 @@ struct PromptMemoryBuilderView: View {
     
     // MARK: - Actions
     
-    private func loadPhotos(from items: [PhotosPickerItem]) async {
-        for item in items {
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
-                
-                let photo = PromptPhoto(
-                    dateTaken: selectedDate,
-                    thumbnail: image,
-                    assetIdentifier: nil
-                )
-                
-                if !selectedPhotos.contains(where: { $0.id == photo.id }) {
-                    selectedPhotos.append(photo)
-                }
-            }
-        }
-        
-        if selectedPhotos.count == 1 {
-            await extractLocation(from: items.first)
-        }
-        
-        photoPickerItems = []
-    }
-    
-    private func extractLocation(from item: PhotosPickerItem?) async {
-        guard let item = item else { return }
+    private func extractLocationFromAsset(_ assetIdentifier: String?) async {
+        guard let assetId = assetIdentifier else { return }
         
         isLoadingLocation = true
         
-        if let assetId = item.itemIdentifier {
-            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
-            if let asset = fetchResult.firstObject, let location = asset.location {
-                let geocoder = CLGeocoder()
-                if let placemark = try? await geocoder.reverseGeocodeLocation(location).first {
-                    let name = placemark.name
-                        ?? placemark.locality
-                        ?? placemark.subLocality
-                        ?? placemark.administrativeArea
-                    
-                    if let name = name {
-                        await MainActor.run {
-                            placeName = name
-                        }
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+        if let asset = fetchResult.firstObject, let location = asset.location {
+            let geocoder = CLGeocoder()
+            if let placemark = try? await geocoder.reverseGeocodeLocation(location).first {
+                let name = placemark.name
+                    ?? placemark.locality
+                    ?? placemark.subLocality
+                    ?? placemark.administrativeArea
+                
+                if let name = name {
+                    await MainActor.run {
+                        placeName = name
                     }
                 }
             }

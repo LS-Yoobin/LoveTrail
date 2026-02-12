@@ -57,7 +57,7 @@ struct HowItWorksView: View {
         VStack(spacing: 14) {
             Text("Just pick photos of us.")
                 .font(.system(size: 25, weight: .light, design: .serif))
-                .foregroundStyle(Color(.darkGray))
+                .foregroundStyle(.white)
 
             Text("Baby Town does the rest.")
                 .font(.system(size: 25, weight: .light, design: .serif))

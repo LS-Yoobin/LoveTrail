@@ -44,11 +44,11 @@ struct FirstMemoriesView: View {
         VStack(spacing: 6) {
             Text("Your First Memories")
                 .font(.system(size: 26, weight: .light, design: .serif))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
 
             Text("Choose the photos that mean the most")
                 .font(.system(size: 14))
-                .foregroundStyle(Color(.secondaryLabel))
+                .foregroundStyle(.white)
         }
         .padding(.top, 28)
         .padding(.bottom, 20)
