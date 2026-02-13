@@ -18,8 +18,9 @@ struct SelectPhotosView: View {
     private let monthSymbols = Calendar.current.shortMonthSymbols
 
     var body: some View {
-        ZStack {
-            BabyTownTheme.backgroundGradient.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                BabyTownTheme.backgroundGradient.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 topBar
@@ -80,8 +81,8 @@ struct SelectPhotosView: View {
                 }
                 .zIndex(3)
             }
-        }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.viewerIndex != nil)
+            }
+            .animation(.easeInOut(duration: 0.25), value: viewModel.viewerIndex != nil)
         .task {
             await viewModel.checkAuthorization()
         }
@@ -106,6 +107,7 @@ struct SelectPhotosView: View {
                 )
                 .navigationBarBackButtonHidden(true)
             }
+        }
         }
     }
 
@@ -135,8 +137,14 @@ struct SelectPhotosView: View {
                     }
                 } label: {
                     Text(viewModel.selectionMode ? "Cancel" : "Select")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(BabyTownTheme.accent)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(viewModel.selectionMode ? BabyTownTheme.accentGradient : LinearGradient(colors: [.blue], startPoint: .leading, endPoint: .trailing))
+                        )
                 }
             }
 
@@ -284,19 +292,30 @@ struct SelectPhotosView: View {
     private var saveButton: some View {
         Button {
             Task {
-                if selectedPrompt != nil {
-                    // For prompt flow, convert selected photos to PromptPhotos and navigate to builder
-                    selectedPhotosForPrompt = await viewModel.convertToPromptPhotos()
-                    showPromptMemoryBuilder = true
+                if let prompt = selectedPrompt {
+                    // For prompt flow, create prompt memory and save directly
+                    let promptPhotos = await viewModel.convertToPromptPhotos()
+                    
+                    // Use the earliest photo's date for proper timeline placement
+                    let memoryDate = promptPhotos.map { $0.dateTaken }.min() ?? Date()
+                    
+                    let memory = PromptMemory(
+                        promptText: prompt.text,
+                        date: memoryDate,
+                        placeName: nil,
+                        loveNote: "",
+                        photos: promptPhotos
+                    )
+                    onSavePromptMemory?(memory)
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        showAnimation = true
+                    }
                 } else {
                     // For regular flow, save as Moments
                     let moments = await viewModel.saveMoments()
                     onSaveMoments(moments)
                     withAnimation(.easeIn(duration: 0.2)) {
                         showAnimation = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        onBack()
                     }
                 }
             }
@@ -314,13 +333,14 @@ struct SelectPhotosView: View {
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 32)
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 Capsule()
                     .fill(BabyTownTheme.accentGradient)
                     .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 12, y: 6)
             )
+            .padding(.horizontal, 32)
         }
         .disabled(viewModel.isSaving)
         .padding(.bottom, 40)
@@ -395,11 +415,11 @@ struct SelectPhotosView: View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(BabyTownTheme.accent)
+                .foregroundStyle(.white)
             
             Text(prompt.text)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(BabyTownTheme.textPrimary)
+                .foregroundStyle(.white)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             
@@ -409,7 +429,7 @@ struct SelectPhotosView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.white)
+                .fill(Color(red: 0.95, green: 0.3, blue: 0.35))
                 .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
         )
         .padding(.horizontal, 16)

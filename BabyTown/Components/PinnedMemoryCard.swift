@@ -18,7 +18,6 @@ struct PinnedMemoryCard: View {
             .background(
                 RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
                     .fill(BabyTownTheme.cardBackground)
-                    .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 3)
             )
             .contentShape(Rectangle())
             .onTapGesture {
@@ -81,6 +80,13 @@ struct PinnedMemoryCard: View {
 
     private var textArea: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if let promptText = moment.promptText {
+                Text(promptText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .lineLimit(2)
+            }
+            
             Text(formattedDate)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(BabyTownTheme.textPrimary)

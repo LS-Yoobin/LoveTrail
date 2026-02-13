@@ -61,13 +61,14 @@ struct ProcessingMemoryCard: View {
             }
             .padding(16)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.3, green: 0.2, blue: 0.4),
-                            Color(red: 0.2, green: 0.15, blue: 0.3)
+                            Color(red: 0.95, green: 0.3, blue: 0.35),
+                            Color(red: 0.88, green: 0.22, blue: 0.32)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

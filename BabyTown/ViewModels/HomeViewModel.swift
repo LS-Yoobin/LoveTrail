@@ -29,7 +29,9 @@ final class HomeViewModel: ObservableObject {
     
     let polaroidStore: LocalPolaroidStore
     private var releaseTimer: Timer?
+    private var periodicCheckTimer: Timer?
     private var isInitializing = true
+    private var cancellables = Set<AnyCancellable>()
 
     var daySections: [DaySection] {
         let unpinnedMoments = moments.filter { !$0.isPinned }
@@ -65,10 +67,22 @@ final class HomeViewModel: ObservableObject {
         }
         
         isInitializing = false
+        
+        setupPolaroidStoreObserver()
     }
     
     deinit {
         releaseTimer?.invalidate()
+        periodicCheckTimer?.invalidate()
+        cancellables.removeAll()
+    }
+    
+    private func setupPolaroidStoreObserver() {
+        polaroidStore.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
     
     func checkAndReleasePhotos() {
@@ -78,6 +92,7 @@ final class HomeViewModel: ObservableObject {
         }
         checkAndUnlockMoments()
         scheduleNextReleaseCheck()
+        setupPeriodicUnlockCheck()
     }
     
     private func checkAndUnlockMoments() {
@@ -117,10 +132,44 @@ final class HomeViewModel: ObservableObject {
         let now = Date()
         let unlockedMemories = polaroidStore.processingMemories.filter { $0.unlockTime <= now }
         
-        for memory in unlockedMemories {
-            if let entry = polaroidStore.entries.first(where: { $0.id == memory.id }) {
-                releasePolaroids([entry])
-                polaroidStore.removeProcessingMemory(memory.id)
+        if !unlockedMemories.isEmpty {
+            var entriesToRelease: [PolaroidEntry] = []
+            
+            for memory in unlockedMemories {
+                if let entry = polaroidStore.entries.first(where: { $0.id == memory.id }) {
+                    entriesToRelease.append(entry)
+                    polaroidStore.removeProcessingMemory(memory.id)
+                }
+            }
+            
+            // Mark entries as released (automatically at 9:00 PM)
+            if !entriesToRelease.isEmpty {
+                polaroidStore.releaseEntries(entriesToRelease)
+                releasePolaroids(entriesToRelease)
+            }
+            
+            // Force UI refresh
+            objectWillChange.send()
+        }
+    }
+    
+    private func setupPeriodicUnlockCheck() {
+        periodicCheckTimer?.invalidate()
+        
+        // Only set up periodic checks if there are processing memories
+        guard !polaroidStore.processingMemories.isEmpty else { return }
+        
+        // Check every minute for unlocks to ensure smooth UI transition
+        periodicCheckTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.checkAndUnlockMoments()
+                
+                // Stop periodic checks if no more processing memories
+                if self.polaroidStore.processingMemories.isEmpty {
+                    self.periodicCheckTimer?.invalidate()
+                    self.periodicCheckTimer = nil
+                }
             }
         }
     }

@@ -13,7 +13,9 @@ struct HomeView: View {
     var onSelectPhotos: () -> Void
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
     var onResetApp: (() -> Void)? = nil
+    var onReplayStory: (() -> Void)? = nil
     @Binding var selectedPrompt: PromptItem?
+    var onMemoriesAdded: (() -> Void)? = nil
     
     @State private var showCameraSheet = false
     @State private var showCameraFullScreen = false
@@ -26,6 +28,9 @@ struct HomeView: View {
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
     @State private var showPromptSheet = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var showUpButton = false
+    @State private var scrollToNewMemory = false
 
     init(
         pinnedFirstMet: UIImage?,
@@ -34,6 +39,7 @@ struct HomeView: View {
         onSelectPhotos: @escaping () -> Void,
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void,
         onResetApp: (() -> Void)? = nil,
+        onReplayStory: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
@@ -44,6 +50,7 @@ struct HomeView: View {
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
+        self.onReplayStory = onReplayStory
         _selectedPrompt = selectedPrompt
     }
 
@@ -52,20 +59,28 @@ struct HomeView: View {
         onSelectPhotos: @escaping () -> Void = {},
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void = { _, _ in },
         onResetApp: (() -> Void)? = nil,
+        onReplayStory: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
+        self.onReplayStory = onReplayStory
         _selectedPrompt = selectedPrompt
     }
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 BabyTownTheme.backgroundGradient
                     .ignoresSafeArea()
+                
+                LoopingVideoPlayer(videoName: "transparent_flowers")
+                    .frame(height: 300)
+                    .opacity(0.4)
+                    .allowsHitTesting(false)
+                    .offset(y: 50)
 
                 VStack(spacing: 0) {
                     BabyTownHeader(onSettingsTap: {
@@ -78,35 +93,69 @@ struct HomeView: View {
                         }
                     )
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        pinnedSection
-                        divider
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 28) {
+                            pinnedSection
+                            divider
 
-                        if viewModel.isEmpty && viewModel.promptMemories.isEmpty {
-                            emptyState
-                        } else {
-                            timelineSection
+                            if viewModel.isEmpty && viewModel.promptMemories.isEmpty {
+                                emptyState
+                            } else {
+                                timelineSection
+                            }
+                        }
+                        .padding(.top, 18)
+                        .padding(.bottom, 100)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ScrollOffsetPreferenceKey.self,
+                                    value: geo.frame(in: .named("scroll")).minY
+                                )
+                            }
+                        )
+                    }
+                    .coordinateSpace(name: "scroll")
+                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                        scrollOffset = value
+                        showUpButton = value < -100
+                    }
+                    .onChange(of: scrollToNewMemory) { _, newValue in
+                        if newValue {
+                            withAnimation {
+                                proxy.scrollTo("timeline", anchor: .top)
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                scrollToNewMemory = false
+                            }
                         }
                     }
-                    .padding(.top, 18)
-                    .padding(.bottom, 100)
                 }
             }
-            
-            VStack {
-                Spacer()
-                GeometryReader { geometry in
-                    GIFImageView(gifName: "TransparentFlowers")
-                        .frame(width: geometry.size.width, height: geometry.size.width * 0.5)
-                        .position(x: geometry.size.width / 2, y: geometry.size.height)
-                }
-                .frame(height: 0)
-                .allowsHitTesting(false)
+            .onAppear {
+                viewModel.checkAndReleasePhotos()
             }
-            .ignoresSafeArea()
+            .onChange(of: viewModel.moments.count) { oldCount, newCount in
+                if newCount > oldCount {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        scrollToNewMemory = true
+                    }
+                }
+            }
+            .onChange(of: viewModel.promptMemories.count) { oldCount, newCount in
+                if newCount > oldCount {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        scrollToNewMemory = true
+                    }
+                }
+            }
             
             cameraButton
+            
+            if showUpButton {
+                upButton
+            }
             
             if let viewerType = showingPinnedViewer {
                 FullScreenPinnedMemoryViewer(
@@ -177,9 +226,14 @@ struct HomeView: View {
             )
         }
         .sheet(isPresented: $showSettings) {
-            SettingsSheet(onResetApp: {
-                onResetApp?()
-            })
+            SettingsSheet(
+                onResetApp: {
+                    onResetApp?()
+                },
+                onReplayStory: {
+                    onReplayStory?()
+                }
+            )
         }
         .fullScreenCover(isPresented: $showSearch) {
             MemorySearchView(
@@ -247,6 +301,7 @@ struct HomeView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
                 }
             } else {
                 Text("No pinned memories yet")
@@ -264,10 +319,10 @@ struct HomeView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(.black.opacity(0.9))
             Text(text)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.black)
             Spacer()
         }
     }
@@ -285,6 +340,7 @@ struct HomeView: View {
         VStack(spacing: 12) {
             sectionLabel("Jinky Adventures", icon: "heart.text.square")
                 .padding(.horizontal, 20)
+                .id("timeline")
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
@@ -295,45 +351,65 @@ struct HomeView: View {
                     ForEach(Array(combinedTimelineItems.enumerated()), id: \.offset) { index, item in
                         switch item {
                         case .daySection(let section):
-                            DayClusterCard(
-                                section: section,
-                                onOpenPhoto: { moment, allMoments in
-                                    viewerMoments = allMoments
-                                    if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                        viewerInitialIndex = idx
+                            VStack(spacing: 16) {
+                                DayClusterCard(
+                                    section: section,
+                                    onOpenPhoto: { moment, allMoments in
+                                        viewerMoments = allMoments
+                                        if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                            viewerInitialIndex = idx
+                                        }
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            showingMomentViewer = true
+                                        }
+                                    },
+                                    onEditCaption: { momentId, caption, voiceNotePath in
+                                        viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                                    },
+                                    onRemove: { section in
+                                        withAnimation {
+                                            viewModel.removeMoments(from: section)
+                                        }
+                                    },
+                                    onTogglePin: { section in
+                                        withAnimation {
+                                            viewModel.togglePin(for: section)
+                                        }
+                                    },
+                                    onAddPhotos: { section, images in
+                                        viewModel.addPhotosToMemory(section: section, images: images)
+                                    },
+                                    onRemovePhoto: { section, momentId in
+                                        viewModel.removePhotoFromMemory(section: section, momentId: momentId)
                                     }
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        showingMomentViewer = true
+                                )
+                                .padding(
+                                    .leading,
+                                    index.isMultiple(of: 2) ? 20 : 46
+                                )
+                                .padding(
+                                    .trailing,
+                                    index.isMultiple(of: 2) ? 46 : 20
+                                )
+                                
+                                // Show "The Beginning..." narrative after the last timeline item
+                                if index == combinedTimelineItems.count - 1 {
+                                    HStack(spacing: 8) {
+                                        HeartbeatIconView()
+                                        
+                                        TypingTextView(
+                                            text: "The Beginning...",
+                                            font: .system(size: 15, weight: .medium, design: .serif),
+                                            color: BabyTownTheme.textPrimary.opacity(0.85)
+                                        )
+                                        
+                                        Spacer()
                                     }
-                                },
-                                onEditCaption: { momentId, caption, voiceNotePath in
-                                    viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
-                                },
-                                onRemove: { section in
-                                    withAnimation {
-                                        viewModel.removeMoments(from: section)
-                                    }
-                                },
-                                onTogglePin: { section in
-                                    withAnimation {
-                                        viewModel.togglePin(for: section)
-                                    }
-                                },
-                                onAddPhotos: { section, images in
-                                    viewModel.addPhotosToMemory(section: section, images: images)
-                                },
-                                onRemovePhoto: { section, momentId in
-                                    viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                                    .padding(.leading, index.isMultiple(of: 2) ? 32 : 58)
+                                    .padding(.top, 8)
                                 }
-                            )
-                            .padding(
-                                .leading,
-                                index.isMultiple(of: 2) ? 20 : 46
-                            )
-                            .padding(
-                                .trailing,
-                                index.isMultiple(of: 2) ? 46 : 20
-                            )
+                            }
+                            
                             
                         case .promptMemory(let memory):
                             PromptMemoryCard(
@@ -402,7 +478,28 @@ struct HomeView: View {
         items += viewModel.promptMemories.map { .promptMemory($0) }
         items += viewModel.polaroidStore.processingMemories.map { .processingMemory($0) }
         
-        return items.sorted { $0.date > $1.date }
+        // Sort with processing memories at the top until 9:00 PM
+        return items.sorted { item1, item2 in
+            let isProcessing1 = isProcessingMemory(item1)
+            let isProcessing2 = isProcessingMemory(item2)
+            
+            // If one is processing and the other isn't, processing comes first
+            if isProcessing1 && !isProcessing2 {
+                return true
+            } else if !isProcessing1 && isProcessing2 {
+                return false
+            }
+            
+            // Otherwise sort by date (newest first)
+            return item1.date > item2.date
+        }
+    }
+    
+    private func isProcessingMemory(_ item: TimelineItem) -> Bool {
+        if case .processingMemory = item {
+            return true
+        }
+        return false
     }
 
     // MARK: - Empty State
@@ -456,6 +553,32 @@ struct HomeView: View {
         }
         .ignoresSafeArea()
     }
+    
+    private var upButton: some View {
+        VStack {
+            HStack {
+                Button {
+                    scrollToNewMemory = true
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.white)
+                        .background(
+                            Circle()
+                                .fill(BabyTownTheme.accentGradient)
+                                .frame(width: 50, height: 50)
+                        )
+                        .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 8, y: 4)
+                }
+                .padding(.leading, 20)
+                .padding(.bottom, 100)
+                
+                Spacer()
+            }
+            
+            Spacer()
+        }
+    }
 }
 
 // MARK: - Pulsing Heart (Empty State)
@@ -479,6 +602,15 @@ private struct PulsingHeartView: View {
                     scale = 1.18
                 }
             }
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

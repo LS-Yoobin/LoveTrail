@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7A455F932F3EBD2700443248 /* transparent flowers gif2.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 7A455F922F3EBD2700443248 /* transparent flowers gif2.mp4 */; };
 		7A9F6B202F3E7AC900664BD9 /* transparent flowers gif.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */; };
 		7A9F6B222F3E7AE100664BD9 /* heart.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B212F3E7AE100664BD9 /* heart.gif */; };
 		7A9F6B2A2F3E8C3300664BD9 /* babytown font.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B292F3E8C3300664BD9 /* babytown font.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		7A455F922F3EBD2700443248 /* transparent flowers gif2.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "transparent flowers gif2.mp4"; sourceTree = "<group>"; };
 		7A9F69342F3E5CE500664BD9 /* BabyTown.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabyTown.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "transparent flowers gif.gif"; sourceTree = "<group>"; };
 		7A9F6B212F3E7AE100664BD9 /* heart.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = heart.gif; sourceTree = "<group>"; };
@@ -61,6 +63,7 @@
 				7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */,
 				7A9F6B212F3E7AE100664BD9 /* heart.gif */,
 				7A9F6B292F3E8C3300664BD9 /* babytown font.png */,
+				7A455F922F3EBD2700443248 /* transparent flowers gif2.mp4 */,
 			);
 			path = Animatiooons;
 			sourceTree = "<group>";
@@ -130,6 +133,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A9F6B222F3E7AE100664BD9 /* heart.gif in Resources */,
+				7A455F932F3EBD2700443248 /* transparent flowers gif2.mp4 in Resources */,
 				7A9F6B202F3E7AC900664BD9 /* transparent flowers gif.gif in Resources */,
 				7A9F6B2A2F3E8C3300664BD9 /* babytown font.png in Resources */,
 			);

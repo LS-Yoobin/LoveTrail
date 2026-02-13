@@ -222,13 +222,14 @@ struct PromptPhotoSelectionView: View {
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 32)
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 Capsule()
                     .fill(BabyTownTheme.accentGradient)
                     .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 12, y: 6)
             )
+            .padding(.horizontal, 32)
         }
         .disabled(viewModel.isSaving)
         .padding(.bottom, 40)

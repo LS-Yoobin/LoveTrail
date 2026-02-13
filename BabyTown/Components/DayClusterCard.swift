@@ -24,8 +24,8 @@ struct DayClusterCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                    .fill(BabyTownTheme.cardBackground)
-                    .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 4)
+                    .fill(BabyTownTheme.cardBackground.opacity(0.75))
+                    .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
             )
             
             connectorNode
@@ -167,6 +167,8 @@ struct DayClusterCard: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.black.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Spacer()
                     
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 14))

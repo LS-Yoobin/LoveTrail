@@ -7,7 +7,7 @@ enum BabyTownTheme {
     static let background = Color.white
     static let blush = Color.pink.opacity(0.15)
     static let backgroundGradient = LinearGradient(
-        colors: [background, blush],
+        colors: [background, background],
         startPoint: .top,
         endPoint: .bottom
     )
@@ -31,7 +31,7 @@ enum BabyTownTheme {
 
     // MARK: - Cards
 
-    static let cardBackground = Color.white
+    static let cardBackground = Color(red: 1.0, green: 0.94, blue: 0.96)
     static let cardShadow = Color.black.opacity(0.05)
     static let cardRadius: CGFloat = 18
 

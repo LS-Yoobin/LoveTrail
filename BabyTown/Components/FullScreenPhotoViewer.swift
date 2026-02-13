@@ -14,6 +14,7 @@ struct FullScreenPhotoViewer: View {
     @State private var currentIndex: Int
     @State private var loadedImages: [String: UIImage] = [:]
     @State private var showSelectButton = true
+    @State private var thumbnails: [String: UIImage] = [:]
 
     init(
         assets: [PHAsset],
@@ -68,9 +69,15 @@ struct FullScreenPhotoViewer: View {
                 .opacity(showSelectButton ? 1 : 0)
                 
                 Spacer()
+                
+                photoPreviewStrip
+                    .opacity(showSelectButton ? 1 : 0)
             }
         }
         .statusBarHidden(true)
+        .onAppear {
+            loadAllThumbnails()
+        }
     }
 
     // MARK: - Page
@@ -117,7 +124,7 @@ struct FullScreenPhotoViewer: View {
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.white.opacity(0.25))
+                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.blue)
                     .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
             )
         }
@@ -181,6 +188,78 @@ struct FullScreenPhotoViewer: View {
             DispatchQueue.main.async {
                 withAnimation(.easeIn(duration: 0.2)) {
                     loadedImages[id] = image
+                }
+            }
+        }
+    }
+    
+    // MARK: - Photo Preview Strip
+    
+    private var photoPreviewStrip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(assets.enumerated()), id: \.element.localIdentifier) { index, asset in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentIndex = index
+                            }
+                        } label: {
+                            ZStack {
+                                if let thumbnail = thumbnails[asset.localIdentifier] {
+                                    Image(uiImage: thumbnail)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                } else {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 60, height: 60)
+                                }
+                                
+                                if currentIndex == index {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(BabyTownTheme.accent, lineWidth: 3)
+                                        .frame(width: 60, height: 60)
+                                }
+                            }
+                        }
+                        .id(index)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+            .background(
+                Rectangle()
+                    .fill(Color.black.opacity(0.5))
+                    .ignoresSafeArea(edges: .bottom)
+            )
+            .onChange(of: currentIndex) { _, newIndex in
+                withAnimation {
+                    proxy.scrollTo(newIndex, anchor: .center)
+                }
+            }
+        }
+    }
+    
+    private func loadAllThumbnails() {
+        let opts = PHImageRequestOptions()
+        opts.deliveryMode = .opportunistic
+        opts.isNetworkAccessAllowed = true
+        
+        for asset in assets {
+            let id = asset.localIdentifier
+            imageManager.requestImage(
+                for: asset,
+                targetSize: CGSize(width: 120, height: 120),
+                contentMode: .aspectFill,
+                options: opts
+            ) { image, _ in
+                guard let image else { return }
+                DispatchQueue.main.async {
+                    thumbnails[id] = image
                 }
             }
         }

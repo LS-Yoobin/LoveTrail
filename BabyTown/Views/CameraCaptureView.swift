@@ -10,6 +10,7 @@ struct CameraCaptureView: View {
     @State private var capturedImage: UIImage?
     @State private var showNotification = false
     @State private var notificationMessage = ""
+    @State private var showReleaseConfirmation = false
     
     private let dailyLimit = 5
     
@@ -61,7 +62,7 @@ struct CameraCaptureView: View {
         .presentationDetents([.height(380)])
         .presentationDragIndicator(.visible)
         .fullScreenCover(isPresented: $showCamera) {
-            CustomCameraView(image: $capturedImage)
+            CustomCameraView(image: $capturedImage, canCapture: canCapture)
                 .ignoresSafeArea()
         }
         .onChange(of: capturedImage) { _, newImage in
@@ -190,7 +191,7 @@ struct CameraCaptureView: View {
     
     private var manualReleaseButton: some View {
         Button {
-            releaseNow()
+            showReleaseConfirmation = true
         } label: {
             Text("Add to Baby Town Now")
                 .font(.system(size: 15, weight: .semibold))
@@ -205,9 +206,28 @@ struct CameraCaptureView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 24)
+        .alert("Are you sure?", isPresented: $showReleaseConfirmation) {
+            Button("No", role: .cancel) { }
+            Button("Yes") {
+                releaseNow()
+            }
+        }
     }
     
     private func handleCapturedPhoto(_ image: UIImage) {
+        guard todaysCount < dailyLimit else {
+            notificationMessage = "Daily limit reached!"
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                showNotification = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                withAnimation {
+                    showNotification = false
+                }
+            }
+            return
+        }
+        
         guard polaroidStore.savePhoto(image) != nil else { return }
         
         let _ = dailyLimit - todaysCount

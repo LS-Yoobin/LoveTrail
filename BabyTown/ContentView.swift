@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var firstMetPhoto: UIImage?
     @State private var officialPhoto: UIImage?
     @State private var selectedPrompt: PromptItem?
+    @State private var shouldScrollToNewMemory = false
     @StateObject private var homeViewModel: HomeViewModel
     
     init() {
@@ -65,38 +66,71 @@ struct ContentView: View {
                     homeViewModel.pinnedFirstMet = firstMet
                     homeViewModel.pinnedOfficial = official
                     
-                    // Create pinned moments for the first two memories
+                    // Create moments for the first two memories
                     var onboardingMoments: [Moment] = []
                     let now = Date()
                     
-                    // Add "When we became official" as first pinned moment
-                    let officialMoment = Moment(
+                    // Add "When we became official" - both pinned and unpinned versions
+                    let officialMomentPinned = Moment(
                         id: UUID(),
                         dateTaken: now,
                         assetIdentifier: nil,
                         thumbnail: official,
-                        placeName: "When we became official",
+                        placeName: nil,
                         caption: nil,
                         voiceNotePath: nil,
+                        promptText: "When we became official",
                         isPinned: true,
                         pinnedAt: now
                     )
-                    onboardingMoments.append(officialMoment)
+                    onboardingMoments.append(officialMomentPinned)
                     
-                    // Add "When we first met" as second pinned moment (if provided)
+                    let officialMomentUnpinned = Moment(
+                        id: UUID(),
+                        dateTaken: now,
+                        assetIdentifier: nil,
+                        thumbnail: official,
+                        placeName: nil,
+                        caption: nil,
+                        voiceNotePath: nil,
+                        promptText: "When we became official",
+                        isPinned: false,
+                        pinnedAt: nil
+                    )
+                    onboardingMoments.append(officialMomentUnpinned)
+                    
+                    // Add "When we first met" - both pinned and unpinned versions (if provided)
                     if let firstMet = firstMet {
-                        let firstMetMoment = Moment(
+                        // Use a date 1 day earlier so it appears in a separate card
+                        let firstMetDate = now.addingTimeInterval(-86400)
+                        
+                        let firstMetMomentPinned = Moment(
                             id: UUID(),
-                            dateTaken: now.addingTimeInterval(-1), // Slightly earlier so it appears second
+                            dateTaken: firstMetDate,
                             assetIdentifier: nil,
                             thumbnail: firstMet,
-                            placeName: "When we first met",
+                            placeName: nil,
                             caption: nil,
                             voiceNotePath: nil,
+                            promptText: "When we first met",
                             isPinned: true,
                             pinnedAt: now.addingTimeInterval(-1)
                         )
-                        onboardingMoments.append(firstMetMoment)
+                        onboardingMoments.append(firstMetMomentPinned)
+                        
+                        let firstMetMomentUnpinned = Moment(
+                            id: UUID(),
+                            dateTaken: firstMetDate,
+                            assetIdentifier: nil,
+                            thumbnail: firstMet,
+                            placeName: nil,
+                            caption: nil,
+                            voiceNotePath: nil,
+                            promptText: "When we first met",
+                            isPinned: false,
+                            pinnedAt: nil
+                        )
+                        onboardingMoments.append(firstMetMomentUnpinned)
                     }
                     
                     homeViewModel.addMoments(onboardingMoments)
@@ -136,6 +170,11 @@ struct ContentView: View {
                             screen = .welcome
                         }
                     },
+                    onReplayStory: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .storyOnboarding
+                        }
+                    },
                     selectedPrompt: $selectedPrompt
                 )
                 .transition(.opacity)
@@ -154,10 +193,12 @@ struct ContentView: View {
                     onSaveMoments: { moments in
                         homeViewModel.addMoments(moments)
                         selectedPrompt = nil
+                        shouldScrollToNewMemory = true
                     },
                     onSavePromptMemory: { memory in
                         homeViewModel.addPromptMemory(memory)
                         selectedPrompt = nil
+                        shouldScrollToNewMemory = true
                     }
                 )
                 .transition(.opacity)

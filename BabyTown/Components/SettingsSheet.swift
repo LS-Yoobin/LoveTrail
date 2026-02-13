@@ -4,6 +4,7 @@ struct SettingsSheet: View {
     
     @Environment(\.dismiss) private var dismiss
     var onResetApp: () -> Void
+    var onReplayStory: () -> Void
     
     @State private var showResetConfirmation = false
     
@@ -11,6 +12,18 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 Section {
+                    Button {
+                        onReplayStory()
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Image(systemName: "play.circle")
+                                .font(.system(size: 16))
+                            Text("Replay Our Story")
+                                .font(.system(size: 16))
+                        }
+                    }
+                    
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
@@ -46,6 +59,22 @@ struct SettingsSheet: View {
                     .fontWeight(.semibold)
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 8) {
+                    Image("BabyTownFullIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 13.5))
+                    
+                    Text("BabyTown 2026")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(.ultraThinMaterial)
+            }
             .confirmationDialog(
                 "Reset Baby Town?",
                 isPresented: $showResetConfirmation,
@@ -64,5 +93,5 @@ struct SettingsSheet: View {
 }
 
 #Preview {
-    SettingsSheet(onResetApp: {})
+    SettingsSheet(onResetApp: {}, onReplayStory: {})
 }

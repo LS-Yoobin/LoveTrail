@@ -1,8 +1,9 @@
 {
   "data" : [
     {
-      "filename" : "transparent-flowers.gif",
-      "idiom" : "universal"
+      "filename" : "transparent flowers gif.gif",
+      "idiom" : "universal",
+      "universal-type-identifier" : "com.compuserve.gif"
     }
   ],
   "info" : {

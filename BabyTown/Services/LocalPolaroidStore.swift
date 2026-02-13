@@ -82,7 +82,7 @@ final class LocalPolaroidStore: ObservableObject {
             try jpegData.write(to: fileURL)
             
             let currentCount = todaysCaptureCount()
-            let isFifth = (currentCount + 1) == 5
+            let isFifth = (currentCount + 1) == 1
             
             let entry = PolaroidEntry(
                 id: id,

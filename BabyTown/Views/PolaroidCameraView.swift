@@ -9,6 +9,7 @@ struct PolaroidCameraView: View {
     @State private var capturedImage: UIImage?
     @State private var showNotification = false
     @State private var notificationMessage = ""
+    @State private var showReleaseConfirmation = false
     
     private let dailyLimit = 5
     
@@ -22,7 +23,7 @@ struct PolaroidCameraView: View {
     
     var body: some View {
         ZStack {
-            CustomCameraView(image: $capturedImage)
+            CustomCameraView(image: $capturedImage, canCapture: todaysCount < dailyLimit)
                 .ignoresSafeArea()
             
             VStack {
@@ -55,12 +56,6 @@ struct PolaroidCameraView: View {
                         .font(.system(size: 17, weight: .medium))
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(.black.opacity(0.3))
-                )
             }
             
             Spacer()
@@ -122,7 +117,7 @@ struct PolaroidCameraView: View {
     
     private var releaseButton: some View {
         Button {
-            releaseNow()
+            showReleaseConfirmation = true
         } label: {
             Text("Add to Baby Town Now")
                 .font(.system(size: 16, weight: .semibold))
@@ -135,9 +130,28 @@ struct PolaroidCameraView: View {
                         .background(Capsule().fill(.black.opacity(0.4)))
                 )
         }
+        .alert("Are you sure?", isPresented: $showReleaseConfirmation) {
+            Button("No", role: .cancel) { }
+            Button("Yes") {
+                releaseNow()
+            }
+        }
     }
     
     private func handleCapturedPhoto(_ image: UIImage) {
+        guard todaysCount < dailyLimit else {
+            notificationMessage = "Daily limit reached! See you at 9 PM"
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                showNotification = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation {
+                    showNotification = false
+                }
+            }
+            return
+        }
+        
         guard polaroidStore.savePhoto(image) != nil else { return }
         
         let remaining = dailyLimit - todaysCount
@@ -152,15 +166,9 @@ struct PolaroidCameraView: View {
             showNotification = true
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             withAnimation {
                 showNotification = false
-            }
-        }
-        
-        if todaysCount >= dailyLimit {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                dismiss()
             }
         }
     }

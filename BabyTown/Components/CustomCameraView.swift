@@ -3,13 +3,14 @@ import AVFoundation
 
 struct CustomCameraView: UIViewControllerRepresentable {
     @Binding var image: UIImage?
+    var canCapture: Bool = true
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> CustomCameraViewController {
         let controller = CustomCameraViewController()
+        controller.canCapture = canCapture
         controller.onPhotoCaptured = { capturedImage in
             image = capturedImage
-            dismiss()
         }
         controller.onCancel = {
             dismiss()
@@ -17,13 +18,20 @@ struct CustomCameraView: UIViewControllerRepresentable {
         return controller
     }
     
-    func updateUIViewController(_ uiViewController: CustomCameraViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: CustomCameraViewController, context: Context) {
+        uiViewController.canCapture = canCapture
+    }
 }
 
 class CustomCameraViewController: UIViewController {
     
     var onPhotoCaptured: ((UIImage) -> Void)?
     var onCancel: (() -> Void)?
+    var canCapture: Bool = true {
+        didSet {
+            updateCaptureButtonState()
+        }
+    }
     
     private var captureSession: AVCaptureSession?
     private var photoOutput: AVCapturePhotoOutput?
@@ -39,13 +47,13 @@ class CustomCameraViewController: UIViewController {
         return button
     }()
     
-    private let cancelButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("Cancel", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
+    
+    private let flashView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .white
+        view.alpha = 0
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
     }()
     
     override func viewDidLoad() {
@@ -98,7 +106,7 @@ class CustomCameraViewController: UIViewController {
     
     private func setupUI() {
         view.addSubview(captureButton)
-        view.addSubview(cancelButton)
+        view.addSubview(flashView)
         
         NSLayoutConstraint.activate([
             captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -106,12 +114,13 @@ class CustomCameraViewController: UIViewController {
             captureButton.widthAnchor.constraint(equalToConstant: 70),
             captureButton.heightAnchor.constraint(equalToConstant: 70),
             
-            cancelButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            cancelButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20)
+            flashView.topAnchor.constraint(equalTo: view.topAnchor),
+            flashView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            flashView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            flashView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
         captureButton.addTarget(self, action: #selector(capturePhoto), for: .touchUpInside)
-        cancelButton.addTarget(self, action: #selector(cancel), for: .touchUpInside)
     }
     
     override func viewDidLayoutSubviews() {
@@ -120,12 +129,22 @@ class CustomCameraViewController: UIViewController {
     }
     
     @objc private func capturePhoto() {
+        guard canCapture else { return }
         let settings = AVCapturePhotoSettings()
         photoOutput?.capturePhoto(with: settings, delegate: self)
     }
     
-    @objc private func cancel() {
-        onCancel?()
+    
+    private func updateCaptureButtonState() {
+        captureButton.isEnabled = canCapture
+        captureButton.alpha = canCapture ? 1.0 : 0.5
+    }
+    
+    private func showFlashEffect() {
+        flashView.alpha = 1.0
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            self.flashView.alpha = 0
+        }
     }
 }
 
@@ -135,6 +154,10 @@ extension CustomCameraViewController: AVCapturePhotoCaptureDelegate {
               let imageData = photo.fileDataRepresentation(),
               let image = UIImage(data: imageData) else {
             return
+        }
+        
+        DispatchQueue.main.async {
+            self.showFlashEffect()
         }
         
         onPhotoCaptured?(image)

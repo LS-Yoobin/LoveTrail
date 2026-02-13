@@ -23,17 +23,8 @@ struct PromptMemoryCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white,
-                                BabyTownTheme.accentSoft.opacity(0.3)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 4)
+                    .fill(BabyTownTheme.cardBackground.opacity(0.75))
+                    .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
@@ -118,6 +109,7 @@ struct PromptMemoryCard: View {
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
                 .blur(radius: isPhotoLocked(photo) ? 20 : 0)
             
             if isPhotoLocked(photo) {
@@ -135,6 +127,7 @@ struct PromptMemoryCard: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .blur(radius: isPhotoLocked(photo) ? 20 : 0)
                     
                     if isPhotoLocked(photo) {
@@ -154,6 +147,7 @@ struct PromptMemoryCard: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .blur(radius: isPhotoLocked(photos[0]) ? 20 : 0)
                 
                 if isPhotoLocked(photos[0]) {
@@ -166,6 +160,7 @@ struct PromptMemoryCard: View {
                     Image(uiImage: photos[1].thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .blur(radius: isPhotoLocked(photos[1]) ? 20 : 0)
                     
                     if isPhotoLocked(photos[1]) {
@@ -177,6 +172,7 @@ struct PromptMemoryCard: View {
                     Image(uiImage: photos[2].thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .blur(radius: isPhotoLocked(photos[2]) ? 20 : 0)
                     
                     if isPhotoLocked(photos[2]) {
@@ -202,6 +198,7 @@ struct PromptMemoryCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                             .blur(radius: isPhotoLocked(photo) ? 20 : 0)
                         
                         if isPhotoLocked(photo) {
@@ -220,6 +217,7 @@ struct PromptMemoryCard: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .blur(radius: isPhotoLocked(photo) ? 20 : 0)
                             
                             if isPhotoLocked(photo) {

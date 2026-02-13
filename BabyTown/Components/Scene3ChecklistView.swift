@@ -2,13 +2,13 @@ import SwiftUI
 
 struct Scene3ChecklistView: View {
     @Binding var isInteractionComplete: Bool
-    @State private var checkedItems: Set<Int> = [0, 1, 2, 3]
+    @State private var checkedItems: Set<Int> = []
     
     let items = [
         (id: 0, icon: "key.fill", text: "G35 Keys"),
         (id: 1, icon: "wrench.and.screwdriver.fill", text: "Tools"),
-        (id: 2, icon: "wallet.pass.fill", text: "Wallet"),
-        (id: 3, icon: "person.fill", text: "BJ")
+        (id: 2, icon: "wallet.pass.fill", text: "Wallet")
+        // (id: 3, icon: "person.fill", text: "BJ") // Temporarily hidden
     ]
     
     var body: some View {
@@ -29,9 +29,9 @@ struct Scene3ChecklistView: View {
                             ChecklistItemRow(
                                 icon: item.icon,
                                 text: item.text,
-                                isChecked: true
+                                isChecked: checkedItems.contains(item.id)
                             ) {
-                                // Items are pre-checked and non-interactive
+                                toggleItem(item.id)
                             }
                         }
                     }
@@ -39,8 +39,18 @@ struct Scene3ChecklistView: View {
             }
             .frame(height: 340)
         }
-        .onAppear {
-            isInteractionComplete = true
+    }
+    
+    private func toggleItem(_ id: Int) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            if checkedItems.contains(id) {
+                checkedItems.remove(id)
+            } else {
+                checkedItems.insert(id)
+            }
+            
+            // Mark interaction complete when all 3 items are checked (BJ temporarily hidden)
+            isInteractionComplete = checkedItems.count == 3
         }
     }
 }

@@ -26,8 +26,18 @@ struct BabyTownHeader: View {
                 }
                 
                 Spacer()
+                
+                Button {
+                    // TODO: Handle notification tap
+                } label: {
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
             }
-            .padding(.leading, 8)
+            .padding(.horizontal, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: 56)
         .background(BabyTownTheme.background.opacity(0.96))

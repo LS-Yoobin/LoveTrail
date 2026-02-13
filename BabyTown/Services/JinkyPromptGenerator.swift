@@ -39,10 +39,9 @@ final class JinkyPromptGenerator: ObservableObject {
     private var usedPrompts: Set<String> = []
     
     func getPromptOfTheDay(date: Date = Date()) -> PromptItem {
-        let calendar = Calendar.current
-        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        let index = dayOfYear % romanticPrompts.count
-        let promptText = romanticPrompts[index]
+        let availablePrompts = romanticPrompts.filter { !usedPrompts.contains($0) }
+        let promptsToChooseFrom = availablePrompts.isEmpty ? romanticPrompts : availablePrompts
+        let promptText = promptsToChooseFrom.randomElement() ?? romanticPrompts[0]
         usedPrompts.insert(promptText)
         return PromptItem(text: promptText)
     }
