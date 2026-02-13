@@ -34,6 +34,7 @@ struct HomeView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
     @State private var scrollToNewMemory = false
+    @State private var showNotifications = false
 
     init(
         pinnedFirstMet: UIImage?,
@@ -86,9 +87,14 @@ struct HomeView: View {
                     .offset(y: 50)
 
                 VStack(spacing: 0) {
-                    BabyTownHeader(onSettingsTap: {
-                        showSettings = true
-                    })
+                    BabyTownHeader(
+                        onSettingsTap: {
+                            showSettings = true
+                        },
+                        onNotificationsTap: {
+                            showNotifications = true
+                        }
+                    )
                     StickyActionBar(
                         onSelectPhotos: onSelectPhotos,
                         onPrompt: {
@@ -138,6 +144,7 @@ struct HomeView: View {
             }
             .onAppear {
                 viewModel.checkAndReleasePhotos()
+                AudioManager.shared.playHomeMusic()
             }
             .onChange(of: viewModel.moments.count) { oldCount, newCount in
                 if newCount > oldCount {
@@ -153,7 +160,30 @@ struct HomeView: View {
                     }
                 }
             }
-            
+            .onChange(of: firstMetPickerItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        viewModel.pinnedFirstMet = image
+                        let moment = Moment(
+                            id: UUID(),
+                            dateTaken: Date(),
+                            assetIdentifier: nil,
+                            thumbnail: image,
+                            placeName: nil,
+                            caption: nil,
+                            voiceNotePath: nil,
+                            promptText: "When we first met",
+                            isPinned: true,
+                            pinnedAt: Date()
+                        )
+                        viewModel.addMoments([moment])
+                    }
+                    firstMetPickerItem = nil
+                }
+            }
+
             cameraButton
             
             if showUpButton {
@@ -252,6 +282,9 @@ struct HomeView: View {
                 }
             )
         }
+        .fullScreenCover(isPresented: $showNotifications) {
+            NotificationCenterView()
+        }
         .fullScreenCover(isPresented: $showSearch) {
             MemorySearchView(
                 allMoments: viewModel.moments,
@@ -290,42 +323,48 @@ struct HomeView: View {
 
     // MARK: - Pinned Memories
 
+    private var hasFirstMetPinned: Bool {
+        viewModel.pinnedMoments.contains { $0.promptText == "When we first met" }
+    }
+
     private var pinnedSection: some View {
         VStack(spacing: 12) {
             sectionLabel("Pinned Memories", icon: "pin.fill")
                 .padding(.horizontal, 20)
-            
-            if !viewModel.pinnedMoments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(viewModel.pinnedMoments) { moment in
-                            PinnedMemoryCard(
-                                moment: moment,
-                                onTap: {
-                                    viewerMoments = [moment]
-                                    viewerInitialIndex = 0
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        showingMomentViewer = true
-                                    }
-                                },
-                                onUnpin: {
-                                    withAnimation {
-                                        viewModel.unpinMoment(moment)
-                                    }
-                                }
-                            )
-                            .frame(width: 180)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // Placeholder for "When we first met" if not yet pinned
+                    if !hasFirstMetPinned {
+                        FirstMetPlaceholderCard {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showingPinnedViewer = .firstMet
+                            }
                         }
+                        .frame(width: 180)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 20)
+
+                    ForEach(viewModel.pinnedMoments) { moment in
+                        PinnedMemoryCard(
+                            moment: moment,
+                            onTap: {
+                                viewerMoments = [moment]
+                                viewerInitialIndex = 0
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    showingMomentViewer = true
+                                }
+                            },
+                            onUnpin: {
+                                withAnimation {
+                                    viewModel.unpinMoment(moment)
+                                }
+                            }
+                        )
+                        .frame(width: 180)
+                    }
                 }
-            } else {
-                Text("No pinned memories yet")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
             }
         }
     }
@@ -398,7 +437,9 @@ struct HomeView: View {
                                     },
                                     onRemovePhoto: { section, momentId in
                                         viewModel.removePhotoFromMemory(section: section, momentId: momentId)
-                                    }
+                                    },
+                                    isLeftAligned: index.isMultiple(of: 2),
+                                    index: index
                                 )
                                 .padding(
                                     .leading,
@@ -425,7 +466,22 @@ struct HomeView: View {
                                             showingPromptPhotoViewer = true
                                         }
                                     }
-                                }
+                                },
+                                onRemove: { memory in
+                                    withAnimation {
+                                        viewModel.removePromptMemory(memory)
+                                    }
+                                },
+                                onEditLoveNote: { memoryId, newNote in
+                                    viewModel.updatePromptMemoryLoveNote(for: memoryId, loveNote: newNote)
+                                },
+                                onTogglePin: { memory in
+                                    withAnimation {
+                                        viewModel.togglePromptMemoryPin(memory)
+                                    }
+                                },
+                                isLeftAligned: index.isMultiple(of: 2),
+                                index: index
                             )
                             .padding(
                                 .leading,
@@ -446,7 +502,10 @@ struct HomeView: View {
                                     released: false,
                                     manuallyReleasedAt: nil,
                                     isFifthPhoto: true
-                                ))
+                                )),
+                                onUnlock: {
+                                    viewModel.checkAndReleasePhotos()
+                                }
                             )
                             .padding(
                                 .leading,
@@ -625,8 +684,7 @@ struct HomeView: View {
             Spacer()
             
             Button {
-                let todaysCount = viewModel.polaroidStore.todaysCaptureCount()
-                if todaysCount >= 5 {
+                if !viewModel.polaroidStore.canCapturePhoto() {
                     showCameraSheet = true
                 } else {
                     showCameraFullScreen = true
@@ -696,6 +754,72 @@ private struct PulsingHeartView: View {
                     scale = 1.18
                 }
             }
+    }
+}
+
+// MARK: - First Met Placeholder Card
+
+private struct FirstMetPlaceholderCard: View {
+
+    var onTap: () -> Void
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [BabyTownTheme.accent.opacity(0.12), BabyTownTheme.accent.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(height: 150)
+
+                VStack(spacing: 10) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
+                        .scaleEffect(pulse ? 1.1 : 1.0)
+
+                    Text("Add Photo")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.accent)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("When we first met")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 8))
+                    Text("Pinned")
+                        .font(.system(size: 10))
+                }
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .fill(BabyTownTheme.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .strokeBorder(BabyTownTheme.accent.opacity(0.2), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
     }
 }
 

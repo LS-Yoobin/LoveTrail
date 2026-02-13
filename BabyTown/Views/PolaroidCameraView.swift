@@ -11,6 +11,8 @@ struct PolaroidCameraView: View {
     @State private var notificationMessage = ""
     @State private var showReleaseConfirmation = false
     
+    @AppStorage("currentCatVariantIndex") private var currentCatVariantIndex = 1
+    
     private let dailyLimit = 5
     
     private var todaysCount: Int {
@@ -23,7 +25,7 @@ struct PolaroidCameraView: View {
     
     var body: some View {
         ZStack {
-            CustomCameraView(image: $capturedImage, canCapture: todaysCount < dailyLimit)
+            CustomCameraView(image: $capturedImage, canCapture: polaroidStore.canCapturePhoto())
                 .ignoresSafeArea()
             
             VStack {
@@ -139,8 +141,8 @@ struct PolaroidCameraView: View {
     }
     
     private func handleCapturedPhoto(_ image: UIImage) {
-        guard todaysCount < dailyLimit else {
-            notificationMessage = "Daily limit reached! See you at 9 PM"
+        guard polaroidStore.canCapturePhoto() else {
+            notificationMessage = "Done for today! New photos at midnight"
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 showNotification = true
             }
@@ -151,11 +153,11 @@ struct PolaroidCameraView: View {
             }
             return
         }
-        
+
         guard polaroidStore.savePhoto(image) != nil else { return }
-        
+
         let remaining = dailyLimit - todaysCount
-        
+
         if remaining > 0 {
             notificationMessage = "Photo saved! \(remaining) left for today"
         } else {
@@ -178,5 +180,13 @@ struct PolaroidCameraView: View {
         polaroidStore.releaseEntriesManually(toRelease)
         onPhotosReleased(toRelease)
         dismiss()
+    }
+    
+    private func rotateCatVariant() {
+        if currentCatVariantIndex < 5 {
+            currentCatVariantIndex += 1
+        } else {
+            currentCatVariantIndex = 1
+        }
     }
 }

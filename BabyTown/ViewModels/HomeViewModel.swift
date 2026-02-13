@@ -250,7 +250,24 @@ final class HomeViewModel: ObservableObject {
         promptMemories.append(memory)
         promptMemories.sort { $0.date > $1.date }
     }
+
+    func removePromptMemory(_ memory: PromptMemory) {
+        promptMemories.removeAll { $0.id == memory.id }
+    }
+
+    func updatePromptMemoryLoveNote(for memoryId: UUID, loveNote: String) {
+        if let index = promptMemories.firstIndex(where: { $0.id == memoryId }) {
+            promptMemories[index].loveNote = loveNote
+        }
+    }
     
+    func togglePromptMemoryPin(_ memory: PromptMemory) {
+        if let index = promptMemories.firstIndex(where: { $0.id == memory.id }) {
+            promptMemories[index].isPinned.toggle()
+            promptMemories[index].pinnedAt = promptMemories[index].isPinned ? Date() : nil
+        }
+    }
+
     func removeMoments(from section: DaySection) {
         let momentIdsToRemove = Set(section.moments.map { $0.id })
         moments.removeAll { momentIdsToRemove.contains($0.id) }

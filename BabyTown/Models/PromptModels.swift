@@ -69,14 +69,18 @@ struct PromptMemory: Identifiable, Codable {
     var placeName: String?
     var loveNote: String
     var photos: [PromptPhoto]
-    
+    var isPinned: Bool
+    var pinnedAt: Date?
+
     init(
         id: UUID = UUID(),
         promptText: String,
         date: Date,
         placeName: String? = nil,
         loveNote: String,
-        photos: [PromptPhoto]
+        photos: [PromptPhoto],
+        isPinned: Bool = false,
+        pinnedAt: Date? = nil
     ) {
         self.id = id
         self.promptText = promptText
@@ -84,5 +88,7 @@ struct PromptMemory: Identifiable, Codable {
         self.placeName = placeName
         self.loveNote = loveNote
         self.photos = photos
+        self.isPinned = isPinned
+        self.pinnedAt = pinnedAt
     }
 }

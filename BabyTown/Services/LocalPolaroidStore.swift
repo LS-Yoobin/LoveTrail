@@ -139,26 +139,43 @@ final class LocalPolaroidStore: ObservableObject {
         let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
         var laCalendar = Calendar.current
         laCalendar.timeZone = laTimeZone
-        
+
         let now = Date()
-        let currentDayStart = getDayStartAt5AM(for: now, calendar: laCalendar)
-        
+        let currentDayStart = laCalendar.startOfDay(for: now)
+
         return entries.filter { entry in
-            let entryDayStart = getDayStartAt5AM(for: entry.capturedAt, calendar: laCalendar)
+            let entryDayStart = laCalendar.startOfDay(for: entry.capturedAt)
             return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart)
         }.count
     }
-    
+
+    func canCapturePhoto() -> Bool {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+
+        let now = Date()
+        let hour = laCalendar.component(.hour, from: now)
+        let count = todaysCaptureCount()
+
+        // If 5 photos taken and it's 9PM or later, block until midnight
+        if count >= 5 && hour >= 21 {
+            return false
+        }
+        // Otherwise allow if under limit
+        return count < 5
+    }
+
     func todaysUnreleasedEntries() -> [PolaroidEntry] {
         let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
         var laCalendar = Calendar.current
         laCalendar.timeZone = laTimeZone
-        
+
         let now = Date()
-        let currentDayStart = getDayStartAt5AM(for: now, calendar: laCalendar)
-        
+        let currentDayStart = laCalendar.startOfDay(for: now)
+
         return entries.filter { entry in
-            let entryDayStart = getDayStartAt5AM(for: entry.capturedAt, calendar: laCalendar)
+            let entryDayStart = laCalendar.startOfDay(for: entry.capturedAt)
             return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart) && !entry.released
         }
     }
@@ -206,24 +223,6 @@ final class LocalPolaroidStore: ObservableObject {
             
             return now >= releaseTime
         }
-    }
-    
-    private func getDayStartAt5AM(for date: Date, calendar: Calendar) -> Date {
-        let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-        guard let hour = components.hour else { return date }
-        
-        var dayStart = calendar.startOfDay(for: date)
-        
-        if hour < 5 {
-            dayStart = calendar.date(byAdding: .day, value: -1, to: dayStart) ?? dayStart
-        }
-        
-        var startComponents = calendar.dateComponents([.year, .month, .day], from: dayStart)
-        startComponents.hour = 5
-        startComponents.minute = 0
-        startComponents.second = 0
-        
-        return calendar.date(from: startComponents) ?? dayStart
     }
     
     func removeProcessingMemory(_ memoryId: UUID) {

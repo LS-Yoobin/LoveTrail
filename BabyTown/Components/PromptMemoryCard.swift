@@ -1,59 +1,127 @@
 import SwiftUI
 
 struct PromptMemoryCard: View {
-    
+
     let memory: PromptMemory
     var onTap: () -> Void
     var onOpenPhoto: ((PromptPhoto, [PromptPhoto]) -> Void)? = nil
-    
+    var onRemove: ((PromptMemory) -> Void)? = nil
+    var onEditLoveNote: ((UUID, String) -> Void)? = nil
+    var onTogglePin: ((PromptMemory) -> Void)? = nil
+    var isLeftAligned: Bool = true
+    var index: Int = 0
+
+    @State private var showDeleteConfirmation = false
+    @State private var showLoveNoteEditor = false
+
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
         return formatter
     }
-    
+
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 10) {
-                headerSection
-                locationSection
-                loveNoteSection
+        VStack(alignment: .leading, spacing: 10) {
+            headerSection
+            locationSection
+            loveNoteSection
+            ZStack(alignment: isLeftAligned ? .bottomTrailing : .bottomLeading) {
                 photoCollage
-                promptTextSection
+                catDecoration
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                    .fill(BabyTownTheme.cardBackground.opacity(0.75))
-                    .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+            promptTextSection
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .fill(BabyTownTheme.cardBackground.opacity(0.75))
+                .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
                     .strokeBorder(BabyTownTheme.accent.opacity(0.15), lineWidth: 1)
+        )
+        .confirmationDialog(
+            "Remove this memory?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Memory", role: .destructive) {
+                onRemove?(memory)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .sheet(isPresented: $showLoveNoteEditor) {
+            PromptLoveNoteEditorSheet(
+                memory: memory,
+                onSave: { newNote in
+                    onEditLoveNote?(memory.id, newNote)
+                }
             )
         }
-        .buttonStyle(.plain)
+    }
+    
+    private var catDecoration: some View {
+        // Loop 1-5
+        let variant = (index % 5) + 1
+        return Image("cat_variant_\(variant)")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 110, height: 110)
+            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
     }
     
     // MARK: - Header
     
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12))
-                    .foregroundStyle(BabyTownTheme.accent)
-                
-                Text("Prompt Memory")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.accent)
-                    .textCase(.uppercase)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dateFormatter.string(from: memory.date))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BabyTownTheme.accent)
+
+                    Text("Prompt Memory")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.accent)
+                        .textCase(.uppercase)
+                }
             }
-            
-            Text(dateFormatter.string(from: memory.date))
-                .font(.system(size: 12))
-                .foregroundStyle(.black)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    onTogglePin?(memory)
+                } label: {
+                    Label(memory.isPinned ? "Unpin Memory" : "Pin Memory", systemImage: memory.isPinned ? "pin.slash" : "pin")
+                }
+                
+                Button {
+                    showLoveNoteEditor = true
+                } label: {
+                    Label("Edit Memory", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Remove Memory", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black.opacity(0.6))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
         }
     }
     
@@ -344,5 +412,61 @@ struct PromptMemoryCard: View {
             Capsule()
                 .fill(.black.opacity(0.6))
         )
+    }
+}
+
+// MARK: - Love Note Editor Sheet
+
+struct PromptLoveNoteEditorSheet: View {
+    let memory: PromptMemory
+    var onSave: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var loveNote: String
+
+    init(memory: PromptMemory, onSave: @escaping (String) -> Void) {
+        self.memory = memory
+        self.onSave = onSave
+        _loveNote = State(initialValue: memory.loveNote)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text(memory.promptText)
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(.black.opacity(0.7))
+                    .padding(.top, 12)
+
+                TextEditor(text: $loveNote)
+                    .font(.system(size: 15))
+                    .frame(minHeight: 120)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(.systemGray6))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                    )
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .navigationTitle("Edit Love Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(loveNote)
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
