@@ -28,6 +28,14 @@ struct WelcomeView: View {
 
             // Main content
             VStack(spacing: 0) {
+                // BabyTown Logo at top
+                Image("BabyTownLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 120)
+                    .padding(.top, 60)
+                    .opacity(textOpacity)
+                
                 Spacer()
 
                 // Center heart

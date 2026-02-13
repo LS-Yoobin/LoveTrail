@@ -116,6 +116,18 @@ final class LocalPolaroidStore: ObservableObject {
         saveEntries()
     }
     
+    func releaseEntriesManually(_ entriesToRelease: [PolaroidEntry]) {
+        let idsToRelease = Set(entriesToRelease.map { $0.id })
+        let now = Date()
+        for index in entries.indices {
+            if idsToRelease.contains(entries[index].id) {
+                entries[index].released = true
+                entries[index].manuallyReleasedAt = now
+            }
+        }
+        saveEntries()
+    }
+    
     func getUnreleasedEntriesReadyForRelease() -> [PolaroidEntry] {
         let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
         var laCalendar = Calendar.current
@@ -155,5 +167,13 @@ final class LocalPolaroidStore: ObservableObject {
         startComponents.second = 0
         
         return calendar.date(from: startComponents) ?? dayStart
+    }
+    
+    func reset() {
+        entries = []
+        saveEntries()
+        
+        try? fileManager.removeItem(at: imagesDirectory)
+        createImagesDirectoryIfNeeded()
     }
 }

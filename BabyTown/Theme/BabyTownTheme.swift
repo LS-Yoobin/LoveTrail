@@ -5,7 +5,7 @@ enum BabyTownTheme {
     // MARK: - Backgrounds
 
     static let background = Color.white
-    static let blush = Color.pink.opacity(0.06)
+    static let blush = Color.pink.opacity(0.15)
     static let backgroundGradient = LinearGradient(
         colors: [background, blush],
         startPoint: .top,

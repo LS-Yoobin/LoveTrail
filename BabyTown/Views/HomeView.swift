@@ -13,8 +13,10 @@ struct HomeView: View {
     var onSelectPhotos: () -> Void
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
     var onResetApp: (() -> Void)? = nil
+    @Binding var selectedPrompt: PromptItem?
     
     @State private var showCameraSheet = false
+    @State private var showCameraFullScreen = false
     @State private var showSettings = false
     @State private var showSearch = false
     @State private var firstMetPickerItem: PhotosPickerItem?
@@ -24,8 +26,6 @@ struct HomeView: View {
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
     @State private var showPromptSheet = false
-    @State private var selectedPrompt: PromptItem?
-    @State private var showPromptBuilder = false
 
     init(
         pinnedFirstMet: UIImage?,
@@ -33,7 +33,8 @@ struct HomeView: View {
         moments: [Moment] = [],
         onSelectPhotos: @escaping () -> Void,
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void,
-        onResetApp: (() -> Void)? = nil
+        onResetApp: (() -> Void)? = nil,
+        selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
             pinnedFirstMet: pinnedFirstMet,
@@ -43,18 +44,21 @@ struct HomeView: View {
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
+        _selectedPrompt = selectedPrompt
     }
 
     init(
         viewModel: HomeViewModel,
         onSelectPhotos: @escaping () -> Void = {},
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void = { _, _ in },
-        onResetApp: (() -> Void)? = nil
+        onResetApp: (() -> Void)? = nil,
+        selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onSelectPhotos = onSelectPhotos
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
+        _selectedPrompt = selectedPrompt
     }
 
     var body: some View {
@@ -93,9 +97,9 @@ struct HomeView: View {
             VStack {
                 Spacer()
                 GeometryReader { geometry in
-                    GIFImageView(gifName: "Animations/Flower")
-                        .frame(width: geometry.size.width * 2.5, height: geometry.size.width * 2.5)
-                        .offset(x: -geometry.size.width * 0.75, y: geometry.size.height * 0.5)
+                    GIFImageView(gifName: "TransparentFlowers")
+                        .frame(width: geometry.size.width, height: geometry.size.width * 0.5)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height)
                 }
                 .frame(height: 0)
                 .allowsHitTesting(false)
@@ -147,27 +151,27 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
         .sheet(isPresented: $showPromptSheet) {
                 JinkyPromptSheetView { prompt in
-                    selectedPrompt = prompt
+                    self.selectedPrompt = prompt
                     showPromptSheet = false
-                    showPromptBuilder = true
+                    onSelectPhotos()
                 }
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.hidden)
         }
-        .navigationDestination(isPresented: $showPromptBuilder) {
-            if let prompt = selectedPrompt {
-                PromptMemoryBuilderView(
-                    promptText: prompt.text,
-                    onSave: { memory in
-                        viewModel.addPromptMemory(memory)
-                    }
-                )
-            }
+        .fullScreenCover(isPresented: $showCameraFullScreen) {
+            PolaroidCameraView(
+                polaroidStore: viewModel.polaroidStore,
+                onPhotosReleased: { releasedEntries in
+                    viewModel.releasePolaroids(releasedEntries)
+                    viewModel.checkAndReleasePhotos()
+                }
+            )
         }
         .sheet(isPresented: $showCameraSheet) {
             CameraCaptureView(
                 polaroidStore: viewModel.polaroidStore,
-                onPhotosReleased: {
+                onPhotosReleased: { releasedEntries in
+                    viewModel.releasePolaroids(releasedEntries)
                     viewModel.checkAndReleasePhotos()
                 }
             )
@@ -314,6 +318,12 @@ struct HomeView: View {
                                     withAnimation {
                                         viewModel.togglePin(for: section)
                                     }
+                                },
+                                onAddPhotos: { section, images in
+                                    viewModel.addPhotosToMemory(section: section, images: images)
+                                },
+                                onRemovePhoto: { section, momentId in
+                                    viewModel.removePhotoFromMemory(section: section, momentId: momentId)
                                 }
                             )
                             .padding(
@@ -399,7 +409,12 @@ struct HomeView: View {
             Spacer()
             
             Button {
-                showCameraSheet = true
+                let todaysCount = viewModel.polaroidStore.todaysCaptureCount()
+                if todaysCount >= 5 {
+                    showCameraSheet = true
+                } else {
+                    showCameraFullScreen = true
+                }
             } label: {
                 ZStack {
                     Circle()

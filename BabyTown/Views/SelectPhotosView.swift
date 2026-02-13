@@ -7,6 +7,7 @@ struct SelectPhotosView: View {
     @State private var showAnimation = false
     @State private var photoSelectedInViewer = false
     
+    var selectedPrompt: PromptItem?
     var onBack: () -> Void
     var onSaveMoments: ([Moment]) -> Void
 
@@ -59,6 +60,15 @@ struct SelectPhotosView: View {
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(2)
+            }
+            
+            // Prompt Display at Bottom
+            if let prompt = selectedPrompt {
+                VStack {
+                    Spacer()
+                    promptDisplay(prompt: prompt)
+                }
+                .zIndex(1)
             }
             
             // Heart Animation Overlay
@@ -350,8 +360,35 @@ struct SelectPhotosView: View {
             Spacer()
         }
     }
+    
+    // MARK: - Prompt Display
+    
+    private func promptDisplay(prompt: PromptItem) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(BabyTownTheme.accent)
+            
+            Text(prompt.text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(BabyTownTheme.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.white)
+                .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
+        )
+        .padding(.horizontal, 16)
+        .padding(.bottom, viewModel.selectionMode && viewModel.selectedCount > 0 ? 100 : 16)
+    }
 }
 
 #Preview {
-    SelectPhotosView(onBack: {}, onSaveMoments: { _ in })
+    SelectPhotosView(selectedPrompt: nil, onBack: {}, onSaveMoments: { _ in })
 }

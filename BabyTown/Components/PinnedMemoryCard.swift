@@ -50,12 +50,31 @@ struct PinnedMemoryCard: View {
 
     @ViewBuilder
     private var photoArea: some View {
-        Image(uiImage: moment.thumbnail)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(minWidth: 0, maxWidth: .infinity)
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+        ZStack {
+            Image(uiImage: moment.thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .frame(height: 150)
+                .blur(radius: moment.isLocked ? 20 : 0)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            
+            if moment.isLocked {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.black.opacity(0.4))
+                
+                VStack(spacing: 6) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                    
+                    if let unlockTime = moment.unlockTime {
+                        TimeUntilUnlockView(unlockTime: unlockTime)
+                    }
+                }
+            }
+        }
+        .frame(height: 150)
     }
 
     // MARK: - Text

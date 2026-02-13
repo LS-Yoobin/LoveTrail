@@ -4,7 +4,7 @@ struct CameraCaptureView: View {
     
     @ObservedObject var polaroidStore: LocalPolaroidStore
     @Environment(\.dismiss) private var dismiss
-    var onPhotosReleased: () -> Void
+    var onPhotosReleased: ([PolaroidEntry]) -> Void
     
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
@@ -58,10 +58,11 @@ struct CameraCaptureView: View {
                     .shadow(color: .black.opacity(0.2), radius: 20, y: -5)
             )
         }
-        .presentationDetents([.height(300)])
+        .presentationDetents([.height(380)])
         .presentationDragIndicator(.visible)
-        .sheet(isPresented: $showCamera) {
-            CameraPickerView(image: $capturedImage)
+        .fullScreenCover(isPresented: $showCamera) {
+            CustomCameraView(image: $capturedImage)
+                .ignoresSafeArea()
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
@@ -225,8 +226,8 @@ struct CameraCaptureView: View {
     
     private func releaseNow() {
         let toRelease = polaroidStore.todaysUnreleasedEntries()
-        polaroidStore.releaseEntries(toRelease)
-        onPhotosReleased()
+        polaroidStore.releaseEntriesManually(toRelease)
+        onPhotosReleased(toRelease)
         dismiss()
     }
 }
@@ -234,6 +235,6 @@ struct CameraCaptureView: View {
 #Preview {
     CameraCaptureView(
         polaroidStore: LocalPolaroidStore(),
-        onPhotosReleased: {}
+        onPhotosReleased: { _ in }
     )
 }

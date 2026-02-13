@@ -13,12 +13,12 @@ struct ChatBubbleView: View {
             
             Text(message)
                 .font(.system(size: 15))
-                .foregroundStyle(isFromJinky ? .black : .white)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 18)
-                        .fill(isFromJinky ? AnyShapeStyle(Color(.systemGray6)) : AnyShapeStyle(BabyTownTheme.accentGradient))
+                        .fill(isFromJinky ? AnyShapeStyle(Color.red.opacity(0.75)) : AnyShapeStyle(BabyTownTheme.accentGradient))
                 )
                 .frame(maxWidth: .infinity, alignment: isFromJinky ? .leading : .trailing)
             
@@ -39,8 +39,8 @@ struct ChatBubbleView: View {
             )
             .frame(width: 32, height: 32)
             .overlay(
-                Text("J")
-                    .font(.system(size: 16, weight: .semibold))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
             )
     }

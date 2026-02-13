@@ -7,6 +7,8 @@ struct DayClusterCard: View {
     var onEditCaption: ((UUID, String, String?) -> Void)? = nil
     var onRemove: ((DaySection) -> Void)? = nil
     var onTogglePin: ((DaySection) -> Void)? = nil
+    var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
+    var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
     var isLeftAligned: Bool = true
     
     @State private var showCaptionEditor = false
@@ -52,6 +54,23 @@ struct DayClusterCard: View {
                 Text(section.displayTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.black)
+                
+                if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 10))
+                            .foregroundStyle(BabyTownTheme.accent)
+                        Text(promptText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(BabyTownTheme.accent)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(BabyTownTheme.accent.opacity(0.1))
+                    )
+                }
 
                 Text(locationText)
                     .font(.system(size: 12))
@@ -89,9 +108,18 @@ struct DayClusterCard: View {
             }
         }
         .sheet(isPresented: $showCaptionEditor) {
-            CaptionEditorSheet(section: section, onSave: { momentId, newCaption, voicePath in
-                onEditCaption?(momentId, newCaption, voicePath)
-            })
+            CaptionEditorSheet(
+                section: section,
+                onSave: { momentId, newCaption, voicePath in
+                    onEditCaption?(momentId, newCaption, voicePath)
+                },
+                onAddPhotos: { images in
+                    onAddPhotos?(section, images)
+                },
+                onRemovePhoto: { momentId in
+                    onRemovePhoto?(section, momentId)
+                }
+            )
         }
         .confirmationDialog(
             "Remove this memory?",
@@ -247,16 +275,37 @@ struct DayClusterCard: View {
 
     private func photoButton(_ moment: Moment) -> some View {
         Button {
-            onOpenPhoto(moment, section.moments)
+            if !moment.isLocked {
+                onOpenPhoto(moment, section.moments)
+            }
         } label: {
-            Image(uiImage: moment.thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .clipped()
-                .contentShape(Rectangle())
+            ZStack {
+                Image(uiImage: moment.thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .clipped()
+                    .blur(radius: moment.isLocked ? 20 : 0)
+                    .contentShape(Rectangle())
+                
+                if moment.isLocked {
+                    Rectangle()
+                        .fill(.black.opacity(0.4))
+                    
+                    VStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                        
+                        if let unlockTime = moment.unlockTime {
+                            TimeUntilUnlockView(unlockTime: unlockTime)
+                        }
+                    }
+                }
+            }
         }
         .buttonStyle(.plain)
+        .disabled(moment.isLocked)
     }
 }
 

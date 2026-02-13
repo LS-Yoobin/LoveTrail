@@ -76,7 +76,39 @@ final class HomeViewModel: ObservableObject {
         if !readyToRelease.isEmpty {
             releasePolaroids(readyToRelease)
         }
+        checkAndUnlockMoments()
         scheduleNextReleaseCheck()
+    }
+    
+    private func checkAndUnlockMoments() {
+        let now = Date()
+        var updated = false
+        
+        for index in moments.indices {
+            if moments[index].isLocked, let unlockTime = moments[index].unlockTime, now >= unlockTime {
+                moments[index].isLocked = false
+                moments[index].unlockTime = nil
+                updated = true
+            }
+        }
+        
+        for memoryIndex in promptMemories.indices {
+            var memoryUpdated = false
+            for photoIndex in promptMemories[memoryIndex].photos.indices {
+                if let unlockTime = promptMemories[memoryIndex].photos[photoIndex].unlockTime,
+                   now >= unlockTime {
+                    promptMemories[memoryIndex].photos[photoIndex].unlockTime = nil
+                    memoryUpdated = true
+                }
+            }
+            if memoryUpdated {
+                updated = true
+            }
+        }
+        
+        if updated {
+            objectWillChange.send()
+        }
     }
     
     func addMoments(_ newMoments: [Moment]) {
@@ -131,6 +163,34 @@ final class HomeViewModel: ObservableObject {
         moments.removeAll { momentIdsToRemove.contains($0.id) }
     }
     
+    func addPhotosToMemory(section: DaySection, images: [UIImage]) {
+        guard let firstMoment = section.moments.first else { return }
+        
+        let newMoments = images.map { image in
+            Moment(
+                id: UUID(),
+                dateTaken: firstMoment.dateTaken,
+                assetIdentifier: nil,
+                thumbnail: image,
+                placeName: firstMoment.placeName,
+                caption: firstMoment.caption,
+                voiceNotePath: firstMoment.voiceNotePath,
+                promptText: firstMoment.promptText,
+                isPinned: false,
+                pinnedAt: nil,
+                isLocked: false,
+                unlockTime: nil
+            )
+        }
+        
+        addMoments(newMoments)
+    }
+    
+    func removePhotoFromMemory(section: DaySection, momentId: UUID) {
+        guard section.moments.count > 1 else { return }
+        moments.removeAll { $0.id == momentId }
+    }
+    
     func togglePin(for section: DaySection) {
         guard let firstMoment = section.moments.first else { return }
         
@@ -145,8 +205,11 @@ final class HomeViewModel: ObservableObject {
                 placeName: firstMoment.placeName,
                 caption: firstMoment.caption,
                 voiceNotePath: firstMoment.voiceNotePath,
+                promptText: firstMoment.promptText,
                 isPinned: true,
-                pinnedAt: Date()
+                pinnedAt: Date(),
+                isLocked: firstMoment.isLocked,
+                unlockTime: firstMoment.unlockTime
             )
             moments.append(pinnedCopy)
         }
@@ -166,20 +229,43 @@ final class HomeViewModel: ObservableObject {
     func releasePolaroids(_ entries: [PolaroidEntry]) {
         var newMoments: [Moment] = []
         
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
         for entry in entries {
             if let image = polaroidStore.loadImage(for: entry) {
+                var isLocked = false
+                var unlockTime: Date? = nil
+                
+                if let manualReleaseTime = entry.manuallyReleasedAt {
+                    let captureDay = laCalendar.startOfDay(for: entry.capturedAt)
+                    var releaseComponents = laCalendar.dateComponents([.year, .month, .day], from: captureDay)
+                    releaseComponents.hour = 21
+                    releaseComponents.minute = 0
+                    releaseComponents.second = 0
+                    
+                    if let scheduledUnlockTime = laCalendar.date(from: releaseComponents) {
+                        if manualReleaseTime < scheduledUnlockTime {
+                            isLocked = true
+                            unlockTime = scheduledUnlockTime
+                        }
+                    }
+                }
+                
                 let moment = Moment(
                     id: entry.id,
                     dateTaken: entry.capturedAt,
                     assetIdentifier: nil,
                     thumbnail: image,
-                    placeName: nil
+                    placeName: nil,
+                    isLocked: isLocked,
+                    unlockTime: unlockTime
                 )
                 newMoments.append(moment)
             }
         }
         
-        polaroidStore.releaseEntries(entries)
         addMoments(newMoments)
     }
     

@@ -8,14 +8,17 @@ struct Moment: Identifiable, Codable {
     var placeName: String?
     var caption: String?
     var voiceNotePath: String?
+    var promptText: String?
     var isPinned: Bool
     var pinnedAt: Date?
+    var isLocked: Bool
+    var unlockTime: Date?
     
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, isPinned, pinnedAt
+        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime
     }
     
-    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil) {
+    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil) {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
@@ -23,8 +26,11 @@ struct Moment: Identifiable, Codable {
         self.placeName = placeName
         self.caption = caption
         self.voiceNotePath = voiceNotePath
+        self.promptText = promptText
         self.isPinned = isPinned
         self.pinnedAt = pinnedAt
+        self.isLocked = isLocked
+        self.unlockTime = unlockTime
     }
     
     init(from decoder: Decoder) throws {
@@ -35,8 +41,11 @@ struct Moment: Identifiable, Codable {
         placeName = try container.decodeIfPresent(String.self, forKey: .placeName)
         caption = try container.decodeIfPresent(String.self, forKey: .caption)
         voiceNotePath = try container.decodeIfPresent(String.self, forKey: .voiceNotePath)
+        promptText = try container.decodeIfPresent(String.self, forKey: .promptText)
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
         pinnedAt = try container.decodeIfPresent(Date.self, forKey: .pinnedAt)
+        isLocked = try container.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
+        unlockTime = try container.decodeIfPresent(Date.self, forKey: .unlockTime)
         
         if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
            let image = UIImage(data: thumbnailData) {
@@ -54,8 +63,11 @@ struct Moment: Identifiable, Codable {
         try container.encodeIfPresent(placeName, forKey: .placeName)
         try container.encodeIfPresent(caption, forKey: .caption)
         try container.encodeIfPresent(voiceNotePath, forKey: .voiceNotePath)
+        try container.encodeIfPresent(promptText, forKey: .promptText)
         try container.encode(isPinned, forKey: .isPinned)
         try container.encodeIfPresent(pinnedAt, forKey: .pinnedAt)
+        try container.encode(isLocked, forKey: .isLocked)
+        try container.encodeIfPresent(unlockTime, forKey: .unlockTime)
         
         if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
             try container.encode(thumbnailData, forKey: .thumbnailData)

@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var screen: Screen = .welcome
     @State private var firstMetPhoto: UIImage?
     @State private var officialPhoto: UIImage?
+    @State private var selectedPrompt: PromptItem?
     @StateObject private var homeViewModel: HomeViewModel
     
     init() {
@@ -122,10 +123,12 @@ struct ContentView: View {
                         homeViewModel.promptMemories = []
                         homeViewModel.pinnedFirstMet = nil
                         homeViewModel.pinnedOfficial = UIImage(systemName: "heart.fill")!
+                        homeViewModel.polaroidStore.reset()
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .welcome
                         }
-                    }
+                    },
+                    selectedPrompt: $selectedPrompt
                 )
                 .transition(.opacity)
                 .onAppear {
@@ -134,6 +137,7 @@ struct ContentView: View {
 
             case .selectPhotos:
                 SelectPhotosView(
+                    selectedPrompt: selectedPrompt,
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.35)) {
                             screen = .home
@@ -141,6 +145,7 @@ struct ContentView: View {
                     },
                     onSaveMoments: { moments in
                         homeViewModel.addMoments(moments)
+                        selectedPrompt = nil
                     }
                 )
                 .transition(.opacity)

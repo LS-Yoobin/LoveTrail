@@ -41,11 +41,8 @@ struct JinkyPromptSheetView: View {
             continueButton
         }
         .background(
-            ZStack {
-                Color.red.opacity(0.75)
-                    .background(.ultraThinMaterial)
-            }
-            .ignoresSafeArea()
+            Color.white
+                .ignoresSafeArea()
         )
         .onAppear {
             promptOfDay = generator.getPromptOfTheDay()
@@ -60,7 +57,7 @@ struct JinkyPromptSheetView: View {
     
     private var handle: some View {
         RoundedRectangle(cornerRadius: 3)
-            .fill(Color.white)
+            .fill(Color(.systemGray4))
             .frame(width: 36, height: 5)
             .padding(.top, 12)
             .padding(.bottom, 8)
@@ -122,16 +119,13 @@ struct JinkyPromptSheetView: View {
                 Text("Give me 3 more")
                     .font(.system(size: 15, weight: .semibold))
             }
-            .foregroundStyle(BabyTownTheme.accent)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(BabyTownTheme.accent, lineWidth: 1.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(BabyTownTheme.accentSoft)
-                    )
+                    .fill(Color(red: 0.95, green: 0.5, blue: 0.55))
+                    .shadow(color: BabyTownTheme.accent.opacity(0.2), radius: 6, y: 2)
             )
         }
     }
@@ -217,7 +211,7 @@ struct JinkyPromptSheetView: View {
             .padding(.bottom, 40)
         }
         .background(
-            Color.red.opacity(0.75)
+            Color.white
                 .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
         )
     }

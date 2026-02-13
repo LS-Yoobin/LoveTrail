@@ -18,6 +18,7 @@ struct PromptMemoryCard: View {
                 headerSection
                 loveNotePreview
                 photoCollage
+                promptTextSection
             }
             .padding(12)
             .background(
@@ -57,11 +58,6 @@ struct PromptMemoryCard: View {
                     .textCase(.uppercase)
             }
             
-            Text(memory.promptText)
-                .font(.system(size: 16, weight: .medium, design: .serif))
-                .foregroundStyle(.black)
-                .lineLimit(2)
-            
             HStack(spacing: 4) {
                 Text(dateFormatter.string(from: memory.date))
                     .font(.system(size: 12))
@@ -88,6 +84,16 @@ struct PromptMemoryCard: View {
             .padding(.vertical, 4)
     }
     
+    // MARK: - Prompt Text Section
+    
+    private var promptTextSection: some View {
+        Text(memory.promptText)
+            .font(.system(size: 14, weight: .medium, design: .serif))
+            .foregroundStyle(.black.opacity(0.85))
+            .lineLimit(3)
+            .padding(.top, 4)
+    }
+    
     // MARK: - Photo Collage
     
     @ViewBuilder
@@ -107,20 +113,34 @@ struct PromptMemoryCard: View {
     }
     
     private func singleLayout(_ photo: PromptPhoto) -> some View {
-        Image(uiImage: photo.thumbnail)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+        ZStack {
+            Image(uiImage: photo.thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(height: 160)
+                .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+            
+            if isPhotoLocked(photo) {
+                lockOverlay
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
     
     private func twoLayout(_ photos: [PromptPhoto]) -> some View {
         HStack(spacing: 3) {
             ForEach(photos) { photo in
-                Image(uiImage: photo.thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity)
+                ZStack {
+                    Image(uiImage: photo.thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                    
+                    if isPhotoLocked(photo) {
+                        lockOverlay
+                    }
+                }
             }
         }
         .frame(height: 120)
@@ -129,19 +149,40 @@ struct PromptMemoryCard: View {
     
     private func threeLayout(_ photos: [PromptPhoto]) -> some View {
         VStack(spacing: 3) {
-            Image(uiImage: photos[0].thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 100)
+            ZStack {
+                Image(uiImage: photos[0].thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 100)
+                    .blur(radius: isPhotoLocked(photos[0]) ? 20 : 0)
+                
+                if isPhotoLocked(photos[0]) {
+                    lockOverlay
+                }
+            }
             
             HStack(spacing: 3) {
-                Image(uiImage: photos[1].thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                ZStack {
+                    Image(uiImage: photos[1].thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .blur(radius: isPhotoLocked(photos[1]) ? 20 : 0)
+                    
+                    if isPhotoLocked(photos[1]) {
+                        lockOverlay
+                    }
+                }
                 
-                Image(uiImage: photos[2].thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                ZStack {
+                    Image(uiImage: photos[2].thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .blur(radius: isPhotoLocked(photos[2]) ? 20 : 0)
+                    
+                    if isPhotoLocked(photos[2]) {
+                        lockOverlay
+                    }
+                }
             }
             .frame(height: 75)
         }
@@ -156,10 +197,17 @@ struct PromptMemoryCard: View {
         return VStack(spacing: 3) {
             HStack(spacing: 3) {
                 ForEach(topRow) { photo in
-                    Image(uiImage: photo.thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
+                    ZStack {
+                        Image(uiImage: photo.thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity)
+                            .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                        
+                        if isPhotoLocked(photo) {
+                            lockOverlay
+                        }
+                    }
                 }
             }
             .frame(height: 80)
@@ -167,15 +215,48 @@ struct PromptMemoryCard: View {
             if !bottomRow.isEmpty {
                 HStack(spacing: 3) {
                     ForEach(bottomRow) { photo in
-                        Image(uiImage: photo.thumbnail)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
+                        ZStack {
+                            Image(uiImage: photo.thumbnail)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity)
+                                .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                            
+                            if isPhotoLocked(photo) {
+                                lockOverlay
+                            }
+                        }
                     }
                 }
                 .frame(height: 80)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+    
+    // MARK: - Helpers
+    
+    private func isPhotoLocked(_ photo: PromptPhoto) -> Bool {
+        guard photo.isFromCamera, let unlockTime = photo.unlockTime else {
+            return false
+        }
+        return Date() < unlockTime
+    }
+    
+    private var lockOverlay: some View {
+        VStack(spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("Locked")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(.black.opacity(0.6))
+        )
     }
 }

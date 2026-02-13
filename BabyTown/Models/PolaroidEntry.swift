@@ -6,8 +6,9 @@ struct PolaroidEntry: Identifiable, Codable {
     let capturedAt: Date
     let imageFileName: String
     var released: Bool
+    var manuallyReleasedAt: Date?
     
     enum CodingKeys: String, CodingKey {
-        case id, capturedAt, imageFileName, released
+        case id, capturedAt, imageFileName, released, manuallyReleasedAt
     }
 }
