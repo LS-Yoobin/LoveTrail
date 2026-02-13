@@ -6,10 +6,13 @@ struct SelectPhotosView: View {
     @StateObject private var viewModel = SelectPhotosViewModel()
     @State private var showAnimation = false
     @State private var photoSelectedInViewer = false
+    @State private var showPromptMemoryBuilder = false
+    @State private var selectedPhotosForPrompt: [PromptPhoto] = []
     
     var selectedPrompt: PromptItem?
     var onBack: () -> Void
     var onSaveMoments: ([Moment]) -> Void
+    var onSavePromptMemory: ((PromptMemory) -> Void)?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     private let monthSymbols = Calendar.current.shortMonthSymbols
@@ -20,6 +23,11 @@ struct SelectPhotosView: View {
 
             VStack(spacing: 0) {
                 topBar
+                
+                if let prompt = selectedPrompt {
+                    promptDisplay(prompt: prompt)
+                }
+                
                 yearChips
                 monthChips
 
@@ -38,16 +46,18 @@ struct SelectPhotosView: View {
                     onToggleSelection: { asset in
                         viewModel.toggleSelection(asset)
                         photoSelectedInViewer = true
-                    }
-                ) {
-                    withAnimation(.easeOut(duration: 0.25)) {
-                        viewModel.viewerIndex = nil
-                        if photoSelectedInViewer && !viewModel.selectionMode {
-                            viewModel.selectionMode = true
-                            photoSelectedInViewer = false
+                    },
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            viewModel.viewerIndex = nil
+                            if photoSelectedInViewer && !viewModel.selectionMode {
+                                viewModel.selectionMode = true
+                                photoSelectedInViewer = false
+                            }
                         }
-                    }
-                }
+                    },
+                    promptText: selectedPrompt?.text
+                )
                 .transition(.opacity)
                 .zIndex(1)
             }
@@ -62,14 +72,6 @@ struct SelectPhotosView: View {
                 .zIndex(2)
             }
             
-            // Prompt Display at Bottom
-            if let prompt = selectedPrompt {
-                VStack {
-                    Spacer()
-                    promptDisplay(prompt: prompt)
-                }
-                .zIndex(1)
-            }
             
             // Heart Animation Overlay
             if showAnimation {
@@ -88,6 +90,22 @@ struct SelectPhotosView: View {
         }
         .onChange(of: viewModel.selectedMonth) { _, _ in
             Task { await viewModel.fetchAssets() }
+        }
+        .navigationDestination(isPresented: $showPromptMemoryBuilder) {
+            if let prompt = selectedPrompt {
+                PromptMemoryBuilderView(
+                    promptText: prompt.text,
+                    onSave: { memory in
+                        onSavePromptMemory?(memory)
+                        showAnimation = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            onBack()
+                        }
+                    },
+                    preSelectedPhotos: selectedPhotosForPrompt
+                )
+                .navigationBarBackButtonHidden(true)
+            }
         }
     }
 
@@ -266,10 +284,20 @@ struct SelectPhotosView: View {
     private var saveButton: some View {
         Button {
             Task {
-                let moments = await viewModel.saveMoments()
-                onSaveMoments(moments)
-                withAnimation(.easeIn(duration: 0.2)) {
-                    showAnimation = true
+                if selectedPrompt != nil {
+                    // For prompt flow, convert selected photos to PromptPhotos and navigate to builder
+                    selectedPhotosForPrompt = await viewModel.convertToPromptPhotos()
+                    showPromptMemoryBuilder = true
+                } else {
+                    // For regular flow, save as Moments
+                    let moments = await viewModel.saveMoments()
+                    onSaveMoments(moments)
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        showAnimation = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        onBack()
+                    }
                 }
             }
         } label: {
@@ -378,14 +406,14 @@ struct SelectPhotosView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(.white)
-                .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
         )
         .padding(.horizontal, 16)
-        .padding(.bottom, viewModel.selectionMode && viewModel.selectedCount > 0 ? 100 : 16)
+        .padding(.vertical, 8)
     }
 }
 

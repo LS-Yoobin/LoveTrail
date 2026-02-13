@@ -6,10 +6,12 @@ import Combine
 final class LocalPolaroidStore: ObservableObject {
     
     @Published private(set) var entries: [PolaroidEntry] = []
+    @Published private(set) var processingMemories: [ProcessingMemory] = []
     
     private let fileManager = FileManager.default
     private let entriesFileName = "polaroid_entries.json"
     private let imagesDirectoryName = "polaroid_images"
+    private let processingMemoriesFileName = "processing_memories.json"
     
     private var documentsDirectory: URL {
         fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -26,6 +28,7 @@ final class LocalPolaroidStore: ObservableObject {
     init() {
         createImagesDirectoryIfNeeded()
         loadEntries()
+        loadProcessingMemories()
     }
     
     private func createImagesDirectoryIfNeeded() {
@@ -44,6 +47,25 @@ final class LocalPolaroidStore: ObservableObject {
         entries = decoded
     }
     
+    private var processingMemoriesFileURL: URL {
+        documentsDirectory.appendingPathComponent(processingMemoriesFileName)
+    }
+    
+    private func loadProcessingMemories() {
+        guard fileManager.fileExists(atPath: processingMemoriesFileURL.path),
+              let data = try? Data(contentsOf: processingMemoriesFileURL),
+              let decoded = try? JSONDecoder().decode([ProcessingMemory].self, from: data) else {
+            processingMemories = []
+            return
+        }
+        processingMemories = decoded
+    }
+    
+    private func saveProcessingMemories() {
+        guard let data = try? JSONEncoder().encode(processingMemories) else { return }
+        try? data.write(to: processingMemoriesFileURL)
+    }
+    
     private func saveEntries() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
         try? data.write(to: entriesFileURL)
@@ -58,18 +80,53 @@ final class LocalPolaroidStore: ObservableObject {
         
         do {
             try jpegData.write(to: fileURL)
+            
+            let currentCount = todaysCaptureCount()
+            let isFifth = (currentCount + 1) == 5
+            
             let entry = PolaroidEntry(
                 id: id,
                 capturedAt: Date(),
                 imageFileName: fileName,
-                released: false
+                released: false,
+                manuallyReleasedAt: nil,
+                isFifthPhoto: isFifth
             )
             entries.append(entry)
             saveEntries()
+            
+            if isFifth {
+                createProcessingMemory(for: entry)
+            }
+            
             return entry
         } catch {
             return nil
         }
+    }
+    
+    private func createProcessingMemory(for entry: PolaroidEntry) {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
+        let captureDay = laCalendar.startOfDay(for: entry.capturedAt)
+        var releaseComponents = laCalendar.dateComponents([.year, .month, .day], from: captureDay)
+        releaseComponents.hour = 21
+        releaseComponents.minute = 0
+        releaseComponents.second = 0
+        
+        guard let unlockTime = laCalendar.date(from: releaseComponents) else { return }
+        
+        let processingMemory = ProcessingMemory(
+            id: entry.id,
+            date: entry.capturedAt,
+            unlockTime: unlockTime,
+            imageFileName: entry.imageFileName
+        )
+        
+        processingMemories.append(processingMemory)
+        saveProcessingMemories()
     }
     
     func loadImage(for entry: PolaroidEntry) -> UIImage? {
@@ -169,9 +226,16 @@ final class LocalPolaroidStore: ObservableObject {
         return calendar.date(from: startComponents) ?? dayStart
     }
     
+    func removeProcessingMemory(_ memoryId: UUID) {
+        processingMemories.removeAll { $0.id == memoryId }
+        saveProcessingMemories()
+    }
+    
     func reset() {
         entries = []
         saveEntries()
+        processingMemories = []
+        saveProcessingMemories()
         
         try? fileManager.removeItem(at: imagesDirectory)
         createImagesDirectoryIfNeeded()

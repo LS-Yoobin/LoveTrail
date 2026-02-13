@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen {
-        case welcome, firstMemories, howItWorks, home, selectPhotos
+        case welcome, storyOnboarding, firstMemories, howItWorks, home, selectPhotos
     }
 
     @State private var screen: Screen = .welcome
@@ -44,6 +44,14 @@ struct ContentView: View {
             switch screen {
             case .welcome:
                 WelcomeView {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .storyOnboarding
+                    }
+                }
+                .transition(.opacity)
+
+            case .storyOnboarding:
+                StoryOnboardingFlow {
                     withAnimation(.easeInOut(duration: 0.4)) {
                         screen = .firstMemories
                     }
@@ -145,6 +153,10 @@ struct ContentView: View {
                     },
                     onSaveMoments: { moments in
                         homeViewModel.addMoments(moments)
+                        selectedPrompt = nil
+                    },
+                    onSavePromptMemory: { memory in
+                        homeViewModel.addPromptMemory(memory)
                         selectedPrompt = nil
                     }
                 )

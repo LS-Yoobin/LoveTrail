@@ -173,7 +173,7 @@ struct MemorySearchView: View {
         
         // Extract date components
         let year = calendar.component(.year, from: date)
-        let month = calendar.component(.month, from: date)
+        let _ = calendar.component(.month, from: date)
         let day = calendar.component(.day, from: date)
         
         // Month names

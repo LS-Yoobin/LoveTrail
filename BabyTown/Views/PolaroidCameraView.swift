@@ -35,11 +35,6 @@ struct PolaroidCameraView: View {
                         .padding(.bottom, 120)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                
-                if hasUnreleasedToday {
-                    releaseButton
-                        .padding(.bottom, 20)
-                }
             }
         }
         .onChange(of: capturedImage) { _, newImage in

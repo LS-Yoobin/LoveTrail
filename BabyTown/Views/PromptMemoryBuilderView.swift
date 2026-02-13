@@ -2,11 +2,13 @@ import SwiftUI
 import PhotosUI
 import Photos
 import CoreLocation
+import MapKit
 
 struct PromptMemoryBuilderView: View {
     
     let promptText: String
     var onSave: (PromptMemory) -> Void
+    var preSelectedPhotos: [PromptPhoto]?
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate = Date()
@@ -63,6 +65,16 @@ struct PromptMemoryBuilderView: View {
                 }
             )
             .navigationBarBackButtonHidden(true)
+        }
+        .onAppear {
+            if let preSelected = preSelectedPhotos, !preSelected.isEmpty {
+                selectedPhotos = preSelected
+                if let firstPhoto = preSelected.first {
+                    Task {
+                        await extractLocationFromAsset(firstPhoto.assetIdentifier)
+                    }
+                }
+            }
         }
     }
     
@@ -308,22 +320,30 @@ struct PromptMemoryBuilderView: View {
         
         let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
         if let asset = fetchResult.firstObject, let location = asset.location {
-            let geocoder = CLGeocoder()
-            if let placemark = try? await geocoder.reverseGeocodeLocation(location).first {
-                let name = placemark.name
-                    ?? placemark.locality
-                    ?? placemark.subLocality
-                    ?? placemark.administrativeArea
-                
-                if let name = name {
-                    await MainActor.run {
-                        placeName = name
+            if let request = MKReverseGeocodingRequest(location: location) {
+                do {
+                    let mapItems = try await request.mapItems
+                    if let mapItem = mapItems.first {
+                        let name = mapItem.name
+                            ?? mapItem.placemark.locality
+                            ?? mapItem.placemark.subLocality
+                            ?? mapItem.placemark.administrativeArea
+                        
+                        if let name = name {
+                            await MainActor.run {
+                                placeName = name
+                            }
+                        }
                     }
+                } catch {
+                    print("Failed to reverse geocode location:", error)
                 }
             }
         }
         
-        isLoadingLocation = false
+        await MainActor.run {
+            isLoadingLocation = false
+        }
     }
     
     private func saveMemory() {

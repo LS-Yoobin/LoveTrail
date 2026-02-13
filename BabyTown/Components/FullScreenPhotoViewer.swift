@@ -9,6 +9,7 @@ struct FullScreenPhotoViewer: View {
     var selectedAssets: Set<String>
     var onToggleSelection: ((PHAsset) -> Void)?
     var onDismiss: () -> Void
+    var promptText: String?
 
     @State private var currentIndex: Int
     @State private var loadedImages: [String: UIImage] = [:]
@@ -20,7 +21,8 @@ struct FullScreenPhotoViewer: View {
         imageManager: PHCachingImageManager,
         selectedAssets: Set<String> = [],
         onToggleSelection: ((PHAsset) -> Void)? = nil,
-        onDismiss: @escaping () -> Void
+        onDismiss: @escaping () -> Void,
+        promptText: String? = nil
     ) {
         self.assets = assets
         self.initialIndex = initialIndex
@@ -28,6 +30,7 @@ struct FullScreenPhotoViewer: View {
         self.selectedAssets = selectedAssets
         self.onToggleSelection = onToggleSelection
         self.onDismiss = onDismiss
+        self.promptText = promptText
         _currentIndex = State(initialValue: initialIndex)
     }
 
@@ -53,15 +56,18 @@ struct FullScreenPhotoViewer: View {
             }
 
             VStack {
-                closeButton
-                Spacer()
-                if showSelectButton, onToggleSelection != nil {
-                    selectButton
+                HStack {
+                    closeButton
+                    Spacer()
+                    if onToggleSelection != nil {
+                        topSelectButton
+                    }
                 }
-            }
-            
-            if isCurrentPhotoSelected {
-                heartIndicator
+                .padding(.top, 12)
+                .padding(.horizontal, 20)
+                .opacity(showSelectButton ? 1 : 0)
+                
+                Spacer()
             }
         }
         .statusBarHidden(true)
@@ -86,18 +92,35 @@ struct FullScreenPhotoViewer: View {
     // MARK: - Close
 
     private var closeButton: some View {
-        HStack {
-            Spacer()
-            Button(action: onDismiss) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white.opacity(0.85))
-            }
+        Button(action: onDismiss) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 30))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white.opacity(0.85))
         }
-        .padding(.top, 12)
-        .padding(.trailing, 20)
-        .opacity(showSelectButton ? 1 : 0)
+    }
+    
+    private var topSelectButton: some View {
+        Button {
+            if let asset = currentAsset {
+                onToggleSelection?(asset)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isCurrentPhotoSelected ? "heart.fill" : "heart")
+                    .font(.system(size: 16, weight: .semibold))
+                Text(isCurrentPhotoSelected ? "Selected" : "Select")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.white.opacity(0.25))
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+            )
+        }
     }
     
     private var selectButton: some View {
@@ -125,19 +148,6 @@ struct FullScreenPhotoViewer: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
-    private var heartIndicator: some View {
-        VStack {
-            HStack {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(BabyTownTheme.accent)
-                    .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
-                    .padding(16)
-                Spacer()
-            }
-            Spacer()
-        }
-    }
     
     private var currentAsset: PHAsset? {
         guard currentIndex < assets.count else { return nil }
@@ -174,5 +184,31 @@ struct FullScreenPhotoViewer: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Prompt Display
+    
+    private func promptDisplay(prompt: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(BabyTownTheme.accent)
+            
+            Text(prompt)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.15))
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+        )
+        .padding(.horizontal, 16)
     }
 }

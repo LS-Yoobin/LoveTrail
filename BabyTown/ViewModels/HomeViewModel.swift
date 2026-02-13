@@ -106,8 +106,22 @@ final class HomeViewModel: ObservableObject {
             }
         }
         
+        checkAndUnlockProcessingMemories()
+        
         if updated {
             objectWillChange.send()
+        }
+    }
+    
+    private func checkAndUnlockProcessingMemories() {
+        let now = Date()
+        let unlockedMemories = polaroidStore.processingMemories.filter { $0.unlockTime <= now }
+        
+        for memory in unlockedMemories {
+            if let entry = polaroidStore.entries.first(where: { $0.id == memory.id }) {
+                releasePolaroids([entry])
+                polaroidStore.removeProcessingMemory(memory.id)
+            }
         }
     }
     

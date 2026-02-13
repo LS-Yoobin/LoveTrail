@@ -288,7 +288,7 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count
+                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + viewModel.polaroidStore.processingMemories.count
                 )
 
                 VStack(spacing: 24) {
@@ -350,6 +350,27 @@ struct HomeView: View {
                                 .trailing,
                                 index.isMultiple(of: 2) ? 46 : 20
                             )
+                            
+                        case .processingMemory(let memory):
+                            ProcessingMemoryCard(
+                                memory: memory,
+                                image: viewModel.polaroidStore.loadImage(for: PolaroidEntry(
+                                    id: memory.id,
+                                    capturedAt: memory.date,
+                                    imageFileName: memory.imageFileName,
+                                    released: false,
+                                    manuallyReleasedAt: nil,
+                                    isFifthPhoto: true
+                                ))
+                            )
+                            .padding(
+                                .leading,
+                                index.isMultiple(of: 2) ? 20 : 46
+                            )
+                            .padding(
+                                .trailing,
+                                index.isMultiple(of: 2) ? 46 : 20
+                            )
                         }
                     }
                 }
@@ -360,12 +381,15 @@ struct HomeView: View {
     private enum TimelineItem {
         case daySection(DaySection)
         case promptMemory(PromptMemory)
+        case processingMemory(ProcessingMemory)
         
         var date: Date {
             switch self {
             case .daySection(let section):
                 return section.date
             case .promptMemory(let memory):
+                return memory.date
+            case .processingMemory(let memory):
                 return memory.date
             }
         }
@@ -376,6 +400,7 @@ struct HomeView: View {
         
         items += viewModel.daySections.map { .daySection($0) }
         items += viewModel.promptMemories.map { .promptMemory($0) }
+        items += viewModel.polaroidStore.processingMemories.map { .processingMemory($0) }
         
         return items.sorted { $0.date > $1.date }
     }

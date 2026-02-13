@@ -160,4 +160,50 @@ final class SelectPhotosViewModel: ObservableObject {
         
         return moments
     }
+    
+    func convertToPromptPhotos() async -> [PromptPhoto] {
+        guard !isSaving else { return [] }
+        isSaving = true
+        
+        let selectedIds = selectedAssets
+        let selectedPHAssets = assets.filter { selectedIds.contains($0.localIdentifier) }
+        
+        var promptPhotos: [PromptPhoto] = []
+        
+        for asset in selectedPHAssets {
+            let thumbnail = await loadFullSizeImage(for: asset)
+            let promptPhoto = PromptPhoto(
+                dateTaken: asset.creationDate ?? Date(),
+                thumbnail: thumbnail,
+                assetIdentifier: asset.localIdentifier,
+                isFromCamera: false,
+                unlockTime: nil
+            )
+            promptPhotos.append(promptPhoto)
+        }
+        
+        selectedAssets.removeAll()
+        selectionMode = false
+        isSaving = false
+        
+        return promptPhotos
+    }
+    
+    private func loadFullSizeImage(for asset: PHAsset) async -> UIImage {
+        await withCheckedContinuation { continuation in
+            let options = PHImageRequestOptions()
+            options.deliveryMode = .highQualityFormat
+            options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
+            
+            imageManager.requestImage(
+                for: asset,
+                targetSize: PHImageManagerMaximumSize,
+                contentMode: .aspectFit,
+                options: options
+            ) { image, _ in
+                continuation.resume(returning: image ?? UIImage())
+            }
+        }
+    }
 }
