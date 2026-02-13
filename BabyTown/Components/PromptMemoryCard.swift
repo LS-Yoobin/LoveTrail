@@ -4,6 +4,7 @@ struct PromptMemoryCard: View {
     
     let memory: PromptMemory
     var onTap: () -> Void
+    var onOpenPhoto: ((PromptPhoto, [PromptPhoto]) -> Void)? = nil
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -16,7 +17,8 @@ struct PromptMemoryCard: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 10) {
                 headerSection
-                loveNotePreview
+                locationSection
+                loveNoteSection
                 photoCollage
                 promptTextSection
             }
@@ -49,30 +51,60 @@ struct PromptMemoryCard: View {
                     .textCase(.uppercase)
             }
             
-            HStack(spacing: 4) {
-                Text(dateFormatter.string(from: memory.date))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.black)
-                
-                if let place = memory.placeName {
-                    Text("•")
-                        .foregroundStyle(.black.opacity(0.5))
-                    Text("Near \(place)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.black)
-                }
-            }
+            Text(dateFormatter.string(from: memory.date))
+                .font(.system(size: 12))
+                .foregroundStyle(.black)
         }
     }
     
-    // MARK: - Love Note Preview
+    // MARK: - Location Section
     
-    private var loveNotePreview: some View {
-        Text(memory.loveNote)
-            .font(.system(size: 13))
-            .foregroundStyle(.black.opacity(0.8))
-            .lineLimit(2)
-            .padding(.vertical, 4)
+    private var locationSection: some View {
+        Text(locationText)
+            .font(.system(size: 12))
+            .foregroundStyle(.black)
+    }
+    
+    private var locationText: String {
+        if let placeName = memory.placeName, !placeName.isEmpty {
+            return "Near \(placeName)"
+        }
+        return "Near Unknown Location"
+    }
+    
+    // MARK: - Love Note Section
+    
+    @ViewBuilder
+    private var loveNoteSection: some View {
+        let hasLoveNote = !memory.loveNote.isEmpty
+        
+        if hasLoveNote {
+            Text(memory.loveNote)
+                .font(.system(size: 13))
+                .foregroundStyle(.black.opacity(0.8))
+                .lineLimit(2)
+                .padding(.vertical, 4)
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.accent)
+                
+                Text("Generate Love Note")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(BabyTownTheme.accent)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(BabyTownTheme.accent.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(BabyTownTheme.accent.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
     }
     
     // MARK: - Prompt Text Section
@@ -104,36 +136,52 @@ struct PromptMemoryCard: View {
     }
     
     private func singleLayout(_ photo: PromptPhoto) -> some View {
-        ZStack {
-            Image(uiImage: photo.thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 160)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .blur(radius: isPhotoLocked(photo) ? 20 : 0)
-            
-            if isPhotoLocked(photo) {
-                lockOverlay
+        Button {
+            if !isPhotoLocked(photo) {
+                onOpenPhoto?(photo, memory.photos)
+            }
+        } label: {
+            ZStack {
+                Image(uiImage: photo.thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                
+                if isPhotoLocked(photo) {
+                    lockOverlay
+                }
             }
         }
+        .buttonStyle(.plain)
+        .disabled(isPhotoLocked(photo))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
     
     private func twoLayout(_ photos: [PromptPhoto]) -> some View {
         HStack(spacing: 3) {
             ForEach(photos) { photo in
-                ZStack {
-                    Image(uiImage: photo.thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .blur(radius: isPhotoLocked(photo) ? 20 : 0)
-                    
-                    if isPhotoLocked(photo) {
-                        lockOverlay
+                Button {
+                    if !isPhotoLocked(photo) {
+                        onOpenPhoto?(photo, memory.photos)
+                    }
+                } label: {
+                    ZStack {
+                        Image(uiImage: photo.thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                        
+                        if isPhotoLocked(photo) {
+                            lockOverlay
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(isPhotoLocked(photo))
             }
         }
         .frame(height: 120)
@@ -142,43 +190,67 @@ struct PromptMemoryCard: View {
     
     private func threeLayout(_ photos: [PromptPhoto]) -> some View {
         VStack(spacing: 3) {
-            ZStack {
-                Image(uiImage: photos[0].thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .blur(radius: isPhotoLocked(photos[0]) ? 20 : 0)
-                
-                if isPhotoLocked(photos[0]) {
-                    lockOverlay
+            Button {
+                if !isPhotoLocked(photos[0]) {
+                    onOpenPhoto?(photos[0], memory.photos)
+                }
+            } label: {
+                ZStack {
+                    Image(uiImage: photos[0].thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .blur(radius: isPhotoLocked(photos[0]) ? 20 : 0)
+                    
+                    if isPhotoLocked(photos[0]) {
+                        lockOverlay
+                    }
                 }
             }
+            .buttonStyle(.plain)
+            .disabled(isPhotoLocked(photos[0]))
             
             HStack(spacing: 3) {
-                ZStack {
-                    Image(uiImage: photos[1].thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .blur(radius: isPhotoLocked(photos[1]) ? 20 : 0)
-                    
-                    if isPhotoLocked(photos[1]) {
-                        lockOverlay
+                Button {
+                    if !isPhotoLocked(photos[1]) {
+                        onOpenPhoto?(photos[1], memory.photos)
+                    }
+                } label: {
+                    ZStack {
+                        Image(uiImage: photos[1].thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .blur(radius: isPhotoLocked(photos[1]) ? 20 : 0)
+                        
+                        if isPhotoLocked(photos[1]) {
+                            lockOverlay
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(isPhotoLocked(photos[1]))
                 
-                ZStack {
-                    Image(uiImage: photos[2].thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .blur(radius: isPhotoLocked(photos[2]) ? 20 : 0)
-                    
-                    if isPhotoLocked(photos[2]) {
-                        lockOverlay
+                Button {
+                    if !isPhotoLocked(photos[2]) {
+                        onOpenPhoto?(photos[2], memory.photos)
+                    }
+                } label: {
+                    ZStack {
+                        Image(uiImage: photos[2].thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .blur(radius: isPhotoLocked(photos[2]) ? 20 : 0)
+                        
+                        if isPhotoLocked(photos[2]) {
+                            lockOverlay
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(isPhotoLocked(photos[2]))
             }
             .frame(height: 75)
         }
@@ -193,25 +265,11 @@ struct PromptMemoryCard: View {
         return VStack(spacing: 3) {
             HStack(spacing: 3) {
                 ForEach(topRow) { photo in
-                    ZStack {
-                        Image(uiImage: photo.thumbnail)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .blur(radius: isPhotoLocked(photo) ? 20 : 0)
-                        
-                        if isPhotoLocked(photo) {
-                            lockOverlay
+                    Button {
+                        if !isPhotoLocked(photo) {
+                            onOpenPhoto?(photo, memory.photos)
                         }
-                    }
-                }
-            }
-            .frame(height: 80)
-            
-            if !bottomRow.isEmpty {
-                HStack(spacing: 3) {
-                    ForEach(bottomRow) { photo in
+                    } label: {
                         ZStack {
                             Image(uiImage: photo.thumbnail)
                                 .resizable()
@@ -224,6 +282,36 @@ struct PromptMemoryCard: View {
                                 lockOverlay
                             }
                         }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPhotoLocked(photo))
+                }
+            }
+            .frame(height: 80)
+            
+            if !bottomRow.isEmpty {
+                HStack(spacing: 3) {
+                    ForEach(bottomRow) { photo in
+                        Button {
+                            if !isPhotoLocked(photo) {
+                                onOpenPhoto?(photo, memory.photos)
+                            }
+                        } label: {
+                            ZStack {
+                                Image(uiImage: photo.thumbnail)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .blur(radius: isPhotoLocked(photo) ? 20 : 0)
+                                
+                                if isPhotoLocked(photo) {
+                                    lockOverlay
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isPhotoLocked(photo))
                     }
                 }
                 .frame(height: 80)

@@ -5,7 +5,7 @@ struct FirstMemoriesView: View {
 
     @StateObject private var viewModel = FirstMemoriesViewModel()
 
-    var onFinished: (_ firstMet: UIImage?, _ official: UIImage) -> Void
+    var onFinished: (_ firstMet: UIImage?, _ official: UIImage, _ firstMetDate: Date?, _ officialDate: Date?) -> Void
 
     var body: some View {
         ZStack {
@@ -101,7 +101,7 @@ struct FirstMemoriesView: View {
     private var doneButton: some View {
         Button { [viewModel] in
             guard let official = viewModel.officialImage else { return }
-            onFinished(viewModel.firstMetImage, official)
+            onFinished(viewModel.firstMetImage, official, viewModel.firstMetDate, viewModel.officialDate)
         } label: {
             Text("Done")
                 .font(.system(size: 17, weight: .medium))
@@ -142,7 +142,7 @@ struct FirstMemoriesView: View {
 }
 
 #Preview {
-    FirstMemoriesView { firstMet, official in
+    FirstMemoriesView { firstMet, official, firstMetDate, officialDate in
         print("Done — firstMet: \(firstMet != nil), official: \(official)")
     }
 }

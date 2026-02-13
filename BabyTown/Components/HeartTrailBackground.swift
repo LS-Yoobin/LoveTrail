@@ -6,7 +6,7 @@ struct HeartTrailBackground: View {
 
     @State private var trailOpacity: Double = 0
 
-    private let amplitude: CGFloat = 40
+    private let amplitude: CGFloat = 100
     private let frequency: CGFloat = 150
     private let heartSpacing: CGFloat = 60
 
@@ -17,7 +17,7 @@ struct HeartTrailBackground: View {
                     .stroke(
                         BabyTownTheme.accent.opacity(0.15),
                         style: StrokeStyle(
-                            lineWidth: 2,
+                            lineWidth: 5,
                             lineCap: .round,
                             lineJoin: .round
                         )
@@ -45,7 +45,7 @@ struct HeartTrailBackground: View {
             let y = t * height
             let x = centerX + amplitude * sin(t * .pi * 4)
             let rotation = cos(t * .pi * 4) * 15
-            let size: CGFloat = i % 2 == 0 ? 8 : 6
+            let size: CGFloat = i % 2 == 0 ? 20 : 15
             let opacity = i % 3 == 0 ? 0.2 : 0.15
             
             Image(systemName: "heart.fill")

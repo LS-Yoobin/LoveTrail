@@ -27,6 +27,9 @@ struct HomeView: View {
     @State private var showingMomentViewer = false
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
+    @State private var showingPromptPhotoViewer = false
+    @State private var viewerPromptPhotos: [PromptPhoto] = []
+    @State private var viewerPromptPhotoIndex = 0
     @State private var showPromptSheet = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
@@ -195,6 +198,20 @@ struct HomeView: View {
                 .transition(.opacity)
                 .zIndex(11)
             }
+            
+            if showingPromptPhotoViewer {
+                PromptPhotoViewer(
+                    photos: viewerPromptPhotos,
+                    initialIndex: viewerPromptPhotoIndex,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingPromptPhotoViewer = false
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(12)
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
         .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
@@ -344,7 +361,7 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + viewModel.polaroidStore.processingMemories.count
+                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + viewModel.polaroidStore.processingMemories.count + viewModel.foundingMoments.count
                 )
 
                 VStack(spacing: 24) {
@@ -391,31 +408,23 @@ struct HomeView: View {
                                     .trailing,
                                     index.isMultiple(of: 2) ? 46 : 20
                                 )
-                                
-                                // Show "The Beginning..." narrative after the last timeline item
-                                if index == combinedTimelineItems.count - 1 {
-                                    HStack(spacing: 8) {
-                                        HeartbeatIconView()
-                                        
-                                        TypingTextView(
-                                            text: "The Beginning...",
-                                            font: .system(size: 15, weight: .medium, design: .serif),
-                                            color: BabyTownTheme.textPrimary.opacity(0.85)
-                                        )
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.leading, index.isMultiple(of: 2) ? 32 : 58)
-                                    .padding(.top, 8)
-                                }
                             }
-                            
-                            
+
+
                         case .promptMemory(let memory):
                             PromptMemoryCard(
                                 memory: memory,
                                 onTap: {
                                     // TODO: Open prompt memory detail view
+                                },
+                                onOpenPhoto: { photo, allPhotos in
+                                    if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                                        viewerPromptPhotos = allPhotos
+                                        viewerPromptPhotoIndex = index
+                                        withAnimation(.easeIn(duration: 0.25)) {
+                                            showingPromptPhotoViewer = true
+                                        }
+                                    }
                                 }
                             )
                             .padding(
@@ -449,9 +458,94 @@ struct HomeView: View {
                             )
                         }
                     }
+
+                    // "The Beginning..." after the last regular item
+                    HStack(spacing: 8) {
+                        HeartbeatIconView()
+
+                        TypingTextView(
+                            text: "The Beginning...",
+                            font: .system(size: 15, weight: .medium, design: .serif),
+                            color: BabyTownTheme.textPrimary.opacity(0.85)
+                        )
+
+                        Spacer()
+                    }
+                    .padding(.leading, 32)
+                    .padding(.top, 8)
+
+                    // Founding moments anchored at the very bottom
+                    ForEach(Array(viewModel.foundingDaySections.enumerated()), id: \.element.id) { idx, section in
+                        let moment = viewModel.foundingMoments[idx]
+
+                        VStack(spacing: 12) {
+                            DayClusterCard(
+                                section: section,
+                                onOpenPhoto: { moment, allMoments in
+                                    viewerMoments = allMoments
+                                    if let i = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                        viewerInitialIndex = i
+                                    }
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        showingMomentViewer = true
+                                    }
+                                },
+                                onEditCaption: { momentId, caption, voiceNotePath in
+                                    viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                                },
+                                onRemove: { section in
+                                    withAnimation {
+                                        viewModel.removeMoments(from: section)
+                                    }
+                                },
+                                onTogglePin: { section in
+                                    withAnimation {
+                                        viewModel.togglePin(for: section)
+                                    }
+                                },
+                                onAddPhotos: { section, images in
+                                    viewModel.addPhotosToMemory(section: section, images: images)
+                                },
+                                onRemovePhoto: { section, momentId in
+                                    viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                                }
+                            )
+                            .padding(.horizontal, 20)
+
+                            foundingMomentLabel(moment)
+                        }
+                        .padding(.top, 16)
+                    }
                 }
             }
         }
+    }
+
+    private func foundingMomentLabel(_ moment: Moment) -> some View {
+        HStack(spacing: 8) {
+            HeartbeatIconView()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(moment.promptText ?? "")
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.85))
+
+                Text(foundingDateString(moment.dateTaken))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.5))
+            }
+
+            Spacer()
+        }
+        .padding(.leading, 32)
+        .padding(.vertical, 12)
+    }
+
+    private func foundingDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        return formatter.string(from: date)
     }
     
     private enum TimelineItem {

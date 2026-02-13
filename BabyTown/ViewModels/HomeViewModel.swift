@@ -33,9 +33,39 @@ final class HomeViewModel: ObservableObject {
     private var isInitializing = true
     private var cancellables = Set<AnyCancellable>()
 
+    private static let foundingPrompts: Set<String> = [
+        "When we first met",
+        "When we became official"
+    ]
+
     var daySections: [DaySection] {
-        let unpinnedMoments = moments.filter { !$0.isPinned }
+        let unpinnedMoments = moments.filter { !$0.isPinned && !Self.isFoundingMoment($0) }
         return DaySection.grouped(from: unpinnedMoments)
+    }
+
+    var foundingMoments: [Moment] {
+        moments
+            .filter { !$0.isPinned && Self.isFoundingMoment($0) }
+            .sorted { m1, m2 in
+                // "When we became official" first, "When we first met" second (bottom)
+                let order: [String] = ["When we became official", "When we first met"]
+                let i1 = order.firstIndex(of: m1.promptText ?? "") ?? 0
+                let i2 = order.firstIndex(of: m2.promptText ?? "") ?? 0
+                return i1 < i2
+            }
+    }
+
+    var foundingDaySections: [DaySection] {
+        let founding = foundingMoments
+        // Group each founding moment into its own DaySection, preserving order
+        return founding.map { moment in
+            DaySection(date: moment.dateTaken, moments: [moment])
+        }
+    }
+
+    private static func isFoundingMoment(_ moment: Moment) -> Bool {
+        guard let prompt = moment.promptText else { return false }
+        return foundingPrompts.contains(prompt)
     }
     
     var pinnedMoments: [Moment] {

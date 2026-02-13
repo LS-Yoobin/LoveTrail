@@ -340,7 +340,7 @@ struct SelectPhotosView: View {
                     .fill(BabyTownTheme.accentGradient)
                     .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 12, y: 6)
             )
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 20)
         }
         .disabled(viewModel.isSaving)
         .padding(.bottom, 40)

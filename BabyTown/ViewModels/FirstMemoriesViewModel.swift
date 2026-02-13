@@ -2,6 +2,8 @@ import Foundation
 import Combine
 import SwiftUI
 import PhotosUI
+import Photos
+import ImageIO
 
 @MainActor
 final class FirstMemoriesViewModel: ObservableObject {
@@ -9,6 +11,8 @@ final class FirstMemoriesViewModel: ObservableObject {
     @Published var firstMetImage: UIImage?
     @Published var officialImage: UIImage?
     @Published var heroImage: UIImage?
+    @Published var firstMetDate: Date?
+    @Published var officialDate: Date?
 
     @Published var firstMetItem: PhotosPickerItem?
     @Published var officialItem: PhotosPickerItem?
@@ -18,20 +22,47 @@ final class FirstMemoriesViewModel: ObservableObject {
     }
 
     func handleFirstMetSelection() async {
-        guard let image = await loadImage(from: firstMetItem) else { return }
-        firstMetImage = image
-        heroImage = image
+        guard let item = firstMetItem else { return }
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        firstMetImage = UIImage(data: data)
+        heroImage = firstMetImage
+        
+        if let exifDate = extractDateFromEXIF(data) {
+            firstMetDate = exifDate
+        } else {
+            firstMetDate = await loadPhotoDateFromAsset(item)
+        }
     }
 
     func handleOfficialSelection() async {
-        guard let image = await loadImage(from: officialItem) else { return }
-        officialImage = image
-        heroImage = image
+        guard let item = officialItem else { return }
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        officialImage = UIImage(data: data)
+        heroImage = officialImage
+        
+        if let exifDate = extractDateFromEXIF(data) {
+            officialDate = exifDate
+        } else {
+            officialDate = await loadPhotoDateFromAsset(item)
+        }
     }
 
-    private func loadImage(from item: PhotosPickerItem?) async -> UIImage? {
-        guard let item else { return nil }
-        guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-        return UIImage(data: data)
+    private func extractDateFromEXIF(_ data: Data) -> Date? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+              let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+              let dateString = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return formatter.date(from: dateString)
+    }
+
+    private func loadPhotoDateFromAsset(_ item: PhotosPickerItem) async -> Date? {
+        guard let assetId = item.itemIdentifier else { return nil }
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+        guard let asset = fetchResult.firstObject else { return nil }
+        return asset.creationDate
     }
 }

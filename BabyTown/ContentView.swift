@@ -60,7 +60,7 @@ struct ContentView: View {
                 .transition(.opacity)
 
             case .firstMemories:
-                FirstMemoriesView { firstMet, official in
+                FirstMemoriesView { firstMet, official, firstMetDate, officialDate in
                     firstMetPhoto = firstMet
                     officialPhoto = official
                     homeViewModel.pinnedFirstMet = firstMet
@@ -70,10 +70,13 @@ struct ContentView: View {
                     var onboardingMoments: [Moment] = []
                     let now = Date()
                     
+                    // Use the actual photo date or fallback to current date
+                    let officialPhotoDate = officialDate ?? now
+                    
                     // Add "When we became official" - both pinned and unpinned versions
                     let officialMomentPinned = Moment(
                         id: UUID(),
-                        dateTaken: now,
+                        dateTaken: officialPhotoDate,
                         assetIdentifier: nil,
                         thumbnail: official,
                         placeName: nil,
@@ -87,7 +90,7 @@ struct ContentView: View {
                     
                     let officialMomentUnpinned = Moment(
                         id: UUID(),
-                        dateTaken: now,
+                        dateTaken: officialPhotoDate,
                         assetIdentifier: nil,
                         thumbnail: official,
                         placeName: nil,
@@ -101,12 +104,12 @@ struct ContentView: View {
                     
                     // Add "When we first met" - both pinned and unpinned versions (if provided)
                     if let firstMet = firstMet {
-                        // Use a date 1 day earlier so it appears in a separate card
-                        let firstMetDate = now.addingTimeInterval(-86400)
+                        // Use the actual photo date or fallback to current date
+                        let firstMetPhotoDate = firstMetDate ?? now
                         
                         let firstMetMomentPinned = Moment(
                             id: UUID(),
-                            dateTaken: firstMetDate,
+                            dateTaken: firstMetPhotoDate,
                             assetIdentifier: nil,
                             thumbnail: firstMet,
                             placeName: nil,
@@ -120,7 +123,7 @@ struct ContentView: View {
                         
                         let firstMetMomentUnpinned = Moment(
                             id: UUID(),
-                            dateTaken: firstMetDate,
+                            dateTaken: firstMetPhotoDate,
                             assetIdentifier: nil,
                             thumbnail: firstMet,
                             placeName: nil,
