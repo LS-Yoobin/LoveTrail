@@ -1,10 +1,24 @@
 import Foundation
 
+private struct DayPlaceKey: Hashable {
+    let date: Date
+    let placeName: String
+}
+
 struct DaySection: Identifiable {
     let date: Date
+    let placeName: String?
     let moments: [Moment]
 
-    var id: Date { date }
+    var id: String {
+        "\(date.timeIntervalSince1970)_\(placeName ?? "")"
+    }
+
+    init(date: Date, placeName: String? = nil, moments: [Moment]) {
+        self.date = date
+        self.placeName = placeName
+        self.moments = moments
+    }
 
     var displayTitle: String {
         let formatter = DateFormatter()
@@ -13,9 +27,12 @@ struct DaySection: Identifiable {
     }
 
     var placeDisplay: String {
-        moments.compactMap(\.placeName).first ?? "Somewhere with you"
+        if let place = placeName, !place.isEmpty {
+            return place
+        }
+        return moments.compactMap(\.placeName).first ?? "Somewhere with you"
     }
-    
+
     var timeDisplay: String {
         guard let firstMoment = moments.first else { return "" }
         let formatter = DateFormatter()
@@ -28,17 +45,21 @@ struct DaySection: Identifiable {
         guard let laTimeZone = TimeZone(identifier: "America/Los_Angeles") else {
             return []
         }
-        
+
         var calendar = Calendar.current
         calendar.timeZone = laTimeZone
-        
+
         let grouped = Dictionary(grouping: moments) { moment in
-            calendar.startOfDay(for: moment.dateTaken)
+            DayPlaceKey(
+                date: calendar.startOfDay(for: moment.dateTaken),
+                placeName: moment.placeName ?? ""
+            )
         }
 
-        return grouped.map { date, dayMoments in
+        return grouped.map { key, dayMoments in
             DaySection(
-                date: date,
+                date: key.date,
+                placeName: key.placeName.isEmpty ? nil : key.placeName,
                 moments: dayMoments.sorted { $0.dateTaken < $1.dateTaken }
             )
         }

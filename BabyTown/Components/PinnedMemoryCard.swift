@@ -2,11 +2,17 @@ import SwiftUI
 
 struct PinnedMemoryCard: View {
 
-    let moment: Moment
+    let item: PinnedItem
     var onTap: (() -> Void)? = nil
     var onUnpin: (() -> Void)? = nil
     
     @State private var showMenu = false
+    @State private var currentPhotoIndex = 0
+    @State private var slideshowTimer: Timer?
+
+    private var slides: [PinnedSlide] {
+        item.slides
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -43,6 +49,12 @@ struct PinnedMemoryCard: View {
             }
             .padding(8)
         }
+        .onAppear {
+            startSlideshow()
+        }
+        .onDisappear {
+            stopSlideshow()
+        }
     }
 
     // MARK: - Photo
@@ -50,27 +62,37 @@ struct PinnedMemoryCard: View {
     @ViewBuilder
     private var photoArea: some View {
         ZStack {
-            Image(uiImage: moment.thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .frame(height: 150)
-                .blur(radius: moment.isLocked ? 20 : 0)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            
-            if moment.isLocked {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.black.opacity(0.4))
+            if !slides.isEmpty {
+                let currentSlide = slides[currentPhotoIndex % slides.count]
                 
-                VStack(spacing: 6) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
+                Image(uiImage: currentSlide.image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .frame(height: 150)
+                    .blur(radius: currentSlide.isLocked ? 20 : 0)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .id(currentSlide.id) // Use ID for better transitions
+                    .transition(.opacity)
+                
+                if currentSlide.isLocked {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(.black.opacity(0.4))
                     
-                    if let unlockTime = moment.unlockTime {
-                        TimeUntilUnlockView(unlockTime: unlockTime)
+                    VStack(spacing: 6) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                        
+                        if let unlockTime = currentSlide.unlockTime {
+                            TimeUntilUnlockView(unlockTime: unlockTime)
+                        }
                     }
                 }
+            } else {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 150)
             }
         }
         .frame(height: 150)
@@ -80,8 +102,8 @@ struct PinnedMemoryCard: View {
 
     private var textArea: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let promptText = moment.promptText {
-                Text(promptText)
+            if let title = item.title {
+                Text(title)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(BabyTownTheme.textPrimary)
                     .lineLimit(2)
@@ -100,7 +122,7 @@ struct PinnedMemoryCard: View {
             }
             .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
 
-            if let placeName = moment.placeName {
+            if let placeName = item.placeName {
                 Text("Near \(placeName)")
                     .font(.system(size: 10))
                     .foregroundStyle(BabyTownTheme.textTertiary)
@@ -112,20 +134,51 @@ struct PinnedMemoryCard: View {
     private var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: moment.dateTaken)
+        return formatter.string(from: item.date)
+    }
+    
+    // MARK: - Slideshow
+    
+    private func startSlideshow() {
+        guard slides.count > 1 else { return }
+        
+        slideshowTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.5)) {
+                currentPhotoIndex = (currentPhotoIndex + 1) % slides.count
+            }
+        }
+    }
+    
+    private func stopSlideshow() {
+        slideshowTimer?.invalidate()
+        slideshowTimer = nil
     }
 }
 
 #Preview {
-    HStack(spacing: 14) {
-        PinnedMemoryCard(
-            moment: Moment.sampleMoments[0],
-            onUnpin: { print("Unpin") }
-        )
-        PinnedMemoryCard(
-            moment: Moment.sampleMoments[1],
-            onUnpin: { print("Unpin") }
-        )
+    let moments = Moment.sampleMoments
+    let promptMemory = PromptMemory(
+        promptText: "Our First Date",
+        date: Date(),
+        loveNote: "It was magical!",
+        photos: [
+            PromptPhoto(dateTaken: Date(), thumbnail: moments[0].thumbnail),
+            PromptPhoto(dateTaken: Date(), thumbnail: moments[1].thumbnail)
+        ],
+        isPinned: true
+    )
+    
+    return ScrollView(.horizontal) {
+        HStack(spacing: 14) {
+            PinnedMemoryCard(
+                item: .moment(moments[0], Array(moments.prefix(3))),
+                onUnpin: { print("Unpin") }
+            )
+            PinnedMemoryCard(
+                item: .prompt(promptMemory),
+                onUnpin: { print("Unpin") }
+            )
+        }
+        .padding(20)
     }
-    .padding(20)
 }

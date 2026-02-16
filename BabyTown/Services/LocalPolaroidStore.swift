@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Combine
+import CoreLocation
 
 @MainActor
 final class LocalPolaroidStore: ObservableObject {
@@ -71,38 +72,47 @@ final class LocalPolaroidStore: ObservableObject {
         try? data.write(to: entriesFileURL)
     }
     
-    func savePhoto(_ image: UIImage) -> PolaroidEntry? {
+    func savePhoto(_ image: UIImage, placeName: String? = nil, location: CLLocation? = nil) -> PolaroidEntry? {
         let id = UUID()
         let fileName = "\(id.uuidString).jpg"
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
-        
+
         guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return nil }
-        
+
         do {
             try jpegData.write(to: fileURL)
-            
-            let currentCount = todaysCaptureCount()
-            let isFifth = (currentCount + 1) == 1
-            
+
+            let isFirstToday = todaysCaptureCount() == 0
+            let isTakenAfter9PM = isPhotoTakenAfter9PM(Date())
+
             let entry = PolaroidEntry(
                 id: id,
                 capturedAt: Date(),
                 imageFileName: fileName,
                 released: false,
                 manuallyReleasedAt: nil,
-                isFifthPhoto: isFifth
+                placeName: placeName,
+                location: location
             )
             entries.append(entry)
             saveEntries()
-            
-            if isFifth {
-                createProcessingMemory(for: entry)
-            }
-            
+
+            // Create processing memory for the unreleased photo so it shows up in the feed
+            createProcessingMemory(for: entry)
+
             return entry
         } catch {
             return nil
         }
+    }
+    
+    private func isPhotoTakenAfter9PM(_ date: Date) -> Bool {
+        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var laCalendar = Calendar.current
+        laCalendar.timeZone = laTimeZone
+        
+        let hour = laCalendar.component(.hour, from: date)
+        return hour >= 21 // 9 PM or later
     }
     
     private func createProcessingMemory(for entry: PolaroidEntry) {
@@ -116,7 +126,13 @@ final class LocalPolaroidStore: ObservableObject {
         releaseComponents.minute = 0
         releaseComponents.second = 0
         
-        guard let unlockTime = laCalendar.date(from: releaseComponents) else { return }
+        guard var unlockTime = laCalendar.date(from: releaseComponents) else { return }
+        
+        // If photo was taken after 9 PM, unlock at 9 PM the next day
+        if entry.capturedAt > unlockTime {
+            guard let nextDayUnlock = laCalendar.date(byAdding: .day, value: 1, to: unlockTime) else { return }
+            unlockTime = nextDayUnlock
+        }
         
         let processingMemory = ProcessingMemory(
             id: entry.id,
@@ -141,29 +157,39 @@ final class LocalPolaroidStore: ObservableObject {
         laCalendar.timeZone = laTimeZone
 
         let now = Date()
-        let currentDayStart = laCalendar.startOfDay(for: now)
+        let currentPeriodStart = get9PMBoundaryDate(for: now)
 
         return entries.filter { entry in
-            let entryDayStart = laCalendar.startOfDay(for: entry.capturedAt)
-            return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart)
+            let entryPeriodStart = get9PMBoundaryDate(for: entry.capturedAt)
+            return laCalendar.isDate(entryPeriodStart, inSameDayAs: currentPeriodStart)
         }.count
     }
-
-    func canCapturePhoto() -> Bool {
+    
+    private func get9PMBoundaryDate(for date: Date) -> Date {
         let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
         var laCalendar = Calendar.current
         laCalendar.timeZone = laTimeZone
-
-        let now = Date()
-        let hour = laCalendar.component(.hour, from: now)
-        let count = todaysCaptureCount()
-
-        // If 5 photos taken and it's 9PM or later, block until midnight
-        if count >= 5 && hour >= 21 {
-            return false
+        
+        let dayStart = laCalendar.startOfDay(for: date)
+        var components = DateComponents()
+        components.hour = 21 // 9 PM
+        components.minute = 0
+        components.second = 0
+        
+        guard let ninePM = laCalendar.date(byAdding: components, to: dayStart) else {
+            return dayStart
         }
-        // Otherwise allow if under limit
-        return count < 5
+        
+        // If the date is before 9 PM, the boundary should be 9 PM of the previous day
+        if date < ninePM {
+            return laCalendar.date(byAdding: .day, value: -1, to: ninePM) ?? ninePM
+        }
+        
+        return ninePM
+    }
+
+    func canCapturePhoto() -> Bool {
+        return true
     }
 
     func todaysUnreleasedEntries() -> [PolaroidEntry] {
@@ -172,11 +198,11 @@ final class LocalPolaroidStore: ObservableObject {
         laCalendar.timeZone = laTimeZone
 
         let now = Date()
-        let currentDayStart = laCalendar.startOfDay(for: now)
+        let currentPeriodStart = get9PMBoundaryDate(for: now)
 
         return entries.filter { entry in
-            let entryDayStart = laCalendar.startOfDay(for: entry.capturedAt)
-            return laCalendar.isDate(entryDayStart, inSameDayAs: currentDayStart) && !entry.released
+            let entryPeriodStart = get9PMBoundaryDate(for: entry.capturedAt)
+            return laCalendar.isDate(entryPeriodStart, inSameDayAs: currentPeriodStart) && !entry.released
         }
     }
     
@@ -219,7 +245,13 @@ final class LocalPolaroidStore: ObservableObject {
             releaseComponents.minute = 0
             releaseComponents.second = 0
             
-            guard let releaseTime = laCalendar.date(from: releaseComponents) else { return false }
+            guard var releaseTime = laCalendar.date(from: releaseComponents) else { return false }
+            
+            // If photo was taken after 9 PM, release at 9 PM the next day
+            if entry.capturedAt > releaseTime {
+                guard let nextDayRelease = laCalendar.date(byAdding: .day, value: 1, to: releaseTime) else { return false }
+                releaseTime = nextDayRelease
+            }
             
             return now >= releaseTime
         }

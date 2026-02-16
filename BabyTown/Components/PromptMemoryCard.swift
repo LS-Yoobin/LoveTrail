@@ -137,7 +137,7 @@ struct PromptMemoryCard: View {
         if let placeName = memory.placeName, !placeName.isEmpty {
             return "Near \(placeName)"
         }
-        return "Near Unknown Location"
+        return "No location data"
     }
     
     // MARK: - Love Note Section

@@ -38,12 +38,31 @@ class CustomCameraViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     
     private let captureButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.backgroundColor = .white
-        button.layer.cornerRadius = 35
-        button.layer.borderWidth = 5
-        button.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        let button = UIButton(type: .custom)
+        
+        // Create circular white outline
+        button.backgroundColor = .clear
+        button.layer.cornerRadius = 40  // Half of 80 for perfect circle
+        button.layer.borderWidth = 3
+        button.layer.borderColor = UIColor.white.cgColor
+        button.clipsToBounds = true
         button.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add cat image in the center
+        if let catImage = UIImage(named: "First Page Cat") {
+            let imageView = UIImageView(image: catImage)
+            imageView.contentMode = .scaleAspectFit
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            button.addSubview(imageView)
+            
+            NSLayoutConstraint.activate([
+                imageView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+                imageView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+                imageView.widthAnchor.constraint(equalTo: button.widthAnchor, multiplier: 0.6),
+                imageView.heightAnchor.constraint(equalTo: button.heightAnchor, multiplier: 0.6)
+            ])
+        }
+        
         return button
     }()
     
@@ -111,8 +130,8 @@ class CustomCameraViewController: UIViewController {
         NSLayoutConstraint.activate([
             captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             captureButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
-            captureButton.widthAnchor.constraint(equalToConstant: 70),
-            captureButton.heightAnchor.constraint(equalToConstant: 70),
+            captureButton.widthAnchor.constraint(equalToConstant: 80),
+            captureButton.heightAnchor.constraint(equalToConstant: 80),
             
             flashView.topAnchor.constraint(equalTo: view.topAnchor),
             flashView.leadingAnchor.constraint(equalTo: view.leadingAnchor),

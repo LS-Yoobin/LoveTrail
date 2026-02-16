@@ -8,35 +8,81 @@ struct MomentPhotoViewer: View {
     let initialIndex: Int
     var onDismiss: () -> Void
     var onUpdateMoments: ([Moment]) -> Void
+    var onDeleteMoment: ((Moment) -> Void)? = nil
     
     @State private var currentIndex: Int
     @State private var editMode = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var updatedMoments: [Moment]
+    @State private var showDeleteConfirmation = false
     
     init(
         moments: [Moment],
         initialIndex: Int,
         onDismiss: @escaping () -> Void,
-        onUpdateMoments: @escaping ([Moment]) -> Void
+        onUpdateMoments: @escaping ([Moment]) -> Void,
+        onDeleteMoment: ((Moment) -> Void)? = nil
     ) {
         self.moments = moments
         self.initialIndex = initialIndex
         self.onDismiss = onDismiss
         self.onUpdateMoments = onUpdateMoments
+        self.onDeleteMoment = onDeleteMoment
         _currentIndex = State(initialValue: initialIndex)
         _updatedMoments = State(initialValue: moments)
     }
     
     var currentMoment: Moment {
-        updatedMoments[currentIndex]
+        if updatedMoments.isEmpty {
+            return moments.first ?? Moment.sampleMoment
+        }
+        guard currentIndex < updatedMoments.count else {
+            return updatedMoments.last ?? moments.first ?? Moment.sampleMoment
+        }
+        return updatedMoments[currentIndex]
+    }
+    
+    var isFromCamera: Bool {
+        currentMoment.assetIdentifier == nil
+    }
+    
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        return formatter
+    }
+    
+    private var photoDateDisplay: some View {
+        HStack {
+            Text(dateFormatter.string(from: currentMoment.dateTaken))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.5))
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+                )
+            Spacer()
+        }
+        .padding(.leading, 20)
     }
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            TabView(selection: $currentIndex) {
+            if updatedMoments.isEmpty {
+                VStack {
+                    Text("No photos to display")
+                        .foregroundStyle(.white)
+                    Button("Dismiss") { onDismiss() }
+                        .padding()
+                }
+            } else {
+                TabView(selection: $currentIndex) {
                 ForEach(Array(updatedMoments.enumerated()), id: \.element.id) { index, moment in
                     photoView(for: moment)
                         .tag(index)
@@ -44,13 +90,20 @@ struct MomentPhotoViewer: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             
-            VStack {
-                topBar
-                Spacer()
-                if editMode {
-                    editControls
-                } else if updatedMoments.count > 1 {
-                    photoPreviewStrip
+            
+                VStack {
+                    topBar
+                    Spacer()
+                    
+                    // Photo date display
+                    photoDateDisplay
+                        .padding(.bottom, 8)
+                    
+                    if editMode {
+                        editControls
+                    } else if updatedMoments.count > 1 {
+                        photoPreviewStrip
+                    }
                 }
             }
         }
@@ -60,6 +113,19 @@ struct MomentPhotoViewer: View {
                 await handlePhotoSelection(newItems)
             }
         }
+        .alert(
+            isFromCamera ? "Remove Photo Permanently?" : "Remove Photo?",
+            isPresented: $showDeleteConfirmation
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                deleteCurrentPhoto()
+            }
+        } message: {
+            Text(isFromCamera 
+                ? "This photo was taken with the in-app camera and will be removed permanently from the app."
+                : "Would you like to remove this photo from the app?")
+        }
     }
     
     // MARK: - Photo View
@@ -68,6 +134,7 @@ struct MomentPhotoViewer: View {
         Image(uiImage: moment.thumbnail)
             .resizable()
             .aspectRatio(contentMode: .fit)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Top Bar
@@ -183,9 +250,35 @@ struct MomentPhotoViewer: View {
                         .fill(Color.white.opacity(0.2))
                 )
             }
+            
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16))
+                    Text("Remove Photo")
+                        .font(.system(size: 15, weight: .medium))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.red.opacity(0.3))
+                )
+            }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 40)
+        .padding(.bottom, 60)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0), Color.black.opacity(0.8)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .padding(.horizontal, -20)
+        )
     }
     
     // MARK: - Photo Selection
@@ -206,5 +299,30 @@ struct MomentPhotoViewer: View {
         }
         
         selectedPhotos = []
+    }
+    
+    // MARK: - Delete Photo
+    
+    private func deleteCurrentPhoto() {
+        let momentToDelete = currentMoment
+        
+        // Remove from local array
+        updatedMoments.remove(at: currentIndex)
+        
+        // Adjust current index if needed
+        if updatedMoments.isEmpty {
+            // If no photos left, call delete callback and dismiss
+            onDeleteMoment?(momentToDelete)
+            onDismiss()
+        } else {
+            // Adjust index if we deleted the last photo
+            if currentIndex >= updatedMoments.count {
+                currentIndex = updatedMoments.count - 1
+            }
+            
+            // Update the moments and call delete callback
+            onUpdateMoments(updatedMoments)
+            onDeleteMoment?(momentToDelete)
+        }
     }
 }

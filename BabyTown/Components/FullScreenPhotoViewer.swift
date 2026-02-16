@@ -88,6 +88,7 @@ struct FullScreenPhotoViewer: View {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
         } else {
             ProgressView()

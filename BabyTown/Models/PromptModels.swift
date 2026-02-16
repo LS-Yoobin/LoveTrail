@@ -18,18 +18,22 @@ struct PromptPhoto: Identifiable, Codable {
     var assetIdentifier: String?
     var isFromCamera: Bool
     var unlockTime: Date?
+    var latitude: Double?
+    var longitude: Double?
     
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, thumbnailData, assetIdentifier, isFromCamera, unlockTime
+        case id, dateTaken, thumbnailData, assetIdentifier, isFromCamera, unlockTime, latitude, longitude
     }
     
-    init(id: UUID = UUID(), dateTaken: Date, thumbnail: UIImage, assetIdentifier: String? = nil, isFromCamera: Bool = false, unlockTime: Date? = nil) {
+    init(id: UUID = UUID(), dateTaken: Date, thumbnail: UIImage, assetIdentifier: String? = nil, isFromCamera: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil) {
         self.id = id
         self.dateTaken = dateTaken
         self.thumbnail = thumbnail
         self.assetIdentifier = assetIdentifier
         self.isFromCamera = isFromCamera
         self.unlockTime = unlockTime
+        self.latitude = latitude
+        self.longitude = longitude
     }
     
     init(from decoder: Decoder) throws {
@@ -39,6 +43,8 @@ struct PromptPhoto: Identifiable, Codable {
         assetIdentifier = try container.decodeIfPresent(String.self, forKey: .assetIdentifier)
         isFromCamera = try container.decodeIfPresent(Bool.self, forKey: .isFromCamera) ?? false
         unlockTime = try container.decodeIfPresent(Date.self, forKey: .unlockTime)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
         
         if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
            let image = UIImage(data: thumbnailData) {
@@ -55,6 +61,8 @@ struct PromptPhoto: Identifiable, Codable {
         try container.encodeIfPresent(assetIdentifier, forKey: .assetIdentifier)
         try container.encode(isFromCamera, forKey: .isFromCamera)
         try container.encodeIfPresent(unlockTime, forKey: .unlockTime)
+        try container.encodeIfPresent(latitude, forKey: .latitude)
+        try container.encodeIfPresent(longitude, forKey: .longitude)
         
         if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
             try container.encode(thumbnailData, forKey: .thumbnailData)
@@ -71,6 +79,8 @@ struct PromptMemory: Identifiable, Codable {
     var photos: [PromptPhoto]
     var isPinned: Bool
     var pinnedAt: Date?
+    var latitude: Double?
+    var longitude: Double?
 
     init(
         id: UUID = UUID(),
@@ -80,7 +90,9 @@ struct PromptMemory: Identifiable, Codable {
         loveNote: String,
         photos: [PromptPhoto],
         isPinned: Bool = false,
-        pinnedAt: Date? = nil
+        pinnedAt: Date? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) {
         self.id = id
         self.promptText = promptText
@@ -90,5 +102,7 @@ struct PromptMemory: Identifiable, Codable {
         self.photos = photos
         self.isPinned = isPinned
         self.pinnedAt = pinnedAt
+        self.latitude = latitude
+        self.longitude = longitude
     }
 }

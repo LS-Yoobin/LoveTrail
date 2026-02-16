@@ -17,6 +17,8 @@ struct PromptMemoryBuilderView: View {
     @State private var selectedPhotos: [PromptPhoto] = []
     @State private var showPhotoSelection = false
     @State private var isLoadingLocation = false
+    @State private var latitude: Double?
+    @State private var longitude: Double?
     @FocusState private var isNoteFieldFocused: Bool
     
     private var laTimeZone: TimeZone {
@@ -59,6 +61,9 @@ struct PromptMemoryBuilderView: View {
                     if let firstPhoto = photos.first {
                         Task {
                             await extractLocationFromAsset(firstPhoto.assetIdentifier)
+                            // Store photo coordinates to memory if provided
+                            self.latitude = firstPhoto.latitude
+                            self.longitude = firstPhoto.longitude
                         }
                     }
                     showPhotoSelection = false
@@ -72,6 +77,9 @@ struct PromptMemoryBuilderView: View {
                 if let firstPhoto = preSelected.first {
                     Task {
                         await extractLocationFromAsset(firstPhoto.assetIdentifier)
+                        // Preserve coordinates from pre-selected photo
+                        self.latitude = firstPhoto.latitude
+                        self.longitude = firstPhoto.longitude
                     }
                 }
             }
@@ -332,6 +340,8 @@ struct PromptMemoryBuilderView: View {
                         if let name = name {
                             await MainActor.run {
                                 placeName = name
+                                self.latitude = location.coordinate.latitude
+                                self.longitude = location.coordinate.longitude
                             }
                         }
                     }
@@ -352,7 +362,9 @@ struct PromptMemoryBuilderView: View {
             date: selectedDate,
             placeName: placeName == "Somewhere with you" ? nil : placeName,
             loveNote: loveNote,
-            photos: selectedPhotos
+            photos: selectedPhotos,
+            latitude: latitude,
+            longitude: longitude
         )
         
         onSave(memory)

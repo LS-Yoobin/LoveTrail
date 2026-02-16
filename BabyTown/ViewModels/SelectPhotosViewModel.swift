@@ -8,8 +8,16 @@ final class SelectPhotosViewModel: ObservableObject {
 
     // MARK: - Filters
 
-    @Published var selectedYear: Int
-    @Published var selectedMonth: Int
+    @Published var selectedYear: Int {
+        didSet {
+            UserDefaults.standard.set(selectedYear, forKey: "SelectPhotos_SelectedYear")
+        }
+    }
+    @Published var selectedMonth: Int {
+        didSet {
+            UserDefaults.standard.set(selectedMonth, forKey: "SelectPhotos_SelectedMonth")
+        }
+    }
 
     // MARK: - Data
 
@@ -47,8 +55,19 @@ final class SelectPhotosViewModel: ObservableObject {
     init() {
         let cal = Calendar.current
         let now = Date()
-        selectedYear = cal.component(.year, from: now)
-        selectedMonth = cal.component(.month, from: now)
+        
+        // Load saved filter values or use current date as default
+        if let savedYear = UserDefaults.standard.object(forKey: "SelectPhotos_SelectedYear") as? Int {
+            selectedYear = savedYear
+        } else {
+            selectedYear = cal.component(.year, from: now)
+        }
+        
+        if let savedMonth = UserDefaults.standard.object(forKey: "SelectPhotos_SelectedMonth") as? Int {
+            selectedMonth = savedMonth
+        } else {
+            selectedMonth = cal.component(.month, from: now)
+        }
     }
 
     // MARK: - Authorization
@@ -177,7 +196,9 @@ final class SelectPhotosViewModel: ObservableObject {
                 thumbnail: thumbnail,
                 assetIdentifier: asset.localIdentifier,
                 isFromCamera: false,
-                unlockTime: nil
+                unlockTime: nil,
+                latitude: asset.location?.coordinate.latitude,
+                longitude: asset.location?.coordinate.longitude
             )
             promptPhotos.append(promptPhoto)
         }

@@ -20,7 +20,7 @@ struct TypingTextView: View {
     private func startTypingAnimation() {
         displayedText = ""
         currentIndex = 0
-        
+
         Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
             if currentIndex < text.count {
                 let index = text.index(text.startIndex, offsetBy: currentIndex)
@@ -28,6 +28,9 @@ struct TypingTextView: View {
                 currentIndex += 1
             } else {
                 timer.invalidate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    startTypingAnimation()
+                }
             }
         }
     }

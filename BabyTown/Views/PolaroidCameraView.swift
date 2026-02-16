@@ -1,38 +1,38 @@
 import SwiftUI
 
 struct PolaroidCameraView: View {
-    
+
     @ObservedObject var polaroidStore: LocalPolaroidStore
     @Environment(\.dismiss) private var dismiss
     var onPhotosReleased: ([PolaroidEntry]) -> Void
-    
+
+    @StateObject private var locationManager = CameraLocationManager()
     @State private var capturedImage: UIImage?
     @State private var showNotification = false
     @State private var notificationMessage = ""
+    @State private var showLogModal = false
     @State private var showReleaseConfirmation = false
-    
+
     @AppStorage("currentCatVariantIndex") private var currentCatVariantIndex = 1
-    
-    private let dailyLimit = 5
-    
+
     private var todaysCount: Int {
         polaroidStore.todaysCaptureCount()
     }
-    
+
     private var hasUnreleasedToday: Bool {
         !polaroidStore.todaysUnreleasedEntries().isEmpty
     }
-    
+
     var body: some View {
         ZStack {
-            CustomCameraView(image: $capturedImage, canCapture: polaroidStore.canCapturePhoto())
+            CustomCameraView(image: $capturedImage, canCapture: true)
                 .ignoresSafeArea()
-            
+
             VStack {
                 topBar
-                
+
                 Spacer()
-                
+
                 if showNotification {
                     notificationBanner
                         .padding(.bottom, 120)
@@ -40,14 +40,23 @@ struct PolaroidCameraView: View {
                 }
             }
         }
+        .onAppear { locationManager.requestPermissionAndStart() }
+        .onDisappear { locationManager.stop() }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
-                handleCapturedPhoto(image)
                 capturedImage = nil
+                Task {
+                    await handleCapturedPhoto(image)
+                }
             }
         }
+        .sheet(isPresented: $showLogModal) {
+            CameraLogView(entries: polaroidStore.todaysUnreleasedEntries())
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
-    
+
     private var topBar: some View {
         HStack {
             Button(action: { dismiss() }) {
@@ -59,34 +68,52 @@ struct PolaroidCameraView: View {
                 }
                 .foregroundStyle(.white)
             }
-            
+
             Spacer()
-            
-            HStack(spacing: 8) {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("\(todaysCount) of \(dailyLimit)")
-                    .font(.system(size: 17, weight: .bold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 0.95, green: 0.26, blue: 0.35), Color(red: 0.88, green: 0.22, blue: 0.32)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+
+            Button(action: { showLogModal = true }) {
+                ZStack(alignment: .topTrailing) {
+                    Group {
+                        if let lastEntry = polaroidStore.todaysUnreleasedEntries().last,
+                           let image = polaroidStore.loadImage(for: lastEntry) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Color.black.opacity(0.3)
+                                .overlay(
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(.white.opacity(0.7))
+                                )
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.5), lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
-            )
+                    
+                    if todaysCount > 0 {
+                        Text("\(todaysCount)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(Color(red: 0.95, green: 0.26, blue: 0.35))
+                                    .shadow(color: .black.opacity(0.2), radius: 2)
+                            )
+                            .offset(x: 8, y: -8)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
     }
-    
+
     private var notificationBanner: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -97,12 +124,10 @@ struct PolaroidCameraView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
             }
-            
-            if todaysCount < dailyLimit {
-                Text("Take another photo if you'd like")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
+
+            Text("Take another photo if you'd like")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -116,7 +141,7 @@ struct PolaroidCameraView: View {
         )
         .padding(.horizontal, 24)
     }
-    
+
     private var releaseButton: some View {
         Button {
             showReleaseConfirmation = true
@@ -139,49 +164,36 @@ struct PolaroidCameraView: View {
             }
         }
     }
-    
-    private func handleCapturedPhoto(_ image: UIImage) {
-        guard polaroidStore.canCapturePhoto() else {
-            notificationMessage = "Done for today! New photos at midnight"
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                showNotification = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                withAnimation {
-                    showNotification = false
-                }
-            }
-            return
+
+    private func handleCapturedPhoto(_ image: UIImage) async {
+        var placeName: String? = nil
+        let location = locationManager.currentLocation
+        if let location = location {
+            placeName = await SmartPlaceResolver.shared.resolvePlaceName(for: location)
         }
 
-        guard polaroidStore.savePhoto(image) != nil else { return }
+        guard polaroidStore.savePhoto(image, placeName: placeName, location: location) != nil else { return }
 
-        let remaining = dailyLimit - todaysCount
+        notificationMessage = "This photo will be available later"
 
-        if remaining > 0 {
-            notificationMessage = "Photo saved! \(remaining) left for today"
-        } else {
-            notificationMessage = "That's 5 for today! See you at 9 PM"
-        }
-        
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             showNotification = true
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
             withAnimation {
                 showNotification = false
             }
         }
     }
-    
+
     private func releaseNow() {
         let toRelease = polaroidStore.todaysUnreleasedEntries()
         polaroidStore.releaseEntriesManually(toRelease)
         onPhotosReleased(toRelease)
         dismiss()
     }
-    
+
     private func rotateCatVariant() {
         if currentCatVariantIndex < 5 {
             currentCatVariantIndex += 1

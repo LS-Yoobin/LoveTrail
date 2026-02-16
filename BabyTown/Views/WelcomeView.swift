@@ -39,18 +39,10 @@ struct WelcomeView: View {
                 Spacer()
 
                 // Center heart
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 90))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                Color.pink,
-                                Color.red.opacity(0.8)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                Image("First Page Cat")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 250)
                     .scaleEffect(heartScale)
                     .opacity(heartOpacity)
                     .shadow(
@@ -60,7 +52,7 @@ struct WelcomeView: View {
 
                 // Title
                 Text("I Love You")
-                    .font(.system(size: 32, weight: .light, design: .serif))
+                    .font(.system(size: 32, weight: .bold, design: .serif))
                     .foregroundStyle(.white)
                     .padding(.top, 28)
                     .opacity(textOpacity)

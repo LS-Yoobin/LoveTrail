@@ -2,6 +2,99 @@ import Foundation
 import Combine
 import SwiftUI
 import UIKit
+import Photos
+
+enum Season: String, CaseIterable, Comparable {
+    case spring = "Spring" // Mar–May
+    case summer = "Summer" // Jun–Aug
+    case fall = "Fall"     // Sep–Nov
+    case winter = "Winter" // Dec–Feb
+
+    static func from(date: Date) -> Season {
+        let month = Calendar.current.component(.month, from: date)
+        switch month {
+        case 3...5: return .spring
+        case 6...8: return .summer
+        case 9...11: return .fall
+        default: return .winter
+        }
+    }
+
+    static func < (lhs: Season, rhs: Season) -> Bool {
+        let order: [Season] = [.spring, .summer, .fall, .winter]
+        return order.firstIndex(of: lhs)! < order.firstIndex(of: rhs)!
+    }
+}
+
+struct SeasonGroup: Identifiable {
+    let id = UUID()
+    let season: Season
+    let sections: [DaySection]
+}
+
+struct YearGroup: Identifiable {
+    let id: Int
+    let seasons: [SeasonGroup]
+}
+
+enum PinnedItem: Identifiable {
+    case moment(Moment, [Moment])
+    case prompt(PromptMemory)
+    
+    var id: UUID {
+        switch self {
+        case .moment(let m, _): return m.id
+        case .prompt(let p): return p.id
+        }
+    }
+    
+    var date: Date {
+        switch self {
+        case .moment(let m, _): return m.dateTaken
+        case .prompt(let p): return p.date
+        }
+    }
+    
+    var pinnedAt: Date {
+        switch self {
+        case .moment(let m, _): return m.pinnedAt ?? Date.distantPast
+        case .prompt(let p): return p.pinnedAt ?? Date.distantPast
+        }
+    }
+    
+    var title: String? {
+        switch self {
+        case .moment(let m, _): return m.promptText
+        case .prompt(let p): return p.promptText
+        }
+    }
+    
+    var placeName: String? {
+        switch self {
+        case .moment(let m, _): return m.placeName
+        case .prompt(let p): return p.placeName
+        }
+    }
+    
+    var slides: [PinnedSlide] {
+        switch self {
+        case .moment(_, let all):
+            return all.map { PinnedSlide(id: $0.id, image: $0.thumbnail, isLocked: $0.isLocked, unlockTime: $0.unlockTime) }
+        case .prompt(let p):
+            return p.photos.map { ph in
+                let isLocked = ph.isFromCamera && (ph.unlockTime.map { Date() < $0 } ?? false)
+                return PinnedSlide(id: ph.id, image: ph.thumbnail, isLocked: isLocked, unlockTime: ph.unlockTime)
+            }
+        }
+    }
+}
+
+struct PinnedSlide: Identifiable {
+    let id: UUID
+    let image: UIImage
+    let isLocked: Bool
+    let unlockTime: Date?
+}
 
 @MainActor
 final class HomeViewModel: ObservableObject {
@@ -21,6 +114,12 @@ final class HomeViewModel: ObservableObject {
             DataPersistenceManager.shared.saveMoments(moments)
         }
     }
+    
+    
+    var allPinnedItems: [PinnedItem] {
+        return pinnedItems
+    }
+
     @Published var promptMemories: [PromptMemory] = [] {
         didSet {
             DataPersistenceManager.shared.savePromptMemories(promptMemories)
@@ -59,7 +158,7 @@ final class HomeViewModel: ObservableObject {
         let founding = foundingMoments
         // Group each founding moment into its own DaySection, preserving order
         return founding.map { moment in
-            DaySection(date: moment.dateTaken, moments: [moment])
+            DaySection(date: moment.dateTaken, placeName: moment.placeName, moments: [moment])
         }
     }
 
@@ -72,8 +171,36 @@ final class HomeViewModel: ObservableObject {
         moments.filter { $0.isPinned }.sorted { ($0.pinnedAt ?? Date.distantPast) > ($1.pinnedAt ?? Date.distantPast) }
     }
 
+    var pinnedItems: [PinnedItem] {
+        var items: [PinnedItem] = []
+        
+        // Pinned Moments
+        for moment in moments.filter({ $0.isPinned }) {
+            let allMomentsFromDay: [Moment]
+            if Self.isFoundingMoment(moment) {
+                // For founding moments, only include photos with the same prompt
+                allMomentsFromDay = moments.filter {
+                    $0.promptText == moment.promptText
+                }.sorted { $0.dateTaken < $1.dateTaken }
+            } else {
+                // Otherwise include all photos from that day
+                allMomentsFromDay = moments.filter {
+                    Calendar.current.isDate($0.dateTaken, inSameDayAs: moment.dateTaken)
+                }.sorted { $0.dateTaken < $1.dateTaken }
+            }
+            items.append(.moment(moment, allMomentsFromDay))
+        }
+        
+        // Pinned Prompt Memories
+        for prompt in promptMemories.filter({ $0.isPinned }) {
+            items.append(.prompt(prompt))
+        }
+        
+        return items.sorted { $0.pinnedAt > $1.pinnedAt }
+    }
+
     var isEmpty: Bool {
-        moments.isEmpty
+        moments.isEmpty && promptMemories.isEmpty && polaroidStore.processingMemories.isEmpty
     }
 
     init(
@@ -267,6 +394,35 @@ final class HomeViewModel: ObservableObject {
             promptMemories[index].pinnedAt = promptMemories[index].isPinned ? Date() : nil
         }
     }
+    
+    func updatePromptMemoryPhotos(_ originalPhotos: [PromptPhoto], with updatedPhotos: [PromptPhoto]) {
+        // Find the prompt memory that contains these photos
+        for index in promptMemories.indices {
+            let memoryPhotoIds = Set(promptMemories[index].photos.map { $0.id })
+            let originalPhotoIds = Set(originalPhotos.map { $0.id })
+            
+            // Check if this memory contains the original photos
+            if !memoryPhotoIds.isDisjoint(with: originalPhotoIds) {
+                promptMemories[index].photos = updatedPhotos
+                break
+            }
+        }
+    }
+    
+    func deletePromptPhoto(_ photo: PromptPhoto, from originalPhotos: [PromptPhoto]) {
+        // Find the prompt memory that contains this photo
+        for index in promptMemories.indices {
+            if let photoIndex = promptMemories[index].photos.firstIndex(where: { $0.id == photo.id }) {
+                promptMemories[index].photos.remove(at: photoIndex)
+                
+                // If no photos left in the memory, remove the entire memory
+                if promptMemories[index].photos.isEmpty {
+                    promptMemories.remove(at: index)
+                }
+                break
+            }
+        }
+    }
 
     func removeMoments(from section: DaySection) {
         let momentIdsToRemove = Set(section.moments.map { $0.id })
@@ -336,6 +492,10 @@ final class HomeViewModel: ObservableObject {
         moments = newMoments
     }
     
+    func deleteMoment(_ moment: Moment) {
+        moments.removeAll { $0.id == moment.id }
+    }
+    
     func releasePolaroids(_ entries: [PolaroidEntry]) {
         var newMoments: [Moment] = []
         
@@ -368,9 +528,11 @@ final class HomeViewModel: ObservableObject {
                     dateTaken: entry.capturedAt,
                     assetIdentifier: nil,
                     thumbnail: image,
-                    placeName: nil,
+                    placeName: entry.placeName,
                     isLocked: isLocked,
-                    unlockTime: unlockTime
+                    unlockTime: unlockTime,
+                    latitude: entry.latitude,
+                    longitude: entry.longitude
                 )
                 newMoments.append(moment)
             }
@@ -416,6 +578,165 @@ final class HomeViewModel: ObservableObject {
                 self?.checkAndReleasePhotos()
             }
         }
+    }
+    
+    // MARK: - On This Day
+    
+    func onThisDayMatches(for date: Date = Date()) -> [DaySection] {
+        // Use LA timezone consistently with the rest of the app
+        guard let laTimeZone = TimeZone(identifier: "America/Los_Angeles") else {
+            return []
+        }
+        
+        var calendar = Calendar.current
+        calendar.timeZone = laTimeZone
+        
+        let targetMonth = calendar.component(.month, from: date)
+        let targetDay = calendar.component(.day, from: date)
+        let currentYear = calendar.component(.year, from: date)
+        
+        // Filter moments that match month and day, but exclude current year and screenshots
+        let matchingMoments = moments.filter { moment in
+            let momentMonth = calendar.component(.month, from: moment.dateTaken)
+            let momentDay = calendar.component(.day, from: moment.dateTaken)
+            let momentYear = calendar.component(.year, from: moment.dateTaken)
+            
+            // Check if it's a screenshot (if it has an asset identifier)
+            if let assetId = moment.assetIdentifier {
+                let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+                if let asset = fetchResult.firstObject {
+                    // Filter out screenshots
+                    if asset.mediaSubtypes.contains(.photoScreenshot) {
+                        return false
+                    }
+                }
+            }
+            
+            return momentMonth == targetMonth && momentDay == targetDay && momentYear != currentYear
+        }
+        
+        // Group by year (all moments from the same year together)
+        let groupedByYear = Dictionary(grouping: matchingMoments) { moment in
+            calendar.component(.year, from: moment.dateTaken)
+        }
+        
+        // Create a DaySection for each year, sorted by year descending (most recent first)
+        return groupedByYear.map { year, yearMoments in
+            let sortedMoments = yearMoments.sorted { $0.dateTaken < $1.dateTaken }
+            // Use the first moment's date and place for the section
+            let firstMoment = sortedMoments.first!
+            return DaySection(
+                date: firstMoment.dateTaken,
+                placeName: firstMoment.placeName,
+                moments: sortedMoments
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+    
+    func flattenedPhotos(for section: DaySection) -> [Moment] {
+        return section.moments.sorted { $0.dateTaken < $1.dateTaken }
+    }
+    
+    /// Check if a moment has already been added to the timeline from On This Day
+    func isAddedFromOnThisDay(_ moment: Moment) -> Bool {
+        moments.contains { existing in
+            existing.isAddedFromOnThisDay &&
+            (existing.assetIdentifier == moment.assetIdentifier ||
+             existing.thumbnail.pngData() == moment.thumbnail.pngData())
+        }
+    }
+    
+    // MARK: - Map Helpers
+    
+    func memoriesWithLocation() -> [DaySection] {
+        let momentsWithCoordinates = moments.filter { $0.location != nil }
+        let promptMomentsWithCoordinates = promptMemories
+            .filter { $0.latitude != nil && $0.longitude != nil }
+            .map { convertToMapMoment($0) }
+        
+        return DaySection.grouped(from: momentsWithCoordinates + promptMomentsWithCoordinates)
+    }
+    
+    func availableYears() -> [Int] {
+        let momentYears = Set(moments.map { $0.year })
+        let promptYears = Set(promptMemories.map { Calendar.current.component(.year, from: $0.date) })
+        return momentYears.union(promptYears).sorted(by: >)
+    }
+    
+    func memories(forYear year: Int) -> [DaySection] {
+        // Filter for memories with location data for the specified year
+        let filteredMoments = moments.filter { $0.year == year && $0.location != nil }
+        let filteredPromptMoments = promptMemories
+            .filter { 
+                Calendar.current.component(.year, from: $0.date) == year && 
+                $0.latitude != nil && 
+                $0.longitude != nil 
+            }
+            .map { convertToMapMoment($0) }
+            
+        return DaySection.grouped(from: filteredMoments + filteredPromptMoments)
+    }
+    
+    private func convertToMapMoment(_ memory: PromptMemory) -> Moment {
+        return Moment(
+            id: memory.id,
+            dateTaken: memory.date,
+            assetIdentifier: memory.photos.first?.assetIdentifier,
+            thumbnail: memory.photos.first?.thumbnail ?? UIImage(),
+            placeName: memory.placeName,
+            caption: memory.loveNote,
+            promptText: memory.promptText,
+            isPinned: memory.isPinned,
+            pinnedAt: memory.pinnedAt,
+            latitude: memory.latitude,
+            longitude: memory.longitude
+        )
+    }
+
+    // MARK: - Table of Contents Logic
+
+    var tocGroups: [YearGroup] {
+        let allUnpinned = moments.filter { !$0.isPinned && !Self.isFoundingMoment($0) }
+        let sections = DaySection.grouped(from: allUnpinned)
+
+        let groupedByYear = Dictionary(grouping: sections) { section in
+            Calendar.current.component(.year, from: section.date)
+        }
+
+        return groupedByYear.map { year, yearSections in
+            let seasons = Dictionary(grouping: yearSections) { section in
+                Season.from(date: section.date)
+            }
+
+            let seasonGroups = seasons.map { season, seasonSections in
+                SeasonGroup(season: season, sections: seasonSections.sorted { $0.date < $1.date })
+            }
+            .sorted { $0.season < $1.season }
+
+            return YearGroup(id: year, seasons: seasonGroups)
+        }
+        .sorted { $0.id < $1.id } // Oldest first as per requirements
+    }
+
+    var tocMilestones: [Moment] {
+        // Get the "official" ones and the "first met" ones from moments, plus pinned ones if they are founding
+        // The requirements say: Special Milestones Section (Pinned at Top)
+        // When We First Met, When We Became Official, The Beginning
+        
+        var milestones: [Moment] = []
+        
+        // Find "When We First Met"
+        if let firstMet = moments.first(where: { $0.promptText == "When we first met" }) {
+            milestones.append(firstMet)
+        }
+        
+        // Find "When We Became Official"
+        if let official = moments.first(where: { $0.promptText == "When we became official" }) {
+            milestones.append(official)
+        }
+        
+        return milestones
     }
 }
 

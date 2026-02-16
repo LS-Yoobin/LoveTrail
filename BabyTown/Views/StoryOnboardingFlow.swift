@@ -48,7 +48,21 @@ struct StoryOnboardingFlow: View {
                         }
                         return
                     }
-                    
+
+                    // Start ringtone when arriving at "The Unexpected Call" (scene index 1)
+                    if newValue == 1 {
+                        AudioManager.shared.playRingtone()
+                    } else if oldValue == 1 {
+                        AudioManager.shared.stopRingtone()
+                    }
+
+                    // Start footsteps when arriving at "Knight in Pajamas" (scene index 2)
+                    if newValue == 2 {
+                        AudioManager.shared.playFootsteps()
+                    } else if oldValue == 2 {
+                        AudioManager.shared.stopFootsteps()
+                    }
+
                     // Reset interaction state when changing scenes
                     interactionComplete = completedScenes.contains(newValue)
                 }
@@ -73,11 +87,27 @@ struct StoryOnboardingFlow: View {
         if currentSceneIndex == 0 && !scene1AnimationTriggered {
             scene1AnimationTriggered = true
             interactionComplete = true
+             AudioManager.shared.playConcertMusic()
             return
         }
         
         // Mark current scene as completed before advancing
         completedScenes.insert(currentSceneIndex)
+
+        // Stop music if we are moving away from scene 1
+        if currentSceneIndex == 0 {
+             AudioManager.shared.stopMusic()
+        }
+
+        // Stop ringtone when answering the call (scene 2)
+        if currentSceneIndex == 1 {
+            AudioManager.shared.stopRingtone()
+        }
+
+        // Stop footsteps when riding into the night (scene 3)
+        if currentSceneIndex == 2 {
+            AudioManager.shared.stopFootsteps()
+        }
         
         if currentSceneIndex < scenes.count - 1 {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {

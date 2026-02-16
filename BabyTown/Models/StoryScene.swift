@@ -45,7 +45,7 @@ extension StoryScene {
         ),
         StoryScene(
             id: 4,
-            title: "Safe in Time",
+            title: "Daddy Rescue",
             subtitle: nil,
             storyText: "Her dad was closer and got her to safety first.",
             ctaText: "We're safe",

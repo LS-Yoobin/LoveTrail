@@ -1,4 +1,5 @@
 import UIKit
+import CoreLocation
 
 struct Moment: Identifiable, Codable {
     let id: UUID
@@ -13,12 +14,15 @@ struct Moment: Identifiable, Codable {
     var pinnedAt: Date?
     var isLocked: Bool
     var unlockTime: Date?
+    var latitude: Double?
+    var longitude: Double?
+    var isAddedFromOnThisDay: Bool
     
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime
+        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay
     }
     
-    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil) {
+    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil, isAddedFromOnThisDay: Bool = false) {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
@@ -31,6 +35,9 @@ struct Moment: Identifiable, Codable {
         self.pinnedAt = pinnedAt
         self.isLocked = isLocked
         self.unlockTime = unlockTime
+        self.latitude = latitude
+        self.longitude = longitude
+        self.isAddedFromOnThisDay = isAddedFromOnThisDay
     }
     
     init(from decoder: Decoder) throws {
@@ -46,6 +53,9 @@ struct Moment: Identifiable, Codable {
         pinnedAt = try container.decodeIfPresent(Date.self, forKey: .pinnedAt)
         isLocked = try container.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
         unlockTime = try container.decodeIfPresent(Date.self, forKey: .unlockTime)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        isAddedFromOnThisDay = try container.decodeIfPresent(Bool.self, forKey: .isAddedFromOnThisDay) ?? false
         
         if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
            let image = UIImage(data: thumbnailData) {
@@ -68,10 +78,23 @@ struct Moment: Identifiable, Codable {
         try container.encodeIfPresent(pinnedAt, forKey: .pinnedAt)
         try container.encode(isLocked, forKey: .isLocked)
         try container.encodeIfPresent(unlockTime, forKey: .unlockTime)
+        try container.encodeIfPresent(latitude, forKey: .latitude)
+        try container.encodeIfPresent(longitude, forKey: .longitude)
+        try container.encode(isAddedFromOnThisDay, forKey: .isAddedFromOnThisDay)
         
         if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
             try container.encode(thumbnailData, forKey: .thumbnailData)
         }
+    }
+    
+    var location: CLLocation? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocation(latitude: lat, longitude: lon)
+    }
+    
+    var year: Int {
+        let calendar = Calendar.current
+        return calendar.component(.year, from: dateTaken)
     }
 }
 
@@ -122,5 +145,14 @@ extension Moment {
 
     static var samplePinnedFirstMet: UIImage {
         placeholder(.init(red: 0.95, green: 0.6, blue: 0.65, alpha: 1))
+    }
+    
+    static var sampleMoment: Moment {
+        Moment(
+            id: UUID(),
+            dateTaken: Date(),
+            thumbnail: placeholder(.systemPink),
+            placeName: "Somewhere Special"
+        )
     }
 }

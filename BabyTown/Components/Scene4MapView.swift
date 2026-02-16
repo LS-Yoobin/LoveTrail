@@ -80,11 +80,13 @@ struct Scene4MapView: View {
     
     private func navigate() {
         guard !isInteractionComplete else { return }
-        
+
+        AudioManager.shared.playCarDoorThenEngine()
+
         withAnimation(.easeInOut(duration: 2.0)) {
             pathProgress = 1.0
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 showSafeZone = true

@@ -4,9 +4,10 @@ import Combine
 struct ProcessingMemoryCard: View {
     let memory: ProcessingMemory
     let image: UIImage?
+    var onUnlock: (() -> Void)? = nil
     @State private var currentTime = Date()
-    
-    private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -54,7 +55,7 @@ struct ProcessingMemoryCard: View {
                         .foregroundStyle(.white)
                 }
                 
-                Text("Your 5th photo of the day is being processed. It will be revealed at 9:00 PM PST.")
+                Text("Your photos are being processed. They will be revealed at 9:00 PM PST.")
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.8))
                     .lineSpacing(2)
@@ -78,6 +79,9 @@ struct ProcessingMemoryCard: View {
         )
         .onReceive(timer) { _ in
             currentTime = Date()
+            if memory.unlockTime <= Date() {
+                onUnlock?()
+            }
         }
     }
     

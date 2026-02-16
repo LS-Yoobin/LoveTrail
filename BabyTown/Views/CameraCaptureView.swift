@@ -1,47 +1,38 @@
 import SwiftUI
 
 struct CameraCaptureView: View {
-    
+
     @ObservedObject var polaroidStore: LocalPolaroidStore
     @Environment(\.dismiss) private var dismiss
     var onPhotosReleased: ([PolaroidEntry]) -> Void
-    
+
+    @StateObject private var locationManager = CameraLocationManager()
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var showNotification = false
     @State private var notificationMessage = ""
     @State private var showReleaseConfirmation = false
-    
-    private let dailyLimit = 5
-    
+
     private var todaysCount: Int {
         polaroidStore.todaysCaptureCount()
     }
-    
-    private var canCapture: Bool {
-        todaysCount < dailyLimit
-    }
-    
+
     private var hasUnreleasedToday: Bool {
         !polaroidStore.todaysUnreleasedEntries().isEmpty
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            
+
             VStack(spacing: 0) {
                 topBar
-                
+
                 Divider()
                     .background(Color.white.opacity(0.3))
-                
-                if canCapture {
-                    captureSection
-                } else {
-                    limitReachedSection
-                }
-                
+
+                captureSection
+
                 if hasUnreleasedToday && todaysCount > 0 {
                     manualReleaseButton
                         .padding(.top, 12)
@@ -61,32 +52,36 @@ struct CameraCaptureView: View {
         }
         .presentationDetents([.height(380)])
         .presentationDragIndicator(.visible)
+        .onAppear { locationManager.requestPermissionAndStart() }
+        .onDisappear { locationManager.stop() }
         .fullScreenCover(isPresented: $showCamera) {
-            CustomCameraView(image: $capturedImage, canCapture: canCapture)
+            CustomCameraView(image: $capturedImage, canCapture: true)
                 .ignoresSafeArea()
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
-                handleCapturedPhoto(image)
                 capturedImage = nil
+                Task {
+                    await handleCapturedPhoto(image)
+                }
             }
         }
     }
-    
+
     private var topBar: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Daily Polaroids")
                     .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(.white)
-                
-                Text("\(todaysCount) of \(dailyLimit) for today")
+
+                Text("\(todaysCount) photo\(todaysCount == 1 ? "" : "s") today")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
-            
+
             Spacer()
-            
+
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 24))
@@ -97,7 +92,7 @@ struct CameraCaptureView: View {
         .padding(.top, 20)
         .padding(.bottom, 16)
     }
-    
+
     private var captureSection: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
@@ -105,13 +100,13 @@ struct CameraCaptureView: View {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 28))
                         .foregroundStyle(.white)
-                    
+
                     Text("Capture a moment")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-                
-                Text("Photos reveal at 9:00 PM • Resets at 5:00 AM")
+
+                Text("Photos reveal at 9:00 PM PST")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                     .padding(.leading, 40)
@@ -119,7 +114,7 @@ struct CameraCaptureView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
             .padding(.top, 16)
-            
+
             Button {
                 showCamera = true
             } label: {
@@ -135,7 +130,7 @@ struct CameraCaptureView: View {
                     )
             }
             .padding(.horizontal, 24)
-            
+
             if showNotification {
                 VStack(spacing: 6) {
                     HStack(spacing: 8) {
@@ -165,30 +160,7 @@ struct CameraCaptureView: View {
         }
         .padding(.bottom, 24)
     }
-    
-    private var limitReachedSection: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.white)
-                
-                Text("That's 5 for today")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text("See you at 9:00 PM when your photos reveal\nLimit resets at 5:00 AM")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 24)
-    }
-    
+
     private var manualReleaseButton: some View {
         Button {
             showReleaseConfirmation = true
@@ -213,37 +185,29 @@ struct CameraCaptureView: View {
             }
         }
     }
-    
-    private func handleCapturedPhoto(_ image: UIImage) {
-        guard todaysCount < dailyLimit else {
-            notificationMessage = "Daily limit reached!"
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                showNotification = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                withAnimation {
-                    showNotification = false
-                }
-            }
-            return
+
+    private func handleCapturedPhoto(_ image: UIImage) async {
+        var placeName: String? = nil
+        let location = locationManager.currentLocation
+        if let location = location {
+            placeName = await SmartPlaceResolver.shared.resolvePlaceName(for: location)
         }
-        
-        guard polaroidStore.savePhoto(image) != nil else { return }
-        
-        let _ = dailyLimit - todaysCount
+
+        guard polaroidStore.savePhoto(image, placeName: placeName, location: location) != nil else { return }
+
         notificationMessage = "This photo will be available later"
-        
+
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             showNotification = true
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
             withAnimation {
                 showNotification = false
             }
         }
     }
-    
+
     private func releaseNow() {
         let toRelease = polaroidStore.todaysUnreleasedEntries()
         polaroidStore.releaseEntriesManually(toRelease)

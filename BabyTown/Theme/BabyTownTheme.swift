@@ -31,7 +31,7 @@ enum BabyTownTheme {
 
     // MARK: - Cards
 
-    static let cardBackground = Color(red: 1.0, green: 0.94, blue: 0.96)
+    static let cardBackground = Color(red: 0.96, green: 0.82, blue: 0.86)
     static let cardShadow = Color.black.opacity(0.05)
     static let cardRadius: CGFloat = 18
 

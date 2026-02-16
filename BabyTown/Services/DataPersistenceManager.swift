@@ -36,6 +36,7 @@ final class DataPersistenceManager {
     
     private let userDefaults = UserDefaults.standard
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
+    private let lastActiveScreenKey = "lastActiveScreen"
     
     private init() {
         createDirectoriesIfNeeded()
@@ -113,11 +114,20 @@ final class DataPersistenceManager {
         return userDefaults.bool(forKey: hasCompletedOnboardingKey)
     }
     
+    func saveLastActiveScreen(_ screen: String) {
+        userDefaults.set(screen, forKey: lastActiveScreenKey)
+    }
+    
+    func loadLastActiveScreen() -> String? {
+        return userDefaults.string(forKey: lastActiveScreenKey)
+    }
+    
     func clearAllData() {
         try? fileManager.removeItem(at: momentsFileURL)
         try? fileManager.removeItem(at: firstMetPhotoURL)
         try? fileManager.removeItem(at: officialPhotoURL)
         try? fileManager.removeItem(at: promptMemoriesFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
+        userDefaults.removeObject(forKey: lastActiveScreenKey)
     }
 }

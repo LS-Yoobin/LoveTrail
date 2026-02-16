@@ -1,12 +1,16 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsSheet: View {
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var notificationManager = NotificationManager.shared
     var onResetApp: () -> Void
     var onReplayStory: () -> Void
     
     @State private var showResetConfirmation = false
+    @State private var showAppIconViewer = false
     
     var body: some View {
         NavigationStack {
@@ -20,7 +24,7 @@ struct SettingsSheet: View {
                             Image(systemName: "play.circle")
                                 .font(.system(size: 16))
                             Text("Replay Our Story")
-                                .font(.system(size: 16))
+                            .font(.system(size: 16))
                         }
                     }
                     
@@ -36,6 +40,38 @@ struct SettingsSheet: View {
                     }
                 } header: {
                     Text("App")
+                }
+                
+                Section {
+                    HStack {
+                        Text("Notifications")
+                        Spacer()
+                        
+                        switch notificationManager.permissionStatus {
+                        case .authorized, .provisional, .ephemeral:
+                            Text("On")
+                                .foregroundStyle(.secondary)
+                        case .denied:
+                            Button("Enable in Settings") {
+                                notificationManager.openAppSettings()
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                        case .notDetermined:
+                            Button("Enable") {
+                                notificationManager.requestAuthorization()
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                        @unknown default:
+                            Text("Unknown")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Permissions")
+                } footer: {
+                    if notificationManager.permissionStatus == .denied {
+                        Text("Turn on notifications to get daily reminders to capture memories.")
+                    }
                 }
                 
                 Section {
@@ -66,7 +102,10 @@ struct SettingsSheet: View {
                         .scaledToFit()
                         .frame(width: 60, height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 13.5))
-                    
+                        .onTapGesture {
+                            showAppIconViewer = true
+                        }
+
                     Text("BabyTown 2026")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -74,6 +113,9 @@ struct SettingsSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(.ultraThinMaterial)
+            }
+            .fullScreenCover(isPresented: $showAppIconViewer) {
+                AppIconViewerOverlay()
             }
             .confirmationDialog(
                 "Reset Baby Town?",
@@ -88,6 +130,39 @@ struct SettingsSheet: View {
             } message: {
                 Text("This will delete all your saved memories, photos, and data. You will start fresh from the welcome screen. This action cannot be undone.")
             }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task {
+                    await notificationManager.checkPermissionStatus()
+                }
+            }
+        }
+    }
+}
+
+private struct AppIconViewerOverlay: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            Image("BabyTownFullIcon")
+                .resizable()
+                .scaledToFit()
+                .clipShape(RoundedRectangle(cornerRadius: 32))
+                .padding(40)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(20)
         }
     }
 }

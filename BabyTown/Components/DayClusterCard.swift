@@ -10,40 +10,37 @@ struct DayClusterCard: View {
     var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
     var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
     var isLeftAligned: Bool = true
+    var index: Int = 0
     
     @State private var showCaptionEditor = false
     @State private var showMenu = false
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        ZStack(alignment: isLeftAligned ? .trailing : .leading) {
-            VStack(alignment: .leading, spacing: 10) {
-                headerRow
+        VStack(alignment: .leading, spacing: 10) {
+            headerRow
+            ZStack(alignment: isLeftAligned ? .bottomTrailing : .bottomLeading) {
                 collageView
+                catDecoration
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                    .fill(BabyTownTheme.cardBackground.opacity(0.75))
-                    .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
-            )
-            
-            connectorNode
-                .offset(x: isLeftAligned ? 12 : -12)
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .fill(BabyTownTheme.cardBackground.opacity(0.75))
+                .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
+        )
         .transition(.scale(scale: 0.96).combined(with: .opacity))
     }
     
-    private var connectorNode: some View {
-        ZStack {
-            Circle()
-                .fill(BabyTownTheme.accent.opacity(0.2))
-                .frame(width: 24, height: 24)
-            
-            Image(systemName: "heart.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.6))
-        }
+    private var catDecoration: some View {
+        // Loop 1-5
+        let variant = (index % 5) + 1
+        return Image("cat_variant_\(variant)")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 110, height: 110)
+            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
     }
 
     // MARK: - Header
@@ -56,19 +53,23 @@ struct DayClusterCard: View {
                     .foregroundStyle(.black)
                 
                 if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
+                    let isFounding = promptText == "When we first met" || promptText == "When we became official"
+
                     HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 10))
-                            .foregroundStyle(BabyTownTheme.accent)
+                        if !isFounding {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 10))
+                                .foregroundStyle(BabyTownTheme.accent)
+                        }
                         Text(promptText)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(BabyTownTheme.accent)
+                            .foregroundStyle(isFounding ? .white : BabyTownTheme.accent)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(
                         Capsule()
-                            .fill(BabyTownTheme.accent.opacity(0.1))
+                            .fill(isFounding ? Color.green : BabyTownTheme.accent.opacity(0.1))
                     )
                 }
 
@@ -110,8 +111,8 @@ struct DayClusterCard: View {
         .sheet(isPresented: $showCaptionEditor) {
             CaptionEditorSheet(
                 section: section,
-                onSave: { momentId, newCaption, voicePath in
-                    onEditCaption?(momentId, newCaption, voicePath)
+                onSave: { momentId, newCaption in
+                    onEditCaption?(momentId, newCaption, nil)
                 },
                 onAddPhotos: { images in
                     onAddPhotos?(section, images)
@@ -139,7 +140,7 @@ struct DayClusterCard: View {
         if let placeName = section.moments.first?.placeName, !placeName.isEmpty {
             return "Near \(placeName)"
         }
-        return "Near Unknown Location"
+        return "No location data"
     }
     
     private var captionText: String {

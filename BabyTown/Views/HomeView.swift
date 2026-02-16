@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Photos
 
 enum PinnedMemoryType {
     case firstMet
@@ -9,6 +10,7 @@ enum PinnedMemoryType {
 struct HomeView: View {
 
     @StateObject private var viewModel: HomeViewModel
+    @StateObject private var nightModeManager = NightModeManager()
 
     var onSelectPhotos: () -> Void
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
@@ -30,11 +32,19 @@ struct HomeView: View {
     @State private var showingPromptPhotoViewer = false
     @State private var viewerPromptPhotos: [PromptPhoto] = []
     @State private var viewerPromptPhotoIndex = 0
+    @State private var viewerPromptText: String? = nil
     @State private var showPromptSheet = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
     @State private var scrollToNewMemory = false
     @State private var showNotifications = false
+    @State private var showOnThisDayViewer = false
+    @State private var onThisDayPhotos: [Moment] = []
+    @State private var onThisDayStartIndex = 0
+    @State private var showScan = false
+    @State private var showMapView = false
+    @State private var showToC = false
+
 
     init(
         pinnedFirstMet: UIImage?,
@@ -77,175 +87,272 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                BabyTownTheme.backgroundGradient
-                    .ignoresSafeArea()
+                // Background Layer
+                HomeBackgroundView(isNightMode: nightModeManager.isNightMode)
+                    .animation(.easeInOut(duration: 0.8), value: nightModeManager.isNightMode)
                 
-                LoopingVideoPlayer(videoName: "transparent_flowers")
-                    .frame(height: 300)
-                    .opacity(0.4)
-                    .allowsHitTesting(false)
-                    .offset(y: 50)
+                if !nightModeManager.isNightMode {
+                    LoopingVideoPlayer(videoName: "transparent_flowers")
+                        .frame(height: 300)
+                        .opacity(0.4)
+                        .allowsHitTesting(false)
+                        .offset(y: 50)
+                }
 
+                // Main Content Layer
                 VStack(spacing: 0) {
                     BabyTownHeader(
-                        onSettingsTap: {
-                            showSettings = true
-                        },
-                        onNotificationsTap: {
-                            showNotifications = true
-                        }
+                        onSettingsTap: { showSettings = true },
+                        onNotificationsTap: { showNotifications = true },
+                        onMapTap: { showMapView = true },
+                        isNightMode: nightModeManager.isNightMode
                     )
+                    
                     StickyActionBar(
                         onSelectPhotos: onSelectPhotos,
-                        onPrompt: {
-                            showPromptSheet = true
-                        }
+                        onScan: { showScan = true },
+                        onPrompt: { showPromptSheet = true },
+                        isNightMode: nightModeManager.isNightMode
                     )
 
-                ScrollViewReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 28) {
-                            pinnedSection
-                            divider
+                    ScrollViewReader { proxy in
+                        ScrollView(showsIndicators: false) {
+                            VStack(spacing: 28) {
+                                // On This Day section
+                                let onThisDayMatches = viewModel.onThisDayMatches()
+                                if !onThisDayMatches.isEmpty {
+                                    OnThisDaySection(
+                                        matches: onThisDayMatches,
+                                        isNightMode: nightModeManager.isNightMode
+                                    ) { section in
+                                        let photos = viewModel.flattenedPhotos(for: section)
+                                        guard !photos.isEmpty else { return }
+                                        onThisDayPhotos = photos
+                                        onThisDayStartIndex = 0
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            showOnThisDayViewer = true
+                                        }
+                                    }
+                                    divider
+                                }
+                                
+                                pinnedSection
+                                divider
 
-                            if viewModel.isEmpty && viewModel.promptMemories.isEmpty {
-                                emptyState
-                            } else {
-                                timelineSection
+                                if viewModel.isEmpty {
+                                    emptyState
+                                } else {
+                                    timelineSection
+                                }
+                            }
+                            .padding(.top, 18)
+                            .padding(.bottom, 100)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: ScrollOffsetPreferenceKey.self,
+                                        value: geo.frame(in: .named("scroll")).minY
+                                    )
+                                }
+                            )
+                        }
+                        .coordinateSpace(name: "scroll")
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            scrollOffset = value
+                            showUpButton = value < -100
+                        }
+                        .onChange(of: scrollToNewMemory) { _, newValue in
+                            if newValue {
+                                withAnimation {
+                                    proxy.scrollTo("timeline", anchor: .top)
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    scrollToNewMemory = false
+                                }
                             }
                         }
-                        .padding(.top, 18)
-                        .padding(.bottom, 100)
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: ScrollOffsetPreferenceKey.self,
-                                    value: geo.frame(in: .named("scroll")).minY
-                                )
+                    }
+                }
+                .onAppear {
+                    viewModel.checkAndReleasePhotos()
+                    AudioManager.shared.playHomeMusic()
+                }
+                .onChange(of: viewModel.moments.count) { oldCount, newCount in
+                    if newCount > oldCount {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            scrollToNewMemory = true
+                        }
+                    }
+                }
+                .onChange(of: viewModel.promptMemories.count) { oldCount, newCount in
+                    if newCount > oldCount {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            scrollToNewMemory = true
+                        }
+                    }
+                }
+                .onChange(of: firstMetPickerItem) { _, newItem in
+                    guard let newItem else { return }
+                    Task {
+                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            var creationDate = Date()
+                            var latitude: Double? = nil
+                            var longitude: Double? = nil
+                            if let identifier = newItem.itemIdentifier {
+                                let result = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+                                if let asset = result.firstObject {
+                                    creationDate = asset.creationDate ?? Date()
+                                    latitude = asset.location?.coordinate.latitude
+                                    longitude = asset.location?.coordinate.longitude
+                                }
                             }
-                        )
+                            viewModel.moments.removeAll { $0.promptText == "When we first met" }
+                            viewModel.pinnedFirstMet = image
+                            let moment = Moment(
+                                id: UUID(), dateTaken: creationDate, assetIdentifier: newItem.itemIdentifier,
+                                thumbnail: image, placeName: nil, caption: nil, voiceNotePath: nil,
+                                promptText: "When we first met", isPinned: true, pinnedAt: Date(),
+                                latitude: latitude, longitude: longitude
+                            )
+                            viewModel.addMoments([moment])
+                        }
+                        firstMetPickerItem = nil
                     }
-                    .coordinateSpace(name: "scroll")
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                        scrollOffset = value
-                        showUpButton = value < -100
+                }
+                .onChange(of: officialPickerItem) { _, newItem in
+                    guard let newItem else { return }
+                    Task {
+                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            var creationDate = Date()
+                            var latitude: Double? = nil
+                            var longitude: Double? = nil
+                            if let identifier = newItem.itemIdentifier {
+                                let result = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+                                if let asset = result.firstObject {
+                                    creationDate = asset.creationDate ?? Date()
+                                    latitude = asset.location?.coordinate.latitude
+                                    longitude = asset.location?.coordinate.longitude
+                                }
+                            }
+                            viewModel.moments.removeAll { $0.promptText == "When we became official" }
+                            viewModel.pinnedOfficial = image
+                            let moment = Moment(
+                                id: UUID(), dateTaken: creationDate, assetIdentifier: newItem.itemIdentifier,
+                                thumbnail: image, placeName: nil, caption: nil, voiceNotePath: nil,
+                                promptText: "When we became official", isPinned: true, pinnedAt: Date(),
+                                latitude: latitude, longitude: longitude
+                            )
+                            viewModel.addMoments([moment])
+                        }
+                        officialPickerItem = nil
                     }
-                    .onChange(of: scrollToNewMemory) { _, newValue in
-                        if newValue {
+                }
+
+                // Floating Buttons
+                cameraButton
+                
+                if showUpButton {
+                    upButton
+                }
+
+                // Overlays and Viewers
+                if let viewerType = showingPinnedViewer {
+                    FullScreenPinnedMemoryViewer(
+                        title: viewerType == .firstMet ? "First Photo Taken Together" : "First Photo As Official Jinkies",
+                        date: "Pinned",
+                        image: viewerType == .firstMet ? viewModel.pinnedFirstMet : viewModel.pinnedOfficial,
+                        pickerItem: viewerType == .firstMet ? $firstMetPickerItem : $officialPickerItem,
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                showingPinnedViewer = nil
+                            }
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
+                
+                if showingMomentViewer {
+                    MomentPhotoViewer(
+                        moments: viewerMoments,
+                        initialIndex: viewerInitialIndex,
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                showingMomentViewer = false
+                            }
+                        },
+                        onUpdateMoments: { updatedMoments in
+                            var newMoments = viewModel.moments
+                            for moment in updatedMoments {
+                                if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
+                                    newMoments[index] = moment
+                                }
+                            }
+                            viewModel.moments = newMoments
+                        },
+                        onDeleteMoment: { moment in
                             withAnimation {
-                                proxy.scrollTo("timeline", anchor: .top)
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                scrollToNewMemory = false
+                                viewModel.deleteMoment(moment)
                             }
                         }
-                    }
+                    )
+                    .transition(.opacity)
+                    .zIndex(11)
                 }
-            }
-            .onAppear {
-                viewModel.checkAndReleasePhotos()
-                AudioManager.shared.playHomeMusic()
-            }
-            .onChange(of: viewModel.moments.count) { oldCount, newCount in
-                if newCount > oldCount {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        scrollToNewMemory = true
-                    }
-                }
-            }
-            .onChange(of: viewModel.promptMemories.count) { oldCount, newCount in
-                if newCount > oldCount {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        scrollToNewMemory = true
-                    }
-                }
-            }
-            .onChange(of: firstMetPickerItem) { _, newItem in
-                guard let newItem else { return }
-                Task {
-                    if let data = try? await newItem.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        viewModel.pinnedFirstMet = image
-                        let moment = Moment(
-                            id: UUID(),
-                            dateTaken: Date(),
-                            assetIdentifier: nil,
-                            thumbnail: image,
-                            placeName: nil,
-                            caption: nil,
-                            voiceNotePath: nil,
-                            promptText: "When we first met",
-                            isPinned: true,
-                            pinnedAt: Date()
-                        )
-                        viewModel.addMoments([moment])
-                    }
-                    firstMetPickerItem = nil
-                }
-            }
-
-            cameraButton
-            
-            if showUpButton {
-                upButton
-            }
-            
-            if let viewerType = showingPinnedViewer {
-                FullScreenPinnedMemoryViewer(
-                    title: viewerType == .firstMet ? "First Photo Taken Together" : "First Photo As Official Jinkies",
-                    date: "Pinned",
-                    image: viewerType == .firstMet ? viewModel.pinnedFirstMet : viewModel.pinnedOfficial,
-                    pickerItem: viewerType == .firstMet ? $firstMetPickerItem : $officialPickerItem,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showingPinnedViewer = nil
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(10)
-            }
-            
-            if showingMomentViewer {
-                MomentPhotoViewer(
-                    moments: viewerMoments,
-                    initialIndex: viewerInitialIndex,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showingMomentViewer = false
-                        }
-                    },
-                    onUpdateMoments: { updatedMoments in
-                        var newMoments = viewModel.moments
-                        for moment in updatedMoments {
-                            if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
-                                newMoments[index] = moment
+                
+                if showingPromptPhotoViewer {
+                    PromptPhotoViewer(
+                        photos: viewerPromptPhotos,
+                        initialIndex: viewerPromptPhotoIndex,
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                showingPromptPhotoViewer = false
                             }
-                        }
-                        viewModel.moments = newMoments
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(11)
-            }
-            
-            if showingPromptPhotoViewer {
-                PromptPhotoViewer(
-                    photos: viewerPromptPhotos,
-                    initialIndex: viewerPromptPhotoIndex,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showingPromptPhotoViewer = false
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(12)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
-        .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
-        .sheet(isPresented: $showPromptSheet) {
+                        },
+                        onUpdatePhotos: { updatedPhotos in
+                            viewModel.updatePromptMemoryPhotos(viewerPromptPhotos, with: updatedPhotos)
+                        },
+                        onDeletePhoto: { photo in
+                            withAnimation {
+                                viewModel.deletePromptPhoto(photo, from: viewerPromptPhotos)
+                            }
+                        },
+                        promptText: viewerPromptText
+                    )
+                    .transition(.opacity)
+                    .zIndex(12)
+                }
+                
+                if showOnThisDayViewer {
+                    OnThisDayPhotoViewer(
+                        photos: onThisDayPhotos,
+                        startIndex: onThisDayStartIndex,
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                showOnThisDayViewer = false
+                            }
+                        },
+                        onAddMemory: { moment in
+                            let newMoment = Moment(
+                                id: UUID(), dateTaken: moment.dateTaken, assetIdentifier: moment.assetIdentifier,
+                                thumbnail: moment.thumbnail, placeName: moment.placeName, caption: moment.caption,
+                                voiceNotePath: moment.voiceNotePath, promptText: nil, isPinned: false,
+                                pinnedAt: nil, isLocked: false, unlockTime: nil,
+                                latitude: moment.latitude, longitude: moment.longitude, isAddedFromOnThisDay: true
+                            )
+                            viewModel.addMoments([newMoment])
+                        },
+                        viewModel: viewModel
+                    )
+                    .transition(.opacity)
+                    .zIndex(13)
+                }
+            } // Close ZStack
+            .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
+            .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
+            .sheet(isPresented: $showPromptSheet) {
                 JinkyPromptSheetView { prompt in
                     self.selectedPrompt = prompt
                     showPromptSheet = false
@@ -253,78 +360,99 @@ struct HomeView: View {
                 }
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.hidden)
-        }
-        .fullScreenCover(isPresented: $showCameraFullScreen) {
-            PolaroidCameraView(
-                polaroidStore: viewModel.polaroidStore,
-                onPhotosReleased: { releasedEntries in
-                    viewModel.releasePolaroids(releasedEntries)
-                    viewModel.checkAndReleasePhotos()
-                }
-            )
-        }
-        .sheet(isPresented: $showCameraSheet) {
-            CameraCaptureView(
-                polaroidStore: viewModel.polaroidStore,
-                onPhotosReleased: { releasedEntries in
-                    viewModel.releasePolaroids(releasedEntries)
-                    viewModel.checkAndReleasePhotos()
-                }
-            )
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsSheet(
-                onResetApp: {
-                    onResetApp?()
-                },
-                onReplayStory: {
-                    onReplayStory?()
-                }
-            )
-        }
-        .fullScreenCover(isPresented: $showNotifications) {
-            NotificationCenterView()
-        }
-        .fullScreenCover(isPresented: $showSearch) {
-            MemorySearchView(
-                allMoments: viewModel.moments,
-                onOpenPhoto: { moment, allMoments in
-                    showSearch = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        viewerMoments = allMoments
-                        if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                            viewerInitialIndex = idx
+            }
+            .fullScreenCover(isPresented: $showCameraFullScreen) {
+                PolaroidCameraView(
+                    polaroidStore: viewModel.polaroidStore,
+                    onPhotosReleased: { releasedEntries in
+                        viewModel.releasePolaroids(releasedEntries)
+                        viewModel.checkAndReleasePhotos()
+                    }
+                )
+            }
+            .sheet(isPresented: $showCameraSheet) {
+                CameraCaptureView(
+                    polaroidStore: viewModel.polaroidStore,
+                    onPhotosReleased: { releasedEntries in
+                        viewModel.releasePolaroids(releasedEntries)
+                        viewModel.checkAndReleasePhotos()
+                    }
+                )
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsSheet(
+                    onResetApp: { onResetApp?() },
+                    onReplayStory: { onReplayStory?() }
+                )
+            }
+            .fullScreenCover(isPresented: $showMapView) {
+                MapView(
+                    viewModel: viewModel,
+                    onOpenMemory: { section in
+                        showMapView = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            let photos = viewModel.flattenedPhotos(for: section)
+                            viewerMoments = photos
+                            viewerInitialIndex = 0
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showingMomentViewer = true
+                            }
                         }
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showingMomentViewer = true
+                    },
+                    onDismiss: { showMapView = false }
+                )
+            }
+            .fullScreenCover(isPresented: $showNotifications) {
+                NotificationCenterView()
+            }
+            .fullScreenCover(isPresented: $showSearch) {
+                MemorySearchView(
+                    allMoments: viewModel.moments,
+                    onOpenPhoto: { moment, allMoments in
+                        showSearch = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            viewerMoments = allMoments
+                            if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                viewerInitialIndex = idx
+                            }
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showingMomentViewer = true
+                            }
                         }
+                    },
+                    onEditCaption: { momentId, caption, voiceNotePath in
+                        viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                    },
+                    onRemove: { section in
+                        withAnimation { viewModel.removeMoments(from: section) }
+                    },
+                    onTogglePin: { section in
+                        withAnimation { viewModel.togglePin(for: section) }
                     }
-                },
-                onEditCaption: { momentId, caption, voiceNotePath in
-                    viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
-                },
-                onRemove: { section in
-                    withAnimation {
-                        viewModel.removeMoments(from: section)
-                    }
-                },
-                onTogglePin: { section in
-                    withAnimation {
-                        viewModel.togglePin(for: section)
-                    }
+                )
+            }
+            .fullScreenCover(isPresented: $showScan) {
+                ScanView(existingAssetIdentifiers: Set(viewModel.moments.compactMap { $0.assetIdentifier })) { moments in
+                    viewModel.addMoments(moments)
                 }
-            )
-        }
-        }
-        .onAppear {
-            viewModel.checkAndReleasePhotos()
+            }
+            .sheet(isPresented: $showToC) {
+                TableOfContentsView(viewModel: viewModel)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 
     // MARK: - Pinned Memories
 
     private var hasFirstMetPinned: Bool {
-        viewModel.pinnedMoments.contains { $0.promptText == "When we first met" }
+        viewModel.pinnedItems.contains { item in
+            switch item {
+            case .moment(let m, _): return m.promptText == "When we first met"
+            case .prompt(let p): return p.promptText == "When we first met"
+            }
+        }
     }
 
     private var pinnedSection: some View {
@@ -344,19 +472,34 @@ struct HomeView: View {
                         .frame(width: 180)
                     }
 
-                    ForEach(viewModel.pinnedMoments) { moment in
+                    ForEach(viewModel.pinnedItems) { item in
                         PinnedMemoryCard(
-                            moment: moment,
+                            item: item,
                             onTap: {
-                                viewerMoments = [moment]
-                                viewerInitialIndex = 0
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    showingMomentViewer = true
+                                switch item {
+                                case .moment(_, let all):
+                                    viewerMoments = all
+                                    viewerInitialIndex = 0
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        showingMomentViewer = true
+                                    }
+                                case .prompt(let p):
+                                    viewerPromptPhotos = p.photos
+                                    viewerPromptPhotoIndex = 0
+                                    viewerPromptText = p.promptText
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        showingPromptPhotoViewer = true
+                                    }
                                 }
                             },
                             onUnpin: {
                                 withAnimation {
-                                    viewModel.unpinMoment(moment)
+                                    switch item {
+                                    case .moment(let m, _):
+                                        viewModel.unpinMoment(m)
+                                    case .prompt(let p):
+                                        viewModel.togglePromptMemoryPin(p)
+                                    }
                                 }
                             }
                         )
@@ -371,15 +514,32 @@ struct HomeView: View {
 
     // MARK: - Section Helpers
 
-    private func sectionLabel(_ text: String, icon: String) -> some View {
+    private func sectionLabel(_ text: String, icon: String, showToCButton: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.black.opacity(0.9))
+                .foregroundStyle(nightModeManager.isNightMode ? .white.opacity(0.9) : .black.opacity(0.9))
             Text(text)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
+                .foregroundStyle(nightModeManager.isNightMode ? .white : .black)
+            
             Spacer()
+            
+            if showToCButton {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showToC = true
+                } label: {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(nightModeManager.isNightMode ? .white.opacity(0.8) : BabyTownTheme.accent.opacity(0.8))
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .fill(nightModeManager.isNightMode ? .white.opacity(0.1) : BabyTownTheme.accent.opacity(0.05))
+                        )
+                }
+            }
         }
     }
 
@@ -394,9 +554,13 @@ struct HomeView: View {
 
     private var timelineSection: some View {
         VStack(spacing: 12) {
-            sectionLabel("Jinky Adventures", icon: "heart.text.square")
-                .padding(.horizontal, 20)
-                .id("timeline")
+            sectionLabel(
+                nightModeManager.isNightMode ? "Jinky Dreams 🌙" : "Jinky Adventures",
+                icon: "heart.text.square",
+                showToCButton: true
+            )
+            .padding(.horizontal, 20)
+            .id("timeline")
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
@@ -405,6 +569,10 @@ struct HomeView: View {
 
                 VStack(spacing: 24) {
                     ForEach(Array(combinedTimelineItems.enumerated()), id: \.offset) { index, item in
+                        if let year = yearHeaderForItem(at: index) {
+                            yearHeaderView(year)
+                        }
+
                         switch item {
                         case .daySection(let section):
                             VStack(spacing: 16) {
@@ -462,6 +630,7 @@ struct HomeView: View {
                                     if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
                                         viewerPromptPhotos = allPhotos
                                         viewerPromptPhotoIndex = index
+                                        viewerPromptText = memory.promptText
                                         withAnimation(.easeIn(duration: 0.25)) {
                                             showingPromptPhotoViewer = true
                                         }
@@ -499,9 +668,7 @@ struct HomeView: View {
                                     id: memory.id,
                                     capturedAt: memory.date,
                                     imageFileName: memory.imageFileName,
-                                    released: false,
-                                    manuallyReleasedAt: nil,
-                                    isFifthPhoto: true
+                                    released: false
                                 )),
                                 onUnlock: {
                                     viewModel.checkAndReleasePhotos()
@@ -655,6 +822,43 @@ struct HomeView: View {
         return false
     }
 
+    private func yearHeaderForItem(at index: Int) -> String? {
+        let items = combinedTimelineItems
+        guard index < items.count else { return nil }
+
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: items[index].date)
+
+        if index == 0 {
+            return String(currentYear)
+        }
+
+        let previousYear = calendar.component(.year, from: items[index - 1].date)
+        if currentYear != previousYear {
+            return String(currentYear)
+        }
+
+        return nil
+    }
+
+    private func yearHeaderView(_ year: String) -> some View {
+        HStack(spacing: 12) {
+            Rectangle()
+                .fill(BabyTownTheme.accent.opacity(0.15))
+                .frame(height: 1)
+
+            Text(year)
+                .font(.system(size: 20, weight: .semibold, design: .serif))
+                .foregroundStyle(nightModeManager.isNightMode ? .white.opacity(0.7) : BabyTownTheme.textPrimary.opacity(0.6))
+
+            Rectangle()
+                .fill(BabyTownTheme.accent.opacity(0.15))
+                .frame(height: 1)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 4)
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
@@ -668,7 +872,7 @@ struct HomeView: View {
                 .font(.system(size: 20, weight: .light, design: .serif))
                 .foregroundStyle(.white)
 
-            Text("Tap Select Photos and I'll\nbuild our love timeline.")
+            Text("Tap Select Photos and I'll build our love timeline.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)

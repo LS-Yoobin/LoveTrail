@@ -10,10 +10,11 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen {
-        case welcome, storyOnboarding, firstMemories, howItWorks, home, selectPhotos
+        case launch, welcome, storyOnboarding, firstMemories, howItWorks, home, selectPhotos
     }
 
-    @State private var screen: Screen = .welcome
+    @State private var screen: Screen = .launch
+    @State private var targetScreen: Screen = .welcome
     @State private var firstMetPhoto: UIImage?
     @State private var officialPhoto: UIImage?
     @State private var selectedPrompt: PromptItem?
@@ -23,15 +24,25 @@ struct ContentView: View {
     init() {
         let hasCompletedOnboarding = DataPersistenceManager.shared.hasCompletedOnboarding()
         
+        // Always start with launch screen
+        _screen = State(initialValue: .launch)
+        
         if hasCompletedOnboarding {
-            _screen = State(initialValue: .home)
+            // Check if user was last on the camera screen
+            let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
+            if lastScreen == "selectPhotos" {
+                _targetScreen = State(initialValue: .selectPhotos)
+            } else {
+                _targetScreen = State(initialValue: .home)
+            }
+            
             _homeViewModel = StateObject(wrappedValue: HomeViewModel(
                 pinnedFirstMet: nil,
                 pinnedOfficial: UIImage(systemName: "heart.fill")!,
                 loadFromPersistence: true
             ))
         } else {
-            _screen = State(initialValue: .welcome)
+            _targetScreen = State(initialValue: .welcome)
             _homeViewModel = StateObject(wrappedValue: HomeViewModel(
                 pinnedFirstMet: nil,
                 pinnedOfficial: UIImage(systemName: "heart.fill")!,
@@ -43,6 +54,18 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             switch screen {
+            case .launch:
+                LaunchScreenView()
+                    .transition(.opacity)
+                    .onAppear {
+                        // Transition to target screen after a delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                screen = targetScreen
+                            }
+                        }
+                    }
+            
             case .welcome:
                 WelcomeView {
                     withAnimation(.easeInOut(duration: 0.4)) {
@@ -183,6 +206,7 @@ struct ContentView: View {
                 .transition(.opacity)
                 .onAppear {
                     homeViewModel.checkAndReleasePhotos()
+                    DataPersistenceManager.shared.saveLastActiveScreen("home")
                 }
 
             case .selectPhotos:
@@ -205,6 +229,24 @@ struct ContentView: View {
                     }
                 )
                 .transition(.opacity)
+                .onAppear {
+                    DataPersistenceManager.shared.saveLastActiveScreen("selectPhotos")
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
+            // Switch to select photos screen when notification is tapped
+            withAnimation(.easeInOut(duration: 0.35)) {
+                
+                // If we are in the welcome flow, we might want to finish onboarding first or just jump? 
+                // Assuming we only want this to work if onboarding is done or we are in home/selectPhotos
+                // For now, let's just switch if we are not in the middle of critical onboarding
+                if screen == .home || screen == .selectPhotos {
+                     screen = .selectPhotos
+                } else if DataPersistenceManager.shared.hasCompletedOnboarding() {
+                    // If onboarding is done but we are somehow elsewhere
+                    screen = .selectPhotos
+                }
             }
         }
     }

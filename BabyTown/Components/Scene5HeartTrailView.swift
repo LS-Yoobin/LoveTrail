@@ -120,6 +120,7 @@ struct Scene5HeartTrailView: View {
     private func completeHeart() {
         isAnimating = true
         isInteractionComplete = true
+        AudioManager.shared.playYipee()
         
         // Heart pulse animation
         withAnimation(.spring(response: 0.6, dampingFraction: 0.5)) {

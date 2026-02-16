@@ -49,14 +49,35 @@ final class FirstMemoriesViewModel: ObservableObject {
 
     private func extractDateFromEXIF(_ data: Data) -> Date? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-              let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
-              let dateString = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String else {
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
             return nil
         }
+        
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        return formatter.date(from: dateString)
+        
+        // Try EXIF DateTimeOriginal first
+        if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+           let dateString = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
+           let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        // Try EXIF DateTimeDigitized
+        if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+           let dateString = exif[kCGImagePropertyExifDateTimeDigitized as String] as? String,
+           let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        // Try TIFF DateTime
+        if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
+           let dateString = tiff[kCGImagePropertyTIFFDateTime as String] as? String,
+           let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        return nil
     }
 
     private func loadPhotoDateFromAsset(_ item: PhotosPickerItem) async -> Date? {

@@ -2,8 +2,11 @@ import SwiftUI
 import Combine
 
 struct BabyTownHeader: View {
-    
+
     var onSettingsTap: (() -> Void)? = nil
+    var onNotificationsTap: (() -> Void)? = nil
+    var onMapTap: (() -> Void)? = nil
+    var isNightMode: Bool = false
 
     var body: some View {
         ZStack {
@@ -19,7 +22,7 @@ struct BabyTownHeader: View {
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
+                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -27,20 +30,39 @@ struct BabyTownHeader: View {
                 
                 Spacer()
                 
+                if let onMapTap = onMapTap {
+                    Button {
+                        onMapTap()
+                    } label: {
+                        Image(systemName: "map.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                }
+                
                 Button {
-                    // TODO: Handle notification tap
+                    onNotificationsTap?()
                 } label: {
-                    Image(systemName: "bell.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+
+                        Circle()
+                            .fill(BabyTownTheme.accent)
+                            .frame(width: 8, height: 8)
+                            .offset(x: -8, y: 10)
+                    }
                 }
             }
             .padding(.horizontal, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: 56)
-        .background(BabyTownTheme.background.opacity(0.96))
+        .background(Color.gray.opacity(0.2))
     }
 }
 
