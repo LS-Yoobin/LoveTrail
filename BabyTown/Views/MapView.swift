@@ -245,7 +245,7 @@ struct MapView: View {
     private func matchesSearch(_ section: DaySection) -> Bool {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return true }
-        let place = (section.placeName ?? "").lowercased()
+        let place = section.placeDisplay.lowercased()
         let country = section.moments.compactMap { $0.country }.joined(separator: " ").lowercased()
         let date = section.timeDisplay.lowercased()
         return place.contains(query) || country.contains(query) || date.contains(query)

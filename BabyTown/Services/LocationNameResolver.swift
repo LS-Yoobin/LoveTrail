@@ -46,6 +46,7 @@ final class LocationNameResolver {
     /// Clear the geocoding cache.
     func clearCache() {
         cache.removeAll()
+        countryCache.removeAll()
     }
 
 

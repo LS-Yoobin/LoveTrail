@@ -835,24 +835,33 @@ final class HomeViewModel: ObservableObject {
         Task { @MainActor in
             defer { isBackfillingCountries = false }
 
-            var updates: [UUID: String] = [:]
+            // Flush resolved countries into `moments` periodically so progress
+            // survives if the task is interrupted (next launch only re-geocodes
+            // the moments that weren't flushed yet — i.e. it's resumable).
+            var pending: [UUID: String] = [:]
+            @MainActor func flush() {
+                guard !pending.isEmpty else { return }
+                var newMoments = moments
+                for index in newMoments.indices {
+                    if let country = pending[newMoments[index].id] {
+                        newMoments[index].country = country
+                    }
+                }
+                moments = newMoments
+                pending.removeAll()
+            }
+
             for moment in targets {
                 guard let coordinate = moment.location?.coordinate else { continue }
                 if let country = await locationResolver.country(from: coordinate) {
-                    updates[moment.id] = country
+                    pending[moment.id] = country
+                    if pending.count >= 20 { flush() }
                 }
                 // ~50 requests/minute ceiling for CLGeocoder.
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
             }
 
-            guard !updates.isEmpty else { return }
-            var newMoments = moments
-            for index in newMoments.indices {
-                if let country = updates[newMoments[index].id] {
-                    newMoments[index].country = country
-                }
-            }
-            moments = newMoments
+            flush()
         }
     }
 
