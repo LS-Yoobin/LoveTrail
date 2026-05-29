@@ -1,6 +1,12 @@
 import SwiftUI
 import MapKit
 
+struct POISelection: Identifiable {
+    let id = UUID()
+    let title: String
+    let coordinate: CLLocationCoordinate2D
+}
+
 struct MapView: View {
     @ObservedObject var viewModel: HomeViewModel
     let onOpenMemory: (DaySection) -> Void
@@ -9,11 +15,10 @@ struct MapView: View {
     
     @State private var selectedYear: Int
     @State private var availableYears: [Int] = []
-    @State private var selectedMemory: DaySection?
-    @State private var showBottomSheet = false
     @State private var region: MKCoordinateRegion
     @State private var annotations: [MemoryMapAnnotation] = []
     @State private var showEmptyStatePrompt = true
+    @State private var poiSelection: POISelection?
     
     init(
         viewModel: HomeViewModel,
@@ -43,10 +48,10 @@ struct MapView: View {
                 region: $region,
                 annotations: annotations,
                 onSelect: { section in
-                    selectedMemory = section
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showBottomSheet = true
-                    }
+                    onOpenMemory(section)
+                },
+                onSelectPOI: { title, coordinate in
+                    poiSelection = POISelection(title: title, coordinate: coordinate)
                 }
             )
             .ignoresSafeArea()
@@ -106,39 +111,13 @@ struct MapView: View {
                 )
             }
             
-            // Bottom sheet
-            if showBottomSheet, let memory = selectedMemory {
-                VStack {
-                    Spacer()
-                    
-                    MemoryBottomSheet(
-                        section: memory,
-                        onOpenMemory: {
-                            showBottomSheet = false
-                            onOpenMemory(memory)
-                        },
-                        onDismiss: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showBottomSheet = false
-                            }
-                        }
-                    )
-                    .transition(.move(edge: .bottom))
-                }
-                .background(
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showBottomSheet = false
-                            }
-                        }
-                )
-            }
         }
         .onAppear {
             setupMapData()
             showEmptyStatePrompt = true
+        }
+        .sheet(item: $poiSelection) { selection in
+            POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
         }
     }
     

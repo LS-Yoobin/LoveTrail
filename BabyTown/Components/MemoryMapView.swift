@@ -6,7 +6,8 @@ struct MemoryMapView: UIViewRepresentable {
     var annotations: [MemoryMapAnnotation]
     var onSelect: (DaySection) -> Void
     var isInteractive: Bool = true
-    
+    var onSelectPOI: (_ title: String, _ coordinate: CLLocationCoordinate2D) -> Void = { _, _ in }
+
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
@@ -14,10 +15,19 @@ struct MemoryMapView: UIViewRepresentable {
         mapView.isZoomEnabled = isInteractive
         mapView.isRotateEnabled = false
         mapView.isPitchEnabled = false
-        
+        mapView.selectableMapFeatures = [.pointsOfInterest]
+
         // Enable clustering
-        mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultAnnotationViewReuseIdentifier)
-        mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
+        mapView.register(
+            MemoryMapMarkerAnnotationView.self,
+            forAnnotationViewWithReuseIdentifier: MKMapViewDefaultAnnotationViewReuseIdentifier
+        )
+        mapView.register(
+            MemoryMapMarkerAnnotationView.self,
+            forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+        )
+        mapView.register(MemoryMapMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "MemoryPin")
+        mapView.register(MemoryMapMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "MemoryCluster")
         
         return mapView
     }
@@ -55,24 +65,17 @@ struct MemoryMapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let memoryAnnotation = annotation as? MemoryMapAnnotation else { return nil }
-            
-            let identifier = "MemoryPin"
-            var view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
-            
-            if view == nil {
-                view = MKMarkerAnnotationView(annotation: memoryAnnotation, reuseIdentifier: identifier)
-                view?.canShowCallout = false
-            } else {
-                view?.annotation = memoryAnnotation
-            }
-            
-            // Clustering logic
-            view?.clusteringIdentifier = "memoryCluster"
-            view?.displayPriority = .required
-            view?.markerTintColor = UIColor(red: 1.0, green: 0.4, blue: 0.5, alpha: 1.0) // BabyTown accent color
-            view?.glyphImage = UIImage(systemName: "heart.fill")
-            
+            let isCluster = annotation is MKClusterAnnotation
+            guard isCluster || annotation is MemoryMapAnnotation else { return nil }
+
+            let identifier = isCluster ? "MemoryCluster" : "MemoryPin"
+            let view = mapView.dequeueReusableAnnotationView(
+                withIdentifier: identifier,
+                for: annotation
+            ) as? MemoryMapMarkerAnnotationView
+                ?? MemoryMapMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+
+            view.annotation = annotation
             return view
         }
         
@@ -81,11 +84,13 @@ struct MemoryMapView: UIViewRepresentable {
                 mapView.deselectAnnotation(view.annotation, animated: false)
                 return
             }
-            if let annotation = view.annotation as? MemoryMapAnnotation {
+            if let feature = view.annotation as? MKMapFeatureAnnotation {
+                parent.onSelectPOI(feature.title ?? "", feature.coordinate)
+                mapView.deselectAnnotation(feature, animated: false)
+            } else if let annotation = view.annotation as? MemoryMapAnnotation {
                 parent.onSelect(annotation.section)
                 mapView.deselectAnnotation(annotation, animated: true)
             } else if let cluster = view.annotation as? MKClusterAnnotation {
-                // If it's a cluster, zoom in
                 let rect = cluster.memberAnnotations.reduce(MKMapRect.null) { rect, annotation in
                     let point = MKMapPoint(annotation.coordinate)
                     return rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
