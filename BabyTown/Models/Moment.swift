@@ -17,12 +17,14 @@ struct Moment: Identifiable, Codable {
     var latitude: Double?
     var longitude: Double?
     var isAddedFromOnThisDay: Bool
-    
+    var isPlaceNameUserSet: Bool
+    var country: String?
+
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay
+        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay, isPlaceNameUserSet, country
     }
     
-    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil, isAddedFromOnThisDay: Bool = false) {
+    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil, isAddedFromOnThisDay: Bool = false, isPlaceNameUserSet: Bool = false, country: String? = nil) {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
@@ -38,6 +40,8 @@ struct Moment: Identifiable, Codable {
         self.latitude = latitude
         self.longitude = longitude
         self.isAddedFromOnThisDay = isAddedFromOnThisDay
+        self.isPlaceNameUserSet = isPlaceNameUserSet
+        self.country = country
     }
     
     init(from decoder: Decoder) throws {
@@ -56,7 +60,9 @@ struct Moment: Identifiable, Codable {
         latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
         isAddedFromOnThisDay = try container.decodeIfPresent(Bool.self, forKey: .isAddedFromOnThisDay) ?? false
-        
+        isPlaceNameUserSet = try container.decodeIfPresent(Bool.self, forKey: .isPlaceNameUserSet) ?? false
+        country = try container.decodeIfPresent(String.self, forKey: .country)
+
         if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
            let image = UIImage(data: thumbnailData) {
             thumbnail = image
@@ -81,7 +87,9 @@ struct Moment: Identifiable, Codable {
         try container.encodeIfPresent(latitude, forKey: .latitude)
         try container.encodeIfPresent(longitude, forKey: .longitude)
         try container.encode(isAddedFromOnThisDay, forKey: .isAddedFromOnThisDay)
-        
+        try container.encode(isPlaceNameUserSet, forKey: .isPlaceNameUserSet)
+        try container.encodeIfPresent(country, forKey: .country)
+
         if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
             try container.encode(thumbnailData, forKey: .thumbnailData)
         }
