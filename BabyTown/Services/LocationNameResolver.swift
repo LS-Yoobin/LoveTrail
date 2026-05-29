@@ -7,6 +7,7 @@ final class LocationNameResolver {
 
     /// Cache keyed by rounded coordinates (~100m precision) to avoid redundant geocode calls
     private var cache: [String: String?] = [:]
+    private var countryCache: [String: String?] = [:]
 
     // MARK: - Public API
 
@@ -76,6 +77,35 @@ final class LocationNameResolver {
             cache[key] = nil
             return nil
         }
+    }
+
+    /// Resolve display name and country in a single geocode call (both cached).
+    func resolveNameAndCountry(from location: CLLocation) async -> (name: String?, country: String?) {
+        let key = cacheKey(for: location)
+        if let name = cache[key], let country = countryCache[key] {
+            return (name, country)
+        }
+
+        let geocoder = CLGeocoder()
+        do {
+            let placemark = try await geocoder.reverseGeocodeLocation(location).first
+            let name = placemark.flatMap { Self.buildDisplayName(from: $0) }
+            let country = placemark?.country
+            cache[key] = name
+            countryCache[key] = country
+            return (name, country)
+        } catch {
+            cache[key] = nil
+            countryCache[key] = nil
+            return (nil, nil)
+        }
+    }
+
+    /// Resolve just the country for a coordinate (cached, shares the geocode above).
+    func country(from coordinate: CLLocationCoordinate2D) async -> String? {
+        await resolveNameAndCountry(
+            from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        ).country
     }
 
     // MARK: - Display Name Builder

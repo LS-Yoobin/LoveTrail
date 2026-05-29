@@ -31,11 +31,18 @@ final class MomentFactory {
         for (index, thumbnail) in thumbnailResults.sorted(by: { $0.0 < $1.0 }) {
             let asset = assets[index]
             let dateTaken = asset.creationDate ?? Date()
-            let placeName = await locationResolver.resolve(from: asset)
-            
+
             // Extract location coordinates from asset
             let latitude = asset.location?.coordinate.latitude
             let longitude = asset.location?.coordinate.longitude
+
+            var placeName: String? = nil
+            var country: String? = nil
+            if let location = asset.location {
+                let details = await locationResolver.resolveNameAndCountry(from: location)
+                placeName = details.name
+                country = details.country
+            }
 
             moments.append(Moment(
                 id: UUID(),
@@ -44,7 +51,8 @@ final class MomentFactory {
                 thumbnail: thumbnail,
                 placeName: placeName,
                 latitude: latitude,
-                longitude: longitude
+                longitude: longitude,
+                country: country
             ))
         }
 
