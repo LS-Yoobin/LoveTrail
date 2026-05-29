@@ -19,6 +19,9 @@ struct MapView: View {
     @State private var annotations: [MemoryMapAnnotation] = []
     @State private var showEmptyStatePrompt = true
     @State private var poiSelection: POISelection?
+    @State private var searchText = ""
+    @State private var isSearchActive = false
+    @State private var selectedCountry: String?
     
     init(
         viewModel: HomeViewModel,
@@ -58,21 +61,82 @@ struct MapView: View {
             
             // Top controls (map visible behind)
             VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    onDismiss()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 44, height: 44)
-                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-                        
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.black)
+                HStack(alignment: .top) {
+                    Button {
+                        onDismiss()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 44, height: 44)
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { isSearchActive.toggle() }
+                        if !isSearchActive {
+                            searchText = ""
+                            updateAnnotations()
+                        }
+                    } label: {
+                        mapCircleIcon(isSearchActive ? "xmark" : "magnifyingglass", filled: isSearchActive)
+                    }
+
+                    Menu {
+                        Button("All Countries") {
+                            selectedCountry = nil
+                            updateAnnotations()
+                            centerMapOnMemories()
+                        }
+                        ForEach(viewModel.availableCountries, id: \.self) { country in
+                            Button(country) {
+                                selectedCountry = country
+                                updateAnnotations()
+                                centerMapOnMemories()
+                            }
+                        }
+                    } label: {
+                        mapCircleIcon(
+                            selectedCountry == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill",
+                            filled: selectedCountry != nil
+                        )
                     }
                 }
-                
+
+                if isSearchActive {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.black.opacity(0.5))
+                        TextField("Search place, country, or date", text: $searchText)
+                            .foregroundStyle(.black)
+                            .autocorrectionDisabled()
+                            .onChange(of: searchText) { _, _ in updateAnnotations() }
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                                updateAnnotations()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.black.opacity(0.3))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                    )
+                }
+
                 if !availableYears.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -91,12 +155,23 @@ struct MapView: View {
                         }
                     }
                 }
-                
+
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                LinearGradient(
+                    colors: [Color.black.opacity(0.45), Color.black.opacity(0)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 220)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .ignoresSafeArea()
+            )
             
             // Empty state
             if annotations.isEmpty && showEmptyStatePrompt {
@@ -115,12 +190,26 @@ struct MapView: View {
         .onAppear {
             setupMapData()
             showEmptyStatePrompt = true
+            viewModel.backfillCountriesIfNeeded()
         }
         .sheet(item: $poiSelection) { selection in
             POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
         }
     }
     
+    private func mapCircleIcon(_ systemName: String, filled: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(.white)
+                .frame(width: 44, height: 44)
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(filled ? BabyTownTheme.accent : .black)
+        }
+    }
+
     private func setupMapData() {
         // Get available years and add "All"
         var years = viewModel.availableYears()
@@ -135,13 +224,31 @@ struct MapView: View {
     }
     
     private func updateAnnotations() {
-        let memories: [DaySection]
+        let base: [DaySection]
         if selectedYear == 0 {
-            memories = viewModel.memoriesWithLocation()
+            base = viewModel.memoriesWithLocation()
         } else {
-            memories = viewModel.memories(forYear: selectedYear)
+            base = viewModel.memories(forYear: selectedYear)
         }
-        annotations = memories.map { MemoryMapAnnotation(section: $0) }
+
+        let filtered = base.filter { section in
+            matchesCountry(section) && matchesSearch(section)
+        }
+        annotations = filtered.map { MemoryMapAnnotation(section: $0) }
+    }
+
+    private func matchesCountry(_ section: DaySection) -> Bool {
+        guard let selectedCountry else { return true }
+        return section.moments.contains { $0.country == selectedCountry }
+    }
+
+    private func matchesSearch(_ section: DaySection) -> Bool {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return true }
+        let place = (section.placeName ?? "").lowercased()
+        let country = section.moments.compactMap { $0.country }.joined(separator: " ").lowercased()
+        let date = section.timeDisplay.lowercased()
+        return place.contains(query) || country.contains(query) || date.contains(query)
     }
     
     private func centerMapOnMemories() {
