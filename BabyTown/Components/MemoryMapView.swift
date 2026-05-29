@@ -87,18 +87,21 @@ struct MemoryMapView: UIViewRepresentable {
             return nil
         }
         
-        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+        // Apple Maps POI features have no custom annotation view, so the
+        // view-based didSelect never fires for them — the annotation-based
+        // variant does, and it also fires for our pins and clusters.
+        func mapView(_ mapView: MKMapView, didSelect annotation: MKAnnotation) {
             guard parent.isInteractive else {
-                mapView.deselectAnnotation(view.annotation, animated: false)
+                mapView.deselectAnnotation(annotation, animated: false)
                 return
             }
-            if let feature = view.annotation as? MKMapFeatureAnnotation {
+            if let feature = annotation as? MKMapFeatureAnnotation {
                 parent.onSelectPOI(feature.title ?? "", feature.coordinate)
                 mapView.deselectAnnotation(feature, animated: false)
-            } else if let annotation = view.annotation as? MemoryMapAnnotation {
+            } else if let annotation = annotation as? MemoryMapAnnotation {
                 parent.onSelect(annotation.section)
                 mapView.deselectAnnotation(annotation, animated: true)
-            } else if let cluster = view.annotation as? MKClusterAnnotation {
+            } else if let cluster = annotation as? MKClusterAnnotation {
                 let rect = cluster.memberAnnotations.reduce(MKMapRect.null) { rect, annotation in
                     let point = MKMapPoint(annotation.coordinate)
                     return rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))

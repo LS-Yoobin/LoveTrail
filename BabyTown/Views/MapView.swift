@@ -114,8 +114,13 @@ struct MapView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.black.opacity(0.5))
-                        TextField("Search place, country, or date", text: $searchText)
-                            .foregroundStyle(.black)
+                        TextField(
+                            "",
+                            text: $searchText,
+                            prompt: Text("Search place, country, or date")
+                                .foregroundColor(.black.opacity(0.4))
+                        )
+                        .foregroundStyle(.black)
                             .autocorrectionDisabled()
                             .onChange(of: searchText) { _, _ in updateAnnotations() }
                         if !searchText.isEmpty {
