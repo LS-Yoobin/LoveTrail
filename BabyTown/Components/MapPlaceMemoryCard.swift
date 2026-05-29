@@ -35,8 +35,8 @@ struct MapPlaceMemoryCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button(action: onTap) {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 10) {
                 ZStack(alignment: .bottomLeading) {
                     Group {
                         if let heroThumbnail {
@@ -61,6 +61,7 @@ struct MapPlaceMemoryCard: View {
                         startPoint: .center,
                         endPoint: .bottom
                     )
+                    .allowsHitTesting(false)
 
                     HStack(spacing: 4) {
                         Image(systemName: "photo.on.rectangle.angled")
@@ -73,6 +74,7 @@ struct MapPlaceMemoryCard: View {
                     .padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(10)
+                    .allowsHitTesting(false)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 150)
@@ -87,10 +89,6 @@ struct MapPlaceMemoryCard: View {
                         .padding(10)
                         .allowsHitTesting(false)
                 }
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onTap) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(placeTitle)
                         .font(.system(size: 16, weight: .semibold))
@@ -112,17 +110,18 @@ struct MapPlaceMemoryCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.plain)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white)
+                    .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 3)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(BabyTownTheme.accent.opacity(0.12), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 3)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(BabyTownTheme.accent.opacity(0.12), lineWidth: 1)
-        }
+        .buttonStyle(.plain)
     }
 }

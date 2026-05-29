@@ -25,6 +25,10 @@ struct MapView: View {
     @State private var selectedCountry: String?
     @FocusState private var isSearchFocused: Bool
 
+    private let minMapSpan: CLLocationDegrees = 0.001
+    private let maxMapSpan: CLLocationDegrees = 80
+    private let userLocationSpan: CLLocationDegrees = 0.02
+
     init(
         viewModel: HomeViewModel,
         onOpenMemory: @escaping (DaySection) -> Void,
@@ -181,7 +185,40 @@ struct MapView: View {
                     onDismiss: { showEmptyStatePrompt = false }
                 )
             }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    mapControlsStack
+                }
+            }
+            .padding(.trailing, 16)
+            .padding(.bottom, 24)
         }
+    }
+
+    private var mapControlsStack: some View {
+        VStack(spacing: 10) {
+            Button {
+                zoomMap(spanMultiplier: 0.5)
+            } label: {
+                mapCircleIcon("plus", filled: false)
+            }
+
+            Button {
+                zoomMap(spanMultiplier: 2)
+            } label: {
+                mapCircleIcon("minus", filled: false)
+            }
+
+            Button {
+                Task { await centerOnUserLocation() }
+            } label: {
+                mapCircleIcon("location.fill", filled: true)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Search results (gray list)
@@ -198,7 +235,7 @@ struct MapView: View {
                     LazyVStack(spacing: 12) {
                         ForEach(searchResultSections) { section in
                             MapPlaceMemoryCard(section: section) {
-                                onOpenMemory(section)
+                                openMemoryFromSearch(section)
                             }
                         }
                     }
@@ -224,16 +261,25 @@ struct MapView: View {
                 Button {
                     closeSearch()
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
-                        .frame(width: 44, height: 44)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Back")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(Color(.systemBackground))
+                    )
                 }
                 .buttonStyle(.plain)
 
                 Spacer()
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 16)
 
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -311,6 +357,17 @@ struct MapView: View {
         }
     }
 
+    private func openMemoryFromSearch(_ section: DaySection) {
+        isSearchFocused = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+        onOpenMemory(section)
+    }
+
     private func mapCircleIcon(_ systemName: String, filled: Bool) -> some View {
         ZStack {
             Circle()
@@ -336,6 +393,27 @@ struct MapView: View {
 
     private func updateAnnotations() {
         annotations = filteredSections.map { MemoryMapAnnotation(section: $0) }
+    }
+
+    private func zoomMap(spanMultiplier: Double) {
+        let newLat = min(max(region.span.latitudeDelta * spanMultiplier, minMapSpan), maxMapSpan)
+        let newLon = min(max(region.span.longitudeDelta * spanMultiplier, minMapSpan), maxMapSpan)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            region = MKCoordinateRegion(
+                center: region.center,
+                span: MKCoordinateSpan(latitudeDelta: newLat, longitudeDelta: newLon)
+            )
+        }
+    }
+
+    private func centerOnUserLocation() async {
+        guard let coordinate = await MapBootstrapLocationProvider.currentCoordinate() else { return }
+        withAnimation(.easeInOut(duration: 0.5)) {
+            region = MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: userLocationSpan, longitudeDelta: userLocationSpan)
+            )
+        }
     }
 
     private func centerMapOnMemories() {
