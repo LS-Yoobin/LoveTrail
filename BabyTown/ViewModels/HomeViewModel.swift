@@ -112,8 +112,13 @@ final class HomeViewModel: ObservableObject {
     @Published var moments: [Moment] {
         didSet {
             DataPersistenceManager.shared.saveMoments(moments)
+            refreshOnThisDay()
         }
     }
+
+    /// Cached "On This Day" sections. Recomputed only when moments change or the
+    /// view appears — never inside `body`, so scrolling doesn't trigger Photos fetches.
+    @Published private(set) var onThisDaySections: [DaySection] = []
     
     
     var allPinnedItems: [PinnedItem] {
@@ -131,6 +136,8 @@ final class HomeViewModel: ObservableObject {
     private var periodicCheckTimer: Timer?
     private var isInitializing = true
     private var cancellables = Set<AnyCancellable>()
+    private let locationResolver = LocationNameResolver()
+    private var isBackfillingCountries = false
 
     private static let foundingPrompts: Set<String> = [
         "When we first met",
@@ -143,15 +150,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     var foundingMoments: [Moment] {
-        moments
-            .filter { !$0.isPinned && Self.isFoundingMoment($0) }
-            .sorted { m1, m2 in
-                // "When we became official" first, "When we first met" second (bottom)
-                let order: [String] = ["When we became official", "When we first met"]
-                let i1 = order.firstIndex(of: m1.promptText ?? "") ?? 0
-                let i2 = order.firstIndex(of: m2.promptText ?? "") ?? 0
-                return i1 < i2
-            }
+        let order = ["When we became official", "When we first met"]
+        return order.compactMap { prompt in
+            let matches = moments.filter { $0.promptText == prompt }
+            return matches.first(where: { !$0.isPinned }) ?? matches.first
+        }
     }
 
     var foundingDaySections: [DaySection] {
@@ -166,6 +169,92 @@ final class HomeViewModel: ObservableObject {
         guard let prompt = moment.promptText else { return false }
         return foundingPrompts.contains(prompt)
     }
+
+    /// Timeline cards use unpinned founding rows; repair data that only has a pinned copy.
+    private func ensureFoundingTimelineMoments() {
+        var updated = moments
+        var changed = false
+
+        for prompt in Self.foundingPrompts {
+            let matches = updated.filter { $0.promptText == prompt }
+            guard !matches.isEmpty else { continue }
+            guard !matches.contains(where: { !$0.isPinned }) else { continue }
+            guard let source = matches.first(where: \.isPinned) ?? matches.first else { continue }
+
+            updated.append(
+                Moment(
+                    id: UUID(),
+                    dateTaken: source.dateTaken,
+                    assetIdentifier: source.assetIdentifier,
+                    thumbnail: source.thumbnail,
+                    placeName: source.placeName,
+                    caption: source.caption,
+                    voiceNotePath: source.voiceNotePath,
+                    promptText: prompt,
+                    isPinned: false,
+                    pinnedAt: nil,
+                    isLocked: source.isLocked,
+                    unlockTime: source.unlockTime,
+                    latitude: source.latitude,
+                    longitude: source.longitude,
+                    isAddedFromOnThisDay: source.isAddedFromOnThisDay,
+                    isPlaceNameUserSet: source.isPlaceNameUserSet
+                )
+            )
+            changed = true
+        }
+
+        if changed {
+            moments = updated
+        }
+    }
+
+    func upsertFoundingMoment(
+        promptText: String,
+        image: UIImage,
+        dateTaken: Date,
+        assetIdentifier: String?,
+        latitude: Double?,
+        longitude: Double?,
+        pinnedAt: Date
+    ) {
+        guard Self.foundingPrompts.contains(promptText) else { return }
+
+        moments.removeAll { $0.promptText == promptText }
+
+        let sharedFields = (
+            dateTaken: dateTaken,
+            assetIdentifier: assetIdentifier,
+            thumbnail: image,
+            promptText: promptText,
+            latitude: latitude,
+            longitude: longitude
+        )
+
+        let pinned = Moment(
+            id: UUID(),
+            dateTaken: sharedFields.dateTaken,
+            assetIdentifier: sharedFields.assetIdentifier,
+            thumbnail: sharedFields.thumbnail,
+            promptText: sharedFields.promptText,
+            isPinned: true,
+            pinnedAt: pinnedAt,
+            latitude: sharedFields.latitude,
+            longitude: sharedFields.longitude
+        )
+        let unpinned = Moment(
+            id: UUID(),
+            dateTaken: sharedFields.dateTaken,
+            assetIdentifier: sharedFields.assetIdentifier,
+            thumbnail: sharedFields.thumbnail,
+            promptText: sharedFields.promptText,
+            isPinned: false,
+            pinnedAt: nil,
+            latitude: sharedFields.latitude,
+            longitude: sharedFields.longitude
+        )
+        addMoments([pinned, unpinned])
+    }
     
     var pinnedMoments: [Moment] {
         moments.filter { $0.isPinned }.sorted { ($0.pinnedAt ?? Date.distantPast) > ($1.pinnedAt ?? Date.distantPast) }
@@ -178,10 +267,8 @@ final class HomeViewModel: ObservableObject {
         for moment in moments.filter({ $0.isPinned }) {
             let allMomentsFromDay: [Moment]
             if Self.isFoundingMoment(moment) {
-                // For founding moments, only include photos with the same prompt
-                allMomentsFromDay = moments.filter {
-                    $0.promptText == moment.promptText
-                }.sorted { $0.dateTaken < $1.dateTaken }
+                // Timeline keeps a separate unpinned copy; pinned card is a single photo.
+                allMomentsFromDay = [moment]
             } else {
                 // Otherwise include all photos from that day
                 allMomentsFromDay = moments.filter {
@@ -201,6 +288,25 @@ final class HomeViewModel: ObservableObject {
 
     var isEmpty: Bool {
         moments.isEmpty && promptMemories.isEmpty && polaroidStore.processingMemories.isEmpty
+    }
+
+    /// One timeline card represents every polaroid still waiting for the 9 PM release.
+    var processingMemoryForTimeline: ProcessingMemory? {
+        let pending = polaroidStore.processingMemories
+        guard let newest = pending.max(by: { $0.date < $1.date }) else { return nil }
+        guard let soonestUnlock = pending.map(\.unlockTime).min(), soonestUnlock != newest.unlockTime else {
+            return newest
+        }
+        return ProcessingMemory(
+            id: newest.id,
+            date: newest.date,
+            unlockTime: soonestUnlock,
+            imageFileName: newest.imageFileName
+        )
+    }
+
+    var processingMemoryCount: Int {
+        polaroidStore.processingMemories.count
     }
 
     init(
@@ -224,7 +330,9 @@ final class HomeViewModel: ObservableObject {
         }
         
         isInitializing = false
-        
+        ensureFoundingTimelineMoments()
+        refreshOnThisDay()
+
         setupPolaroidStoreObserver()
     }
     
@@ -380,6 +488,7 @@ final class HomeViewModel: ObservableObject {
         placeName: String?,
         latitude: Double?,
         longitude: Double?,
+        isPlaceNameUserSet: Bool = false,
         voiceNotePath: String? = nil
     ) {
         let momentIds = Set(section.moments.map(\.id))
@@ -395,6 +504,7 @@ final class HomeViewModel: ObservableObject {
             newMoments[index].placeName = placeName
             newMoments[index].latitude = latitude
             newMoments[index].longitude = longitude
+            newMoments[index].isPlaceNameUserSet = isPlaceNameUserSet
         }
         moments = newMoments
     }
@@ -608,44 +718,58 @@ final class HomeViewModel: ObservableObject {
     
     // MARK: - On This Day
     
-    func onThisDayMatches(for date: Date = Date()) -> [DaySection] {
+    /// Recompute the cached `onThisDaySections`. Call on appear and whenever moments change.
+    /// Cheap to call: it does a date filter first and only touches the Photos library once.
+    func refreshOnThisDay(for date: Date = Date()) {
+        onThisDaySections = computeOnThisDayMatches(for: date)
+    }
+
+    private func computeOnThisDayMatches(for date: Date = Date()) -> [DaySection] {
         // Use LA timezone consistently with the rest of the app
         guard let laTimeZone = TimeZone(identifier: "America/Los_Angeles") else {
             return []
         }
-        
+
         var calendar = Calendar.current
         calendar.timeZone = laTimeZone
-        
+
         let targetMonth = calendar.component(.month, from: date)
         let targetDay = calendar.component(.day, from: date)
         let currentYear = calendar.component(.year, from: date)
-        
-        // Filter moments that match month and day, but exclude current year and screenshots
-        let matchingMoments = moments.filter { moment in
+
+        // 1) Cheap date filter first — no Photos calls. This is almost always a tiny set.
+        let dateMatches = moments.filter { moment in
             let momentMonth = calendar.component(.month, from: moment.dateTaken)
             let momentDay = calendar.component(.day, from: moment.dateTaken)
             let momentYear = calendar.component(.year, from: moment.dateTaken)
-            
-            // Check if it's a screenshot (if it has an asset identifier)
-            if let assetId = moment.assetIdentifier {
-                let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
-                if let asset = fetchResult.firstObject {
-                    // Filter out screenshots
-                    if asset.mediaSubtypes.contains(.photoScreenshot) {
-                        return false
-                    }
-                }
-            }
-            
             return momentMonth == targetMonth && momentDay == targetDay && momentYear != currentYear
         }
-        
+
+        guard !dateMatches.isEmpty else { return [] }
+
+        // 2) One batched Photos fetch to find screenshots among the few candidates,
+        //    instead of a synchronous fetch per moment.
+        let candidateIds = dateMatches.compactMap { $0.assetIdentifier }
+        var screenshotIds = Set<String>()
+        if !candidateIds.isEmpty {
+            let fetch = PHAsset.fetchAssets(withLocalIdentifiers: candidateIds, options: nil)
+            fetch.enumerateObjects { asset, _, _ in
+                if asset.mediaSubtypes.contains(.photoScreenshot) {
+                    screenshotIds.insert(asset.localIdentifier)
+                }
+            }
+        }
+
+        let matchingMoments = dateMatches.filter { moment in
+            guard let id = moment.assetIdentifier else { return true }
+            return !screenshotIds.contains(id)
+        }
+
         // Group by year (all moments from the same year together)
         let groupedByYear = Dictionary(grouping: matchingMoments) { moment in
             calendar.component(.year, from: moment.dateTaken)
         }
-        
+
         // Create a DaySection for each year, sorted by year descending (most recent first)
         return groupedByYear.map { year, yearMoments in
             let sortedMoments = yearMoments.sorted { $0.dateTaken < $1.dateTaken }
@@ -684,12 +808,54 @@ final class HomeViewModel: ObservableObject {
         return DaySection.grouped(from: momentsWithCoordinates + promptMomentsWithCoordinates)
     }
     
+    var availableCountries: [String] {
+        let names = moments.compactMap { moment -> String? in
+            guard let country = moment.country?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !country.isEmpty else { return nil }
+            return country
+        }
+        return Set(names).sorted()
+    }
+
     func availableYears() -> [Int] {
         let momentYears = Set(moments.map { $0.year })
         let promptYears = Set(promptMemories.map { Calendar.current.component(.year, from: $0.date) })
         return momentYears.union(promptYears).sorted(by: >)
     }
     
+    /// Fill `country` for legacy moments that have coordinates but no country yet.
+    /// Throttled to respect CLGeocoder limits; batches one save at the end.
+    func backfillCountriesIfNeeded() {
+        guard !isBackfillingCountries else { return }
+
+        let targets = moments.filter { $0.country == nil && $0.location != nil }
+        guard !targets.isEmpty else { return }
+
+        isBackfillingCountries = true
+        Task { @MainActor in
+            defer { isBackfillingCountries = false }
+
+            var updates: [UUID: String] = [:]
+            for moment in targets {
+                guard let coordinate = moment.location?.coordinate else { continue }
+                if let country = await locationResolver.country(from: coordinate) {
+                    updates[moment.id] = country
+                }
+                // ~50 requests/minute ceiling for CLGeocoder.
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+            }
+
+            guard !updates.isEmpty else { return }
+            var newMoments = moments
+            for index in newMoments.indices {
+                if let country = updates[newMoments[index].id] {
+                    newMoments[index].country = country
+                }
+            }
+            moments = newMoments
+        }
+    }
+
     func memories(forYear year: Int) -> [DaySection] {
         // Filter for memories with location data for the specified year
         let filteredMoments = moments.filter { $0.year == year && $0.location != nil }
@@ -736,13 +902,13 @@ final class HomeViewModel: ObservableObject {
             }
 
             let seasonGroups = seasons.map { season, seasonSections in
-                SeasonGroup(season: season, sections: seasonSections.sorted { $0.date < $1.date })
+                SeasonGroup(season: season, sections: seasonSections.sorted { $0.date > $1.date })
             }
-            .sorted { $0.season < $1.season }
+            .sorted { $0.season > $1.season }
 
             return YearGroup(id: year, seasons: seasonGroups)
         }
-        .sorted { $0.id < $1.id } // Oldest first as per requirements
+        .sorted { $0.id > $1.id }
     }
 
     var tocMilestones: [Moment] {
