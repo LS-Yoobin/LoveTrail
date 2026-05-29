@@ -5,11 +5,12 @@ struct DayClusterCard: View {
     let section: DaySection
     var onOpenPhoto: (Moment, [Moment]) -> Void
     var onEditCaption: ((UUID, String, String?) -> Void)? = nil
-    var onEditMemory: ((DaySection, UUID, String, String?, Double?, Double?) -> Void)? = nil
+    var onEditMemory: ((DaySection, UUID, String, String?, Double?, Double?, Bool) -> Void)? = nil
     var onRemove: ((DaySection) -> Void)? = nil
     var onTogglePin: ((DaySection) -> Void)? = nil
     var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
     var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
+    var onShare: ((MemorySharePayload) -> Void)? = nil
     var isLeftAligned: Bool = true
     var index: Int = 0
     
@@ -76,9 +77,7 @@ struct DayClusterCard: View {
                         )
                     }
 
-                    Text(locationText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.black)
+                    locationRow
                 }
                 
                 Spacer(minLength: 0)
@@ -91,9 +90,9 @@ struct DayClusterCard: View {
         .sheet(isPresented: $showCaptionEditor) {
             CaptionEditorSheet(
                 section: section,
-                onSave: { momentId, newCaption, placeName, latitude, longitude in
+                onSave: { momentId, newCaption, placeName, latitude, longitude, isPlaceNameUserSet in
                     if let onEditMemory {
-                        onEditMemory(section, momentId, newCaption, placeName, latitude, longitude)
+                        onEditMemory(section, momentId, newCaption, placeName, latitude, longitude, isPlaceNameUserSet)
                     } else {
                         onEditCaption?(momentId, newCaption, nil)
                     }
@@ -123,6 +122,12 @@ struct DayClusterCard: View {
     private var memoryMenu: some View {
         Menu {
                 Button {
+                    onShare?(MemorySharePayload(section: section))
+                } label: {
+                    Label("Share Memory", systemImage: "square.and.arrow.up")
+                }
+
+                Button {
                     onTogglePin?(section)
                 } label: {
                     Label(isPinned ? "Unpin Memory" : "Pin Memory", systemImage: isPinned ? "pin.slash" : "pin")
@@ -148,11 +153,20 @@ struct DayClusterCard: View {
         }
     }
     
-    private var locationText: String {
-        if let placeName = section.moments.first?.placeName, !placeName.isEmpty {
-            return "Near \(placeName)"
+    @ViewBuilder
+    private var locationRow: some View {
+        if section.formattedPlaceName != nil {
+            PlaceNameLabel(
+                rawPlaceName: section.moments.first?.placeName,
+                isUserSet: section.isPlaceNameUserSet,
+                font: .system(size: 12),
+                foregroundStyle: .black
+            )
+        } else {
+            Text("No location data")
+                .font(.system(size: 12))
+                .foregroundStyle(.black)
         }
-        return "No location data"
     }
     
     private var captionText: String {

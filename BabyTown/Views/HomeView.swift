@@ -11,6 +11,7 @@ struct HomeView: View {
 
     @StateObject private var viewModel: HomeViewModel
     @StateObject private var nightModeManager = NightModeManager()
+    @StateObject private var shareCoordinator = MemoryShareCoordinator()
 
     var onSelectPhotos: () -> Void
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
@@ -22,7 +23,9 @@ struct HomeView: View {
     @State private var showCameraSheet = false
     @State private var showCameraFullScreen = false
     @State private var showSettings = false
-    @State private var showSearch = false
+    @State private var memorySearchText = ""
+    @FocusState private var isMemorySearchFocused: Bool
+    @State private var isSearchBarPinned = false
     @State private var firstMetPickerItem: PhotosPickerItem?
     @State private var officialPickerItem: PhotosPickerItem?
     @State private var showingPinnedViewer: PinnedMemoryType?
@@ -38,6 +41,7 @@ struct HomeView: View {
     @State private var showUpButton = false
     @State private var scrollToNewMemory = false
     @State private var showNotifications = false
+    @State private var hasUnreadNotifications = AppNotification.hasUnread()
     @State private var showOnThisDayViewer = false
     @State private var onThisDayPhotos: [Moment] = []
     @State private var onThisDayStartIndex = 0
@@ -111,7 +115,8 @@ struct HomeView: View {
                         onSettingsTap: { showSettings = true },
                         onNotificationsTap: { showNotifications = true },
                         onMapTap: { openMap() },
-                        isNightMode: nightModeManager.isNightMode
+                        isNightMode: nightModeManager.isNightMode,
+                        showsUnreadBadge: hasUnreadNotifications
                     )
                     
                     StickyActionBar(
@@ -121,48 +126,85 @@ struct HomeView: View {
                         isNightMode: nightModeManager.isNightMode
                     )
 
+                    if isSearchBarPinned {
+                        memoryInlineSearchBar
+                            .padding(.top, 10)
+                            .padding(.bottom, 14)
+                    }
+
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(spacing: 28) {
-                                MapPullHintView(
-                                    progress: min(currentPullProgress, 1),
-                                    isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView,
-                                    isNightMode: nightModeManager.isNightMode
-                                )
-                                
-                                // On This Day section
-                                let onThisDayMatches = viewModel.onThisDayMatches()
-                                if !onThisDayMatches.isEmpty {
-                                    OnThisDaySection(
-                                        matches: onThisDayMatches,
+                            VStack(spacing: isMemorySearchActive ? 16 : 28) {
+                                if !isUsingMemorySearch {
+                                    MapPullHintView(
+                                        progress: min(currentPullProgress, 1),
+                                        isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView,
                                         isNightMode: nightModeManager.isNightMode
-                                    ) { section in
-                                        let photos = viewModel.flattenedPhotos(for: section)
-                                        guard !photos.isEmpty else { return }
-                                        onThisDayPhotos = photos
-                                        onThisDayStartIndex = 0
-                                        withAnimation(.easeInOut(duration: 0.25)) {
-                                            showOnThisDayViewer = true
-                                        }
-                                    }
-                                    divider
+                                    )
                                 }
-                                
-                                pinnedSection
-                                divider
 
-                                if viewModel.isEmpty {
-                                    emptyState
+                                if !isSearchBarPinned {
+                                    memorySearchBarPlaceholder
+                                }
+
+                                if isMemorySearchActive {
+                                    inlineMemorySearchResults
                                 } else {
-                                    timelineSection
+                                    // On This Day section (cached; never computed in body)
+                                    let onThisDayMatches = viewModel.onThisDaySections
+                                    if !onThisDayMatches.isEmpty {
+                                        OnThisDaySection(
+                                            matches: onThisDayMatches,
+                                            isNightMode: nightModeManager.isNightMode
+                                        ) { section in
+                                            let photos = viewModel.flattenedPhotos(for: section)
+                                            guard !photos.isEmpty else { return }
+                                            onThisDayPhotos = photos
+                                            onThisDayStartIndex = 0
+                                            withAnimation(.easeInOut(duration: 0.25)) {
+                                                showOnThisDayViewer = true
+                                            }
+                                        }
+                                        divider
+                                    }
+
+                                    pinnedSection
+                                    divider
+
+                                    if viewModel.isEmpty {
+                                        emptyState
+                                    } else {
+                                        timelineSection
+                                    }
                                 }
                             }
-                            .padding(.top, 18)
+                            .padding(.top, isSearchBarPinned ? (isMemorySearchActive ? 4 : 8) : 18)
                             .padding(.bottom, 100)
+                        }
+                        .scrollDismissesKeyboard(
+                            isMemorySearchFocused ? .immediately : .interactively
+                        )
+                        .onChange(of: isMemorySearchFocused) { _, focused in
+                            if focused {
+                                isSearchBarPinned = true
+                            } else if !isMemorySearchActive {
+                                isSearchBarPinned = false
+                            }
+                        }
+                        .onChange(of: memorySearchText) { _, _ in
+                            if isMemorySearchActive {
+                                isSearchBarPinned = true
+                            } else if !isMemorySearchFocused {
+                                isSearchBarPinned = false
+                            }
                         }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
                             geometry.contentOffset.y + geometry.contentInsets.top
-                        } action: { _, topOffset in
+                        } action: { previousTopOffset, topOffset in
+                            dismissSearchKeyboardIfScrolling(
+                                from: previousTopOffset,
+                                to: topOffset
+                            )
                             handleScrollTopOffsetChange(topOffset)
                         }
                         .onChange(of: scrollToNewMemory) { _, newValue in
@@ -181,6 +223,7 @@ struct HomeView: View {
                 .sensoryFeedback(.success, trigger: mapOpenHapticTick)
                 .onAppear {
                     viewModel.checkAndReleasePhotos()
+                    viewModel.refreshOnThisDay()
                     AudioManager.shared.playHomeMusic()
                 }
                 .onChange(of: viewModel.moments.count) { oldCount, newCount in
@@ -213,15 +256,16 @@ struct HomeView: View {
                                     longitude = asset.location?.coordinate.longitude
                                 }
                             }
-                            viewModel.moments.removeAll { $0.promptText == "When we first met" }
                             viewModel.pinnedFirstMet = image
-                            let moment = Moment(
-                                id: UUID(), dateTaken: creationDate, assetIdentifier: newItem.itemIdentifier,
-                                thumbnail: image, placeName: nil, caption: nil, voiceNotePath: nil,
-                                promptText: "When we first met", isPinned: true, pinnedAt: Date(),
-                                latitude: latitude, longitude: longitude
+                            viewModel.upsertFoundingMoment(
+                                promptText: "When we first met",
+                                image: image,
+                                dateTaken: creationDate,
+                                assetIdentifier: newItem.itemIdentifier,
+                                latitude: latitude,
+                                longitude: longitude,
+                                pinnedAt: Date().addingTimeInterval(-1)
                             )
-                            viewModel.addMoments([moment])
                         }
                         firstMetPickerItem = nil
                     }
@@ -242,15 +286,16 @@ struct HomeView: View {
                                     longitude = asset.location?.coordinate.longitude
                                 }
                             }
-                            viewModel.moments.removeAll { $0.promptText == "When we became official" }
                             viewModel.pinnedOfficial = image
-                            let moment = Moment(
-                                id: UUID(), dateTaken: creationDate, assetIdentifier: newItem.itemIdentifier,
-                                thumbnail: image, placeName: nil, caption: nil, voiceNotePath: nil,
-                                promptText: "When we became official", isPinned: true, pinnedAt: Date(),
-                                latitude: latitude, longitude: longitude
+                            viewModel.upsertFoundingMoment(
+                                promptText: "When we became official",
+                                image: image,
+                                dateTaken: creationDate,
+                                assetIdentifier: newItem.itemIdentifier,
+                                latitude: latitude,
+                                longitude: longitude,
+                                pinnedAt: Date()
                             )
-                            viewModel.addMoments([moment])
                         }
                         officialPickerItem = nil
                     }
@@ -399,45 +444,10 @@ struct HomeView: View {
                     onReplayStory: { onReplayStory?() }
                 )
             }
-            .fullScreenCover(isPresented: $showNotifications) {
-                NotificationCenterView()
+            .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshUnreadNotifications) {
+                NotificationCenterView(onNotificationRead: refreshUnreadNotifications)
             }
-            .fullScreenCover(isPresented: $showSearch) {
-                MemorySearchView(
-                    allMoments: viewModel.moments,
-                    onOpenPhoto: { moment, allMoments in
-                        showSearch = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            viewerMoments = allMoments
-                            if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                viewerInitialIndex = idx
-                            }
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                showingMomentViewer = true
-                            }
-                        }
-                    },
-                    onEditCaption: { momentId, caption, voiceNotePath in
-                        viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
-                    },
-                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
-                        viewModel.updateMemory(
-                            section: section,
-                            primaryMomentId: momentId,
-                            caption: caption,
-                            placeName: placeName,
-                            latitude: latitude,
-                            longitude: longitude
-                        )
-                    },
-                    onRemove: { section in
-                        withAnimation { viewModel.removeMoments(from: section) }
-                    },
-                    onTogglePin: { section in
-                        withAnimation { viewModel.togglePin(for: section) }
-                    }
-                )
-            }
+            .onAppear(perform: refreshUnreadNotifications)
             .fullScreenCover(isPresented: $showScan) {
                 ScanView(existingAssetIdentifiers: Set(viewModel.moments.compactMap { $0.assetIdentifier })) { moments in
                     viewModel.addMoments(moments)
@@ -448,7 +458,12 @@ struct HomeView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+            .memorySharePresentation(coordinator: shareCoordinator)
         }
+    }
+
+    private func shareMemory(_ payload: MemorySharePayload) {
+        shareCoordinator.share(payload)
     }
     
     // MARK: - Map pull reveal
@@ -519,6 +534,12 @@ struct HomeView: View {
     private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
         scrollOffset = topOffset
         showUpButton = topOffset > 100
+
+        guard !isUsingMemorySearch else {
+            peakPullOffset = 0
+            didCrossMapOpenThreshold = false
+            return
+        }
         
         // Negative topOffset = overscroll pull-down at the top of the feed.
         let pull = max(0, -topOffset)
@@ -542,11 +563,243 @@ struct HomeView: View {
         }
     }
     
+    private func refreshUnreadNotifications() {
+        hasUnreadNotifications = AppNotification.hasUnread(
+            userNickname: DataPersistenceManager.shared.loadUserNickname()
+        )
+    }
+
     private func openMap() {
         guard !showMapView else { return }
         mapOpenHapticTick += 1
         withAnimation(.easeInOut(duration: 0.3)) {
             showMapView = true
+        }
+    }
+
+    private func dismissSearchKeyboardIfScrolling(from previousOffset: CGFloat, to offset: CGFloat) {
+        guard isMemorySearchFocused else { return }
+        guard abs(offset - previousOffset) > 2 else { return }
+        isMemorySearchFocused = false
+    }
+
+    // MARK: - Memory Search
+
+    private var isMemorySearchActive: Bool {
+        !memorySearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isUsingMemorySearch: Bool {
+        isSearchBarPinned || isMemorySearchActive
+    }
+
+    private var memorySearchFilteredSections: [DaySection] {
+        let filtered = viewModel.moments.filter {
+            MemorySearchMatcher.matches(moment: $0, query: memorySearchText)
+        }
+        return DaySection.grouped(from: filtered)
+    }
+
+    private var memorySearchFilteredPrompts: [PromptMemory] {
+        viewModel.promptMemories
+            .filter { MemorySearchMatcher.matches(promptMemory: $0, query: memorySearchText) }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var memorySearchBarPlaceholder: some View {
+        Button {
+            isSearchBarPinned = true
+            DispatchQueue.main.async {
+                isMemorySearchFocused = true
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(
+                        nightModeManager.isNightMode
+                            ? .white.opacity(0.55)
+                            : BabyTownTheme.textPrimary.opacity(0.45)
+                    )
+
+                Text("Search places, dates, love notes...")
+                    .font(.system(size: 16))
+                    .foregroundStyle(
+                        nightModeManager.isNightMode
+                            ? .white.opacity(0.45)
+                            : BabyTownTheme.textPrimary.opacity(0.4)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(memorySearchBarBackground)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+    }
+
+    private var memoryInlineSearchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(
+                    nightModeManager.isNightMode
+                        ? .white.opacity(0.55)
+                        : BabyTownTheme.textPrimary.opacity(0.45)
+                )
+
+            TextField("Search places, dates, love notes...", text: $memorySearchText)
+                .font(.system(size: 16))
+                .foregroundStyle(nightModeManager.isNightMode ? .white : BabyTownTheme.textPrimary)
+                .focused($isMemorySearchFocused)
+                .submitLabel(.search)
+
+            if !memorySearchText.isEmpty {
+                Button {
+                    memorySearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(
+                            nightModeManager.isNightMode
+                                ? .white.opacity(0.45)
+                                : BabyTownTheme.textPrimary.opacity(0.4)
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(memorySearchBarBackground)
+        .padding(.horizontal, 20)
+    }
+
+    private var memorySearchBarBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(
+                nightModeManager.isNightMode
+                    ? Color.white.opacity(0.1)
+                    : Color(.systemGray6)
+            )
+    }
+
+    @ViewBuilder
+    private var inlineMemorySearchResults: some View {
+        let sections = memorySearchFilteredSections
+        let prompts = memorySearchFilteredPrompts
+
+        if sections.isEmpty && prompts.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 36))
+                    .foregroundStyle(
+                        nightModeManager.isNightMode
+                            ? .white.opacity(0.35)
+                            : BabyTownTheme.textSecondary.opacity(0.5)
+                    )
+
+                Text("No memories found")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(nightModeManager.isNightMode ? .white : BabyTownTheme.textPrimary)
+
+                Text("Try a place, date, love note, or prompt")
+                    .font(.system(size: 14))
+                    .foregroundStyle(
+                        nightModeManager.isNightMode
+                            ? .white.opacity(0.6)
+                            : BabyTownTheme.textSecondary
+                    )
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 40)
+            .padding(.horizontal, 32)
+        } else {
+            VStack(spacing: 20) {
+                ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                    DayClusterCard(
+                        section: section,
+                        onOpenPhoto: { moment, allMoments in
+                            viewerMoments = allMoments
+                            if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                viewerInitialIndex = idx
+                            }
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showingMomentViewer = true
+                            }
+                        },
+                        onEditCaption: { momentId, caption, voiceNotePath in
+                            viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                        },
+                        onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                            viewModel.updateMemory(
+                                section: section,
+                                primaryMomentId: momentId,
+                                caption: caption,
+                                placeName: placeName,
+                                latitude: latitude,
+                                longitude: longitude,
+                                isPlaceNameUserSet: isPlaceNameUserSet
+                            )
+                        },
+                        onRemove: { section in
+                            withAnimation { viewModel.removeMoments(from: section) }
+                        },
+                        onTogglePin: { section in
+                            withAnimation { viewModel.togglePin(for: section) }
+                        },
+                        onAddPhotos: { section, images in
+                            viewModel.addPhotosToMemory(section: section, images: images)
+                        },
+                        onRemovePhoto: { section, momentId in
+                            viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                        },
+                        onShare: shareMemory,
+                        isLeftAligned: index.isMultiple(of: 2),
+                        index: index
+                    )
+                    .padding(.horizontal, 20)
+                }
+
+                ForEach(Array(prompts.enumerated()), id: \.element.id) { index, memory in
+                    let cardIndex = sections.count + index
+                    PromptMemoryCard(
+                        memory: memory,
+                        onTap: {},
+                        onOpenPhoto: { photo, allPhotos in
+                            if let photoIndex = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                                viewerPromptPhotos = allPhotos
+                                viewerPromptPhotoIndex = photoIndex
+                                viewerPromptText = memory.promptText
+                                withAnimation(.easeIn(duration: 0.25)) {
+                                    showingPromptPhotoViewer = true
+                                }
+                            }
+                        },
+                        onRemove: { memory in
+                            withAnimation { viewModel.removePromptMemory(memory) }
+                        },
+                        onEditLoveNote: { memoryId, newNote in
+                            viewModel.updatePromptMemoryLoveNote(for: memoryId, loveNote: newNote)
+                        },
+                        onTogglePin: { memory in
+                            withAnimation { viewModel.togglePromptMemoryPin(memory) }
+                        },
+                        onShare: shareMemory,
+                        isLeftAligned: cardIndex.isMultiple(of: 2),
+                        index: cardIndex
+                    )
+                    .padding(
+                        .leading,
+                        cardIndex.isMultiple(of: 2) ? 20 : 46
+                    )
+                    .padding(
+                        .trailing,
+                        cardIndex.isMultiple(of: 2) ? 46 : 20
+                    )
+                }
+            }
+            .padding(.top, 12)
         }
     }
 
@@ -607,7 +860,8 @@ struct HomeView: View {
                                         viewModel.togglePromptMemoryPin(p)
                                     }
                                 }
-                            }
+                            },
+                            onShare: shareMemory
                         )
                         .frame(width: 180)
                     }
@@ -638,11 +892,12 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "book.closed")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(nightModeManager.isNightMode ? .white.opacity(0.8) : BabyTownTheme.accent.opacity(0.8))
+                        .foregroundStyle(.white)
                         .padding(8)
                         .background(
                             Circle()
-                                .fill(nightModeManager.isNightMode ? .white.opacity(0.1) : BabyTownTheme.accent.opacity(0.05))
+                                .fill(BabyTownTheme.accentGradient)
+                                .shadow(color: BabyTownTheme.accent.opacity(0.28), radius: 4, y: 2)
                         )
                 }
             }
@@ -661,7 +916,7 @@ struct HomeView: View {
     private var timelineSection: some View {
         VStack(spacing: 12) {
             sectionLabel(
-                nightModeManager.isNightMode ? "Jinky Dreams 🌙" : "Our Adventures",
+                nightModeManager.isNightMode ? "Our Dreams 🌙" : "Our Adventures",
                 icon: "heart.text.square",
                 showToCButton: true
             )
@@ -670,16 +925,18 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + viewModel.polaroidStore.processingMemories.count + viewModel.foundingMoments.count
+                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingMoments.count
                 )
 
-                VStack(spacing: 24) {
-                    ForEach(Array(combinedTimelineItems.enumerated()), id: \.offset) { index, item in
-                        if let year = yearHeaderForItem(at: index) {
+                let rows = timelineRows
+                LazyVStack(spacing: 24) {
+                    ForEach(rows) { row in
+                        let index = row.displayIndex
+                        if let year = row.yearHeader {
                             yearHeaderView(year)
                         }
 
-                        switch item {
+                        switch row.item {
                         case .daySection(let section):
                             VStack(spacing: 16) {
                                 DayClusterCard(
@@ -696,14 +953,15 @@ struct HomeView: View {
                                     onEditCaption: { momentId, caption, voiceNotePath in
                                         viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
                                     },
-                                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
+                                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
                                         viewModel.updateMemory(
                                             section: section,
                                             primaryMomentId: momentId,
                                             caption: caption,
                                             placeName: placeName,
                                             latitude: latitude,
-                                            longitude: longitude
+                                            longitude: longitude,
+                                            isPlaceNameUserSet: isPlaceNameUserSet
                                         )
                                     },
                                     onRemove: { section in
@@ -722,6 +980,7 @@ struct HomeView: View {
                                     onRemovePhoto: { section, momentId in
                                         viewModel.removePhotoFromMemory(section: section, momentId: momentId)
                                     },
+                                    onShare: shareMemory,
                                     isLeftAligned: index.isMultiple(of: 2),
                                     index: index
                                 )
@@ -765,6 +1024,7 @@ struct HomeView: View {
                                         viewModel.togglePromptMemoryPin(memory)
                                     }
                                 },
+                                onShare: shareMemory,
                                 isLeftAligned: index.isMultiple(of: 2),
                                 index: index
                             )
@@ -780,6 +1040,7 @@ struct HomeView: View {
                         case .processingMemory(let memory):
                             ProcessingMemoryCard(
                                 memory: memory,
+                                pendingCount: viewModel.processingMemoryCount,
                                 image: viewModel.polaroidStore.loadImage(for: PolaroidEntry(
                                     id: memory.id,
                                     capturedAt: memory.date,
@@ -808,7 +1069,7 @@ struct HomeView: View {
                         TypingTextView(
                             text: "The Beginning...",
                             font: .system(size: 15, weight: .medium, design: .serif),
-                            color: BabyTownTheme.textPrimary.opacity(0.85)
+                            color: foundingMomentTitleColor
                         )
 
                         Spacer()
@@ -835,14 +1096,15 @@ struct HomeView: View {
                                 onEditCaption: { momentId, caption, voiceNotePath in
                                     viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
                                 },
-                                onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
+                                onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
                                     viewModel.updateMemory(
                                         section: section,
                                         primaryMomentId: momentId,
                                         caption: caption,
                                         placeName: placeName,
                                         latitude: latitude,
-                                        longitude: longitude
+                                        longitude: longitude,
+                                        isPlaceNameUserSet: isPlaceNameUserSet
                                     )
                                 },
                                 onRemove: { section in
@@ -860,7 +1122,8 @@ struct HomeView: View {
                                 },
                                 onRemovePhoto: { section, momentId in
                                     viewModel.removePhotoFromMemory(section: section, momentId: momentId)
-                                }
+                                },
+                                onShare: shareMemory
                             )
                             .padding(.horizontal, 20)
 
@@ -873,6 +1136,18 @@ struct HomeView: View {
         }
     }
 
+    private var foundingMomentTitleColor: Color {
+        nightModeManager.isNightMode
+            ? .white.opacity(0.95)
+            : BabyTownTheme.textPrimary.opacity(0.85)
+    }
+
+    private var foundingMomentDateColor: Color {
+        nightModeManager.isNightMode
+            ? .white.opacity(0.82)
+            : BabyTownTheme.textPrimary.opacity(0.5)
+    }
+
     private func foundingMomentLabel(_ moment: Moment) -> some View {
         HStack(spacing: 8) {
             HeartbeatIconView()
@@ -880,11 +1155,11 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(moment.promptText ?? "")
                     .font(.system(size: 15, weight: .medium, design: .serif))
-                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.85))
+                    .foregroundStyle(foundingMomentTitleColor)
 
                 Text(foundingDateString(moment.dateTaken))
                     .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.5))
+                    .foregroundStyle(foundingMomentDateColor)
             }
 
             Spacer()
@@ -915,6 +1190,19 @@ struct HomeView: View {
                 return memory.date
             }
         }
+
+        var stableId: String {
+            switch self {
+            case .daySection(let section):
+                return "day-\(section.id)"
+            case .promptMemory(let memory):
+                return "prompt-\(memory.id.uuidString)"
+            case .processingMemory(let memory):
+                return "processing-\(memory.id.uuidString)"
+            }
+        }
+
+        var stableSortKey: String { stableId }
     }
     
     private var combinedTimelineItems: [TimelineItem] {
@@ -922,7 +1210,9 @@ struct HomeView: View {
         
         items += viewModel.daySections.map { .daySection($0) }
         items += viewModel.promptMemories.map { .promptMemory($0) }
-        items += viewModel.polaroidStore.processingMemories.map { .processingMemory($0) }
+        if let processingMemory = viewModel.processingMemoryForTimeline {
+            items.append(.processingMemory(processingMemory))
+        }
         
         // Sort with processing memories at the top until 9:00 PM
         return items.sorted { item1, item2 in
@@ -936,8 +1226,11 @@ struct HomeView: View {
                 return false
             }
             
-            // Otherwise sort by date (newest first)
-            return item1.date > item2.date
+            // Otherwise sort by date (newest first), with stable tiebreaker
+            if item1.date != item2.date {
+                return item1.date > item2.date
+            }
+            return item1.stableSortKey < item2.stableSortKey
         }
     }
     
@@ -948,23 +1241,35 @@ struct HomeView: View {
         return false
     }
 
-    private func yearHeaderForItem(at index: Int) -> String? {
+    private struct TimelineRow: Identifiable {
+        let id: String
+        let item: TimelineItem
+        let yearHeader: String?
+        let displayIndex: Int
+    }
+
+    /// Builds the sorted timeline once and precomputes year-header boundaries in a single
+    /// pass. Replaces the old per-item `yearHeaderForItem`, which re-sorted the whole list
+    /// for every row (O(N²) per render).
+    private var timelineRows: [TimelineRow] {
         let items = combinedTimelineItems
-        guard index < items.count else { return nil }
-
         let calendar = Calendar.current
-        let currentYear = calendar.component(.year, from: items[index].date)
+        var rows: [TimelineRow] = []
+        rows.reserveCapacity(items.count)
 
-        if index == 0 {
-            return String(currentYear)
+        var previousYear: Int? = nil
+        for (displayIndex, item) in items.enumerated() {
+            let year = calendar.component(.year, from: item.date)
+            let header: String? = (year != previousYear) ? String(year) : nil
+            previousYear = year
+            rows.append(TimelineRow(
+                id: item.stableId,
+                item: item,
+                yearHeader: header,
+                displayIndex: displayIndex
+            ))
         }
-
-        let previousYear = calendar.component(.year, from: items[index - 1].date)
-        if currentYear != previousYear {
-            return String(currentYear)
-        }
-
-        return nil
+        return rows
     }
 
     private func yearHeaderView(_ year: String) -> some View {

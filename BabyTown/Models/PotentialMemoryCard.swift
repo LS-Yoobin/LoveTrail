@@ -12,6 +12,7 @@ struct PotentialMemoryCard: Identifiable {
     let coverPhoto: UIImage
     let secondaryThumbnails: [UIImage]
     let assetIdentifiers: [String]
+    let coverAssetIdentifier: String
     var isAdded: Bool
     
     init(
@@ -23,6 +24,7 @@ struct PotentialMemoryCard: Identifiable {
         coverPhoto: UIImage,
         secondaryThumbnails: [UIImage] = [],
         assetIdentifiers: [String],
+        coverAssetIdentifier: String,
         isAdded: Bool = false
     ) {
         self.id = id
@@ -33,12 +35,16 @@ struct PotentialMemoryCard: Identifiable {
         self.coverPhoto = coverPhoto
         self.secondaryThumbnails = secondaryThumbnails
         self.assetIdentifiers = assetIdentifiers
+        self.coverAssetIdentifier = coverAssetIdentifier
         self.isAdded = isAdded
     }
     
     var dateRangeDisplay: String {
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
         let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "MMM d"
         
         let startDay = calendar.startOfDay(for: dateRange.start)

@@ -7,6 +7,7 @@ struct BabyTownHeader: View {
     var onNotificationsTap: (() -> Void)? = nil
     var onMapTap: (() -> Void)? = nil
     var isNightMode: Bool = false
+    var showsUnreadBadge: Bool = false
 
     var body: some View {
         ZStack {
@@ -52,20 +53,24 @@ struct BabyTownHeader: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
 
-                        Circle()
-                            .fill(BabyTownTheme.accent)
-                            .frame(width: 8, height: 8)
-                            .offset(x: -8, y: 10)
+                        if showsUnreadBadge {
+                            Circle()
+                                .fill(BabyTownTheme.accent)
+                                .frame(width: 8, height: 8)
+                                .offset(x: -8, y: 10)
+                        }
                     }
                 }
             }
             .padding(.horizontal, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: 56)
-        .background(Color.gray.opacity(0.2))
     }
 }
 
 #Preview {
-    BabyTownHeader()
+    ZStack {
+        HomeBackgroundView(isNightMode: false)
+        BabyTownHeader()
+    }
 }

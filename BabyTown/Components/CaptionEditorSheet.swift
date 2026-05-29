@@ -6,7 +6,7 @@ import CoreLocation
 struct CaptionEditorSheet: View {
     
     let section: DaySection
-    var onSave: (UUID, String, String?, Double?, Double?) -> Void
+    var onSave: (UUID, String, String?, Double?, Double?, Bool) -> Void
     var onAddPhotos: (([UIImage]) -> Void)?
     var onRemovePhoto: ((UUID) -> Void)?
     
@@ -19,6 +19,10 @@ struct CaptionEditorSheet: View {
     // Location editing (fastblog-style flow)
     @State private var isEditingLocation = false
     @State private var editedPlaceName: String = ""
+    @State private var isPlaceNameUserSet = false
+    @State private var initialPlaceName: String = ""
+    @State private var initialLatitude: Double?
+    @State private var initialLongitude: Double?
     @State private var editedLatitude: Double?
     @State private var editedLongitude: Double?
     @State private var mapCenter: CLLocationCoordinate2D?
@@ -63,6 +67,7 @@ struct CaptionEditorSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     if isEditingLocation {
                         Button("Back") {
+                            syncUserSetPlaceFlagFromEdits()
                             isEditingLocation = false
                             isPlaceFieldFocused = false
                             placeSearch.suggestions = []
@@ -195,8 +200,26 @@ struct CaptionEditorSheet: View {
         }
     }
     
+    private static let foundingPrompts: Set<String> = [
+        "When we first met",
+        "When we became official"
+    ]
+
+    private var foundingPromptText: String? {
+        guard let prompt = section.moments.first?.promptText,
+              Self.foundingPrompts.contains(prompt) else { return nil }
+        return prompt
+    }
+
     private var locationTopInset: some View {
         VStack(spacing: 0) {
+            if let foundingPromptText {
+                PromptDisplayCard(prompt: foundingPromptText, variant: .formHeader)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+            }
+
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -330,9 +353,7 @@ struct CaptionEditorSheet: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 
-                Text(locationDisplayText)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.9))
+                locationDisplayRow
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
                     .background(
@@ -346,12 +367,24 @@ struct CaptionEditorSheet: View {
         .padding(.top, 20)
     }
     
-    private var locationDisplayText: String {
+    @ViewBuilder
+    private var locationDisplayRow: some View {
         let trimmed = editedPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return "Near \(trimmed)"
+        if trimmed.isEmpty {
+            Text("Tap to add a location")
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.9))
+        } else {
+            PlaceNameLabel(
+                rawPlaceName: trimmed,
+                isUserSet: isPlaceNameUserSet,
+                font: .system(size: 15),
+                foregroundStyle: .white.opacity(0.9),
+                iconSize: 13,
+                spacing: 5,
+                lineLimit: 2
+            )
         }
-        return "Tap to add a location"
     }
     
     private var photoManagementSection: some View {
@@ -438,9 +471,13 @@ struct CaptionEditorSheet: View {
     
     private func loadInitialPlaceState() {
         let raw = section.moments.first?.placeName ?? ""
-        editedPlaceName = raw.hasPrefix("Near ") ? String(raw.dropFirst(5)) : raw
+        editedPlaceName = PlaceNameFormatting.storedName(fromUserInput: raw)
+        isPlaceNameUserSet = section.moments.first?.isPlaceNameUserSet ?? false
+        initialPlaceName = editedPlaceName
         editedLatitude = section.moments.first?.latitude
         editedLongitude = section.moments.first?.longitude
+        initialLatitude = editedLatitude
+        initialLongitude = editedLongitude
         if let lat = editedLatitude, let lon = editedLongitude {
             mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lon)
             mapSpanMeters = 350
@@ -519,9 +556,23 @@ struct CaptionEditorSheet: View {
         return nil
     }
     
+    private func markUserSetPlace() {
+        isPlaceNameUserSet = true
+    }
+
+    private func syncUserSetPlaceFlagFromEdits() {
+        let trimmed = editedPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let placeChanged = trimmed != initialPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let coordinatesChanged = editedLatitude != initialLatitude || editedLongitude != initialLongitude
+        if placeChanged || coordinatesChanged {
+            markUserSetPlace()
+        }
+    }
+
     // MARK: - POI resolution
     
     private func applyAutocompleteSuggestion(_ suggestion: PlaceSuggestion) {
+        markUserSetPlace()
         showSuggestions = false
         isPlaceFieldFocused = false
         editedPlaceName = suggestion.title
@@ -541,6 +592,7 @@ struct CaptionEditorSheet: View {
     }
     
     private func applyMapTapPOIChoice(_ candidate: MapTapPOICandidate) {
+        markUserSetPlace()
         editedPlaceName = candidate.name
         editedLatitude = candidate.coordinate.latitude
         editedLongitude = candidate.coordinate.longitude
@@ -570,6 +622,7 @@ struct CaptionEditorSheet: View {
             defer { isResolvingPOI = false }
             switch await placeSearch.resolveMapTapPOI(near: coordinate, mapRegion: mapRegion) {
             case .single(let name, let coord):
+                markUserSetPlace()
                 editedPlaceName = name
                 editedLatitude = coord.latitude
                 editedLongitude = coord.longitude
@@ -584,6 +637,7 @@ struct CaptionEditorSheet: View {
             case .none:
                 let name = await placeSearch.resolveCoordinateName(at: coordinate)
                 if !name.isEmpty, name != "Unknown Place" {
+                    markUserSetPlace()
                     editedPlaceName = name
                 }
             }
@@ -612,6 +666,7 @@ struct CaptionEditorSheet: View {
             if let mapItem = try? await request.mapItem,
                let raw = mapItem.name?.trimmingCharacters(in: .whitespacesAndNewlines),
                !raw.isEmpty {
+                markUserSetPlace()
                 editedPlaceName = raw
                 let coord = mapItem.placemark.coordinate
                 editedLatitude = coord.latitude
@@ -627,6 +682,7 @@ struct CaptionEditorSheet: View {
             let subtitlePart = annotation.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines)
             let combined = [titlePart, subtitlePart].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — ")
             if !combined.isEmpty {
+                markUserSetPlace()
                 editedPlaceName = combined
                 editedLatitude = annotation.coordinate.latitude
                 editedLongitude = annotation.coordinate.longitude
@@ -643,9 +699,10 @@ struct CaptionEditorSheet: View {
     
     private func saveMemory() {
         guard let firstMoment = section.moments.first else { return }
-        let trimmedPlace = editedPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        syncUserSetPlaceFlagFromEdits()
+        let trimmedPlace = PlaceNameFormatting.storedName(fromUserInput: editedPlaceName)
         let placeName = trimmedPlace.isEmpty ? nil : trimmedPlace
-        onSave(firstMoment.id, captionText, placeName, editedLatitude, editedLongitude)
+        onSave(firstMoment.id, captionText, placeName, editedLatitude, editedLongitude, isPlaceNameUserSet)
         dismiss()
     }
 }

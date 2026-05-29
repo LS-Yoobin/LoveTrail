@@ -33,6 +33,18 @@ struct DaySection: Identifiable {
         return moments.compactMap(\.placeName).first ?? "Somewhere with you"
     }
 
+    var isPlaceNameUserSet: Bool {
+        moments.first?.isPlaceNameUserSet ?? false
+    }
+
+    /// Display string for UI (adds "Near" prefix when not user-picked).
+    var formattedPlaceName: String? {
+        guard let moment = moments.first else { return nil }
+        let raw = moment.placeName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !raw.isEmpty else { return nil }
+        return PlaceNameFormatting.displayName(raw: moment.placeName, isUserSet: moment.isPlaceNameUserSet) ?? raw
+    }
+
     var timeDisplay: String {
         guard let firstMoment = moments.first else { return "" }
         let formatter = DateFormatter()

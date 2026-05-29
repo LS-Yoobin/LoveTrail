@@ -30,12 +30,18 @@ class PhotoClusteringService {
             }
         }
         
-        // Sort clusters by most recent date
-        return clusters.sorted { $0.dateRange.end > $1.dateRange.end }
+        // Sort clusters chronologically (Jan → Dec) by first day in the memory.
+        return clusters.sorted { lhs, rhs in
+            if lhs.dateRange.start != rhs.dateRange.start {
+                return lhs.dateRange.start < rhs.dateRange.start
+            }
+            return lhs.dateRange.end < rhs.dateRange.end
+        }
     }
     
     private func findMatchingCluster(for photo: PhotoMetadata, in clusters: [PhotoCluster]) -> Int? {
-        for (index, cluster) in clusters.enumerated() {
+        // Prefer the most recent cluster so an older visit doesn't absorb a new one at the same place.
+        for (index, cluster) in clusters.enumerated().reversed() {
             // Check distance to cluster center
             let distance = calculateDistance(
                 from: photo.coordinate,
@@ -68,6 +74,8 @@ class PhotoClusteringService {
             longitude: totalLon / Double(cluster.photos.count)
         )
         
+        cluster.photos.sort { $0.creationDate < $1.creationDate }
+
         // Update date range
         if let first = cluster.photos.first, let last = cluster.photos.last {
             cluster.dateRange = DateInterval(

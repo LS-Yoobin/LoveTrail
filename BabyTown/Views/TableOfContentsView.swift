@@ -23,15 +23,6 @@ struct TableOfContentsView: View {
 
     private let backgroundColor = Color(red: 253/255, green: 246/255, blue: 236/255) // #FDF6EC
     private let serifFont = "Georgia" // Fallback to system serif if needed
-
-    /// Keeps the warm accent tint in the top bar at all scroll positions (iOS 26 scroll-edge effect only applies it at scroll top by default).
-    private var topAccentWash: LinearGradient {
-        LinearGradient(
-            colors: [BabyTownTheme.accent.opacity(0.28), backgroundColor.opacity(0.95)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
     
     var body: some View {
         NavigationView {
@@ -42,15 +33,6 @@ struct TableOfContentsView: View {
                 // for now we'll use a very light overlay
                 Color.black.opacity(0.02)
                     .ignoresSafeArea()
-
-                // Persistent accent wash behind the navigation bar (matches scroll-top tint).
-                VStack(spacing: 0) {
-                    topAccentWash
-                        .frame(height: 120)
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
 
                 ScrollView {
                     VStack(alignment: .center, spacing: 32) {
@@ -81,6 +63,7 @@ struct TableOfContentsView: View {
                                     tocRow(
                                         title: milestone.promptText ?? "Special Moment",
                                         date: formatDate(milestone.dateTaken),
+                                        loveNote: loveNote(from: milestone),
                                         thumbnail: milestone.thumbnail
                                     ) {
                                         momentsViewerConfig = IdentifiableMoments(
@@ -94,6 +77,7 @@ struct TableOfContentsView: View {
                                 tocRow(
                                     title: "The Beginning",
                                     date: "Founding",
+                                    loveNote: nil,
                                     thumbnail: nil
                                 ) {
                                     // Scroll to bottom logic could go here
@@ -118,6 +102,7 @@ struct TableOfContentsView: View {
                                                     tocRow(
                                                         title: section.placeDisplay,
                                                         date: formatDate(section.date),
+                                                        loveNote: loveNote(from: section),
                                                         thumbnail: section.moments.first?.thumbnail
                                                     ) {
                                                         let photos = viewModel.flattenedPhotos(for: section)
@@ -158,15 +143,17 @@ struct TableOfContentsView: View {
                 .allowsHitTesting(false)
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(topAccentWash, for: .navigationBar)
+            .toolbarBackground(backgroundColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary.opacity(0.5))
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
                 }
             }
@@ -232,12 +219,18 @@ struct TableOfContentsView: View {
         }
     }
 
-    private func tocRow(title: String, date: String, thumbnail: UIImage?, action: @escaping () -> Void) -> some View {
+    private func tocRow(
+        title: String,
+        date: String,
+        loveNote: String?,
+        thumbnail: UIImage?,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         }) {
-            HStack(alignment: .bottom, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 if let thumb = thumbnail {
                     Image(uiImage: thumb)
                         .resizable()
@@ -256,24 +249,46 @@ struct TableOfContentsView: View {
                         )
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .bottom, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(title)
                             .font(.custom(serifFont, size: 16))
                             .foregroundColor(BabyTownTheme.textPrimary)
+                            .multilineTextAlignment(.leading)
                         
-                        Spacer()
+                        Spacer(minLength: 8)
                         
                         Text(date)
                             .font(.system(size: 12, design: .serif))
                             .foregroundColor(BabyTownTheme.textPrimary)
                             .fixedSize()
                     }
+                    
+                    if let loveNote {
+                        Text(loveNote)
+                            .font(.system(size: 12, design: .serif))
+                            .foregroundColor(BabyTownTheme.textPrimary.opacity(0.65))
+                            .italic()
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    private func loveNote(from moment: Moment) -> String? {
+        guard let caption = moment.caption?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !caption.isEmpty else { return nil }
+        return caption
+    }
+
+    private func loveNote(from section: DaySection) -> String? {
+        section.moments
+            .compactMap { loveNote(from: $0) }
+            .first
     }
 
     private func formatDate(_ date: Date) -> String {

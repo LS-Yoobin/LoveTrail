@@ -1,19 +1,43 @@
 import SwiftUI
+import Photos
 
 struct PotentialMemoryCardView: View {
     let card: PotentialMemoryCard
     let onAdd: () -> Void
     
     @State private var showToast = false
+    @State private var showingPhotoViewer = false
+    private let imageManager = PHCachingImageManager()
+    
+    private var photoAssets: [PHAsset] {
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: card.assetIdentifiers, options: nil)
+        var assets: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            assets.append(asset)
+        }
+        return assets.sorted {
+            ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast)
+        }
+    }
+    
+    private var coverPhotoIndex: Int {
+        photoAssets.firstIndex(where: { $0.localIdentifier == card.coverAssetIdentifier }) ?? 0
+    }
     
     var body: some View {
         HStack(spacing: 12) {
             // Cover photo
-            Image(uiImage: card.coverPhoto)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 120, height: 120)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            Button {
+                guard !photoAssets.isEmpty else { return }
+                showingPhotoViewer = true
+            } label: {
+                Image(uiImage: card.coverPhoto)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
             
             // Info section
             VStack(alignment: .leading, spacing: 6) {
@@ -59,6 +83,7 @@ struct PotentialMemoryCardView: View {
             }
         }
         .padding(12)
+        .opacity(card.isAdded ? 0.6 : 1.0)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemGray5))
@@ -74,16 +99,22 @@ struct PotentialMemoryCardView: View {
                 .tint(.green)
             }
         }
-        .overlay(alignment: .top) {
+        .overlay {
             if showToast {
                 ToastView(message: "Added to Our Adventures")
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.scale(scale: 0.92).combined(with: .opacity))
                     .zIndex(1)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: showToast)
-        .disabled(card.isAdded)
-        .opacity(card.isAdded ? 0.6 : 1.0)
+        .fullScreenCover(isPresented: $showingPhotoViewer) {
+            FullScreenPhotoViewer(
+                assets: photoAssets,
+                initialIndex: coverPhotoIndex,
+                imageManager: imageManager,
+                onDismiss: { showingPhotoViewer = false }
+            )
+        }
     }
     
     private func handleAdd() {
@@ -112,9 +143,8 @@ struct ToastView: View {
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(Color.green)
-                    .shadow(radius: 4)
+                    .fill(Color.green.opacity(1))
+                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
             )
-            .padding(.top, 8)
     }
 }

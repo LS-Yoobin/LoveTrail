@@ -3,6 +3,7 @@ import Combine
 
 struct ProcessingMemoryCard: View {
     let memory: ProcessingMemory
+    var pendingCount: Int = 1
     let image: UIImage?
     var onUnlock: (() -> Void)? = nil
     @State private var currentTime = Date()
@@ -37,7 +38,7 @@ struct ProcessingMemoryCard: View {
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
                         
-                        Text("Processing your memory...")
+                        Text(processingStatusText)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white.opacity(0.9))
                     }
@@ -46,16 +47,16 @@ struct ProcessingMemoryCard: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: "calendar")
+                    Image(systemName: "clock")
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.7))
                     
-                    Text(formatDate(memory.date))
+                    Text(formatCaptureTimestamp(memory.date))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white)
                 }
                 
-                Text("Your photos are being processed. They will be revealed at 9:00 PM PST.")
+                Text(darkroomFooterText)
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.8))
                     .lineSpacing(2)
@@ -85,6 +86,20 @@ struct ProcessingMemoryCard: View {
         }
     }
     
+    private var processingStatusText: String {
+        if pendingCount > 1 {
+            return "Processing \(pendingCount) memories..."
+        }
+        return "Processing your memory..."
+    }
+
+    private var darkroomFooterText: String {
+        if pendingCount > 1 {
+            return "Your captures are in the darkroom — curtain up at 9 PM PST."
+        }
+        return "Still in the darkroom — curtain up at 9 PM PST."
+    }
+
     private var processingAnimation: some View {
         ZStack {
             Circle()
@@ -103,11 +118,11 @@ struct ProcessingMemoryCard: View {
         }
     }
     
-    private func formatDate(_ date: Date) -> String {
+    private func formatCaptureTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
+        formatter.dateFormat = "EEEE, MMM d, yyyy • h:mm a"
         formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
-        return formatter.string(from: date)
+        return formatter.string(from: date) + " PST"
     }
 }
 

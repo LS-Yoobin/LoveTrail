@@ -344,8 +344,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone to capture ambient audio with Vibe and Reel photos.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BabyTown uses your location to tag photos and suggest a starting area when you add a place to a memory.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone to capture ambient audio with Vibe and Reel photos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to help you build your love timeline with precious memories.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -381,8 +381,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone to capture ambient audio with Vibe and Reel photos.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BabyTown uses your location to tag photos and suggest a starting area when you add a place to a memory.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone to capture ambient audio with Vibe and Reel photos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to help you build your love timeline with precious memories.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

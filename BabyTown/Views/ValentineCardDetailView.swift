@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Reserved for future Valentine's Day use. Active in-app card: `BabyTownWelcomeCardDetailView`.
 struct ValentineCardDetailView: View {
 
     @Environment(\.dismiss) private var dismiss

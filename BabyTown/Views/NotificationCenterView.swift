@@ -2,9 +2,11 @@ import SwiftUI
 
 struct NotificationCenterView: View {
 
+    var onNotificationRead: (() -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
-    @State private var notifications = AppNotification.seededNotifications
-    @State private var openedValentine = false
+    @State private var notifications: [AppNotification] = []
+    @State private var openedWelcomeCard = false
 
     var body: some View {
         NavigationStack {
@@ -41,17 +43,32 @@ struct NotificationCenterView: View {
                     }
                 }
             }
-            .fullScreenCover(isPresented: $openedValentine) {
-                ValentineCardDetailView()
+            .fullScreenCover(isPresented: $openedWelcomeCard) {
+                BabyTownWelcomeCardDetailView()
+            }
+            .onAppear {
+                notifications = AppNotification.seededNotifications(
+                    userNickname: DataPersistenceManager.shared.loadUserNickname()
+                )
             }
         }
     }
 
     private func handleTap(_ notification: AppNotification) {
         switch notification.type {
+        case .welcomeCard:
+            markRead(notification)
+            openedWelcomeCard = true
         case .valentinesCard:
-            openedValentine = true
+            // Reserved for future Valentine's Day — wire to `ValentineCardDetailView`.
+            markRead(notification)
+            break
         }
+    }
+
+    private func markRead(_ notification: AppNotification) {
+        DataPersistenceManager.shared.markInAppNotificationRead(id: notification.id)
+        onNotificationRead?()
     }
 
     private var emptyState: some View {

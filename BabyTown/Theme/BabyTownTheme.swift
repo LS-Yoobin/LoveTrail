@@ -44,3 +44,20 @@ enum BabyTownTheme {
     )
     static let buttonShadow = Color.pink.opacity(0.3)
 }
+
+enum PlaceNameFormatting {
+    static func displayName(raw: String?, isUserSet: Bool) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let stripped = trimmed.hasPrefix("Near ") ? String(trimmed.dropFirst(5)) : trimmed
+        if isUserSet { return stripped }
+        return "Near \(stripped)"
+    }
+
+    static func storedName(fromUserInput input: String) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("Near ") { return String(trimmed.dropFirst(5)) }
+        return trimmed
+    }
+}

@@ -9,14 +9,21 @@ struct PhotoGridCell: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                photoContent
-                selectionOverlay
-            }
-            .aspectRatio(1, contentMode: .fill)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .contentShape(RoundedRectangle(cornerRadius: 4))
+            // Color.clear drives a definite square frame from the column width;
+            // the photo fills it as a clipped overlay. Without this anchor the
+            // resizable image falls back to its intrinsic size and cells overlap.
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    ZStack {
+                        photoContent
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        selectionOverlay
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .contentShape(RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }
@@ -47,34 +54,28 @@ struct PhotoGridCell: View {
         if selectionMode {
             ZStack {
                 if isSelected {
-                    Color.black.opacity(0.15)
+                    Color.black.opacity(0.2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                VStack {
-                    HStack {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(isSelected ? BabyTownTheme.accent : .black.opacity(0.25))
-                                .frame(width: 26, height: 26)
-
-                            Image(systemName: isSelected ? "heart.fill" : "heart")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
-                        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                        .padding(6)
-                    }
-                    Spacer()
-                }
+                selectionHeart
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.15), value: isSelected)
         }
+    }
+
+    private var selectionHeart: some View {
+        Image(systemName: isSelected ? "heart.fill" : "heart")
+            .font(.system(size: 30, weight: isSelected ? .regular : .semibold))
+            .foregroundStyle(isSelected ? Color(red: 0.95, green: 0.25, blue: 0.3) : .white)
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+            .scaleEffect(isSelected ? 1.1 : 1)
     }
 }
 
 #Preview {
-    HStack(spacing: 2) {
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
         PhotoGridCell(
             thumbnail: Moment.placeholder(.systemPink),
             isSelected: false,
@@ -94,6 +95,5 @@ struct PhotoGridCell: View {
             action: {}
         )
     }
-    .frame(height: 120)
-    .padding()
+    .padding(2)
 }

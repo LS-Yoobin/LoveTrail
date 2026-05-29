@@ -48,10 +48,21 @@ struct OnThisDayCard: View {
                 }
                 
                 // Location
-                Text(section.placeDisplay)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(1)
+                Group {
+                    if let formatted = section.formattedPlaceName {
+                        PlaceNameLabel(
+                            rawPlaceName: section.moments.first?.placeName,
+                            isUserSet: section.isPlaceNameUserSet,
+                            font: .system(size: 12, weight: .regular),
+                            foregroundStyle: .white.opacity(0.8)
+                        )
+                    } else {
+                        Text(section.placeDisplay)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
             }
             .padding(16)
             .frame(maxWidth: isFullWidth ? .infinity : 200)

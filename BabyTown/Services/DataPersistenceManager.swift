@@ -38,6 +38,7 @@ final class DataPersistenceManager {
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     private let lastActiveScreenKey = "lastActiveScreen"
     private let userNicknameKey = "userNickname"
+    private let readInAppNotificationIDsKey = "readInAppNotificationIDs"
     
     private init() {
         createDirectoriesIfNeeded()
@@ -134,7 +135,20 @@ final class DataPersistenceManager {
         let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
-    
+
+    func readInAppNotificationIDs() -> Set<String> {
+        guard let ids = userDefaults.stringArray(forKey: readInAppNotificationIDsKey) else {
+            return []
+        }
+        return Set(ids)
+    }
+
+    func markInAppNotificationRead(id: String) {
+        var ids = readInAppNotificationIDs()
+        ids.insert(id)
+        userDefaults.set(Array(ids), forKey: readInAppNotificationIDsKey)
+    }
+
     func clearAllData() {
         try? fileManager.removeItem(at: momentsFileURL)
         try? fileManager.removeItem(at: firstMetPhotoURL)
@@ -143,5 +157,6 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
+        userDefaults.removeObject(forKey: readInAppNotificationIDsKey)
     }
 }

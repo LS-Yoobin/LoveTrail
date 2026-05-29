@@ -197,9 +197,7 @@ struct ContentView: View {
                 HomeView(
                     viewModel: homeViewModel,
                     onSelectPhotos: {
-                        withAnimation(.easeInOut(duration: 0.35)) {
-                            screen = .selectPhotos
-                        }
+                        screen = .selectPhotos
                     },
                     onOpenPhotoViewer: { _, _ in },
                     onResetApp: {
@@ -220,7 +218,7 @@ struct ContentView: View {
                     },
                     selectedPrompt: $selectedPrompt
                 )
-                .transition(.opacity)
+                .transition(.identity)
                 .onAppear {
                     homeViewModel.checkAndReleasePhotos()
                     DataPersistenceManager.shared.saveLastActiveScreen("home")
@@ -230,9 +228,7 @@ struct ContentView: View {
                 SelectPhotosView(
                     selectedPrompt: selectedPrompt,
                     onBack: {
-                        withAnimation(.easeInOut(duration: 0.35)) {
-                            screen = .home
-                        }
+                        screen = .home
                     },
                     onSaveMoments: { moments in
                         homeViewModel.addMoments(moments)
@@ -245,25 +241,17 @@ struct ContentView: View {
                         shouldScrollToNewMemory = true
                     }
                 )
-                .transition(.opacity)
+                .transition(.identity)
                 .onAppear {
                     DataPersistenceManager.shared.saveLastActiveScreen("selectPhotos")
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
-            // Switch to select photos screen when notification is tapped
-            withAnimation(.easeInOut(duration: 0.35)) {
-                
-                // If we are in the welcome flow, we might want to finish onboarding first or just jump? 
-                // Assuming we only want this to work if onboarding is done or we are in home/selectPhotos
-                // For now, let's just switch if we are not in the middle of critical onboarding
-                if screen == .home || screen == .selectPhotos {
-                     screen = .selectPhotos
-                } else if DataPersistenceManager.shared.hasCompletedOnboarding() {
-                    // If onboarding is done but we are somehow elsewhere
-                    screen = .selectPhotos
-                }
+            if screen == .home || screen == .selectPhotos {
+                screen = .selectPhotos
+            } else if DataPersistenceManager.shared.hasCompletedOnboarding() {
+                screen = .selectPhotos
             }
         }
     }

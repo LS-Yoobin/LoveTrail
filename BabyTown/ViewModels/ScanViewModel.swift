@@ -49,6 +49,8 @@ class ScanViewModel: ObservableObject {
             potentialCards.append(card)
             scanProgress += progressPerCluster
         }
+
+        sortPotentialCardsChronologically()
         
         scanProgress = 1.0
         isScanning = false
@@ -101,10 +103,20 @@ class ScanViewModel: ObservableObject {
             coverPhoto: coverImage,
             secondaryThumbnails: secondaryImages,
             assetIdentifiers: cluster.photos.map { $0.asset.localIdentifier },
+            coverAssetIdentifier: bestPhoto.asset.localIdentifier,
             isAdded: cluster.photos.contains { existingAssetIdentifiers.contains($0.asset.localIdentifier) }
         )
     }
     
+    private func sortPotentialCardsChronologically() {
+        potentialCards.sort { lhs, rhs in
+            if lhs.dateRange.start != rhs.dateRange.start {
+                return lhs.dateRange.start < rhs.dateRange.start
+            }
+            return lhs.dateRange.end < rhs.dateRange.end
+        }
+    }
+
     func addCardToHome(_ card: PotentialMemoryCard) async -> [Moment] {
         // Mark card as added
         if let index = potentialCards.firstIndex(where: { $0.id == card.id }) {

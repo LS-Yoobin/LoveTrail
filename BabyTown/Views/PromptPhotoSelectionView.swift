@@ -180,6 +180,7 @@ struct PromptPhotoSelectionView: View {
             emptyState
         } else {
             photoGrid
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
     
@@ -320,17 +321,15 @@ struct PromptPhotoSelectionView: View {
         var promptPhotos: [PromptPhoto] = []
         
         for assetId in viewModel.selectedAssets {
-            if let asset = viewModel.assets.first(where: { $0.localIdentifier == assetId }) {
-                let image = await loadFullImage(for: asset)
-                if let image = image {
-                    let photo = PromptPhoto(
-                        dateTaken: asset.creationDate ?? Date(),
-                        thumbnail: image,
-                        assetIdentifier: assetId
-                    )
-                    promptPhotos.append(photo)
-                }
-            }
+            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+            guard let asset = fetchResult.firstObject,
+                  let image = await loadFullImage(for: asset) else { continue }
+            let photo = PromptPhoto(
+                dateTaken: asset.creationDate ?? Date(),
+                thumbnail: image,
+                assetIdentifier: assetId
+            )
+            promptPhotos.append(photo)
         }
         
         return promptPhotos.sorted { $0.dateTaken > $1.dateTaken }
@@ -338,6 +337,7 @@ struct PromptPhotoSelectionView: View {
     
     private func loadFullImage(for asset: PHAsset) async -> UIImage? {
         await withCheckedContinuation { continuation in
+            var hasResumed = false
             let options = PHImageRequestOptions()
             options.deliveryMode = .highQualityFormat
             options.isNetworkAccessAllowed = true
@@ -345,10 +345,13 @@ struct PromptPhotoSelectionView: View {
             
             viewModel.imageManager.requestImage(
                 for: asset,
-                targetSize: CGSize(width: 1000, height: 1000),
+                targetSize: CGSize(width: 2000, height: 2000),
                 contentMode: .aspectFill,
                 options: options
-            ) { image, _ in
+            ) { image, info in
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                guard !isDegraded, !hasResumed else { return }
+                hasResumed = true
                 continuation.resume(returning: image)
             }
         }

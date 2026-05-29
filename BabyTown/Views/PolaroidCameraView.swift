@@ -78,6 +78,9 @@ struct PolaroidCameraView: View {
             shutterBar
                 .padding(.vertical, 8)
         }
+        .onChange(of: cameraController.isConfigured) { _, configured in
+            if configured { cameraController.startRunning() }
+        }
         .onAppear {
             InAppCameraAudioSession.activateForCamera()
             cameraController.startRunning()
@@ -244,15 +247,18 @@ struct PolaroidCameraView: View {
     // MARK: - Shutter bar
 
     private var shutterBar: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             if cameraController.isRecordingMomentVideo {
                 reelRecordingIndicator
+                    .padding(.bottom, 12)
             }
 
-            HStack(spacing: 0) {
-                Color.clear
-                    .frame(maxWidth: .infinity)
+            if cameraController.position == .back {
+                zoomControl
+                    .padding(.bottom, 12)
+            }
 
+            ZStack {
                 Group {
                     if isReelCaptureMode {
                         reelShutterControl
@@ -260,20 +266,56 @@ struct PolaroidCameraView: View {
                         photoShutterButton
                     }
                 }
-                .frame(width: 88)
 
-                Button {
-                    showLogModal = true
-                } label: {
-                    todaysCaptureButton
+                HStack {
+                    Spacer()
+                    Button {
+                        showLogModal = true
+                    } label: {
+                        todaysCaptureButton
+                    }
+                    .disabled(cameraController.isRecordingMomentVideo)
                 }
-                .frame(maxWidth: .infinity)
-                .disabled(cameraController.isRecordingMomentVideo)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 20)
 
             captureModePicker
         }
         .padding(.horizontal, 24)
+    }
+
+    private var zoomControl: some View {
+        HStack(spacing: 20) {
+            ForEach(CameraZoomPreset.allCases, id: \.self) { preset in
+                let isSelected = abs(cameraController.displayZoomFactor - preset.displayFactor) < 0.01
+                let isAvailable = cameraController.availableZoomPresets.contains(preset.displayFactor)
+
+                Button {
+                    cameraController.setDisplayZoom(preset.displayFactor)
+                } label: {
+                    Text(preset.label)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isSelected ? .yellow : .white)
+                        .frame(width: 36, height: 36)
+                        .background {
+                            if isSelected {
+                                Circle()
+                                    .fill(Color.white.opacity(0.22))
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(!isAvailable || cameraController.isRecordingMomentVideo)
+                .opacity(isAvailable ? 1 : 0.35)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .disabled(cameraController.isRecordingMomentVideo)
+        .opacity(cameraController.isRecordingMomentVideo ? 0.5 : 1)
     }
 
     private var photoShutterButton: some View {
@@ -282,6 +324,10 @@ struct PolaroidCameraView: View {
         } label: {
             ZStack {
                 Circle()
+                    .fill(.white)
+                    .frame(width: 74, height: 74)
+
+                Circle()
                     .strokeBorder(.white, lineWidth: 3)
                     .frame(width: 80, height: 80)
 
@@ -289,7 +335,7 @@ struct PolaroidCameraView: View {
                     Image(uiImage: catImage)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 48, height: 48)
+                        .frame(width: 58, height: 58)
                 }
             }
         }

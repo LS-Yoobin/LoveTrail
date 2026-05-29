@@ -1,25 +1,42 @@
 import Foundation
 
-enum NotificationType {
+enum NotificationType: String {
+    case welcomeCard
     case valentinesCard
 }
 
 struct AppNotification: Identifiable {
-    let id: UUID
+    let id: String
     let title: String
     let bodyPreview: String
     let date: Date
     let type: NotificationType
     let icon: String
 
-    static let seededNotifications: [AppNotification] = [
-        AppNotification(
-            id: UUID(),
-            title: "Valentines Day Card",
-            bodyPreview: "For Jinky",
-            date: Date(),
-            type: .valentinesCard,
-            icon: "heart.fill"
-        )
-    ]
+    static func seededNotifications(userNickname: String? = nil) -> [AppNotification] {
+        let trimmed = userNickname?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview: String
+        if let trimmed, !trimmed.isEmpty {
+            preview = "For \(trimmed)"
+        } else {
+            preview = "For you"
+        }
+
+        return [
+            AppNotification(
+                id: NotificationType.welcomeCard.rawValue,
+                title: "Welcome to BabyTown",
+                bodyPreview: preview,
+                date: Date(),
+                type: .welcomeCard,
+                icon: "sparkles"
+            )
+        ]
+    }
+
+    static func hasUnread(userNickname: String? = nil) -> Bool {
+        let readIDs = DataPersistenceManager.shared.readInAppNotificationIDs()
+        return seededNotifications(userNickname: userNickname).contains { !readIDs.contains($0.id) }
+    }
 }

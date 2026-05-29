@@ -202,8 +202,7 @@ final class SelectPhotosViewModel: ObservableObject {
         guard !isSaving else { return [] }
         isSaving = true
         
-        let selectedIds = selectedAssets
-        let selectedPHAssets = assets.filter { selectedIds.contains($0.localIdentifier) }
+        let selectedPHAssets = fetchSelectedAssets()
         
         let factory = MomentFactory()
         let moments = await factory.createMoments(from: selectedPHAssets)
@@ -219,13 +218,12 @@ final class SelectPhotosViewModel: ObservableObject {
         guard !isSaving else { return [] }
         isSaving = true
         
-        let selectedIds = selectedAssets
-        let selectedPHAssets = assets.filter { selectedIds.contains($0.localIdentifier) }
+        let selectedPHAssets = fetchSelectedAssets()
         
         var promptPhotos: [PromptPhoto] = []
         
         for asset in selectedPHAssets {
-            let thumbnail = await loadFullSizeImage(for: asset)
+            guard let thumbnail = await loadFullSizeImage(for: asset) else { continue }
             let promptPhoto = PromptPhoto(
                 dateTaken: asset.creationDate ?? Date(),
                 thumbnail: thumbnail,
@@ -287,8 +285,8 @@ final class SelectPhotosViewModel: ObservableObject {
         for result in results {
             if let id = result.assetIdentifier {
                 let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-                if let asset = fetched.firstObject {
-                    let thumbnail = await loadFullSizeImage(for: asset)
+                if let asset = fetched.firstObject,
+                   let thumbnail = await loadFullSizeImage(for: asset) {
                     promptPhotos.append(PromptPhoto(
                         dateTaken: asset.creationDate ?? Date(),
                         thumbnail: thumbnail,
@@ -317,20 +315,36 @@ final class SelectPhotosViewModel: ObservableObject {
         }
     }
 
-    private func loadFullSizeImage(for asset: PHAsset) async -> UIImage {
+    private func fetchSelectedAssets() -> [PHAsset] {
+        let fetchResult = PHAsset.fetchAssets(
+            withLocalIdentifiers: Array(selectedAssets),
+            options: nil
+        )
+        var fetched: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            fetched.append(asset)
+        }
+        return fetched
+    }
+
+    private func loadFullSizeImage(for asset: PHAsset) async -> UIImage? {
         await withCheckedContinuation { continuation in
+            var hasResumed = false
             let options = PHImageRequestOptions()
             options.deliveryMode = .highQualityFormat
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
-            
+
             imageManager.requestImage(
                 for: asset,
-                targetSize: PHImageManagerMaximumSize,
-                contentMode: .aspectFit,
+                targetSize: CGSize(width: 2000, height: 2000),
+                contentMode: .aspectFill,
                 options: options
-            ) { image, _ in
-                continuation.resume(returning: image ?? UIImage())
+            ) { image, info in
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                guard !isDegraded, !hasResumed else { return }
+                hasResumed = true
+                continuation.resume(returning: image)
             }
         }
     }

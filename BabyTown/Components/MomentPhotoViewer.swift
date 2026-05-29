@@ -12,9 +12,14 @@ struct MomentPhotoViewer: View {
     
     @State private var currentIndex: Int
     @State private var editMode = false
+    @State private var momentsBeforeEdit: [Moment]?
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var updatedMoments: [Moment]
     @State private var showDeleteConfirmation = false
+    @State private var showChrome = true
+    @State private var showMapsChooser = false
+
+    @Environment(\.openURL) private var openURL
     
     init(
         moments: [Moment],
@@ -64,6 +69,25 @@ struct MomentPhotoViewer: View {
         return note
     }
 
+    private static let foundingPrompts: Set<String> = [
+        "When we first met",
+        "When we became official"
+    ]
+
+    private var foundingPromptText: String? {
+        guard let prompt = updatedMoments.first?.promptText,
+              Self.foundingPrompts.contains(prompt) else { return nil }
+        return prompt
+    }
+
+    private var foundingMomentWithPlaceName: Moment? {
+        guard foundingPromptText != nil else { return nil }
+        return updatedMoments.first(where: {
+            guard let name = $0.placeName?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+            return !name.isEmpty
+        })
+    }
+
     private var photoMetadataDisplay: some View {
         HStack {
             VStack(alignment: .leading, spacing: loveNoteText == nil ? 0 : 8) {
@@ -108,22 +132,7 @@ struct MomentPhotoViewer: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             
             
-                VStack(spacing: 0) {
-                    topBar
-                    Spacer()
-                    
-                    photoMetadataDisplay
-                        .padding(.bottom, 8)
-                    
-                    if editMode {
-                        editControls
-                    } else if updatedMoments.count > 1 {
-                        photoPreviewStrip
-                    }
-                }
-                .background(alignment: .bottom) {
-                    photoViewerBottomGradient
-                }
+                viewerChromeOverlay
             }
         }
         .statusBarHidden(true)
@@ -154,29 +163,112 @@ struct MomentPhotoViewer: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: handlePhotoTap)
+    }
+
+    private func handlePhotoTap() {
+        if editMode {
+            cancelEditing()
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showChrome.toggle()
+        }
+    }
+
+    private var viewerChromeOverlay: some View {
+        VStack(spacing: 0) {
+            topBar
+                .allowsHitTesting(showChrome)
+
+            Spacer()
+                .allowsHitTesting(false)
+
+            viewerChromeBottom
+                .allowsHitTesting(showChrome)
+        }
+        .opacity(showChrome ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showChrome)
+        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: editMode)
+        .allowsHitTesting(showChrome)
+        .background(alignment: .bottom) {
+            if showChrome && !editMode {
+                photoViewerBottomGradient
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var viewerChromeBottom: some View {
+        if !editMode {
+            if let foundingPromptText {
+                PromptDisplayCard(prompt: foundingPromptText)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
+
+            if let foundingMoment = foundingMomentWithPlaceName {
+                foundingPlaceNameDisplay(moment: foundingMoment)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
+
+            photoMetadataDisplay
+                .padding(.bottom, 8)
+        }
+
+        if editMode {
+            PhotoViewerPolaroidEditTray(
+                selectedPhotos: $selectedPhotos,
+                onRemove: { showDeleteConfirmation = true }
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if updatedMoments.count > 1 {
+            photoPreviewStrip
+        }
     }
     
     // MARK: - Top Bar
     
     private var topBar: some View {
         HStack {
-            Button(action: {
+            Button(action: editMode ? cancelEditing : onDismiss) {
                 if editMode {
-                    onUpdateMoments(updatedMoments)
+                    Text("Cancel")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        )
+                } else {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
-                onDismiss()
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white.opacity(0.85))
             }
             
             Spacer()
-            
-            Button(action: {
-                editMode.toggle()
-            }) {
+
+            if !editMode, hasNavigationDestination {
+                Button {
+                    showMapsChooser = true
+                } label: {
+                    Image(systemName: "location.north.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                        .rotationEffect(.degrees(45))
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.green))
+                }
+                .padding(.trailing, 4)
+            }
+
+            Button(action: finishEditing) {
                 Text(editMode ? "Done" : "Edit")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
@@ -190,6 +282,71 @@ struct MomentPhotoViewer: View {
         }
         .padding(.top, 12)
         .padding(.horizontal, 20)
+        .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
+            Button("Apple Maps") { openInMaps(useGoogle: false) }
+            Button("Google Maps") { openInMaps(useGoogle: true) }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    // MARK: - Navigation (open place in Maps)
+
+    private var hasNavigationDestination: Bool {
+        (currentMoment.latitude != nil && currentMoment.longitude != nil)
+            || !(currentMoment.placeName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    /// Search query: prefer the place name, fall back to coordinates.
+    private var navigationQuery: String {
+        if let name = currentMoment.placeName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty {
+            return name
+        }
+        if let lat = currentMoment.latitude, let lon = currentMoment.longitude {
+            return "\(lat),\(lon)"
+        }
+        return ""
+    }
+
+    private func openInMaps(useGoogle: Bool) {
+        let query = navigationQuery
+        guard !query.isEmpty else { return }
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+
+        let urlString: String
+        if useGoogle {
+            // Universal link: opens the Google Maps app if installed, else the web.
+            urlString = "https://www.google.com/maps/search/?api=1&query=\(encoded)"
+        } else {
+            var apple = "http://maps.apple.com/?q=\(encoded)"
+            if let lat = currentMoment.latitude, let lon = currentMoment.longitude {
+                apple += "&ll=\(lat),\(lon)"
+            }
+            urlString = apple
+        }
+
+        if let url = URL(string: urlString) {
+            openURL(url)
+        }
+    }
+
+    private func finishEditing() {
+        if editMode {
+            onUpdateMoments(updatedMoments)
+            momentsBeforeEdit = nil
+            editMode = false
+        } else {
+            momentsBeforeEdit = updatedMoments
+            editMode = true
+        }
+    }
+
+    private func cancelEditing() {
+        if let snapshot = momentsBeforeEdit {
+            updatedMoments = snapshot
+        }
+        momentsBeforeEdit = nil
+        editMode = false
     }
     
     // MARK: - Photo Preview Strip
@@ -246,60 +403,6 @@ struct MomentPhotoViewer: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
     
-    // MARK: - Edit Controls
-    
-    private var editControls: some View {
-        VStack(spacing: 16) {
-            PhotosPicker(
-                selection: $selectedPhotos,
-                maxSelectionCount: 1,
-                matching: .images
-            ) {
-                HStack {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 16))
-                    Text("Replace Photo")
-                        .font(.system(size: 15, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.2))
-                )
-            }
-            
-            Button {
-                showDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16))
-                    Text("Remove Photo")
-                        .font(.system(size: 15, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.red.opacity(0.3))
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 60)
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0), Color.black.opacity(0.8)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .padding(.horizontal, -20)
-        )
-    }
-    
     // MARK: - Photo Selection
     
     private func handlePhotoSelection(_ items: [PhotosPickerItem]) async {
@@ -330,8 +433,33 @@ struct MomentPhotoViewer: View {
             .shadow(color: .black.opacity(0.45), radius: 10, y: 4)
     }
 
+    private func foundingPlaceNameDisplay(moment: Moment) -> some View {
+        HStack(spacing: 8) {
+            PlaceNameLabel(
+                rawPlaceName: moment.placeName,
+                isUserSet: moment.isPlaceNameUserSet,
+                font: .system(size: 14, weight: .medium),
+                foregroundStyle: .white,
+                iconSize: 14,
+                spacing: 6,
+                lineLimit: 2
+            )
+
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.white)
+        .photoViewerLegibleText()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(photoViewerMetadataBackground)
+    }
+
     private var photoViewerBottomGradient: some View {
-        LinearGradient(
+        let hasFoundingExtras = foundingPromptText != nil
+        let baseHeight: CGFloat = loveNoteText == nil ? 140 : 220
+        let foundingExtra: CGFloat = hasFoundingExtras ? (foundingMomentWithPlaceName != nil ? 160 : 80) : 0
+
+        return LinearGradient(
             colors: [
                 Color.black.opacity(0),
                 Color.black.opacity(0.35),
@@ -341,7 +469,7 @@ struct MomentPhotoViewer: View {
             endPoint: .bottom
         )
         .frame(maxWidth: .infinity)
-        .frame(height: loveNoteText == nil ? 140 : 220)
+        .frame(height: baseHeight + foundingExtra)
         .allowsHitTesting(false)
     }
 

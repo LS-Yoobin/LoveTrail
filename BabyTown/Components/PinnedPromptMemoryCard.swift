@@ -5,6 +5,7 @@ struct PinnedPromptMemoryCard: View {
     let memory: PromptMemory
     var onTap: (() -> Void)? = nil
     var onUnpin: (() -> Void)? = nil
+    var onShare: ((MemorySharePayload) -> Void)? = nil
     
     @State private var currentPhotoIndex = 0
     @State private var slideshowTimer: Timer?
@@ -26,6 +27,12 @@ struct PinnedPromptMemoryCard: View {
             }
             
             Menu {
+                Button {
+                    onShare?(MemorySharePayload(memory: memory))
+                } label: {
+                    Label("Share Memory", systemImage: "square.and.arrow.up")
+                }
+
                 Button(role: .destructive) {
                     onUnpin?()
                 } label: {
@@ -43,6 +50,7 @@ struct PinnedPromptMemoryCard: View {
                     .contentShape(Rectangle())
             }
             .padding(8)
+            .offset(x: -5, y: 5)
         }
         .onAppear {
             startSlideshow()

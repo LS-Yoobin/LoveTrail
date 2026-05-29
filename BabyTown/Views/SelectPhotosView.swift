@@ -24,92 +24,95 @@ struct SelectPhotosView: View {
             ZStack {
                 BabyTownTheme.backgroundGradient.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                topBar
-                
-                if let prompt = selectedPrompt {
-                    promptDisplay(prompt: prompt)
+                VStack(spacing: 0) {
+                    topBar
+
+                    if let prompt = selectedPrompt {
+                        promptDisplay(prompt: prompt)
+                    }
+
+                    yearChips
+                    monthChips
+
+                    Divider().padding(.horizontal, 20)
+
+                    content
                 }
-                
-                yearChips
-                monthChips
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    bottomActionBar
+                }
 
-                Divider().padding(.horizontal, 20)
-
-                content
-
-                bottomActionBar
-            }
-
-            // Full-screen viewer
-            if let index = viewModel.viewerIndex {
-                FullScreenPhotoViewer(
-                    assets: viewModel.assets,
-                    initialIndex: index,
-                    imageManager: viewModel.imageManager,
-                    selectedAssets: viewModel.selectedAssets,
-                    onToggleSelection: { asset in
-                        viewModel.toggleSelection(asset)
-                        photoSelectedInViewer = true
-                    },
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            viewModel.viewerIndex = nil
-                            if photoSelectedInViewer && !viewModel.selectionMode {
-                                viewModel.selectionMode = true
-                                photoSelectedInViewer = false
+                if let index = viewModel.viewerIndex {
+                    FullScreenPhotoViewer(
+                        assets: viewModel.assets,
+                        initialIndex: index,
+                        imageManager: viewModel.imageManager,
+                        selectedAssets: viewModel.selectedAssets,
+                        onToggleSelection: { asset in
+                            viewModel.toggleSelection(asset)
+                            photoSelectedInViewer = true
+                        },
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                viewModel.viewerIndex = nil
+                                if photoSelectedInViewer && !viewModel.selectionMode {
+                                    viewModel.selectionMode = true
+                                    photoSelectedInViewer = false
+                                }
                             }
-                        }
-                    },
-                    promptText: selectedPrompt?.text
-                )
-                .transition(.opacity)
-                .zIndex(1)
-            }
-            
-            // Heart Animation Overlay
-            if showAnimation {
-                HeartSaveAnimationOverlay {
-                    onBack()
+                        },
+                        promptText: selectedPrompt?.text
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
-                .zIndex(3)
-            }
+
+                if showAnimation {
+                    HeartSaveAnimationOverlay {
+                        onBack()
+                    }
+                    .zIndex(3)
+                }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.viewerIndex != nil)
-        .task {
-            await viewModel.checkAuthorization()
-        }
-        .onChange(of: viewModel.selectedYear) { _, _ in
-            Task { await viewModel.fetchAssets() }
-        }
-        .onChange(of: viewModel.selectedMonth) { _, _ in
-            Task { await viewModel.fetchAssets() }
-        }
-        .sheet(isPresented: $showSystemGallery) {
-            PhotoPickerView(
-                selectedImages: .constant([]),
-                selectionLimit: 0,
-                onFinish: { results in
-                    Task { await handleSystemGalleryPicks(results) }
-                }
-            )
-        }
-        .navigationDestination(isPresented: $showPromptMemoryBuilder) {
-            if let prompt = selectedPrompt {
-                PromptMemoryBuilderView(
-                    promptText: prompt.text,
-                    onSave: { memory in
-                        onSavePromptMemory?(memory)
-                        showAnimation = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            onBack()
-                        }
-                    },
-                    preSelectedPhotos: selectedPhotosForPrompt
-                )
-                .navigationBarBackButtonHidden(true)
+            .task {
+                await viewModel.checkAuthorization()
             }
-        }
+            .onChange(of: viewModel.selectedYear) { _, _ in
+                Task { await viewModel.fetchAssets() }
+            }
+            .onChange(of: viewModel.selectedMonth) { _, _ in
+                Task { await viewModel.fetchAssets() }
+            }
+            .fullScreenCover(isPresented: $showSystemGallery) {
+                PhotoPickerView(
+                    selectedImages: .constant([]),
+                    selectionLimit: 0,
+                    onFinish: { results in
+                        showSystemGallery = false
+                        Task { await handleSystemGalleryPicks(results) }
+                    }
+                )
+                .ignoresSafeArea()
+            }
+            .navigationDestination(isPresented: $showPromptMemoryBuilder) {
+                if let prompt = selectedPrompt {
+                    PromptMemoryBuilderView(
+                        promptText: prompt.text,
+                        onSave: { memory in
+                            onSavePromptMemory?(memory)
+                            showAnimation = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                onBack()
+                            }
+                        },
+                        preSelectedPhotos: selectedPhotosForPrompt
+                    )
+                    .navigationBarBackButtonHidden(true)
+                }
+            }
         }
     }
 
@@ -268,6 +271,7 @@ struct SelectPhotosView: View {
             emptyState
         } else {
             photoGrid
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -318,11 +322,12 @@ struct SelectPhotosView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.selectionMode)
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 24)
-        .background(
+        .safeAreaPadding(.bottom, 12)
+        .background {
             BabyTownTheme.background
                 .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
-        )
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     private var openGalleryBarButton: some View {
@@ -406,11 +411,12 @@ struct SelectPhotosView: View {
     
     private func performSave() {
         Task {
-            if let prompt = selectedPrompt {
+            if selectedPrompt != nil {
                 let promptPhotos = await viewModel.convertToPromptPhotos()
+                guard !promptPhotos.isEmpty else { return }
                 let memoryDate = promptPhotos.map { $0.dateTaken }.min() ?? Date()
                 let memory = PromptMemory(
-                    promptText: prompt.text,
+                    promptText: selectedPrompt!.text,
                     date: memoryDate,
                     placeName: nil,
                     loveNote: "",

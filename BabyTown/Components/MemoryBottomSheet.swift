@@ -4,7 +4,12 @@ struct MemoryBottomSheet: View {
     let section: DaySection
     let onOpenMemory: () -> Void
     let onDismiss: () -> Void
-    
+
+    @State private var dragOffset: CGFloat = 0
+
+    private static let openMemoryDragThreshold: CGFloat = 72
+    private static let dismissDragThreshold: CGFloat = 100
+
     private var coverPhoto: UIImage {
         section.moments.first?.thumbnail ?? UIImage(systemName: "photo")!
     }
@@ -39,10 +44,23 @@ struct MemoryBottomSheet: View {
                 
                 // Memory details
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(section.placeName ?? "Memory")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
-                        .lineLimit(1)
+                    Group {
+                        if let formatted = section.formattedPlaceName {
+                            PlaceNameLabel(
+                                rawPlaceName: section.moments.first?.placeName,
+                                isUserSet: section.isPlaceNameUserSet,
+                                font: .system(size: 18, weight: .semibold),
+                                foregroundStyle: BabyTownTheme.textPrimary,
+                                iconSize: 14,
+                                spacing: 5
+                            )
+                        } else {
+                            Text("Memory")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(BabyTownTheme.textPrimary)
+                        }
+                    }
+                    .lineLimit(1)
                     
                     Text(dateRange)
                         .font(.system(size: 14))
@@ -75,14 +93,41 @@ struct MemoryBottomSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            .padding(.bottom, 30)
+            .padding(.bottom, 20)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(BabyTownTheme.background)
-                .shadow(color: .black.opacity(0.15), radius: 20, y: -5)
+        .safeAreaPadding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background {
+            Color.white
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 20,
+                topTrailingRadius: 20
+            )
         )
+        .shadow(color: .black.opacity(0.15), radius: 20, y: -5)
+        .offset(y: dragOffset)
+        .gesture(dragGesture)
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                dragOffset = value.translation.height
+            }
+            .onEnded { value in
+                if value.translation.height < -Self.openMemoryDragThreshold {
+                    onOpenMemory()
+                } else if value.translation.height > Self.dismissDragThreshold {
+                    onDismiss()
+                }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                    dragOffset = 0
+                }
+            }
     }
 }
 

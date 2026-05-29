@@ -36,7 +36,7 @@ struct FullScreenPhotoViewer: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             Color.black.ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
@@ -50,29 +50,9 @@ struct FullScreenPhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showSelectButton.toggle()
-                }
-            }
+            .ignoresSafeArea()
 
-            VStack {
-                HStack {
-                    closeButton
-                    Spacer()
-                    if onToggleSelection != nil {
-                        topSelectButton
-                    }
-                }
-                .padding(.top, 12)
-                .padding(.horizontal, 20)
-                .opacity(showSelectButton ? 1 : 0)
-                
-                Spacer()
-                
-                photoPreviewStrip
-                    .opacity(showSelectButton ? 1 : 0)
-            }
+            viewerChromeOverlay
         }
         .statusBarHidden(true)
         .onAppear {
@@ -84,17 +64,55 @@ struct FullScreenPhotoViewer: View {
 
     @ViewBuilder
     private func pageView(for asset: PHAsset) -> some View {
-        if let image = loadedImages[asset.localIdentifier] {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-        } else {
-            ProgressView()
-                .tint(.white.opacity(0.6))
-                .scaleEffect(1.2)
+        Group {
+            if let image = loadedImages[asset.localIdentifier] {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            } else {
+                ProgressView()
+                    .tint(.white.opacity(0.6))
+                    .scaleEffect(1.2)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !showSelectButton else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showSelectButton = true
+            }
+        }
+    }
+
+    private var viewerChromeOverlay: some View {
+        VStack(spacing: 0) {
+            HStack {
+                closeButton
+                Spacer()
+                if onToggleSelection != nil {
+                    topSelectButton
+                }
+            }
+            .padding(.top, 12)
+            .padding(.horizontal, 20)
+
+            Spacer()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard showSelectButton else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSelectButton = false
+                    }
+                }
+
+            photoPreviewStrip
+        }
+        .opacity(showSelectButton ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showSelectButton)
+        .allowsHitTesting(showSelectButton)
     }
 
     // MARK: - Close

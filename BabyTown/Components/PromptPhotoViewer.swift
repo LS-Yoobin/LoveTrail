@@ -11,9 +11,10 @@ struct PromptPhotoViewer: View {
     
     @State private var currentIndex: Int
     @State private var editMode = false
+    @State private var photosBeforeEdit: [PromptPhoto]?
     @State private var updatedPhotos: [PromptPhoto]
     @State private var showDeleteConfirmation = false
-    @State private var showControls = true
+    @State private var showChrome = true
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -73,35 +74,8 @@ struct PromptPhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showControls.toggle()
-                }
-            }
-            
-                VStack {
-                    topBar
-                        .opacity(showControls ? 1 : 0)
-                    
-                    Spacer()
-                    
-                    if showControls {
-                        if let promptText = promptText {
-                            promptDisplay(prompt: promptText)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 8)
-                        }
-                        
-                        photoDateDisplay
-                            .padding(.bottom, 8)
-                        
-                        if editMode {
-                            editControls
-                        } else if updatedPhotos.count > 1 {
-                            photoPreviewStrip
-                        }
-                    }
-                }
+
+                viewerChromeOverlay
             }
         }
         .statusBarHidden(true)
@@ -125,27 +99,86 @@ struct PromptPhotoViewer: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: handlePhotoTap)
+    }
+
+    private func handlePhotoTap() {
+        if editMode {
+            cancelEditing()
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showChrome.toggle()
+        }
+    }
+
+    private var viewerChromeOverlay: some View {
+        VStack(spacing: 0) {
+            topBar
+                .allowsHitTesting(showChrome)
+
+            Spacer()
+                .allowsHitTesting(false)
+
+            viewerChromeBottom
+                .allowsHitTesting(showChrome)
+        }
+        .opacity(showChrome ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showChrome)
+        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: editMode)
+        .allowsHitTesting(showChrome)
+    }
+
+    @ViewBuilder
+    private var viewerChromeBottom: some View {
+        if !editMode {
+            if let promptText {
+                PromptDisplayCard(prompt: promptText)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
+
+            photoDateDisplay
+                .padding(.bottom, 8)
+        }
+
+        if editMode {
+            PhotoViewerPolaroidEditTray(
+                selectedPhotos: .constant([]),
+                showsReplace: false,
+                onRemove: { showDeleteConfirmation = true }
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if updatedPhotos.count > 1 {
+            photoPreviewStrip
+        }
     }
     
     private var topBar: some View {
         HStack {
-            Button(action: {
+            Button(action: editMode ? cancelEditing : onDismiss) {
                 if editMode {
-                    onUpdatePhotos?(updatedPhotos)
+                    Text("Cancel")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        )
+                } else {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
-                onDismiss()
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white.opacity(0.85))
             }
             
             Spacer()
             
-            Button(action: {
-                editMode.toggle()
-            }) {
+            Button(action: finishEditing) {
                 Text(editMode ? "Done" : "Edit")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
@@ -159,6 +192,25 @@ struct PromptPhotoViewer: View {
         }
         .padding(.top, 12)
         .padding(.horizontal, 20)
+    }
+
+    private func finishEditing() {
+        if editMode {
+            onUpdatePhotos?(updatedPhotos)
+            photosBeforeEdit = nil
+            editMode = false
+        } else {
+            photosBeforeEdit = updatedPhotos
+            editMode = true
+        }
+    }
+
+    private func cancelEditing() {
+        if let snapshot = photosBeforeEdit {
+            updatedPhotos = snapshot
+        }
+        photosBeforeEdit = nil
+        editMode = false
     }
     
     private var photoPreviewStrip: some View {
@@ -213,40 +265,6 @@ struct PromptPhotoViewer: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
     
-    // MARK: - Edit Controls
-    
-    private var editControls: some View {
-        VStack(spacing: 16) {
-            Button {
-                showDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16))
-                    Text("Remove Photo")
-                        .font(.system(size: 15, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.red.opacity(0.3))
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 60)
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0), Color.black.opacity(0.8)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .padding(.horizontal, -20)
-        )
-    }
-    
     // MARK: - Delete Photo
     
     private func deleteCurrentPhoto() {
@@ -291,28 +309,4 @@ struct PromptPhotoViewer: View {
         .padding(.leading, 20)
     }
     
-    // MARK: - Prompt Display
-    
-    private func promptDisplay(prompt: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(BabyTownTheme.accent)
-            
-            Text(prompt)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-            
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.15))
-                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
-        )
-    }
 }

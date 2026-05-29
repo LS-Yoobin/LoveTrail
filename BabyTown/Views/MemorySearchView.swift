@@ -6,11 +6,13 @@ struct MemorySearchView: View {
     let allMoments: [Moment]
     var onOpenPhoto: (Moment, [Moment]) -> Void
     var onEditCaption: (UUID, String, String?) -> Void
-    var onEditMemory: (DaySection, UUID, String, String?, Double?, Double?) -> Void
+    var onEditMemory: (DaySection, UUID, String, String?, Double?, Double?, Bool) -> Void
     var onRemove: (DaySection) -> Void
     var onTogglePin: (DaySection) -> Void
+    var onShare: ((MemorySharePayload) -> Void)? = nil
     
     @State private var searchText = ""
+    @StateObject private var shareCoordinator = MemoryShareCoordinator()
     @FocusState private var isSearchFocused: Bool
     
     private var filteredSections: [DaySection] {
@@ -19,7 +21,7 @@ struct MemorySearchView: View {
         }
         
         let filtered = allMoments.filter { moment in
-            matchesSearch(moment: moment, query: searchText)
+            MemorySearchMatcher.matches(moment: moment, query: searchText)
         }
         
         return DaySection.grouped(from: filtered)
@@ -44,6 +46,7 @@ struct MemorySearchView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .memorySharePresentation(coordinator: shareCoordinator)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Search Memories")
@@ -73,7 +76,7 @@ struct MemorySearchView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.5))
             
-            TextField("Search by month, year, or date...", text: $searchText)
+            TextField("Places, dates, love notes, prompts...", text: $searchText)
                 .font(.system(size: 16))
                 .foregroundStyle(BabyTownTheme.textPrimary)
                 .focused($isSearchFocused)
@@ -109,6 +112,13 @@ struct MemorySearchView: View {
                         onEditMemory: onEditMemory,
                         onRemove: onRemove,
                         onTogglePin: onTogglePin,
+                        onShare: { payload in
+                            if let onShare {
+                                onShare(payload)
+                            } else {
+                                shareCoordinator.share(payload)
+                            }
+                        },
                         isLeftAligned: true
                     )
                     .padding(.horizontal, 20)
@@ -131,7 +141,7 @@ struct MemorySearchView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(BabyTownTheme.textPrimary)
             
-            Text("Try searching by:\n• Month (e.g., \"January\", \"Jan\")\n• Year (e.g., \"2024\")\n• Date (e.g., \"15\", \"25th\")")
+            Text("Try searching by place, date, love note, or prompt text.")
                 .font(.system(size: 14))
                 .foregroundStyle(BabyTownTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -162,55 +172,6 @@ struct MemorySearchView: View {
         }
         .padding(.horizontal, 40)
     }
-    
-    private func matchesSearch(moment: Moment, query: String) -> Bool {
-        let lowercaseQuery = query.lowercased().trimmingCharacters(in: .whitespaces)
-        
-        if lowercaseQuery.isEmpty {
-            return false
-        }
-        
-        let calendar = Calendar.current
-        let date = moment.dateTaken
-        
-        // Extract date components
-        let year = calendar.component(.year, from: date)
-        let _ = calendar.component(.month, from: date)
-        let day = calendar.component(.day, from: date)
-        
-        // Month names
-        let monthName = date.formatted(.dateTime.month(.wide)).lowercased()
-        let monthAbbreviation = date.formatted(.dateTime.month(.abbreviated)).lowercased()
-        
-        // Check year match
-        if String(year).contains(lowercaseQuery) {
-            return true
-        }
-        
-        // Check month name match
-        if monthName.contains(lowercaseQuery) || monthAbbreviation.contains(lowercaseQuery) {
-            return true
-        }
-        
-        // Check day match
-        let dayString = String(day)
-        if dayString == lowercaseQuery || "\(day)th" == lowercaseQuery || "\(day)st" == lowercaseQuery || "\(day)nd" == lowercaseQuery || "\(day)rd" == lowercaseQuery {
-            return true
-        }
-        
-        // Check if query is just a number that matches the day
-        if let queryNumber = Int(lowercaseQuery), queryNumber == day {
-            return true
-        }
-        
-        // Check full date string
-        let fullDateString = date.formatted(.dateTime.month().day().year()).lowercased()
-        if fullDateString.contains(lowercaseQuery) {
-            return true
-        }
-        
-        return false
-    }
 }
 
 #Preview {
@@ -218,7 +179,7 @@ struct MemorySearchView: View {
         allMoments: Moment.sampleMoments,
         onOpenPhoto: { _, _ in },
         onEditCaption: { _, _, _ in },
-        onEditMemory: { _, _, _, _, _, _ in },
+        onEditMemory: { _, _, _, _, _, _, _ in },
         onRemove: { _ in },
         onTogglePin: { _ in }
     )

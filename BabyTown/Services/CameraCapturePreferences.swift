@@ -1,5 +1,27 @@
 import Foundation
 
+enum CameraZoomPreset: CaseIterable, Hashable {
+    case half
+    case one
+    case three
+
+    var displayFactor: CGFloat {
+        switch self {
+        case .half: return 0.5
+        case .one: return 1
+        case .three: return 3
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .half: return ".5"
+        case .one: return "1"
+        case .three: return "3"
+        }
+    }
+}
+
 enum CameraCaptureMode: String, CaseIterable, Identifiable {
     case photo
     case vibe
@@ -18,8 +40,8 @@ enum CameraCaptureMode: String, CaseIterable, Identifiable {
 
 enum ReelPreferences {
     static let userDefaultsKey = "babytown.camera.reelMaxDurationSeconds"
-    static let defaultDurationSeconds: TimeInterval = 5
-    static let choices: [TimeInterval] = [5, 10, 15, 30]
+    static let defaultDurationSeconds: TimeInterval = 3
+    static let choices: [TimeInterval] = [2, 3, 4, 5]
 
     static var maxDurationSeconds: TimeInterval {
         let stored = UserDefaults.standard.double(forKey: userDefaultsKey)

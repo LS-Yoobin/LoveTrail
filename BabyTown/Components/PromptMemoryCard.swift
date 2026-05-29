@@ -8,6 +8,7 @@ struct PromptMemoryCard: View {
     var onRemove: ((PromptMemory) -> Void)? = nil
     var onEditLoveNote: ((UUID, String) -> Void)? = nil
     var onTogglePin: ((PromptMemory) -> Void)? = nil
+    var onShare: ((MemorySharePayload) -> Void)? = nil
     var isLeftAligned: Bool = true
     var index: Int = 0
 
@@ -79,26 +80,19 @@ struct PromptMemoryCard: View {
     
     private var headerSection: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(dateFormatter.string(from: memory.date))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.black)
-
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12))
-                        .foregroundStyle(BabyTownTheme.accent)
-
-                    Text("Prompt Memory")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.accent)
-                        .textCase(.uppercase)
-                }
-            }
+            Text(dateFormatter.string(from: memory.date))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
 
             Spacer()
 
             Menu {
+                Button {
+                    onShare?(MemorySharePayload(memory: memory))
+                } label: {
+                    Label("Share Memory", systemImage: "square.and.arrow.up")
+                }
+
                 Button {
                     onTogglePin?(memory)
                 } label: {
@@ -179,11 +173,24 @@ struct PromptMemoryCard: View {
     // MARK: - Prompt Text Section
     
     private var promptTextSection: some View {
-        Text(memory.promptText)
-            .font(.system(size: 14, weight: .medium, design: .serif))
-            .foregroundStyle(.black.opacity(0.85))
-            .lineLimit(3)
-            .padding(.top, 4)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12))
+                    .foregroundStyle(BabyTownTheme.accent)
+
+                Text("Prompt Memory")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.accent)
+                    .textCase(.uppercase)
+            }
+
+            Text(memory.promptText)
+                .font(.system(size: 14, weight: .medium, design: .serif))
+                .foregroundStyle(.black.opacity(0.85))
+                .lineLimit(3)
+        }
+        .padding(.top, 10)
     }
     
     // MARK: - Photo Collage
