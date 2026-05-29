@@ -136,7 +136,7 @@ struct ScanView: View {
             
             Text("Scanning photos...")
                 .font(.system(size: 15))
-                .foregroundStyle(BabyTownTheme.textSecondary)
+                .foregroundStyle(.black)
             
             if viewModel.scanProgress > 0 {
                 Text("\(Int(viewModel.scanProgress * 100))%")

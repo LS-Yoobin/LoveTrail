@@ -194,6 +194,26 @@ struct FullScreenPhotoViewer: View {
         }
     }
     
+    @ViewBuilder
+    private func previewThumbnail(for asset: PHAsset, isCurrent: Bool) -> some View {
+        ZStack {
+            if let thumbnail = thumbnails[asset.localIdentifier] {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.white.opacity(0.2)
+            }
+
+            if isCurrent {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(BabyTownTheme.accent, lineWidth: 3)
+            }
+        }
+        .frame(width: 60, height: 60)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
     // MARK: - Photo Preview Strip
     
     private var photoPreviewStrip: some View {
@@ -206,26 +226,11 @@ struct FullScreenPhotoViewer: View {
                                 currentIndex = index
                             }
                         } label: {
-                            ZStack {
-                                if let thumbnail = thumbnails[asset.localIdentifier] {
-                                    Image(uiImage: thumbnail)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 60, height: 60)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                } else {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.white.opacity(0.2))
-                                        .frame(width: 60, height: 60)
-                                }
-                                
-                                if currentIndex == index {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(BabyTownTheme.accent, lineWidth: 3)
-                                        .frame(width: 60, height: 60)
-                                }
-                            }
+                            previewThumbnail(for: asset, isCurrent: currentIndex == index)
                         }
+                        .buttonStyle(.plain)
+                        .frame(width: 60, height: 60)
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
                         .id(index)
                     }
                 }
@@ -237,12 +242,28 @@ struct FullScreenPhotoViewer: View {
                     .fill(Color.black.opacity(0.5))
                     .ignoresSafeArea(edges: .bottom)
             )
+            .onAppear {
+                scrollPreviewStrip(to: currentIndex, proxy: proxy, animated: false)
+            }
             .onChange(of: currentIndex) { _, newIndex in
-                withAnimation {
-                    proxy.scrollTo(newIndex, anchor: .center)
-                }
+                scrollPreviewStrip(to: newIndex, proxy: proxy, animated: true)
             }
         }
+    }
+
+    private func scrollPreviewStrip(to index: Int, proxy: ScrollViewProxy, animated: Bool) {
+        let scroll = {
+            proxy.scrollTo(index, anchor: .center)
+        }
+        let performScroll = {
+            if animated {
+                withAnimation { scroll() }
+            } else {
+                scroll()
+            }
+        }
+        // Defer until layout is ready so ScrollViewReader can resolve the target id.
+        DispatchQueue.main.async(execute: performScroll)
     }
     
     private func loadAllThumbnails() {

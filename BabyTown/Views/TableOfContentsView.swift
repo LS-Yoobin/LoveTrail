@@ -23,18 +23,16 @@ struct TableOfContentsView: View {
 
     private let backgroundColor = Color(red: 253/255, green: 246/255, blue: 236/255) // #FDF6EC
     private let serifFont = "Georgia" // Fallback to system serif if needed
-    
-    private var totalMemoriesCount: Int {
-        // Count unique moments (group by date and place to avoid counting duplicates from same memory)
-        let uniqueMomentSections = DaySection.grouped(from: viewModel.moments)
-        let momentCount = uniqueMomentSections.count
-        
-        // Count prompt memories
-        let promptMemoryCount = viewModel.promptMemories.count
-        
-        return momentCount + promptMemoryCount
-    }
 
+    /// Keeps the warm accent tint in the top bar at all scroll positions (iOS 26 scroll-edge effect only applies it at scroll top by default).
+    private var topAccentWash: LinearGradient {
+        LinearGradient(
+            colors: [BabyTownTheme.accent.opacity(0.28), backgroundColor.opacity(0.95)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -44,6 +42,15 @@ struct TableOfContentsView: View {
                 // for now we'll use a very light overlay
                 Color.black.opacity(0.02)
                     .ignoresSafeArea()
+
+                // Persistent accent wash behind the navigation bar (matches scroll-top tint).
+                VStack(spacing: 0) {
+                    topAccentWash
+                        .frame(height: 120)
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
 
                 ScrollView {
                     VStack(alignment: .center, spacing: 32) {
@@ -60,7 +67,7 @@ struct TableOfContentsView: View {
                                 .foregroundColor(BabyTownTheme.textPrimary)
                             
                             
-                            Text("\(totalMemoriesCount) Memories Saved")
+                            Text("\(viewModel.tocMemoryCount) Memories Saved")
                                 .font(.system(size: 14, design: .serif))
                                 .foregroundColor(BabyTownTheme.textPrimary)
                                 .padding(.top, 4)
@@ -132,6 +139,8 @@ struct TableOfContentsView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 60)
                 }
+                .background(backgroundColor)
+                .scrollEdgeEffectStyle(.hard, for: .top)
                 
                 // Cat decoration in bottom right corner
                 VStack {
@@ -149,6 +158,8 @@ struct TableOfContentsView: View {
                 .allowsHitTesting(false)
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(topAccentWash, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -159,6 +170,7 @@ struct TableOfContentsView: View {
                     }
                 }
             }
+            .presentationBackground(backgroundColor)
             .fullScreenCover(item: $momentsViewerConfig) { config in
                 MomentPhotoViewer(
                     moments: config.moments,

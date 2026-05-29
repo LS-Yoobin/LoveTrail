@@ -44,6 +44,12 @@ struct HomeView: View {
     @State private var showScan = false
     @State private var showMapView = false
     @State private var showToC = false
+    @State private var peakPullOffset: CGFloat = 0
+    @State private var didCrossMapOpenThreshold = false
+    @State private var mapThresholdHapticTick = 0
+    @State private var mapOpenHapticTick = 0
+    
+    private let mapOpenThreshold: CGFloat = 110
 
 
     init(
@@ -86,7 +92,7 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .top) {
                 // Background Layer
                 HomeBackgroundView(isNightMode: nightModeManager.isNightMode)
                     .animation(.easeInOut(duration: 0.8), value: nightModeManager.isNightMode)
@@ -104,7 +110,7 @@ struct HomeView: View {
                     BabyTownHeader(
                         onSettingsTap: { showSettings = true },
                         onNotificationsTap: { showNotifications = true },
-                        onMapTap: { showMapView = true },
+                        onMapTap: { openMap() },
                         isNightMode: nightModeManager.isNightMode
                     )
                     
@@ -118,6 +124,12 @@ struct HomeView: View {
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 28) {
+                                MapPullHintView(
+                                    progress: min(currentPullProgress, 1),
+                                    isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView,
+                                    isNightMode: nightModeManager.isNightMode
+                                )
+                                
                                 // On This Day section
                                 let onThisDayMatches = viewModel.onThisDayMatches()
                                 if !onThisDayMatches.isEmpty {
@@ -147,19 +159,11 @@ struct HomeView: View {
                             }
                             .padding(.top, 18)
                             .padding(.bottom, 100)
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear.preference(
-                                        key: ScrollOffsetPreferenceKey.self,
-                                        value: geo.frame(in: .named("scroll")).minY
-                                    )
-                                }
-                            )
                         }
-                        .coordinateSpace(name: "scroll")
-                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                            scrollOffset = value
-                            showUpButton = value < -100
+                        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                            geometry.contentOffset.y + geometry.contentInsets.top
+                        } action: { _, topOffset in
+                            handleScrollTopOffsetChange(topOffset)
                         }
                         .onChange(of: scrollToNewMemory) { _, newValue in
                             if newValue {
@@ -173,6 +177,8 @@ struct HomeView: View {
                         }
                     }
                 }
+                .sensoryFeedback(.impact(weight: .medium), trigger: mapThresholdHapticTick)
+                .sensoryFeedback(.success, trigger: mapOpenHapticTick)
                 .onAppear {
                     viewModel.checkAndReleasePhotos()
                     AudioManager.shared.playHomeMusic()
@@ -274,7 +280,7 @@ struct HomeView: View {
                     .zIndex(10)
                 }
                 
-                if showingMomentViewer {
+                if showingMomentViewer, !showMapView {
                     MomentPhotoViewer(
                         moments: viewerMoments,
                         initialIndex: viewerInitialIndex,
@@ -349,7 +355,15 @@ struct HomeView: View {
                     .transition(.opacity)
                     .zIndex(13)
                 }
+                
+                if showMapView {
+                    memoryMapOverlay
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .zIndex(20)
+                        .transition(.opacity)
+                }
             } // Close ZStack
+            .animation(.easeInOut(duration: 0.3), value: showMapView)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
             .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
             .sheet(isPresented: $showPromptSheet) {
@@ -385,23 +399,6 @@ struct HomeView: View {
                     onReplayStory: { onReplayStory?() }
                 )
             }
-            .fullScreenCover(isPresented: $showMapView) {
-                MapView(
-                    viewModel: viewModel,
-                    onOpenMemory: { section in
-                        showMapView = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            let photos = viewModel.flattenedPhotos(for: section)
-                            viewerMoments = photos
-                            viewerInitialIndex = 0
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                showingMomentViewer = true
-                            }
-                        }
-                    },
-                    onDismiss: { showMapView = false }
-                )
-            }
             .fullScreenCover(isPresented: $showNotifications) {
                 NotificationCenterView()
             }
@@ -423,6 +420,16 @@ struct HomeView: View {
                     onEditCaption: { momentId, caption, voiceNotePath in
                         viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
                     },
+                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
+                        viewModel.updateMemory(
+                            section: section,
+                            primaryMomentId: momentId,
+                            caption: caption,
+                            placeName: placeName,
+                            latitude: latitude,
+                            longitude: longitude
+                        )
+                    },
                     onRemove: { section in
                         withAnimation { viewModel.removeMoments(from: section) }
                     },
@@ -441,6 +448,105 @@ struct HomeView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+        }
+    }
+    
+    // MARK: - Map pull reveal
+    
+    @ViewBuilder
+    private var memoryMapOverlay: some View {
+        ZStack {
+            MapView(
+                viewModel: viewModel,
+                onOpenMemory: { section in
+                    let photos = viewModel.flattenedPhotos(for: section)
+                    viewerMoments = photos
+                    viewerInitialIndex = 0
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showingMomentViewer = true
+                    }
+                },
+                onDismiss: {
+                    showingMomentViewer = false
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showMapView = false
+                    }
+                },
+                onScanPhotos: {
+                    showingMomentViewer = false
+                    showMapView = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showScan = true
+                    }
+                }
+            )
+
+            if showingMomentViewer {
+                MomentPhotoViewer(
+                    moments: viewerMoments,
+                    initialIndex: viewerInitialIndex,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingMomentViewer = false
+                        }
+                    },
+                    onUpdateMoments: { updatedMoments in
+                        var newMoments = viewModel.moments
+                        for moment in updatedMoments {
+                            if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
+                                newMoments[index] = moment
+                            }
+                        }
+                        viewModel.moments = newMoments
+                    },
+                    onDeleteMoment: { moment in
+                        withAnimation {
+                            viewModel.deleteMoment(moment)
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
+    }
+    
+    private var currentPullProgress: CGFloat {
+        max(0, -scrollOffset) / mapOpenThreshold
+    }
+    
+    private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
+        scrollOffset = topOffset
+        showUpButton = topOffset > 100
+        
+        // Negative topOffset = overscroll pull-down at the top of the feed.
+        let pull = max(0, -topOffset)
+        
+        if pull > peakPullOffset {
+            peakPullOffset = pull
+        }
+        
+        if pull >= mapOpenThreshold, !didCrossMapOpenThreshold {
+            didCrossMapOpenThreshold = true
+            mapThresholdHapticTick += 1
+        }
+        
+        let wasPulling = peakPullOffset > 2
+        if wasPulling && pull < 2 {
+            if peakPullOffset >= mapOpenThreshold {
+                openMap()
+            }
+            peakPullOffset = 0
+            didCrossMapOpenThreshold = false
+        }
+    }
+    
+    private func openMap() {
+        guard !showMapView else { return }
+        mapOpenHapticTick += 1
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showMapView = true
         }
     }
 
@@ -555,7 +661,7 @@ struct HomeView: View {
     private var timelineSection: some View {
         VStack(spacing: 12) {
             sectionLabel(
-                nightModeManager.isNightMode ? "Jinky Dreams 🌙" : "Jinky Adventures",
+                nightModeManager.isNightMode ? "Jinky Dreams 🌙" : "Our Adventures",
                 icon: "heart.text.square",
                 showToCButton: true
             )
@@ -589,6 +695,16 @@ struct HomeView: View {
                                     },
                                     onEditCaption: { momentId, caption, voiceNotePath in
                                         viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                                    },
+                                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
+                                        viewModel.updateMemory(
+                                            section: section,
+                                            primaryMomentId: momentId,
+                                            caption: caption,
+                                            placeName: placeName,
+                                            latitude: latitude,
+                                            longitude: longitude
+                                        )
                                     },
                                     onRemove: { section in
                                         withAnimation {
@@ -718,6 +834,16 @@ struct HomeView: View {
                                 },
                                 onEditCaption: { momentId, caption, voiceNotePath in
                                     viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                                },
+                                onEditMemory: { section, momentId, caption, placeName, latitude, longitude in
+                                    viewModel.updateMemory(
+                                        section: section,
+                                        primaryMomentId: momentId,
+                                        caption: caption,
+                                        placeName: placeName,
+                                        latitude: latitude,
+                                        longitude: longitude
+                                    )
                                 },
                                 onRemove: { section in
                                     withAnimation {
@@ -912,7 +1038,11 @@ struct HomeView: View {
     
     private var upButton: some View {
         VStack {
+            Spacer()
+            
             HStack {
+                Spacer()
+                
                 Button {
                     scrollToNewMemory = true
                 } label: {
@@ -926,14 +1056,11 @@ struct HomeView: View {
                         )
                         .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 8, y: 4)
                 }
-                .padding(.leading, 20)
-                .padding(.bottom, 100)
-                
-                Spacer()
+                .padding(.trailing, 20)
+                .padding(.bottom, 32)
             }
-            
-            Spacer()
         }
+        .ignoresSafeArea()
     }
 }
 
@@ -1024,15 +1151,6 @@ private struct FirstMetPlaceholderCard: View {
                 pulse = true
             }
         }
-    }
-}
-
-// MARK: - Scroll Offset Preference Key
-
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

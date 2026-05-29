@@ -3,10 +3,16 @@ import SwiftUI
 struct MapEmptyStateView: View {
     let selectedYear: Int
     let onScanPhotos: () -> Void
+    let onDismiss: () -> Void
     
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onDismiss()
+                }
             
             VStack(spacing: 12) {
                 Image(systemName: "map")
@@ -41,17 +47,15 @@ struct MapEmptyStateView: View {
                     .fill(BabyTownTheme.background.opacity(0.95))
                     .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
             )
-            
-            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.3))
-        .allowsHitTesting(true)
     }
 }
 
 #Preview {
-    MapEmptyStateView(selectedYear: 2024) {
+    MapEmptyStateView(selectedYear: 2024, onScanPhotos: {
         print("Scan photos tapped")
-    }
+    }, onDismiss: {
+        print("Dismissed")
+    })
 }

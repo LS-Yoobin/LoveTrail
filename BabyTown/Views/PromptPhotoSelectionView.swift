@@ -131,6 +131,7 @@ struct PromptPhotoSelectionView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(1...12, id: \.self) { month in
+                    let isSelectable = viewModel.isMonthSelectable(month)
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.selectedMonth = month
@@ -138,14 +139,28 @@ struct PromptPhotoSelectionView: View {
                     } label: {
                         Text(monthSymbols[month - 1])
                             .font(.system(size: 13, weight: viewModel.selectedMonth == month ? .semibold : .regular))
-                            .foregroundStyle(viewModel.selectedMonth == month ? .white : BabyTownTheme.textSecondary)
+                            .foregroundStyle(
+                                viewModel.selectedMonth == month
+                                    ? .white
+                                    : (isSelectable ? BabyTownTheme.textSecondary : BabyTownTheme.textTertiary)
+                            )
                             .padding(.horizontal, 14)
                             .padding(.vertical, 6)
                             .background(
                                 Capsule()
-                                    .fill(viewModel.selectedMonth == month ? BabyTownTheme.accentGradient : LinearGradient(colors: [Color(.systemGray6)], startPoint: .leading, endPoint: .trailing))
+                                    .fill(
+                                        viewModel.selectedMonth == month
+                                            ? BabyTownTheme.accentGradient
+                                            : LinearGradient(
+                                                colors: [isSelectable ? Color(.systemGray6) : Color(.systemGray5)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                    )
                             )
+                            .opacity(isSelectable ? 1 : 0.55)
                     }
+                    .disabled(!isSelectable)
                 }
             }
             .padding(.horizontal, 20)

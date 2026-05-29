@@ -44,11 +44,11 @@ struct FirstMemoriesView: View {
         VStack(spacing: 6) {
             Text("Your First Memories")
                 .font(.system(size: 26, weight: .light, design: .serif))
-                .foregroundStyle(.white)
+                .foregroundStyle(.black)
 
             Text("Choose the photos that mean the most")
                 .font(.system(size: 14))
-                .foregroundStyle(.white)
+                .foregroundStyle(.black)
         }
         .padding(.top, 28)
         .padding(.bottom, 20)
@@ -69,6 +69,18 @@ struct FirstMemoriesView: View {
         
         return VStack(spacing: 12) {
             PhotosPicker(
+                selection: $viewModel.officialItem,
+                matching: .images
+            ) {
+                MemorySelectionCard(
+                    title: "When we became official",
+                    subtitle: "The day you said yes",
+                    image: officialImage
+                )
+            }
+            .buttonStyle(.plain)
+
+            PhotosPicker(
                 selection: $viewModel.firstMetItem,
                 matching: .images
             ) {
@@ -77,18 +89,6 @@ struct FirstMemoriesView: View {
                     subtitle: "The moment it all started",
                     image: firstMetImage,
                     isOptional: true
-                )
-            }
-            .buttonStyle(.plain)
-
-            PhotosPicker(
-                selection: $viewModel.officialItem,
-                matching: .images
-            ) {
-                MemorySelectionCard(
-                    title: "When we became official",
-                    subtitle: "The day you said yes",
-                    image: officialImage
                 )
             }
             .buttonStyle(.plain)

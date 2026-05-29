@@ -72,6 +72,7 @@ struct PromptMemoryCard: View {
             .scaledToFit()
             .frame(width: 110, height: 110)
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .allowsHitTesting(false)
     }
     
     // MARK: - Header

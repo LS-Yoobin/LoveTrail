@@ -373,6 +373,32 @@ final class HomeViewModel: ObservableObject {
         }
     }
     
+    func updateMemory(
+        section: DaySection,
+        primaryMomentId: UUID,
+        caption: String,
+        placeName: String?,
+        latitude: Double?,
+        longitude: Double?,
+        voiceNotePath: String? = nil
+    ) {
+        let momentIds = Set(section.moments.map(\.id))
+        var newMoments = moments
+        for index in newMoments.indices {
+            guard momentIds.contains(newMoments[index].id) else { continue }
+            if newMoments[index].id == primaryMomentId {
+                newMoments[index].caption = caption.isEmpty ? nil : caption
+                if let voicePath = voiceNotePath {
+                    newMoments[index].voiceNotePath = voicePath
+                }
+            }
+            newMoments[index].placeName = placeName
+            newMoments[index].latitude = latitude
+            newMoments[index].longitude = longitude
+        }
+        moments = newMoments
+    }
+    
     func addPromptMemory(_ memory: PromptMemory) {
         promptMemories.append(memory)
         promptMemories.sort { $0.date > $1.date }
@@ -737,6 +763,15 @@ final class HomeViewModel: ObservableObject {
         }
         
         return milestones
+    }
+
+    /// Matches the memory rows shown in the table of contents (milestones + year/season sections).
+    var tocMemoryCount: Int {
+        let sectionCount = tocGroups
+            .flatMap(\.seasons)
+            .flatMap(\.sections)
+            .count
+        return tocMilestones.count + sectionCount
     }
 }
 

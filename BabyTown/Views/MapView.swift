@@ -5,6 +5,7 @@ struct MapView: View {
     @ObservedObject var viewModel: HomeViewModel
     let onOpenMemory: (DaySection) -> Void
     let onDismiss: () -> Void
+    let onScanPhotos: () -> Void
     
     @State private var selectedYear: Int
     @State private var availableYears: [Int] = []
@@ -12,11 +13,18 @@ struct MapView: View {
     @State private var showBottomSheet = false
     @State private var region: MKCoordinateRegion
     @State private var annotations: [MemoryMapAnnotation] = []
+    @State private var showEmptyStatePrompt = true
     
-    init(viewModel: HomeViewModel, onOpenMemory: @escaping (DaySection) -> Void, onDismiss: @escaping () -> Void) {
+    init(
+        viewModel: HomeViewModel,
+        onOpenMemory: @escaping (DaySection) -> Void,
+        onDismiss: @escaping () -> Void,
+        onScanPhotos: @escaping () -> Void
+    ) {
         self.viewModel = viewModel
         self.onOpenMemory = onOpenMemory
         self.onDismiss = onDismiss
+        self.onScanPhotos = onScanPhotos
         
         // Initialize with "All" (0)
         _selectedYear = State(initialValue: 0)
@@ -43,16 +51,22 @@ struct MapView: View {
             )
             .ignoresSafeArea()
             
-            // Top section: Year filter
-            VStack {
-                HStack {
-                    Spacer()
+            // Top controls (map visible behind)
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    onDismiss()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 44, height: 44)
+                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                        
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.black)
+                    }
                 }
-                .frame(height: 60)
-                .background(
-                    BabyTownTheme.background.opacity(0.95)
-                        .ignoresSafeArea(edges: .top)
-                )
                 
                 if !availableYears.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -70,48 +84,26 @@ struct MapView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
                     }
-                    .background(
-                        BabyTownTheme.background.opacity(0.95)
-                    )
                 }
                 
                 Spacer()
             }
-            
-            // Back button
-            VStack {
-                HStack {
-                    Button {
-                        onDismiss()
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(BabyTownTheme.background.opacity(0.95))
-                                .frame(width: 44, height: 44)
-                                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-                            
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(BabyTownTheme.textPrimary)
-                        }
-                    }
-                    .padding(.leading, 16)
-                    .padding(.top, 60)
-                    
-                    Spacer()
-                }
-                
-                Spacer()
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             
             // Empty state
-            if annotations.isEmpty {
-                MapEmptyStateView(selectedYear: selectedYear) {
-                    onDismiss()
-                }
+            if annotations.isEmpty && showEmptyStatePrompt {
+                MapEmptyStateView(
+                    selectedYear: selectedYear,
+                    onScanPhotos: {
+                        onScanPhotos()
+                    },
+                    onDismiss: {
+                        showEmptyStatePrompt = false
+                    }
+                )
             }
             
             // Bottom sheet
@@ -146,6 +138,7 @@ struct MapView: View {
         }
         .onAppear {
             setupMapData()
+            showEmptyStatePrompt = true
         }
     }
     
@@ -208,7 +201,9 @@ struct MapView: View {
 
 #Preview {
     let viewModel = HomeViewModel.filledPreview
-    return MapView(viewModel: viewModel, onOpenMemory: { _ in }) {
+    return MapView(viewModel: viewModel, onOpenMemory: { _ in }, onDismiss: {
         print("Dismiss")
-    }
+    }, onScanPhotos: {
+        print("Scan photos")
+    })
 }

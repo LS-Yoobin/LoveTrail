@@ -5,6 +5,7 @@ struct DayClusterCard: View {
     let section: DaySection
     var onOpenPhoto: (Moment, [Moment]) -> Void
     var onEditCaption: ((UUID, String, String?) -> Void)? = nil
+    var onEditMemory: ((DaySection, UUID, String, String?, Double?, Double?) -> Void)? = nil
     var onRemove: ((DaySection) -> Void)? = nil
     var onTogglePin: ((DaySection) -> Void)? = nil
     var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
@@ -41,78 +42,61 @@ struct DayClusterCard: View {
             .scaledToFit()
             .frame(width: 110, height: 110)
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .allowsHitTesting(false)
     }
 
     // MARK: - Header
 
     private var headerRow: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(section.displayTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.black)
-                
-                if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
-                    let isFounding = promptText == "When we first met" || promptText == "When we became official"
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(section.displayTitle)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                    
+                    if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
+                        let isFounding = promptText == "When we first met" || promptText == "When we became official"
 
-                    HStack(spacing: 4) {
-                        if !isFounding {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 10))
-                                .foregroundStyle(BabyTownTheme.accent)
+                        HStack(spacing: 4) {
+                            if !isFounding {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(BabyTownTheme.accent)
+                            }
+                            Text(promptText)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(isFounding ? .white : BabyTownTheme.accent)
                         }
-                        Text(promptText)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(isFounding ? .white : BabyTownTheme.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(isFounding ? Color.green : BabyTownTheme.accent.opacity(0.1))
+                        )
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule()
-                            .fill(isFounding ? Color.green : BabyTownTheme.accent.opacity(0.1))
-                    )
-                }
 
-                Text(locationText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.black)
+                    Text(locationText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.black)
+                }
                 
-                captionView
+                Spacer(minLength: 0)
+                
+                memoryMenu
             }
             
-            Spacer()
-            
-            Menu {
-                Button {
-                    onTogglePin?(section)
-                } label: {
-                    Label(isPinned ? "Unpin Memory" : "Pin Memory", systemImage: isPinned ? "pin.slash" : "pin")
-                }
-                
-                Button {
-                    showCaptionEditor = true
-                } label: {
-                    Label("Edit Memory", systemImage: "pencil")
-                }
-                
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Remove Memory", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.black.opacity(0.6))
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
+            captionView
         }
         .sheet(isPresented: $showCaptionEditor) {
             CaptionEditorSheet(
                 section: section,
-                onSave: { momentId, newCaption in
-                    onEditCaption?(momentId, newCaption, nil)
+                onSave: { momentId, newCaption, placeName, latitude, longitude in
+                    if let onEditMemory {
+                        onEditMemory(section, momentId, newCaption, placeName, latitude, longitude)
+                    } else {
+                        onEditCaption?(momentId, newCaption, nil)
+                    }
                 },
                 onAddPhotos: { images in
                     onAddPhotos?(section, images)
@@ -133,6 +117,34 @@ struct DayClusterCard: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This action cannot be undone.")
+        }
+    }
+
+    private var memoryMenu: some View {
+        Menu {
+                Button {
+                    onTogglePin?(section)
+                } label: {
+                    Label(isPinned ? "Unpin Memory" : "Pin Memory", systemImage: isPinned ? "pin.slash" : "pin")
+                }
+                
+                Button {
+                    showCaptionEditor = true
+                } label: {
+                    Label("Edit Memory", systemImage: "pencil")
+                }
+                
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Remove Memory", systemImage: "trash")
+                }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.black.opacity(0.6))
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
     }
     
@@ -162,20 +174,20 @@ struct DayClusterCard: View {
             showCaptionEditor = true
         } label: {
             if hasCaption {
-                // State 2: Caption exists - show text with edit icon
-                HStack(spacing: 0) {
+                // State 2: Caption exists — pencil right-aligned with kebab menu column
+                HStack(alignment: .center, spacing: 8) {
                     Text(captionText)
                         .font(.system(size: 12))
                         .foregroundStyle(.black.opacity(0.7))
+                        .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    Spacer()
                     
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 14))
                         .foregroundStyle(.black.opacity(0.4))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32, alignment: .trailing)
                 }
+                .frame(maxWidth: .infinity)
             } else {
                 // State 1: Empty - appealing generate prompt
                 HStack(spacing: 6) {

@@ -6,6 +6,7 @@ struct MemorySearchView: View {
     let allMoments: [Moment]
     var onOpenPhoto: (Moment, [Moment]) -> Void
     var onEditCaption: (UUID, String, String?) -> Void
+    var onEditMemory: (DaySection, UUID, String, String?, Double?, Double?) -> Void
     var onRemove: (DaySection) -> Void
     var onTogglePin: (DaySection) -> Void
     
@@ -105,6 +106,7 @@ struct MemorySearchView: View {
                         section: section,
                         onOpenPhoto: onOpenPhoto,
                         onEditCaption: onEditCaption,
+                        onEditMemory: onEditMemory,
                         onRemove: onRemove,
                         onTogglePin: onTogglePin,
                         isLeftAligned: true
@@ -216,6 +218,7 @@ struct MemorySearchView: View {
         allMoments: Moment.sampleMoments,
         onOpenPhoto: { _, _ in },
         onEditCaption: { _, _, _ in },
+        onEditMemory: { _, _, _, _, _, _ in },
         onRemove: { _ in },
         onTogglePin: { _ in }
     )

@@ -12,6 +12,8 @@ final class LocalPolaroidStore: ObservableObject {
     private let fileManager = FileManager.default
     private let entriesFileName = "polaroid_entries.json"
     private let imagesDirectoryName = "polaroid_images"
+    private let vibesDirectoryName = "polaroid_vibes"
+    private let videosDirectoryName = "polaroid_videos"
     private let processingMemoriesFileName = "processing_memories.json"
     
     private var documentsDirectory: URL {
@@ -25,16 +27,26 @@ final class LocalPolaroidStore: ObservableObject {
     private var imagesDirectory: URL {
         documentsDirectory.appendingPathComponent(imagesDirectoryName)
     }
-    
+
+    private var vibesDirectory: URL {
+        documentsDirectory.appendingPathComponent(vibesDirectoryName)
+    }
+
+    private var videosDirectory: URL {
+        documentsDirectory.appendingPathComponent(videosDirectoryName)
+    }
+
     init() {
-        createImagesDirectoryIfNeeded()
+        createMediaDirectoriesIfNeeded()
         loadEntries()
         loadProcessingMemories()
     }
     
-    private func createImagesDirectoryIfNeeded() {
-        if !fileManager.fileExists(atPath: imagesDirectory.path) {
-            try? fileManager.createDirectory(at: imagesDirectory, withIntermediateDirectories: true)
+    private func createMediaDirectoriesIfNeeded() {
+        for directory in [imagesDirectory, vibesDirectory, videosDirectory] {
+            if !fileManager.fileExists(atPath: directory.path) {
+                try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            }
         }
     }
     
@@ -72,7 +84,13 @@ final class LocalPolaroidStore: ObservableObject {
         try? data.write(to: entriesFileURL)
     }
     
-    func savePhoto(_ image: UIImage, placeName: String? = nil, location: CLLocation? = nil) -> PolaroidEntry? {
+    func savePhoto(
+        _ image: UIImage,
+        placeName: String? = nil,
+        location: CLLocation? = nil,
+        vibeSourceURL: URL? = nil,
+        videoSourceURL: URL? = nil
+    ) -> PolaroidEntry? {
         let id = UUID()
         let fileName = "\(id.uuidString).jpg"
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
@@ -82,8 +100,23 @@ final class LocalPolaroidStore: ObservableObject {
         do {
             try jpegData.write(to: fileURL)
 
-            let isFirstToday = todaysCaptureCount() == 0
-            let isTakenAfter9PM = isPhotoTakenAfter9PM(Date())
+            var vibeFileName: String?
+            if let vibeSourceURL {
+                let name = "\(id.uuidString).m4a"
+                let dest = vibesDirectory.appendingPathComponent(name)
+                try? fileManager.removeItem(at: dest)
+                try fileManager.copyItem(at: vibeSourceURL, to: dest)
+                vibeFileName = name
+            }
+
+            var videoFileName: String?
+            if let videoSourceURL {
+                let name = "\(id.uuidString).mov"
+                let dest = videosDirectory.appendingPathComponent(name)
+                try? fileManager.removeItem(at: dest)
+                try fileManager.copyItem(at: videoSourceURL, to: dest)
+                videoFileName = name
+            }
 
             let entry = PolaroidEntry(
                 id: id,
@@ -92,12 +125,13 @@ final class LocalPolaroidStore: ObservableObject {
                 released: false,
                 manuallyReleasedAt: nil,
                 placeName: placeName,
-                location: location
+                location: location,
+                vibeFileName: vibeFileName,
+                videoFileName: videoFileName
             )
             entries.append(entry)
             saveEntries()
 
-            // Create processing memory for the unreleased photo so it shows up in the feed
             createProcessingMemory(for: entry)
 
             return entry
@@ -269,6 +303,8 @@ final class LocalPolaroidStore: ObservableObject {
         saveProcessingMemories()
         
         try? fileManager.removeItem(at: imagesDirectory)
-        createImagesDirectoryIfNeeded()
+        try? fileManager.removeItem(at: vibesDirectory)
+        try? fileManager.removeItem(at: videosDirectory)
+        createMediaDirectoriesIfNeeded()
     }
 }

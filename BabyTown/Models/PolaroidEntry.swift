@@ -11,12 +11,24 @@ struct PolaroidEntry: Identifiable, Codable {
     var placeName: String?
     var latitude: Double?
     var longitude: Double?
+    var vibeFileName: String?
+    var videoFileName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, capturedAt, imageFileName, released, manuallyReleasedAt, placeName, latitude, longitude
+        case id, capturedAt, imageFileName, released, manuallyReleasedAt, placeName, latitude, longitude, vibeFileName, videoFileName
     }
 
-    init(id: UUID, capturedAt: Date, imageFileName: String, released: Bool, manuallyReleasedAt: Date? = nil, placeName: String? = nil, location: CLLocation? = nil) {
+    init(
+        id: UUID,
+        capturedAt: Date,
+        imageFileName: String,
+        released: Bool,
+        manuallyReleasedAt: Date? = nil,
+        placeName: String? = nil,
+        location: CLLocation? = nil,
+        vibeFileName: String? = nil,
+        videoFileName: String? = nil
+    ) {
         self.id = id
         self.capturedAt = capturedAt
         self.imageFileName = imageFileName
@@ -25,6 +37,8 @@ struct PolaroidEntry: Identifiable, Codable {
         self.placeName = placeName
         self.latitude = location?.coordinate.latitude
         self.longitude = location?.coordinate.longitude
+        self.vibeFileName = vibeFileName
+        self.videoFileName = videoFileName
     }
 
     init(from decoder: Decoder) throws {
@@ -37,6 +51,8 @@ struct PolaroidEntry: Identifiable, Codable {
         placeName = try container.decodeIfPresent(String.self, forKey: .placeName)
         latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        vibeFileName = try container.decodeIfPresent(String.self, forKey: .vibeFileName)
+        videoFileName = try container.decodeIfPresent(String.self, forKey: .videoFileName)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -49,6 +65,8 @@ struct PolaroidEntry: Identifiable, Codable {
         try container.encodeIfPresent(placeName, forKey: .placeName)
         try container.encodeIfPresent(latitude, forKey: .latitude)
         try container.encodeIfPresent(longitude, forKey: .longitude)
+        try container.encodeIfPresent(vibeFileName, forKey: .vibeFileName)
+        try container.encodeIfPresent(videoFileName, forKey: .videoFileName)
     }
     
     var location: CLLocation? {

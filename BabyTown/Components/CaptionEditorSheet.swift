@@ -1,9 +1,12 @@
 import SwiftUI
+import Photos
+import MapKit
+import CoreLocation
 
 struct CaptionEditorSheet: View {
     
     let section: DaySection
-    var onSave: (UUID, String) -> Void
+    var onSave: (UUID, String, String?, Double?, Double?) -> Void
     var onAddPhotos: (([UIImage]) -> Void)?
     var onRemovePhoto: ((UUID) -> Void)?
     
@@ -13,55 +16,76 @@ struct CaptionEditorSheet: View {
     @State private var showPhotoPicker = false
     @State private var selectedImages: [UIImage] = []
     
+    // Location editing (fastblog-style flow)
+    @State private var isEditingLocation = false
+    @State private var editedPlaceName: String = ""
+    @State private var editedLatitude: Double?
+    @State private var editedLongitude: Double?
+    @State private var mapCenter: CLLocationCoordinate2D?
+    @State private var mapSpanMeters: CLLocationDistance = 350
+    @State private var mapShowsPin = true
+    @State private var mapShowsUserLocation = false
+    @State private var mapViewportHint: String?
+    @State private var isMapBootstrapping = false
+    @State private var isResolvingPOI = false
+    @State private var showSuggestions = true
+    @State private var showMapTapPOIDisambiguation = false
+    @State private var mapTapPOICandidates: [MapTapPOICandidate] = []
+    @FocusState private var isPlaceFieldFocused: Bool
+    @StateObject private var placeSearch = MemoryPlaceSearchViewModel()
+    
+    private var mapCoordinate: CLLocationCoordinate2D? {
+        if let lat = editedLatitude, let lon = editedLongitude {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        return mapCenter
+    }
+
+    private var mapLocationBottomHint: String {
+        if let mapViewportHint {
+            return mapViewportHint
+        }
+        return "Tap a place on the map or search above"
+    }
+    
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    photoManagementSection
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Add a love note for this memory")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white)
-                        
-                        TextField("Type your caption here...", text: $captionText, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white)
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray4))
-                            )
-                            .lineLimit(3...6)
-                            .focused($isTextFieldFocused)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
+            Group {
+                if isEditingLocation {
+                    locationEditingView
+                } else {
+                    mainEditingView
                 }
-                .padding(.bottom, 20)
             }
-            .navigationTitle("Edit Memory")
+            .navigationTitle(isEditingLocation ? "Location" : "Edit Memory")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+                    if isEditingLocation {
+                        Button("Back") {
+                            isEditingLocation = false
+                            isPlaceFieldFocused = false
+                            placeSearch.suggestions = []
+                        }
+                    } else {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
                 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        if let firstMoment = section.moments.first {
-                            onSave(firstMoment.id, captionText)
+                if !isEditingLocation {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            saveMemory()
                         }
-                        dismiss()
+                        .fontWeight(.semibold)
                     }
-                    .fontWeight(.semibold)
                 }
             }
             .onAppear {
                 captionText = section.moments.first?.caption ?? ""
+                loadInitialPlaceState()
                 isTextFieldFocused = true
             }
             .sheet(isPresented: $showPhotoPicker) {
@@ -73,8 +97,261 @@ struct CaptionEditorSheet: View {
                         }
                     }
             }
+            .sheet(isPresented: $showMapTapPOIDisambiguation) {
+                poiDisambiguationSheet
+            }
         }
         .presentationDetents([.large])
+    }
+    
+    // MARK: - Main edit form
+    
+    private var mainEditingView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                locationSection
+                photoManagementSection
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Add a love note for this memory")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                    
+                    TextField("Type your caption here...", text: $captionText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.systemGray4))
+                        )
+                        .lineLimit(3...6)
+                        .focused($isTextFieldFocused)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+            }
+            .padding(.bottom, 20)
+        }
+    }
+    
+    // MARK: - Location editing (map + autocomplete)
+    
+    private var locationEditingView: some View {
+        ZStack(alignment: .bottom) {
+            if let coord = mapCoordinate {
+                MemoryLocationMapView(
+                    center: coord,
+                    title: editedPlaceName.isEmpty ? nil : editedPlaceName,
+                    spanMeters: mapSpanMeters,
+                    showsPin: mapShowsPin,
+                    showsUserLocation: mapShowsUserLocation,
+                    onTap: { tapped, region in
+                        resolvePOI(at: tapped, mapRegion: region)
+                    },
+                    onMapFeatureTap: { feature, region, endSelection in
+                        resolvePOIFromMapFeature(feature, mapRegion: region, endMapSelection: endSelection)
+                    }
+                )
+                .ignoresSafeArea(edges: .bottom)
+            }
+
+            if isMapBootstrapping {
+                Color.black.opacity(0.12)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .overlay {
+                        ProgressView()
+                            .tint(BabyTownTheme.accent)
+                    }
+            }
+            
+            if isResolvingPOI {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .overlay {
+                        ProgressView()
+                            .tint(.white)
+                    }
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            locationTopInset
+        }
+        .overlay(alignment: .bottom) {
+            Text(mapLocationBottomHint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.bottom, 12)
+        }
+        .task(id: isEditingLocation) {
+            guard isEditingLocation else { return }
+            await bootstrapMapCenter()
+        }
+    }
+    
+    private var locationTopInset: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Place name", text: $editedPlaceName)
+                    .focused($isPlaceFieldFocused)
+                    .autocorrectionDisabled()
+                    .onChange(of: isPlaceFieldFocused) { _, focused in
+                        if focused {
+                            showSuggestions = true
+                            placeSearch.query = editedPlaceName
+                        }
+                    }
+                    .onChange(of: editedPlaceName) { _, newValue in
+                        if showSuggestions {
+                            placeSearch.query = newValue
+                        }
+                    }
+                
+                if !editedPlaceName.isEmpty {
+                    Button {
+                        editedPlaceName = ""
+                        placeSearch.query = ""
+                        isPlaceFieldFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.systemGray4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
+            
+            if isPlaceFieldFocused, showSuggestions, !placeSearch.suggestions.isEmpty {
+                suggestionsList
+            }
+        }
+    }
+    
+    private var suggestionsList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+            Text("Suggestions")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(placeSearch.suggestions) { suggestion in
+                        Button {
+                            applyAutocompleteSuggestion(suggestion)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(suggestion.title)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                if !suggestion.subtitle.isEmpty {
+                                    Text(suggestion.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                            .padding(.leading, 16)
+                    }
+                }
+            }
+            .frame(maxHeight: 220)
+        }
+        .background(Color(.systemBackground))
+    }
+    
+    private var poiDisambiguationSheet: some View {
+        NavigationStack {
+            List(mapTapPOICandidates) { candidate in
+                Button {
+                    applyMapTapPOIChoice(candidate)
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(candidate.name)
+                            .font(.body.weight(.medium))
+                        Text(
+                            candidate.distanceMeters < 8
+                                ? "Very near your tap"
+                                : String(format: "About %.0f m from your tap", candidate.distanceMeters)
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Which place is this?")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+    
+    private var locationSection: some View {
+        Button {
+            isEditingLocation = true
+            isTextFieldFocused = false
+            primeMapForLocationEditingIfNeeded()
+            placeSearch.setBiasLocation(mapCoordinate)
+            placeSearch.query = editedPlaceName
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BabyTownTheme.accent)
+                    Text("Location")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                
+                Text(locationDisplayText)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemGray4))
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
+    
+    private var locationDisplayText: String {
+        let trimmed = editedPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return "Near \(trimmed)"
+        }
+        return "Tap to add a location"
     }
     
     private var photoManagementSection: some View {
@@ -105,7 +382,6 @@ struct CaptionEditorSheet: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 20)
     }
     
     private func photoThumbnail(_ moment: Moment) -> some View {
@@ -129,7 +405,8 @@ struct CaptionEditorSheet: View {
                                 .frame(width: 20, height: 20)
                         )
                 }
-                .offset(x: 5, y: -5)
+                .padding(.top, 5)
+                .padding(.trailing, 5)
             }
         }
     }
@@ -157,5 +434,218 @@ struct CaptionEditorSheet: View {
         }
     }
     
+    // MARK: - Place state
+    
+    private func loadInitialPlaceState() {
+        let raw = section.moments.first?.placeName ?? ""
+        editedPlaceName = raw.hasPrefix("Near ") ? String(raw.dropFirst(5)) : raw
+        editedLatitude = section.moments.first?.latitude
+        editedLongitude = section.moments.first?.longitude
+        if let lat = editedLatitude, let lon = editedLongitude {
+            mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            mapSpanMeters = 350
+            mapShowsPin = true
+            mapShowsUserLocation = false
+            mapViewportHint = nil
+        }
+    }
+    
+    private func primeMapForLocationEditingIfNeeded() {
+        guard mapCoordinate == nil else { return }
+        let regional = MapRegionalDefault.coordinate()
+        mapCenter = regional
+        mapSpanMeters = MapRegionalDefault.spanMeters
+        mapShowsPin = false
+        mapShowsUserLocation = false
+        mapViewportHint = MapBootstrapResult.viewportRegional(regional).viewportHint
+    }
 
+    private func bootstrapMapCenter() async {
+        await MainActor.run { isMapBootstrapping = true }
+        let result = await resolveMapBootstrap()
+        await MainActor.run {
+            applyMapBootstrapResult(result)
+            isMapBootstrapping = false
+        }
+    }
+
+    private func applyMapBootstrapResult(_ result: MapBootstrapResult) {
+        mapCenter = result.coordinate
+        mapSpanMeters = result.spanMeters
+        mapShowsPin = result.showsPin
+        mapShowsUserLocation = result.showsUserLocation
+        mapViewportHint = result.viewportHint
+        placeSearch.setBiasLocation(result.coordinate)
+
+        if case .memoryOrPhoto(_, let prefill) = result, prefill {
+            editedLatitude = result.coordinate.latitude
+            editedLongitude = result.coordinate.longitude
+        }
+    }
+
+    private func resolveMapBootstrap() async -> MapBootstrapResult {
+        if let lat = editedLatitude, let lon = editedLongitude {
+            let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            return .memoryOrPhoto(coord, prefillCoordinates: false)
+        }
+
+        if let coord = photoGPSCoordinate() {
+            return .memoryOrPhoto(coord, prefillCoordinates: true)
+        }
+
+        if let deviceCoord = await MapBootstrapLocationProvider.currentCoordinate() {
+            return .viewportDevice(deviceCoord)
+        }
+
+        let regional = MapRegionalDefault.coordinate()
+        return .viewportRegional(regional)
+    }
+
+    private func photoGPSCoordinate() -> CLLocationCoordinate2D? {
+        if let assetId = section.moments.first?.assetIdentifier {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+            if let asset = assets.firstObject, let location = asset.location {
+                return location.coordinate
+            }
+        }
+        for moment in section.moments {
+            if let assetId = moment.assetIdentifier {
+                let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+                if let asset = assets.firstObject, let location = asset.location {
+                    return location.coordinate
+                }
+            }
+        }
+        return nil
+    }
+    
+    // MARK: - POI resolution
+    
+    private func applyAutocompleteSuggestion(_ suggestion: PlaceSuggestion) {
+        showSuggestions = false
+        isPlaceFieldFocused = false
+        editedPlaceName = suggestion.title
+        placeSearch.suggestions = []
+        Task { @MainActor in
+            if let coord = await placeSearch.resolveDetails(for: suggestion) {
+                editedLatitude = coord.latitude
+                editedLongitude = coord.longitude
+                mapCenter = coord
+                mapSpanMeters = 350
+                mapShowsPin = true
+                mapShowsUserLocation = false
+                mapViewportHint = nil
+                placeSearch.setBiasLocation(coord)
+            }
+        }
+    }
+    
+    private func applyMapTapPOIChoice(_ candidate: MapTapPOICandidate) {
+        editedPlaceName = candidate.name
+        editedLatitude = candidate.coordinate.latitude
+        editedLongitude = candidate.coordinate.longitude
+        mapCenter = candidate.coordinate
+        mapSpanMeters = 350
+        mapShowsPin = true
+        mapShowsUserLocation = false
+        mapViewportHint = nil
+        showMapTapPOIDisambiguation = false
+        mapTapPOICandidates = []
+    }
+    
+    private func resolvePOI(at coordinate: CLLocationCoordinate2D, mapRegion: MKCoordinateRegion?) {
+        guard !isResolvingPOI else { return }
+        isResolvingPOI = true
+        isPlaceFieldFocused = false
+        showSuggestions = false
+        editedLatitude = coordinate.latitude
+        editedLongitude = coordinate.longitude
+        mapCenter = coordinate
+        mapSpanMeters = 350
+        mapShowsPin = true
+        mapShowsUserLocation = false
+        mapViewportHint = nil
+        
+        Task { @MainActor in
+            defer { isResolvingPOI = false }
+            switch await placeSearch.resolveMapTapPOI(near: coordinate, mapRegion: mapRegion) {
+            case .single(let name, let coord):
+                editedPlaceName = name
+                editedLatitude = coord.latitude
+                editedLongitude = coord.longitude
+                mapCenter = coord
+                mapSpanMeters = 350
+                mapShowsPin = true
+                mapShowsUserLocation = false
+                mapViewportHint = nil
+            case .ambiguous(let candidates):
+                mapTapPOICandidates = candidates
+                showMapTapPOIDisambiguation = true
+            case .none:
+                let name = await placeSearch.resolveCoordinateName(at: coordinate)
+                if !name.isEmpty, name != "Unknown Place" {
+                    editedPlaceName = name
+                }
+            }
+        }
+    }
+    
+    private func resolvePOIFromMapFeature(
+        _ annotation: MKMapFeatureAnnotation,
+        mapRegion: MKCoordinateRegion,
+        endMapSelection: @escaping () -> Void
+    ) {
+        guard !isResolvingPOI else {
+            endMapSelection()
+            return
+        }
+        isResolvingPOI = true
+        isPlaceFieldFocused = false
+        showSuggestions = false
+        
+        Task { @MainActor in
+            defer {
+                isResolvingPOI = false
+                endMapSelection()
+            }
+            let request = MKMapItemRequest(mapFeatureAnnotation: annotation)
+            if let mapItem = try? await request.mapItem,
+               let raw = mapItem.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !raw.isEmpty {
+                editedPlaceName = raw
+                let coord = mapItem.placemark.coordinate
+                editedLatitude = coord.latitude
+                editedLongitude = coord.longitude
+                mapCenter = coord
+                mapSpanMeters = 350
+                mapShowsPin = true
+                mapShowsUserLocation = false
+                mapViewportHint = nil
+                return
+            }
+            let titlePart = annotation.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let subtitlePart = annotation.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let combined = [titlePart, subtitlePart].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — ")
+            if !combined.isEmpty {
+                editedPlaceName = combined
+                editedLatitude = annotation.coordinate.latitude
+                editedLongitude = annotation.coordinate.longitude
+                mapCenter = annotation.coordinate
+                mapSpanMeters = 350
+                mapShowsPin = true
+                mapShowsUserLocation = false
+                mapViewportHint = nil
+                return
+            }
+            resolvePOI(at: annotation.coordinate, mapRegion: mapRegion)
+        }
+    }
+    
+    private func saveMemory() {
+        guard let firstMoment = section.moments.first else { return }
+        let trimmedPlace = editedPlaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let placeName = trimmedPlace.isEmpty ? nil : trimmedPlace
+        onSave(firstMoment.id, captionText, placeName, editedLatitude, editedLongitude)
+        dismiss()
+    }
 }

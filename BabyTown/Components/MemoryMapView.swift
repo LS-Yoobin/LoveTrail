@@ -5,10 +5,15 @@ struct MemoryMapView: UIViewRepresentable {
     @Binding var region: MKCoordinateRegion
     var annotations: [MemoryMapAnnotation]
     var onSelect: (DaySection) -> Void
+    var isInteractive: Bool = true
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
+        mapView.isScrollEnabled = isInteractive
+        mapView.isZoomEnabled = isInteractive
+        mapView.isRotateEnabled = false
+        mapView.isPitchEnabled = false
         
         // Enable clustering
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultAnnotationViewReuseIdentifier)
@@ -72,6 +77,10 @@ struct MemoryMapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard parent.isInteractive else {
+                mapView.deselectAnnotation(view.annotation, animated: false)
+                return
+            }
             if let annotation = view.annotation as? MemoryMapAnnotation {
                 parent.onSelect(annotation.section)
                 mapView.deselectAnnotation(annotation, animated: true)

@@ -76,7 +76,7 @@ struct PotentialMemoryCardView: View {
         }
         .overlay(alignment: .top) {
             if showToast {
-                ToastView(message: "Added to Jinky Adventures")
+                ToastView(message: "Added to Our Adventures")
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .zIndex(1)
             }

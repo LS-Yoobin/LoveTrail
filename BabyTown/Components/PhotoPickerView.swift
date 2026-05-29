@@ -4,6 +4,7 @@ import PhotosUI
 struct PhotoPickerView: UIViewControllerRepresentable {
     @Binding var selectedImages: [UIImage]
     var selectionLimit: Int = 10
+    var onFinish: (([PHPickerResult]) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
@@ -31,7 +32,12 @@ struct PhotoPickerView: UIViewControllerRepresentable {
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             parent.dismiss()
-            
+
+            if let onFinish = parent.onFinish {
+                onFinish(results)
+                return
+            }
+
             guard !results.isEmpty else { return }
             
             let group = DispatchGroup()

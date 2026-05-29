@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen {
-        case launch, welcome, storyOnboarding, firstMemories, howItWorks, home, selectPhotos
+        case launch, welcome, storyOnboarding, nickname, firstMemories, howItWorks, photoAccess, home, selectPhotos
     }
 
     @State private var screen: Screen = .launch
@@ -76,6 +76,15 @@ struct ContentView: View {
 
             case .storyOnboarding:
                 StoryOnboardingFlow {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .nickname
+                    }
+                }
+                .transition(.opacity)
+
+            case .nickname:
+                NicknameView { nickname in
+                    DataPersistenceManager.shared.saveUserNickname(nickname)
                     withAnimation(.easeInOut(duration: 0.4)) {
                         screen = .firstMemories
                     }
@@ -169,6 +178,14 @@ struct ContentView: View {
 
             case .howItWorks:
                 HowItWorksView {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .photoAccess
+                    }
+                }
+                .transition(.opacity)
+
+            case .photoAccess:
+                PhotoAccessView {
                     DataPersistenceManager.shared.setOnboardingCompleted(true)
                     withAnimation(.easeInOut(duration: 0.4)) {
                         screen = .home

@@ -9,16 +9,16 @@ struct YearFilterChip: View {
         Button(action: onTap) {
             Text(title)
                 .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : BabyTownTheme.textPrimary)
+                .foregroundStyle(isSelected ? .white : .black)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? AnyShapeStyle(BabyTownTheme.accentGradient) : AnyShapeStyle(Color.clear))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.clear : BabyTownTheme.textPrimary.opacity(0.3), lineWidth: 1.5)
+                        .fill(
+                            isSelected
+                                ? AnyShapeStyle(BabyTownTheme.accentGradient)
+                                : AnyShapeStyle(Color(white: 0.88))
+                        )
                 )
         }
         .buttonStyle(.plain)

@@ -53,21 +53,38 @@ struct MomentPhotoViewer: View {
         return formatter
     }
     
-    private var photoDateDisplay: some View {
+    private var loveNoteText: String? {
+        let note = updatedMoments
+            .compactMap { moment -> String? in
+                guard let caption = moment.caption?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !caption.isEmpty else { return nil }
+                return caption
+            }
+            .first
+        return note
+    }
+
+    private var photoMetadataDisplay: some View {
         HStack {
-            Text(dateFormatter.string(from: currentMoment.dateTaken))
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(Color.black.opacity(0.5))
-                        .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
-                )
-            Spacer()
+            VStack(alignment: .leading, spacing: loveNoteText == nil ? 0 : 8) {
+                Text(dateFormatter.string(from: currentMoment.dateTaken))
+                    .font(.system(size: 15, weight: .semibold))
+
+                if let loveNote = loveNoteText {
+                    Text(loveNote)
+                        .font(.system(size: 15, weight: .regular))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .foregroundStyle(.white)
+            .photoViewerLegibleText()
+            .padding(.horizontal, 16)
+            .padding(.vertical, loveNoteText == nil ? 10 : 14)
+            .background(photoViewerMetadataBackground)
+            Spacer(minLength: 0)
         }
-        .padding(.leading, 20)
+        .padding(.horizontal, 20)
     }
     
     var body: some View {
@@ -91,12 +108,11 @@ struct MomentPhotoViewer: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             
             
-                VStack {
+                VStack(spacing: 0) {
                     topBar
                     Spacer()
                     
-                    // Photo date display
-                    photoDateDisplay
+                    photoMetadataDisplay
                         .padding(.bottom, 8)
                     
                     if editMode {
@@ -104,6 +120,9 @@ struct MomentPhotoViewer: View {
                     } else if updatedMoments.count > 1 {
                         photoPreviewStrip
                     }
+                }
+                .background(alignment: .bottom) {
+                    photoViewerBottomGradient
                 }
             }
         }
@@ -301,6 +320,31 @@ struct MomentPhotoViewer: View {
         selectedPhotos = []
     }
     
+    private var photoViewerMetadataBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.black.opacity(0.68))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.45), radius: 10, y: 4)
+    }
+
+    private var photoViewerBottomGradient: some View {
+        LinearGradient(
+            colors: [
+                Color.black.opacity(0),
+                Color.black.opacity(0.35),
+                Color.black.opacity(0.72)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: loveNoteText == nil ? 140 : 220)
+        .allowsHitTesting(false)
+    }
+
     // MARK: - Delete Photo
     
     private func deleteCurrentPhoto() {
@@ -324,5 +368,16 @@ struct MomentPhotoViewer: View {
             onUpdateMoments(updatedMoments)
             onDeleteMoment?(momentToDelete)
         }
+    }
+}
+
+// MARK: - Legible overlay text (light or dark photos)
+
+private extension View {
+    func photoViewerLegibleText() -> some View {
+        self
+            .shadow(color: .black.opacity(0.95), radius: 0, x: 0, y: 0.5)
+            .shadow(color: .black.opacity(0.85), radius: 3, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 3)
     }
 }

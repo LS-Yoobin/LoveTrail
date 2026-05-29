@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import Photos
+import PhotosUI
 
 @MainActor
 final class SelectPhotosViewModel: ObservableObject {
@@ -11,6 +12,7 @@ final class SelectPhotosViewModel: ObservableObject {
     @Published var selectedYear: Int {
         didSet {
             UserDefaults.standard.set(selectedYear, forKey: "SelectPhotos_SelectedYear")
+            clampSelectedMonthIfNeeded()
         }
     }
     @Published var selectedMonth: Int {
@@ -48,6 +50,17 @@ final class SelectPhotosViewModel: ObservableObject {
         return Array((current - 10)...current).reversed()
     }
 
+    var availableMonths: [Int] {
+        let calendar = Calendar.current
+        let now = Date()
+        let currentYear = calendar.component(.year, from: now)
+        let currentMonth = calendar.component(.month, from: now)
+
+        if selectedYear > currentYear { return [] }
+        if selectedYear < currentYear { return Array(1...12) }
+        return Array(1...currentMonth)
+    }
+
     var selectedCount: Int { selectedAssets.count }
 
     // MARK: - Init
@@ -68,6 +81,28 @@ final class SelectPhotosViewModel: ObservableObject {
         } else {
             selectedMonth = cal.component(.month, from: now)
         }
+
+        clampSelectedMonthIfNeeded()
+    }
+
+    // MARK: - Month availability
+
+    func isMonthSelectable(_ month: Int, for year: Int? = nil) -> Bool {
+        let year = year ?? selectedYear
+        let calendar = Calendar.current
+        let now = Date()
+        let currentYear = calendar.component(.year, from: now)
+        let currentMonth = calendar.component(.month, from: now)
+
+        if year > currentYear { return false }
+        if year < currentYear { return true }
+        return month >= 1 && month <= currentMonth
+    }
+
+    func clampSelectedMonthIfNeeded() {
+        guard !isMonthSelectable(selectedMonth) else { return }
+        let calendar = Calendar.current
+        selectedMonth = calendar.component(.month, from: Date())
     }
 
     // MARK: - Authorization
@@ -210,6 +245,78 @@ final class SelectPhotosViewModel: ObservableObject {
         return promptPhotos
     }
     
+    func createMomentsFromPickerResults(_ results: [PHPickerResult]) async -> [Moment] {
+        guard !results.isEmpty else { return [] }
+        isSaving = true
+        defer { isSaving = false }
+
+        var assets: [PHAsset] = []
+        var fallbackImages: [UIImage] = []
+
+        for result in results {
+            if let id = result.assetIdentifier {
+                let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                if let asset = fetched.firstObject {
+                    assets.append(asset)
+                    continue
+                }
+            }
+            if let image = await loadImage(from: result.itemProvider) {
+                fallbackImages.append(image)
+            }
+        }
+
+        var moments = await MomentFactory().createMoments(from: assets)
+        for image in fallbackImages {
+            moments.append(Moment(
+                id: UUID(),
+                dateTaken: Date(),
+                thumbnail: image
+            ))
+        }
+        return moments
+    }
+
+    func createPromptPhotosFromPickerResults(_ results: [PHPickerResult]) async -> [PromptPhoto] {
+        guard !results.isEmpty else { return [] }
+        isSaving = true
+        defer { isSaving = false }
+
+        var promptPhotos: [PromptPhoto] = []
+
+        for result in results {
+            if let id = result.assetIdentifier {
+                let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                if let asset = fetched.firstObject {
+                    let thumbnail = await loadFullSizeImage(for: asset)
+                    promptPhotos.append(PromptPhoto(
+                        dateTaken: asset.creationDate ?? Date(),
+                        thumbnail: thumbnail,
+                        assetIdentifier: asset.localIdentifier,
+                        latitude: asset.location?.coordinate.latitude,
+                        longitude: asset.location?.coordinate.longitude
+                    ))
+                    continue
+                }
+            }
+            if let image = await loadImage(from: result.itemProvider) {
+                promptPhotos.append(PromptPhoto(
+                    dateTaken: Date(),
+                    thumbnail: image
+                ))
+            }
+        }
+        return promptPhotos
+    }
+
+    private func loadImage(from provider: NSItemProvider) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                continuation.resume(returning: object as? UIImage)
+            }
+        }
+    }
+
     private func loadFullSizeImage(for asset: PHAsset) async -> UIImage {
         await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()

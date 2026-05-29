@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import PhotosUI
 
 struct SelectPhotosView: View {
 
@@ -8,6 +9,7 @@ struct SelectPhotosView: View {
     @State private var photoSelectedInViewer = false
     @State private var showPromptMemoryBuilder = false
     @State private var selectedPhotosForPrompt: [PromptPhoto] = []
+    @State private var showSystemGallery = false
     
     var selectedPrompt: PromptItem?
     var onBack: () -> Void
@@ -35,6 +37,8 @@ struct SelectPhotosView: View {
                 Divider().padding(.horizontal, 20)
 
                 content
+
+                bottomActionBar
             }
 
             // Full-screen viewer
@@ -63,17 +67,6 @@ struct SelectPhotosView: View {
                 .zIndex(1)
             }
             
-            // Floating Save Button
-            if viewModel.selectionMode && viewModel.selectedCount > 0 {
-                VStack {
-                    Spacer()
-                    saveButton
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(2)
-            }
-            
-            
             // Heart Animation Overlay
             if showAnimation {
                 HeartSaveAnimationOverlay {
@@ -91,6 +84,15 @@ struct SelectPhotosView: View {
         }
         .onChange(of: viewModel.selectedMonth) { _, _ in
             Task { await viewModel.fetchAssets() }
+        }
+        .sheet(isPresented: $showSystemGallery) {
+            PhotoPickerView(
+                selectedImages: .constant([]),
+                selectionLimit: 0,
+                onFinish: { results in
+                    Task { await handleSystemGalleryPicks(results) }
+                }
+            )
         }
         .navigationDestination(isPresented: $showPromptMemoryBuilder) {
             if let prompt = selectedPrompt {
@@ -197,7 +199,7 @@ struct SelectPhotosView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(1...12, id: \.self) { month in
+                    ForEach(viewModel.availableMonths, id: \.self) { month in
                         chipButton(
                             label: monthSymbols[month - 1],
                             isActive: viewModel.selectedMonth == month
@@ -221,22 +223,36 @@ struct SelectPhotosView: View {
     private func chipButton(
         label: String,
         isActive: Bool,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                .foregroundStyle(isActive ? .white : BabyTownTheme.textPrimary)
+                .foregroundStyle(
+                    isActive
+                        ? .white
+                        : (isEnabled ? BabyTownTheme.textPrimary : BabyTownTheme.textTertiary)
+                )
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(isActive
-                              ? AnyShapeStyle(BabyTownTheme.accentGradient)
-                              : AnyShapeStyle(BabyTownTheme.accentSoft))
+                        .fill(
+                            isActive
+                                ? AnyShapeStyle(BabyTownTheme.accentGradient)
+                                : AnyShapeStyle(
+                                    isEnabled
+                                        ? BabyTownTheme.accentSoft
+                                        : Color(.systemGray5)
+                                )
+                        )
                 )
+                .opacity(isEnabled ? 1 : 0.55)
         }
+        .disabled(!isEnabled)
         .animation(.easeInOut(duration: 0.2), value: isActive)
+        .animation(.easeInOut(duration: 0.2), value: isEnabled)
     }
 
     // MARK: - Content
@@ -283,42 +299,56 @@ struct SelectPhotosView: View {
                 }
             }
             .padding(2)
-            .padding(.bottom, viewModel.selectionMode && viewModel.selectedCount > 0 ? 100 : 0)
+            .padding(.bottom, gridBottomPadding)
         }
     }
-    
-    // MARK: - Save Button
-    
-    private var saveButton: some View {
-        Button {
-            Task {
-                if let prompt = selectedPrompt {
-                    // For prompt flow, create prompt memory and save directly
-                    let promptPhotos = await viewModel.convertToPromptPhotos()
-                    
-                    // Use the earliest photo's date for proper timeline placement
-                    let memoryDate = promptPhotos.map { $0.dateTaken }.min() ?? Date()
-                    
-                    let memory = PromptMemory(
-                        promptText: prompt.text,
-                        date: memoryDate,
-                        placeName: nil,
-                        loveNote: "",
-                        photos: promptPhotos
-                    )
-                    onSavePromptMemory?(memory)
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        showAnimation = true
-                    }
-                } else {
-                    // For regular flow, save as Moments
-                    let moments = await viewModel.saveMoments()
-                    onSaveMoments(moments)
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        showAnimation = true
-                    }
-                }
+
+    private var gridBottomPadding: CGFloat { 16 }
+
+    // MARK: - Bottom Action Bar
+
+    private var bottomActionBar: some View {
+        Group {
+            if viewModel.selectionMode {
+                saveBarButton
+            } else {
+                openGalleryBarButton
             }
+        }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.selectionMode)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 24)
+        .background(
+            BabyTownTheme.background
+                .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+        )
+    }
+
+    private var openGalleryBarButton: some View {
+        Button {
+            showSystemGallery = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("Open Gallery")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                Capsule()
+                    .fill(BabyTownTheme.accentGradient)
+                    .shadow(color: BabyTownTheme.accent.opacity(0.35), radius: 12, y: 6)
+            )
+        }
+    }
+
+    private var saveBarButton: some View {
+        Button {
+            performSave()
         } label: {
             HStack(spacing: 8) {
                 if viewModel.isSaving {
@@ -327,23 +357,77 @@ struct SelectPhotosView: View {
                         .scaleEffect(0.9)
                 } else {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                 }
-                Text("Save (\(viewModel.selectedCount))")
-                    .font(.system(size: 16, weight: .semibold))
+                Text(viewModel.selectedCount > 0 ? "Save (\(viewModel.selectedCount))" : "Save")
+                    .font(.system(size: 17, weight: .semibold))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 Capsule()
-                    .fill(BabyTownTheme.accentGradient)
-                    .shadow(color: BabyTownTheme.accent.opacity(0.4), radius: 12, y: 6)
+                    .fill(LinearGradient(colors: [.blue], startPoint: .leading, endPoint: .trailing))
+                    .shadow(color: Color.blue.opacity(0.35), radius: 12, y: 6)
             )
-            .padding(.horizontal, 20)
         }
-        .disabled(viewModel.isSaving)
-        .padding(.bottom, 40)
+        .disabled(viewModel.isSaving || viewModel.selectedCount == 0)
+        .opacity(viewModel.selectedCount == 0 ? 0.5 : 1)
+    }
+
+    private func handleSystemGalleryPicks(_ results: [PHPickerResult]) async {
+        guard !results.isEmpty else { return }
+
+        if let prompt = selectedPrompt {
+            let promptPhotos = await viewModel.createPromptPhotosFromPickerResults(results)
+            guard !promptPhotos.isEmpty else { return }
+
+            let memoryDate = promptPhotos.map(\.dateTaken).min() ?? Date()
+            let memory = PromptMemory(
+                promptText: prompt.text,
+                date: memoryDate,
+                placeName: nil,
+                loveNote: "",
+                photos: promptPhotos
+            )
+            onSavePromptMemory?(memory)
+            withAnimation(.easeIn(duration: 0.2)) {
+                showAnimation = true
+            }
+        } else {
+            let moments = await viewModel.createMomentsFromPickerResults(results)
+            guard !moments.isEmpty else { return }
+            onSaveMoments(moments)
+            withAnimation(.easeIn(duration: 0.2)) {
+                showAnimation = true
+            }
+        }
+    }
+    
+    private func performSave() {
+        Task {
+            if let prompt = selectedPrompt {
+                let promptPhotos = await viewModel.convertToPromptPhotos()
+                let memoryDate = promptPhotos.map { $0.dateTaken }.min() ?? Date()
+                let memory = PromptMemory(
+                    promptText: prompt.text,
+                    date: memoryDate,
+                    placeName: nil,
+                    loveNote: "",
+                    photos: promptPhotos
+                )
+                onSavePromptMemory?(memory)
+                withAnimation(.easeIn(duration: 0.2)) {
+                    showAnimation = true
+                }
+            } else {
+                let moments = await viewModel.saveMoments()
+                onSaveMoments(moments)
+                withAnimation(.easeIn(duration: 0.2)) {
+                    showAnimation = true
+                }
+            }
+        }
     }
 
     // MARK: - States

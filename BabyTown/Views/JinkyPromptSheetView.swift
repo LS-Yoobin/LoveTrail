@@ -66,8 +66,9 @@ struct JinkyPromptSheetView: View {
     // MARK: - Greeting
     
     private var greeting: some View {
-        ChatBubbleView(
-            message: "Hi Trish! Here is the prompt of the day!",
+        let name = DataPersistenceManager.shared.loadUserNickname() ?? "there"
+        return ChatBubbleView(
+            message: "Hi \(name)! Here is the prompt of the day!",
             isFromJinky: true
         )
     }

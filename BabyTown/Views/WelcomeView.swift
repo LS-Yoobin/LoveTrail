@@ -51,9 +51,11 @@ struct WelcomeView: View {
                     )
 
                 // Title
-                Text("I Love You")
-                    .font(.system(size: 32, weight: .bold, design: .serif))
-                    .foregroundStyle(.white)
+                Text("Welcome to your BabyTown!")
+                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
                     .padding(.top, 28)
                     .opacity(textOpacity)
 
@@ -61,7 +63,7 @@ struct WelcomeView: View {
 
                 // Continue button
                 Button(action: onContinue) {
-                    Text("Continue to Baby Town")
+                    Text("Let's go.")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)

@@ -13,8 +13,10 @@ struct PhotoGridCell: View {
                 photoContent
                 selectionOverlay
             }
-            .aspectRatio(1, contentMode: .fit)
+            .aspectRatio(1, contentMode: .fill)
+            .frame(maxWidth: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 4))
+            .contentShape(RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }
@@ -26,9 +28,7 @@ struct PhotoGridCell: View {
         if let thumbnail {
             Image(uiImage: thumbnail)
                 .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .clipped()
+                .scaledToFill()
         } else {
             Rectangle()
                 .fill(BabyTownTheme.accentSoft)
