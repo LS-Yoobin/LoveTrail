@@ -266,6 +266,11 @@ struct MomentPhotoViewer: View {
                         .background(Circle().fill(Color.green))
                 }
                 .padding(.trailing, 4)
+                .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
+                    Button("Apple Maps") { openInMaps(useGoogle: false) }
+                    Button("Google Maps") { openInMaps(useGoogle: true) }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
 
             Button(action: finishEditing) {
@@ -282,11 +287,6 @@ struct MomentPhotoViewer: View {
         }
         .padding(.top, 12)
         .padding(.horizontal, 20)
-        .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
-            Button("Apple Maps") { openInMaps(useGoogle: false) }
-            Button("Google Maps") { openInMaps(useGoogle: true) }
-            Button("Cancel", role: .cancel) {}
-        }
     }
 
     // MARK: - Navigation (open place in Maps)

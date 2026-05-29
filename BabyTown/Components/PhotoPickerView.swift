@@ -31,13 +31,12 @@ struct PhotoPickerView: UIViewControllerRepresentable {
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            parent.dismiss()
-
             if let onFinish = parent.onFinish {
                 onFinish(results)
                 return
             }
 
+            parent.dismiss()
             guard !results.isEmpty else { return }
             
             let group = DispatchGroup()

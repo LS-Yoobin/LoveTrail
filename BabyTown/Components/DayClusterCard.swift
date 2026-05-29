@@ -10,6 +10,7 @@ struct DayClusterCard: View {
     var onTogglePin: ((DaySection) -> Void)? = nil
     var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
     var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
+    var onSyncMemoryPhotos: ((DaySection, Set<String>, Set<UUID>) -> Void)? = nil
     var onShare: ((MemorySharePayload) -> Void)? = nil
     var isLeftAligned: Bool = true
     var index: Int = 0
@@ -21,10 +22,12 @@ struct DayClusterCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             headerRow
+            promptSection
             ZStack(alignment: isLeftAligned ? .bottomTrailing : .bottomLeading) {
                 collageView
                 catDecoration
             }
+            captionView
         }
         .padding(12)
         .background(
@@ -55,27 +58,6 @@ struct DayClusterCard: View {
                     Text(section.displayTitle)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.black)
-                    
-                    if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
-                        let isFounding = promptText == "When we first met" || promptText == "When we became official"
-
-                        HStack(spacing: 4) {
-                            if !isFounding {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(BabyTownTheme.accent)
-                            }
-                            Text(promptText)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(isFounding ? .white : BabyTownTheme.accent)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(isFounding ? Color.green : BabyTownTheme.accent.opacity(0.1))
-                        )
-                    }
 
                     locationRow
                 }
@@ -84,8 +66,6 @@ struct DayClusterCard: View {
                 
                 memoryMenu
             }
-            
-            captionView
         }
         .sheet(isPresented: $showCaptionEditor) {
             CaptionEditorSheet(
@@ -102,6 +82,9 @@ struct DayClusterCard: View {
                 },
                 onRemovePhoto: { momentId in
                     onRemovePhoto?(section, momentId)
+                },
+                onSyncMemoryPhotos: { assetIds, orphanIds in
+                    onSyncMemoryPhotos?(section, assetIds, orphanIds)
                 }
             )
         }
@@ -153,6 +136,30 @@ struct DayClusterCard: View {
         }
     }
     
+    @ViewBuilder
+    private var promptSection: some View {
+        if let promptText = section.moments.first?.promptText, !promptText.isEmpty {
+            let isFounding = promptText == "When we first met" || promptText == "When we became official"
+
+            HStack(spacing: 4) {
+                if !isFounding {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10))
+                        .foregroundStyle(BabyTownTheme.accent)
+                }
+                Text(promptText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(isFounding ? .white : BabyTownTheme.accent)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(isFounding ? Color.green : BabyTownTheme.accent.opacity(0.1))
+            )
+        }
+    }
+
     @ViewBuilder
     private var locationRow: some View {
         if section.formattedPlaceName != nil {

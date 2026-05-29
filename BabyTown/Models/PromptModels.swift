@@ -81,6 +81,7 @@ struct PromptMemory: Identifiable, Codable {
     var pinnedAt: Date?
     var latitude: Double?
     var longitude: Double?
+    var isPlaceNameUserSet: Bool
 
     init(
         id: UUID = UUID(),
@@ -92,7 +93,8 @@ struct PromptMemory: Identifiable, Codable {
         isPinned: Bool = false,
         pinnedAt: Date? = nil,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
+        isPlaceNameUserSet: Bool = false
     ) {
         self.id = id
         self.promptText = promptText
@@ -104,5 +106,67 @@ struct PromptMemory: Identifiable, Codable {
         self.pinnedAt = pinnedAt
         self.latitude = latitude
         self.longitude = longitude
+        self.isPlaceNameUserSet = isPlaceNameUserSet
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, promptText, date, placeName, loveNote, photos, isPinned, pinnedAt
+        case latitude, longitude, isPlaceNameUserSet
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        promptText = try container.decode(String.self, forKey: .promptText)
+        date = try container.decode(Date.self, forKey: .date)
+        placeName = try container.decodeIfPresent(String.self, forKey: .placeName)
+        loveNote = try container.decode(String.self, forKey: .loveNote)
+        photos = try container.decode([PromptPhoto].self, forKey: .photos)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        pinnedAt = try container.decodeIfPresent(Date.self, forKey: .pinnedAt)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        isPlaceNameUserSet = try container.decodeIfPresent(Bool.self, forKey: .isPlaceNameUserSet) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(promptText, forKey: .promptText)
+        try container.encode(date, forKey: .date)
+        try container.encodeIfPresent(placeName, forKey: .placeName)
+        try container.encode(loveNote, forKey: .loveNote)
+        try container.encode(photos, forKey: .photos)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(pinnedAt, forKey: .pinnedAt)
+        try container.encodeIfPresent(latitude, forKey: .latitude)
+        try container.encodeIfPresent(longitude, forKey: .longitude)
+        try container.encode(isPlaceNameUserSet, forKey: .isPlaceNameUserSet)
+    }
+
+    /// Adapts this prompt memory for `CaptionEditorSheet`, which is built around `DaySection` / `Moment`.
+    func asEditingDaySection() -> DaySection {
+        let caption = loveNote.isEmpty ? nil : loveNote
+        let moments = photos.map { photo in
+            let locked = photo.isFromCamera
+                && photo.unlockTime.map { Date() < $0 } == true
+            return Moment(
+                id: photo.id,
+                dateTaken: photo.dateTaken,
+                assetIdentifier: photo.assetIdentifier,
+                thumbnail: photo.thumbnail,
+                placeName: placeName,
+                caption: caption,
+                promptText: promptText,
+                isPinned: isPinned,
+                pinnedAt: pinnedAt,
+                isLocked: locked,
+                unlockTime: photo.unlockTime,
+                latitude: photo.latitude ?? latitude,
+                longitude: photo.longitude ?? longitude,
+                isPlaceNameUserSet: isPlaceNameUserSet
+            )
+        }
+        return DaySection(date: date, placeName: placeName, moments: moments)
     }
 }

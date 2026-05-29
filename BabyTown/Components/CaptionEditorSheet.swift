@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import PhotosUI
 import MapKit
 import CoreLocation
 
@@ -9,12 +10,14 @@ struct CaptionEditorSheet: View {
     var onSave: (UUID, String, String?, Double?, Double?, Bool) -> Void
     var onAddPhotos: (([UIImage]) -> Void)?
     var onRemovePhoto: ((UUID) -> Void)?
+    var onSyncMemoryPhotos: ((Set<String>, Set<UUID>) -> Void)?
     
     @Environment(\.dismiss) private var dismiss
     @State private var captionText: String = ""
     @FocusState private var isTextFieldFocused: Bool
-    @State private var showPhotoPicker = false
-    @State private var selectedImages: [UIImage] = []
+    @State private var showSystemGallery = false
+    @State private var isEditingPhotos = false
+    @StateObject private var photoGalleryVM = MemoryMomentPhotoGalleryViewModel()
     
     // Location editing (fastblog-style flow)
     @State private var isEditingLocation = false
@@ -51,17 +54,23 @@ struct CaptionEditorSheet: View {
         }
         return "Tap a place on the map or search above"
     }
+
+    private let photoGalleryColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     
     var body: some View {
         NavigationStack {
             Group {
                 if isEditingLocation {
                     locationEditingView
+                } else if isEditingPhotos {
+                    memoryPhotoGalleryView
                 } else {
                     mainEditingView
                 }
             }
-            .navigationTitle(isEditingLocation ? "Location" : "Edit Memory")
+            .navigationTitle(
+                isEditingLocation ? "Location" : (isEditingPhotos ? "Photos" : "Edit Memory")
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -72,6 +81,10 @@ struct CaptionEditorSheet: View {
                             isPlaceFieldFocused = false
                             placeSearch.suggestions = []
                         }
+                    } else if isEditingPhotos {
+                        Button("Back") {
+                            isEditingPhotos = false
+                        }
                     } else {
                         Button("Cancel") {
                             dismiss()
@@ -79,7 +92,14 @@ struct CaptionEditorSheet: View {
                     }
                 }
                 
-                if !isEditingLocation {
+                if isEditingPhotos {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            isEditingPhotos = false
+                        }
+                        .fontWeight(.semibold)
+                    }
+                } else if !isEditingLocation {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
                             saveMemory()
@@ -91,16 +111,21 @@ struct CaptionEditorSheet: View {
             .onAppear {
                 captionText = section.moments.first?.caption ?? ""
                 loadInitialPlaceState()
+                photoGalleryVM.prepare(from: section)
                 isTextFieldFocused = true
             }
-            .sheet(isPresented: $showPhotoPicker) {
-                PhotoPickerView(selectedImages: $selectedImages, selectionLimit: 10)
-                    .onDisappear {
-                        if !selectedImages.isEmpty {
-                            onAddPhotos?(selectedImages)
-                            selectedImages = []
+            .fullScreenCover(isPresented: $showSystemGallery) {
+                PhotoPickerView(
+                    selectedImages: .constant([]),
+                    selectionLimit: 0,
+                    onFinish: { results in
+                        showSystemGallery = false
+                        Task {
+                            await photoGalleryVM.incorporatePickerResults(results)
                         }
                     }
+                )
+                .ignoresSafeArea()
             }
             .sheet(isPresented: $showMapTapPOIDisambiguation) {
                 poiDisambiguationSheet
@@ -399,14 +424,14 @@ struct CaptionEditorSheet: View {
                 
                 Spacer()
                 
-                Text("\(section.moments.count)")
+                Text("\(photoGalleryVM.selectedCount)")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(BabyTownTheme.accent)
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(section.moments) { moment in
+                    ForEach(photoGalleryVM.previewMoments(from: section)) { moment in
                         photoThumbnail(moment)
                     }
                     
@@ -425,9 +450,12 @@ struct CaptionEditorSheet: View {
                 .frame(width: 80, height: 80)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             
-            if section.moments.count > 1 {
+            if photoGalleryVM.selectedCount > 1 {
                 Button {
-                    onRemovePhoto?(moment.id)
+                    if section.moments.contains(where: { $0.id == moment.id }) {
+                        onRemovePhoto?(moment.id)
+                    }
+                    photoGalleryVM.removeMomentFromEditingSelection(moment)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
@@ -444,9 +472,161 @@ struct CaptionEditorSheet: View {
         }
     }
     
+    // MARK: - Memory photo gallery
+
+    private var memoryPhotoGalleryView: some View {
+        VStack(spacing: 0) {
+            Group {
+                if photoGalleryVM.authorizationStatus == .denied
+                    || photoGalleryVM.authorizationStatus == .restricted {
+                    photoGalleryDeniedState
+                } else if photoGalleryVM.isLoading {
+                    photoGalleryLoadingState
+                } else if photoGalleryVM.assets.isEmpty && photoGalleryVM.orphanMoments.isEmpty {
+                    photoGalleryEmptyState
+                } else {
+                    memoryPhotoGalleryGrid
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            memoryPhotoGalleryBottomBar
+        }
+        .task(id: isEditingPhotos) {
+            guard isEditingPhotos else { return }
+            await photoGalleryVM.checkAuthorizationAndLoad(for: section)
+        }
+    }
+
+    private var memoryPhotoGalleryGrid: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVGrid(columns: photoGalleryColumns, spacing: 2) {
+                ForEach(photoGalleryVM.orphanMoments) { moment in
+                    PhotoGridCell(
+                        thumbnail: moment.thumbnail,
+                        isSelected: photoGalleryVM.selectedOrphanMomentIds.contains(moment.id),
+                        selectionMode: false,
+                        memoryEditStyle: true
+                    ) {
+                        photoGalleryVM.toggleOrphanMoment(moment)
+                    }
+                }
+
+                ForEach(photoGalleryVM.assets, id: \.localIdentifier) { asset in
+                    PhotoGridCell(
+                        thumbnail: photoGalleryVM.thumbnails[asset.localIdentifier],
+                        isSelected: photoGalleryVM.selectedAssetIds.contains(asset.localIdentifier),
+                        selectionMode: false,
+                        memoryEditStyle: true
+                    ) {
+                        photoGalleryVM.toggleSelection(asset)
+                    }
+                    .onAppear {
+                        photoGalleryVM.loadThumbnail(for: asset)
+                    }
+                }
+            }
+            .padding(2)
+            .padding(.bottom, 16)
+        }
+    }
+
+    private var memoryPhotoGalleryBottomBar: some View {
+        Button {
+            showSystemGallery = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("Open Gallery")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                Capsule()
+                    .fill(BabyTownTheme.accentGradient)
+                    .shadow(color: BabyTownTheme.accent.opacity(0.35), radius: 12, y: 6)
+            )
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .safeAreaPadding(.bottom, 12)
+        .background {
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private var photoGalleryLoadingState: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+                .tint(BabyTownTheme.accent)
+            Text("Loading photos…")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .padding(.top, 10)
+            Spacer()
+        }
+    }
+
+    private var photoGalleryEmptyState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "photo.on.rectangle")
+                .font(.system(size: 38, weight: .thin))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.3))
+            Text("No nearby photos found")
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+            Text("Use Open Gallery to add more")
+                .font(.system(size: 13))
+                .foregroundStyle(.tertiary)
+            Spacer()
+        }
+    }
+
+    private var photoGalleryDeniedState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "lock.shield")
+                .font(.system(size: 38, weight: .thin))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
+            Text("Photo Access Needed")
+                .font(.system(size: 17, weight: .medium))
+            Text("Allow photo access in Settings to browse photos for this memory.")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                Text("Open Settings")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(BabyTownTheme.accentGradient))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private func openMemoryPhotoGallery() {
+        isTextFieldFocused = false
+        isEditingPhotos = true
+    }
+
     private var addPhotoButton: some View {
         Button {
-            showPhotoPicker = true
+            openMemoryPhotoGallery()
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: "plus")
@@ -702,6 +882,7 @@ struct CaptionEditorSheet: View {
         syncUserSetPlaceFlagFromEdits()
         let trimmedPlace = PlaceNameFormatting.storedName(fromUserInput: editedPlaceName)
         let placeName = trimmedPlace.isEmpty ? nil : trimmedPlace
+        onSyncMemoryPhotos?(photoGalleryVM.selectedAssetIds, photoGalleryVM.selectedOrphanMomentIds)
         onSave(firstMoment.id, captionText, placeName, editedLatitude, editedLongitude, isPlaceNameUserSet)
         dismiss()
     }

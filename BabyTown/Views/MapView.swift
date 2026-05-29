@@ -8,11 +8,12 @@ struct POISelection: Identifiable {
 }
 
 struct MapView: View {
+
     @ObservedObject var viewModel: HomeViewModel
     let onOpenMemory: (DaySection) -> Void
     let onDismiss: () -> Void
     let onScanPhotos: () -> Void
-    
+
     @State private var selectedYear: Int
     @State private var availableYears: [Int] = []
     @State private var region: MKCoordinateRegion
@@ -22,7 +23,8 @@ struct MapView: View {
     @State private var searchText = ""
     @State private var isSearchActive = false
     @State private var selectedCountry: String?
-    
+    @FocusState private var isSearchFocused: Bool
+
     init(
         viewModel: HomeViewModel,
         onOpenMemory: @escaping (DaySection) -> Void,
@@ -33,20 +35,56 @@ struct MapView: View {
         self.onOpenMemory = onOpenMemory
         self.onDismiss = onDismiss
         self.onScanPhotos = onScanPhotos
-        
-        // Initialize with "All" (0)
         _selectedYear = State(initialValue: 0)
-        
-        // Initialize with default region
         _region = State(initialValue: MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
             span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
         ))
     }
-    
+
+    private var filteredSections: [DaySection] {
+        MapPlacesFiltering.sections(
+            from: viewModel,
+            selectedYear: selectedYear,
+            selectedCountry: selectedCountry,
+            searchText: searchText
+        )
+    }
+
+    /// Located memories for search, newest first.
+    private var searchResultSections: [DaySection] {
+        filteredSections.sorted { lhs, rhs in
+            let lhsDate = lhs.moments.map(\.dateTaken).max() ?? lhs.date
+            let rhsDate = rhs.moments.map(\.dateTaken).max() ?? rhs.date
+            return lhsDate > rhsDate
+        }
+    }
+
     var body: some View {
         ZStack {
-            // New Map Component
+            if isSearchActive {
+                mapSearchResultsView
+                    .transition(.opacity)
+            } else {
+                mapContentView
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isSearchActive)
+        .onAppear {
+            setupMapData()
+            showEmptyStatePrompt = true
+            viewModel.backfillCountriesIfNeeded()
+        }
+        .sheet(item: $poiSelection) { selection in
+            POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
+        }
+    }
+
+    // MARK: - Map (original full-screen experience)
+
+    private var mapContentView: some View {
+        ZStack {
             MemoryMapView(
                 region: $region,
                 annotations: annotations,
@@ -58,35 +96,23 @@ struct MapView: View {
                 }
             )
             .ignoresSafeArea()
-            
-            // Top controls (map visible behind)
+
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     Button {
                         onDismiss()
                     } label: {
-                        ZStack {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 44, height: 44)
-                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                        }
+                        mapCircleIcon("chevron.left", filled: false)
                     }
 
                     Spacer()
 
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { isSearchActive.toggle() }
-                        if !isSearchActive {
-                            searchText = ""
-                            updateAnnotations()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSearchActive = true
                         }
                     } label: {
-                        mapCircleIcon(isSearchActive ? "xmark" : "magnifyingglass", filled: isSearchActive)
+                        mapCircleIcon("magnifyingglass", filled: false)
                     }
 
                     Menu {
@@ -104,42 +130,12 @@ struct MapView: View {
                         }
                     } label: {
                         mapCircleIcon(
-                            selectedCountry == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill",
+                            selectedCountry == nil
+                                ? "line.3.horizontal.decrease.circle"
+                                : "line.3.horizontal.decrease.circle.fill",
                             filled: selectedCountry != nil
                         )
                     }
-                }
-
-                if isSearchActive {
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.black.opacity(0.5))
-                        TextField(
-                            "",
-                            text: $searchText,
-                            prompt: Text("Search place, country, or date")
-                                .foregroundColor(.black.opacity(0.4))
-                        )
-                        .foregroundStyle(.black)
-                            .autocorrectionDisabled()
-                            .onChange(of: searchText) { _, _ in updateAnnotations() }
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                                updateAnnotations()
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.black.opacity(0.3))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.white)
-                            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-                    )
                 }
 
                 if !availableYears.isEmpty {
@@ -177,31 +173,144 @@ struct MapView: View {
                 .allowsHitTesting(false)
                 .ignoresSafeArea()
             )
-            
-            // Empty state
+
             if annotations.isEmpty && showEmptyStatePrompt {
                 MapEmptyStateView(
                     selectedYear: selectedYear,
-                    onScanPhotos: {
-                        onScanPhotos()
-                    },
-                    onDismiss: {
-                        showEmptyStatePrompt = false
-                    }
+                    onScanPhotos: onScanPhotos,
+                    onDismiss: { showEmptyStatePrompt = false }
                 )
             }
-            
-        }
-        .onAppear {
-            setupMapData()
-            showEmptyStatePrompt = true
-            viewModel.backfillCountriesIfNeeded()
-        }
-        .sheet(item: $poiSelection) { selection in
-            POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
         }
     }
-    
+
+    // MARK: - Search results (gray list)
+
+    private var mapSearchResultsView: some View {
+        VStack(spacing: 0) {
+            mapSearchTopBar
+
+            ScrollView(showsIndicators: false) {
+                if searchResultSections.isEmpty {
+                    mapSearchEmptyState
+                        .padding(.top, 48)
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(searchResultSections) { section in
+                            MapPlaceMemoryCard(section: section) {
+                                onOpenMemory(section)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGray6).ignoresSafeArea())
+        .onAppear {
+            DispatchQueue.main.async {
+                isSearchFocused = true
+            }
+        }
+    }
+
+    private var mapSearchTopBar: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Button {
+                    closeSearch()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(BabyTownTheme.textSecondary)
+
+                TextField(
+                    "",
+                    text: $searchText,
+                    prompt: Text("Search place, country, or date")
+                        .foregroundStyle(BabyTownTheme.textTertiary)
+                )
+                .font(.system(size: 16))
+                .foregroundStyle(BabyTownTheme.textPrimary)
+                .autocorrectionDisabled()
+                .focused($isSearchFocused)
+                .onChange(of: searchText) { _, _ in
+                    updateAnnotations()
+                }
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                        updateAnnotations()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(BabyTownTheme.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .padding(.horizontal, 16)
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(Color(.systemGray6))
+    }
+
+    private var mapSearchEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "mappin.and.ellipse")
+                .font(.system(size: 40))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.35))
+
+            Text(searchText.isEmpty ? "No places yet" : "No matches")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(BabyTownTheme.textPrimary)
+
+            Text(
+                searchText.isEmpty
+                    ? "Add location to your memories to see them here."
+                    : "Try a different search term or clear filters on the map."
+            )
+            .font(.system(size: 14))
+            .foregroundStyle(BabyTownTheme.textSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Helpers
+
+    private func closeSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isSearchActive = false
+            isSearchFocused = false
+            searchText = ""
+            updateAnnotations()
+        }
+    }
+
     private func mapCircleIcon(_ systemName: String, filled: Bool) -> some View {
         ZStack {
             Circle()
@@ -216,70 +325,34 @@ struct MapView: View {
     }
 
     private func setupMapData() {
-        // Get available years and add "All"
         var years = viewModel.availableYears()
         if !years.isEmpty {
             years.insert(0, at: 0)
         }
         availableYears = years
-        
-        // Update annotations and center map
         updateAnnotations()
         centerMapOnMemories()
     }
-    
+
     private func updateAnnotations() {
-        let base: [DaySection]
-        if selectedYear == 0 {
-            base = viewModel.memoriesWithLocation()
-        } else {
-            base = viewModel.memories(forYear: selectedYear)
-        }
-
-        let filtered = base.filter { section in
-            matchesCountry(section) && matchesSearch(section)
-        }
-        annotations = filtered.map { MemoryMapAnnotation(section: $0) }
+        annotations = filteredSections.map { MemoryMapAnnotation(section: $0) }
     }
 
-    private func matchesCountry(_ section: DaySection) -> Bool {
-        guard let selectedCountry else { return true }
-        return section.moments.contains { $0.country == selectedCountry }
-    }
-
-    private func matchesSearch(_ section: DaySection) -> Bool {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return true }
-        let place = section.placeDisplay.lowercased()
-        let country = section.moments.compactMap { $0.country }.joined(separator: " ").lowercased()
-        let date = section.timeDisplay.lowercased()
-        return place.contains(query) || country.contains(query) || date.contains(query)
-    }
-    
     private func centerMapOnMemories() {
         guard !annotations.isEmpty else { return }
-        
-        let coordinates = annotations.map { $0.coordinate }
-        
-        let minLat = coordinates.map { $0.latitude }.min() ?? 0
-        let maxLat = coordinates.map { $0.latitude }.max() ?? 0
-        let minLon = coordinates.map { $0.longitude }.min() ?? 0
-        let maxLon = coordinates.map { $0.longitude }.max() ?? 0
-        
+
+        let coordinates = annotations.map(\.coordinate)
+        let minLat = coordinates.map(\.latitude).min() ?? 0
+        let maxLat = coordinates.map(\.latitude).max() ?? 0
+        let minLon = coordinates.map(\.longitude).min() ?? 0
+        let maxLon = coordinates.map(\.longitude).max() ?? 0
+
         let centerLat = (minLat + maxLat) / 2
         let centerLon = (minLon + maxLon) / 2
-        
-        let spanLat = (maxLat - minLat) * 1.5
-        let spanLon = (maxLon - minLon) * 1.5
-        
-        let finalSpanLat = max(spanLat, 0.05)
-        let finalSpanLon = max(spanLon, 0.05)
-        
-        // For "All" view, maybe use a slightly larger padding if there are many memories
         let padding = selectedYear == 0 ? 2.0 : 1.5
-        let paddedSpanLat = max(spanLat * padding, 0.05)
-        let paddedSpanLon = max(spanLon * padding, 0.05)
-        
+        let paddedSpanLat = max((maxLat - minLat) * padding, 0.05)
+        let paddedSpanLon = max((maxLon - minLon) * padding, 0.05)
+
         withAnimation(.easeInOut(duration: 0.5)) {
             region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
@@ -287,14 +360,13 @@ struct MapView: View {
             )
         }
     }
-
 }
 
 #Preview {
-    let viewModel = HomeViewModel.filledPreview
-    return MapView(viewModel: viewModel, onOpenMemory: { _ in }, onDismiss: {
-        print("Dismiss")
-    }, onScanPhotos: {
-        print("Scan photos")
-    })
+    MapView(
+        viewModel: HomeViewModel.filledPreview,
+        onOpenMemory: { _ in },
+        onDismiss: {},
+        onScanPhotos: {}
+    )
 }

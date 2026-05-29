@@ -523,6 +523,87 @@ final class HomeViewModel: ObservableObject {
             promptMemories[index].loveNote = loveNote
         }
     }
+
+    func updatePromptMemory(
+        memoryId: UUID,
+        primaryPhotoId _: UUID,
+        loveNote: String,
+        placeName: String?,
+        latitude: Double?,
+        longitude: Double?,
+        isPlaceNameUserSet: Bool = false
+    ) {
+        guard let index = promptMemories.firstIndex(where: { $0.id == memoryId }) else { return }
+        promptMemories[index].loveNote = loveNote
+        promptMemories[index].placeName = placeName
+        promptMemories[index].latitude = latitude
+        promptMemories[index].longitude = longitude
+        promptMemories[index].isPlaceNameUserSet = isPlaceNameUserSet
+    }
+
+    func addPhotosToPromptMemory(memoryId: UUID, images: [UIImage]) {
+        guard let index = promptMemories.firstIndex(where: { $0.id == memoryId }) else { return }
+        let memory = promptMemories[index]
+        let newPhotos = images.map { image in
+            PromptPhoto(
+                dateTaken: memory.date,
+                thumbnail: image,
+                latitude: memory.latitude,
+                longitude: memory.longitude
+            )
+        }
+        promptMemories[index].photos.append(contentsOf: newPhotos)
+    }
+
+    func removePhotoFromPromptMemory(memoryId: UUID, photoId: UUID) {
+        guard let index = promptMemories.firstIndex(where: { $0.id == memoryId }) else { return }
+        guard promptMemories[index].photos.count > 1 else { return }
+        promptMemories[index].photos.removeAll { $0.id == photoId }
+    }
+
+    func syncPromptMemoryPhotos(
+        memoryId: UUID,
+        selectedAssetIds: Set<String>,
+        selectedOrphanMomentIds: Set<UUID>
+    ) async {
+        guard let index = promptMemories.firstIndex(where: { $0.id == memoryId }) else { return }
+        let memory = promptMemories[index]
+        let existingAssetIds = Set(memory.photos.compactMap(\.assetIdentifier))
+
+        var photos = memory.photos.filter { photo in
+            if let assetId = photo.assetIdentifier {
+                return selectedAssetIds.contains(assetId)
+            }
+            return selectedOrphanMomentIds.contains(photo.id)
+        }
+
+        let assetIdsToAdd = selectedAssetIds.subtracting(existingAssetIds)
+        if !assetIdsToAdd.isEmpty {
+            var assets: [PHAsset] = []
+            for id in assetIdsToAdd {
+                let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                if let asset = fetched.firstObject {
+                    assets.append(asset)
+                }
+            }
+
+            let created = await MomentFactory().createMoments(from: assets)
+            for moment in created {
+                photos.append(
+                    PromptPhoto(
+                        dateTaken: moment.dateTaken,
+                        thumbnail: moment.thumbnail,
+                        assetIdentifier: moment.assetIdentifier,
+                        latitude: moment.latitude ?? memory.latitude,
+                        longitude: moment.longitude ?? memory.longitude
+                    )
+                )
+            }
+        }
+
+        photos.sort { $0.dateTaken < $1.dateTaken }
+        promptMemories[index].photos = photos
+    }
     
     func togglePromptMemoryPin(_ memory: PromptMemory) {
         if let index = promptMemories.firstIndex(where: { $0.id == memory.id }) {
@@ -586,6 +667,51 @@ final class HomeViewModel: ObservableObject {
         }
         
         addMoments(newMoments)
+    }
+
+    func syncMemoryPhotos(
+        section: DaySection,
+        selectedAssetIds: Set<String>,
+        selectedOrphanMomentIds: Set<UUID>
+    ) async {
+        guard let firstMoment = section.moments.first else { return }
+
+        let existingAssetIds = Set(section.moments.compactMap(\.assetIdentifier))
+
+        for moment in section.moments {
+            if let assetId = moment.assetIdentifier {
+                if !selectedAssetIds.contains(assetId) {
+                    moments.removeAll { $0.id == moment.id }
+                }
+            } else if !selectedOrphanMomentIds.contains(moment.id) {
+                moments.removeAll { $0.id == moment.id }
+            }
+        }
+
+        let assetIdsToAdd = selectedAssetIds.subtracting(existingAssetIds)
+        guard !assetIdsToAdd.isEmpty else { return }
+
+        var assets: [PHAsset] = []
+        for id in assetIdsToAdd {
+            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+            if let asset = fetched.firstObject {
+                assets.append(asset)
+            }
+        }
+
+        let created = await MomentFactory().createMoments(from: assets)
+        let enriched = created.map { moment -> Moment in
+            var copy = moment
+            copy.placeName = firstMoment.placeName
+            copy.caption = firstMoment.caption
+            copy.voiceNotePath = firstMoment.voiceNotePath
+            copy.promptText = firstMoment.promptText
+            copy.isPlaceNameUserSet = firstMoment.isPlaceNameUserSet
+            if copy.latitude == nil { copy.latitude = firstMoment.latitude }
+            if copy.longitude == nil { copy.longitude = firstMoment.longitude }
+            return copy
+        }
+        addMoments(enriched)
     }
     
     func removePhotoFromMemory(section: DaySection, momentId: UUID) {
@@ -913,7 +1039,11 @@ final class HomeViewModel: ObservableObject {
             let seasonGroups = seasons.map { season, seasonSections in
                 SeasonGroup(season: season, sections: seasonSections.sorted { $0.date > $1.date })
             }
-            .sorted { $0.season > $1.season }
+            .sorted { lhs, rhs in
+                let lhsNewest = lhs.sections.map(\.date).max() ?? .distantPast
+                let rhsNewest = rhs.sections.map(\.date).max() ?? .distantPast
+                return lhsNewest > rhsNewest
+            }
 
             return YearGroup(id: year, seasons: seasonGroups)
         }

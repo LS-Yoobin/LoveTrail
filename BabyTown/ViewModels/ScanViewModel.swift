@@ -5,6 +5,7 @@ import Combine
 @MainActor
 class ScanViewModel: ObservableObject {
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    @Published var selectedMonth: Int = Calendar.current.component(.month, from: Date())
     @Published var potentialCards: [PotentialMemoryCard] = []
     @Published var isScanning: Bool = false
     @Published var scanProgress: Double = 0.0
@@ -12,6 +13,19 @@ class ScanViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     var existingAssetIdentifiers: Set<String> = []
+
+    var availableMonths: [Int] {
+        let calendar = Calendar.current
+        let months = Set(potentialCards.map { calendar.component(.month, from: $0.dateRange.start) })
+        return months.sorted()
+    }
+
+    var filteredPotentialCards: [PotentialMemoryCard] {
+        let calendar = Calendar.current
+        return potentialCards.filter {
+            calendar.component(.month, from: $0.dateRange.start) == selectedMonth
+        }
+    }
     
     private let photoScanService = PhotoScanService()
     private let clusteringService = PhotoClusteringService()
@@ -51,9 +65,17 @@ class ScanViewModel: ObservableObject {
         }
 
         sortPotentialCardsChronologically()
+        syncSelectedMonthAfterScan()
         
         scanProgress = 1.0
         isScanning = false
+    }
+
+    private func syncSelectedMonthAfterScan() {
+        let months = availableMonths
+        guard !months.isEmpty else { return }
+        if months.contains(selectedMonth) { return }
+        selectedMonth = months.last ?? selectedMonth
     }
     
     private func processCluster(_ cluster: PhotoCluster) async -> PotentialMemoryCard {

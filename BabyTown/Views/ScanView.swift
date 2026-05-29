@@ -4,6 +4,10 @@ import Photos
 struct ScanView: View {
     @StateObject private var viewModel = ScanViewModel()
     @Environment(\.dismiss) private var dismiss
+
+    private let monthSymbols = Calendar.current.shortMonthSymbols
+    private let monthFilterBarHeight: CGFloat = 52
+    private let monthFilterListSpacing: CGFloat = 16
     
     let existingAssetIdentifiers: Set<String>
     let onMemoriesAdded: ([Moment]) -> Void
@@ -209,18 +213,90 @@ struct ScanView: View {
     }
     
     private var resultsListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.potentialCards) { card in
-                    PotentialMemoryCardView(card: card) {
-                        Task {
-                            let moments = await viewModel.addCardToHome(card)
-                            onMemoriesAdded(moments)
+        ZStack(alignment: .top) {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.filteredPotentialCards) { card in
+                        PotentialMemoryCardView(card: card) {
+                            Task {
+                                let moments = await viewModel.addCardToHome(card)
+                                onMemoriesAdded(moments)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .padding(.top, monthFilterBarHeight + monthFilterListSpacing)
             }
-            .padding(16)
+
+            monthFilterBar
         }
+    }
+
+    private var monthFilterBar: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(viewModel.availableMonths, id: \.self) { month in
+                        monthChipButton(
+                            label: monthSymbols[month - 1],
+                            isActive: viewModel.selectedMonth == month
+                        ) {
+                            viewModel.selectedMonth = month
+                        }
+                        .id(month)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .frame(height: monthFilterBarHeight)
+            .background(
+                LinearGradient(
+                    colors: [
+                        BabyTownTheme.background,
+                        BabyTownTheme.background.opacity(0.92),
+                        BabyTownTheme.background.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+            )
+            .onAppear {
+                proxy.scrollTo(viewModel.selectedMonth, anchor: .center)
+            }
+            .onChange(of: viewModel.selectedMonth) { _, month in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(month, anchor: .center)
+                }
+            }
+            .onChange(of: viewModel.availableMonths) { _, _ in
+                proxy.scrollTo(viewModel.selectedMonth, anchor: .center)
+            }
+        }
+    }
+
+    private func monthChipButton(
+        label: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                .foregroundStyle(isActive ? .white : BabyTownTheme.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(
+                            isActive
+                                ? AnyShapeStyle(BabyTownTheme.accentGradient)
+                                : AnyShapeStyle(BabyTownTheme.accentSoft)
+                        )
+                )
+        }
+        .animation(.easeInOut(duration: 0.2), value: isActive)
     }
 }

@@ -75,6 +75,11 @@ struct DaySection: Identifiable {
                 moments: dayMoments.sorted { $0.dateTaken < $1.dateTaken }
             )
         }
-        .sorted { $0.date > $1.date }
+        .sorted { lhs, rhs in
+            if lhs.date != rhs.date {
+                return lhs.date > rhs.date
+            }
+            return lhs.id < rhs.id
+        }
     }
 }

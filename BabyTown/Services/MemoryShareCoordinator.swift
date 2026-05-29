@@ -12,8 +12,8 @@ final class MemoryShareCoordinator: ObservableObject {
     func share(_ payload: MemorySharePayload) {
         guard !isGenerating else { return }
 
-        let unlocked = payload.unlockedPhotoSources
-        guard !unlocked.isEmpty else {
+        let sources = shareablePhotoSources(from: payload)
+        guard !sources.isEmpty else {
             errorMessage = "This memory has no photos available to share."
             showError = true
             return
@@ -22,7 +22,7 @@ final class MemoryShareCoordinator: ObservableObject {
         isGenerating = true
 
         Task {
-            let sources = Array(unlocked.prefix(MemorySharePhotoCollage.maxPhotos))
+            let sources = Array(sources.prefix(MemorySharePhotoCollage.maxPhotos))
             let images = await MemoryShareImageLoader.loadImages(for: sources)
             guard !images.isEmpty else {
                 isGenerating = false
@@ -41,6 +41,13 @@ final class MemoryShareCoordinator: ObservableObject {
             isGenerating = false
             ActivitySharePresenter.present(image: rendered)
         }
+    }
+
+    /// Prefer unlocked photos; fall back to stored thumbnails (e.g. locked prompt-camera shots).
+    private func shareablePhotoSources(from payload: MemorySharePayload) -> [MemorySharePhotoSource] {
+        let unlocked = payload.unlockedPhotoSources
+        if !unlocked.isEmpty { return unlocked }
+        return payload.photoSources
     }
 }
 

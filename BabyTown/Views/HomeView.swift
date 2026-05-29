@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var showCameraFullScreen = false
     @State private var showSettings = false
     @State private var memorySearchText = ""
+    @State private var cachedMemorySearchRows: [MemorySearchRow] = []
     @FocusState private var isMemorySearchFocused: Bool
     @State private var isSearchBarPinned = false
     @State private var firstMetPickerItem: PhotosPickerItem?
@@ -191,11 +192,23 @@ struct HomeView: View {
                                 isSearchBarPinned = false
                             }
                         }
-                        .onChange(of: memorySearchText) { _, _ in
+                        .onChange(of: memorySearchText, initial: true) { _, _ in
+                            rebuildMemorySearchRowsCache()
                             if isMemorySearchActive {
                                 isSearchBarPinned = true
                             } else if !isMemorySearchFocused {
                                 isSearchBarPinned = false
+                                cachedMemorySearchRows = []
+                            }
+                        }
+                        .onChange(of: viewModel.moments.count) { _, _ in
+                            if isMemorySearchActive {
+                                rebuildMemorySearchRowsCache()
+                            }
+                        }
+                        .onChange(of: viewModel.promptMemories.count) { _, _ in
+                            if isMemorySearchActive {
+                                rebuildMemorySearchRowsCache()
                             }
                         }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -532,8 +545,12 @@ struct HomeView: View {
     }
     
     private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
-        scrollOffset = topOffset
         showUpButton = topOffset > 100
+
+        // Avoid re-rendering search results on every scroll frame (causes card recycling glitches).
+        if !isMemorySearchActive {
+            scrollOffset = topOffset
+        }
 
         guard !isUsingMemorySearch else {
             peakPullOffset = 0
@@ -603,7 +620,54 @@ struct HomeView: View {
     private var memorySearchFilteredPrompts: [PromptMemory] {
         viewModel.promptMemories
             .filter { MemorySearchMatcher.matches(promptMemory: $0, query: memorySearchText) }
-            .sorted { $0.date > $1.date }
+            .sorted { lhs, rhs in
+                if lhs.date != rhs.date {
+                    return lhs.date > rhs.date
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+    }
+
+    private enum MemorySearchItem {
+        case daySection(DaySection)
+        case promptMemory(PromptMemory)
+    }
+
+    private struct MemorySearchRow: Identifiable {
+        let id: String
+        let item: MemorySearchItem
+        let displayIndex: Int
+    }
+
+    private func rebuildMemorySearchRowsCache() {
+        guard isMemorySearchActive else {
+            cachedMemorySearchRows = []
+            return
+        }
+
+        let sections = memorySearchFilteredSections
+        let prompts = memorySearchFilteredPrompts
+        var rows: [MemorySearchRow] = []
+        rows.reserveCapacity(sections.count + prompts.count)
+
+        for (displayIndex, section) in sections.enumerated() {
+            rows.append(MemorySearchRow(
+                id: "day-\(section.id)",
+                item: .daySection(section),
+                displayIndex: displayIndex
+            ))
+        }
+
+        let promptOffset = sections.count
+        for (index, memory) in prompts.enumerated() {
+            rows.append(MemorySearchRow(
+                id: "prompt-\(memory.id.uuidString)",
+                item: .promptMemory(memory),
+                displayIndex: promptOffset + index
+            ))
+        }
+
+        cachedMemorySearchRows = rows
     }
 
     private var memorySearchBarPlaceholder: some View {
@@ -686,10 +750,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var inlineMemorySearchResults: some View {
-        let sections = memorySearchFilteredSections
-        let prompts = memorySearchFilteredPrompts
+        let rows = cachedMemorySearchRows
 
-        if sections.isEmpty && prompts.isEmpty {
+        if rows.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 36))
@@ -715,91 +778,137 @@ struct HomeView: View {
             .padding(.top, 40)
             .padding(.horizontal, 32)
         } else {
-            VStack(spacing: 20) {
-                ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-                    DayClusterCard(
-                        section: section,
-                        onOpenPhoto: { moment, allMoments in
-                            viewerMoments = allMoments
-                            if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                viewerInitialIndex = idx
-                            }
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                showingMomentViewer = true
-                            }
-                        },
-                        onEditCaption: { momentId, caption, voiceNotePath in
-                            viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
-                        },
-                        onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
-                            viewModel.updateMemory(
-                                section: section,
-                                primaryMomentId: momentId,
-                                caption: caption,
-                                placeName: placeName,
-                                latitude: latitude,
-                                longitude: longitude,
-                                isPlaceNameUserSet: isPlaceNameUserSet
-                            )
-                        },
-                        onRemove: { section in
-                            withAnimation { viewModel.removeMoments(from: section) }
-                        },
-                        onTogglePin: { section in
-                            withAnimation { viewModel.togglePin(for: section) }
-                        },
-                        onAddPhotos: { section, images in
-                            viewModel.addPhotosToMemory(section: section, images: images)
-                        },
-                        onRemovePhoto: { section, momentId in
-                            viewModel.removePhotoFromMemory(section: section, momentId: momentId)
-                        },
-                        onShare: shareMemory,
-                        isLeftAligned: index.isMultiple(of: 2),
-                        index: index
-                    )
-                    .padding(.horizontal, 20)
-                }
+            // VStack (not LazyVStack): already inside ScrollView; lazy nesting causes identity glitches.
+            VStack(spacing: 24) {
+                ForEach(rows) { row in
+                    let index = row.displayIndex
 
-                ForEach(Array(prompts.enumerated()), id: \.element.id) { index, memory in
-                    let cardIndex = sections.count + index
-                    PromptMemoryCard(
-                        memory: memory,
-                        onTap: {},
-                        onOpenPhoto: { photo, allPhotos in
-                            if let photoIndex = allPhotos.firstIndex(where: { $0.id == photo.id }) {
-                                viewerPromptPhotos = allPhotos
-                                viewerPromptPhotoIndex = photoIndex
-                                viewerPromptText = memory.promptText
-                                withAnimation(.easeIn(duration: 0.25)) {
-                                    showingPromptPhotoViewer = true
+                    switch row.item {
+                    case .daySection(let section):
+                        DayClusterCard(
+                            section: section,
+                            onOpenPhoto: { moment, allMoments in
+                                viewerMoments = allMoments
+                                if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                    viewerInitialIndex = idx
                                 }
-                            }
-                        },
-                        onRemove: { memory in
-                            withAnimation { viewModel.removePromptMemory(memory) }
-                        },
-                        onEditLoveNote: { memoryId, newNote in
-                            viewModel.updatePromptMemoryLoveNote(for: memoryId, loveNote: newNote)
-                        },
-                        onTogglePin: { memory in
-                            withAnimation { viewModel.togglePromptMemoryPin(memory) }
-                        },
-                        onShare: shareMemory,
-                        isLeftAligned: cardIndex.isMultiple(of: 2),
-                        index: cardIndex
-                    )
-                    .padding(
-                        .leading,
-                        cardIndex.isMultiple(of: 2) ? 20 : 46
-                    )
-                    .padding(
-                        .trailing,
-                        cardIndex.isMultiple(of: 2) ? 46 : 20
-                    )
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    showingMomentViewer = true
+                                }
+                            },
+                            onEditCaption: { momentId, caption, voiceNotePath in
+                                viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                            },
+                            onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                                viewModel.updateMemory(
+                                    section: section,
+                                    primaryMomentId: momentId,
+                                    caption: caption,
+                                    placeName: placeName,
+                                    latitude: latitude,
+                                    longitude: longitude,
+                                    isPlaceNameUserSet: isPlaceNameUserSet
+                                )
+                            },
+                            onRemove: { section in
+                                withAnimation { viewModel.removeMoments(from: section) }
+                            },
+                            onTogglePin: { section in
+                                withAnimation { viewModel.togglePin(for: section) }
+                            },
+                            onAddPhotos: { section, images in
+                                viewModel.addPhotosToMemory(section: section, images: images)
+                            },
+                            onRemovePhoto: { section, momentId in
+                                viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                            },
+                            onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                                Task {
+                                    await viewModel.syncMemoryPhotos(
+                                        section: section,
+                                        selectedAssetIds: assetIds,
+                                        selectedOrphanMomentIds: orphanIds
+                                    )
+                                }
+                            },
+                            onShare: shareMemory,
+                            isLeftAligned: index.isMultiple(of: 2),
+                            index: index
+                        )
+                        .padding(
+                            .leading,
+                            index.isMultiple(of: 2) ? 20 : 46
+                        )
+                        .padding(
+                            .trailing,
+                            index.isMultiple(of: 2) ? 46 : 20
+                        )
+                        .id(row.id)
+
+                    case .promptMemory(let memory):
+                        PromptMemoryCard(
+                            memory: memory,
+                            onTap: {},
+                            onOpenPhoto: { photo, allPhotos in
+                                if let photoIndex = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                                    viewerPromptPhotos = allPhotos
+                                    viewerPromptPhotoIndex = photoIndex
+                                    viewerPromptText = memory.promptText
+                                    withAnimation(.easeIn(duration: 0.25)) {
+                                        showingPromptPhotoViewer = true
+                                    }
+                                }
+                            },
+                            onRemove: { memory in
+                                withAnimation { viewModel.removePromptMemory(memory) }
+                            },
+                            onEditMemory: { memoryId, photoId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                                viewModel.updatePromptMemory(
+                                    memoryId: memoryId,
+                                    primaryPhotoId: photoId,
+                                    loveNote: caption,
+                                    placeName: placeName,
+                                    latitude: latitude,
+                                    longitude: longitude,
+                                    isPlaceNameUserSet: isPlaceNameUserSet
+                                )
+                            },
+                            onAddPhotos: { memoryId, images in
+                                viewModel.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+                            },
+                            onRemovePhoto: { memoryId, photoId in
+                                viewModel.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+                            },
+                            onSyncMemoryPhotos: { memoryId, assetIds, orphanIds in
+                                Task {
+                                    await viewModel.syncPromptMemoryPhotos(
+                                        memoryId: memoryId,
+                                        selectedAssetIds: assetIds,
+                                        selectedOrphanMomentIds: orphanIds
+                                    )
+                                }
+                            },
+                            onTogglePin: { memory in
+                                withAnimation { viewModel.togglePromptMemoryPin(memory) }
+                            },
+                            onShare: shareMemory,
+                            isLeftAligned: index.isMultiple(of: 2),
+                            index: index
+                        )
+                        .padding(
+                            .leading,
+                            index.isMultiple(of: 2) ? 20 : 46
+                        )
+                        .padding(
+                            .trailing,
+                            index.isMultiple(of: 2) ? 46 : 20
+                        )
+                        .id(row.id)
+                    }
                 }
             }
             .padding(.top, 12)
+            .animation(nil, value: cachedMemorySearchRows.map(\.id))
         }
     }
 
@@ -980,6 +1089,15 @@ struct HomeView: View {
                                     onRemovePhoto: { section, momentId in
                                         viewModel.removePhotoFromMemory(section: section, momentId: momentId)
                                     },
+                                    onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                                        Task {
+                                            await viewModel.syncMemoryPhotos(
+                                                section: section,
+                                                selectedAssetIds: assetIds,
+                                                selectedOrphanMomentIds: orphanIds
+                                            )
+                                        }
+                                    },
                                     onShare: shareMemory,
                                     isLeftAligned: index.isMultiple(of: 2),
                                     index: index
@@ -1016,8 +1134,31 @@ struct HomeView: View {
                                         viewModel.removePromptMemory(memory)
                                     }
                                 },
-                                onEditLoveNote: { memoryId, newNote in
-                                    viewModel.updatePromptMemoryLoveNote(for: memoryId, loveNote: newNote)
+                                onEditMemory: { memoryId, photoId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                                    viewModel.updatePromptMemory(
+                                        memoryId: memoryId,
+                                        primaryPhotoId: photoId,
+                                        loveNote: caption,
+                                        placeName: placeName,
+                                        latitude: latitude,
+                                        longitude: longitude,
+                                        isPlaceNameUserSet: isPlaceNameUserSet
+                                    )
+                                },
+                                onAddPhotos: { memoryId, images in
+                                    viewModel.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+                                },
+                                onRemovePhoto: { memoryId, photoId in
+                                    viewModel.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+                                },
+                                onSyncMemoryPhotos: { memoryId, assetIds, orphanIds in
+                                    Task {
+                                        await viewModel.syncPromptMemoryPhotos(
+                                            memoryId: memoryId,
+                                            selectedAssetIds: assetIds,
+                                            selectedOrphanMomentIds: orphanIds
+                                        )
+                                    }
                                 },
                                 onTogglePin: { memory in
                                     withAnimation {
@@ -1122,6 +1263,15 @@ struct HomeView: View {
                                 },
                                 onRemovePhoto: { section, momentId in
                                     viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                                },
+                                onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                                    Task {
+                                        await viewModel.syncMemoryPhotos(
+                                            section: section,
+                                            selectedAssetIds: assetIds,
+                                            selectedOrphanMomentIds: orphanIds
+                                        )
+                                    }
                                 },
                                 onShare: shareMemory
                             )

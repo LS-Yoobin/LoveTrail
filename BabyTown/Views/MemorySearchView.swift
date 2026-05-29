@@ -19,12 +19,28 @@ struct MemorySearchView: View {
         if searchText.isEmpty {
             return []
         }
-        
+
         let filtered = allMoments.filter { moment in
             MemorySearchMatcher.matches(moment: moment, query: searchText)
         }
-        
+
         return DaySection.grouped(from: filtered)
+    }
+
+    private struct SearchResultRow: Identifiable {
+        let id: String
+        let section: DaySection
+        let displayIndex: Int
+    }
+
+    private var searchResultRows: [SearchResultRow] {
+        filteredSections.enumerated().map { index, section in
+            SearchResultRow(
+                id: "day-\(section.id)",
+                section: section,
+                displayIndex: index
+            )
+        }
     }
     
     var body: some View {
@@ -103,10 +119,11 @@ struct MemorySearchView: View {
     
     private var searchResults: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
-                ForEach(filteredSections) { section in
+            VStack(spacing: 24) {
+                ForEach(searchResultRows) { row in
+                    let index = row.displayIndex
                     DayClusterCard(
-                        section: section,
+                        section: row.section,
                         onOpenPhoto: onOpenPhoto,
                         onEditCaption: onEditCaption,
                         onEditMemory: onEditMemory,
@@ -119,13 +136,23 @@ struct MemorySearchView: View {
                                 shareCoordinator.share(payload)
                             }
                         },
-                        isLeftAligned: true
+                        isLeftAligned: index.isMultiple(of: 2),
+                        index: index
                     )
-                    .padding(.horizontal, 20)
+                    .padding(
+                        .leading,
+                        index.isMultiple(of: 2) ? 20 : 46
+                    )
+                    .padding(
+                        .trailing,
+                        index.isMultiple(of: 2) ? 46 : 20
+                    )
+                    .id(row.id)
                 }
             }
             .padding(.vertical, 12)
             .padding(.bottom, 40)
+            .animation(nil, value: searchResultRows.map(\.id))
         }
     }
     
