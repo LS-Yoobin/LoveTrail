@@ -19,15 +19,17 @@ struct MemoryMapView: UIViewRepresentable {
 
         // Enable clustering
         mapView.register(
+            MemoryPhotoMarkerView.self,
+            forAnnotationViewWithReuseIdentifier: "MemoryPin"
+        )
+        mapView.register(
             MemoryMapMarkerAnnotationView.self,
-            forAnnotationViewWithReuseIdentifier: MKMapViewDefaultAnnotationViewReuseIdentifier
+            forAnnotationViewWithReuseIdentifier: "MemoryCluster"
         )
         mapView.register(
             MemoryMapMarkerAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier
         )
-        mapView.register(MemoryMapMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "MemoryPin")
-        mapView.register(MemoryMapMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "MemoryCluster")
         
         return mapView
     }
@@ -65,18 +67,24 @@ struct MemoryMapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            let isCluster = annotation is MKClusterAnnotation
-            guard isCluster || annotation is MemoryMapAnnotation else { return nil }
-
-            let identifier = isCluster ? "MemoryCluster" : "MemoryPin"
-            let view = mapView.dequeueReusableAnnotationView(
-                withIdentifier: identifier,
-                for: annotation
-            ) as? MemoryMapMarkerAnnotationView
-                ?? MemoryMapMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-
-            view.annotation = annotation
-            return view
+            if annotation is MKClusterAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(
+                    withIdentifier: "MemoryCluster",
+                    for: annotation
+                ) as? MemoryMapMarkerAnnotationView
+                    ?? MemoryMapMarkerAnnotationView(annotation: annotation, reuseIdentifier: "MemoryCluster")
+                view.annotation = annotation
+                return view
+            } else if annotation is MemoryMapAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(
+                    withIdentifier: "MemoryPin",
+                    for: annotation
+                ) as? MemoryPhotoMarkerView
+                    ?? MemoryPhotoMarkerView(annotation: annotation, reuseIdentifier: "MemoryPin")
+                view.annotation = annotation
+                return view
+            }
+            return nil
         }
         
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
