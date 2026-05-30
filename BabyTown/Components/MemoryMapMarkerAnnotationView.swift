@@ -76,13 +76,11 @@ final class MemoryMapMarkerAnnotationView: MKMarkerAnnotationView {
         titleVisibility = .hidden
         subtitleVisibility = .hidden
 
-        if let cluster = annotation as? MKClusterAnnotation {
+        if let cluster = annotation as? MemoryClusterAnnotation {
             placeNamePill.isHidden = true
-            clusteringIdentifier = "memoryCluster"
             glyphImage = nil
-            glyphText = "\(cluster.memberAnnotations.count)"
+            glyphText = "\(cluster.count)"
         } else if let memory = annotation as? MemoryMapAnnotation {
-            clusteringIdentifier = "memoryCluster"
             glyphText = nil
             let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
             glyphImage = UIImage(systemName: "heart.fill", withConfiguration: config)

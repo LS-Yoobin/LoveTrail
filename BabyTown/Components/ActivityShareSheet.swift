@@ -48,6 +48,38 @@ enum ActivitySharePresenter {
         presenter.present(activity, animated: true)
     }
 
+    /// Presents the system share sheet for plain text (used as a fallback when
+    /// the device can't send SMS).
+    @MainActor
+    static func present(text: String, onComplete: (() -> Void)? = nil) {
+        guard let presenter = topViewController() else {
+            onComplete?()
+            return
+        }
+
+        let activity = UIActivityViewController(
+            activityItems: [text],
+            applicationActivities: nil
+        )
+
+        activity.completionWithItemsHandler = { _, _, _, _ in
+            onComplete?()
+        }
+
+        if let popover = activity.popoverPresentationController {
+            popover.sourceView = presenter.view
+            popover.sourceRect = CGRect(
+                x: presenter.view.bounds.midX,
+                y: presenter.view.bounds.midY,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+
+        presenter.present(activity, animated: true)
+    }
+
     private static func writeTemporaryJPEG(from image: UIImage) -> URL? {
         guard let data = image.jpegData(compressionQuality: 0.92) else { return nil }
         let url = FileManager.default.temporaryDirectory

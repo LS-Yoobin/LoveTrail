@@ -17,7 +17,8 @@ struct MemoryMapView: UIViewRepresentable {
         mapView.isPitchEnabled = false
         mapView.selectableMapFeatures = [.pointsOfInterest]
 
-        // Enable clustering
+        // App-controlled clustering only (no native MapKit clustering): register the
+        // individual pin and the count marker under their own identifiers.
         mapView.register(
             MemoryPhotoMarkerView.self,
             forAnnotationViewWithReuseIdentifier: "MemoryPin"
@@ -26,22 +27,34 @@ struct MemoryMapView: UIViewRepresentable {
             MemoryMapMarkerAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: "MemoryCluster"
         )
-        mapView.register(
-            MemoryMapMarkerAnnotationView.self,
-            forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-        )
-        
+
         return mapView
     }
-    
+
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Update annotations if they've changed
-        let currentAnnotations = uiView.annotations.compactMap { $0 as? MemoryMapAnnotation }
-        
-        if currentAnnotations.count != annotations.count || 
-           Set(currentAnnotations.map { $0.id }) != Set(annotations.map { $0.id }) {
-            uiView.removeAnnotations(uiView.annotations)
-            uiView.addAnnotations(annotations)
+        // We cluster ourselves at the current span instead of relying on MapKit's automatic
+        // clustering, which re-evaluates (and visibly reshuffles) whenever annotations are
+        // added. Recomputing here means a filter change just adds/removes the delta of plain
+        // pins/clusters, and grouping only changes when the span changes (i.e. the user zooms).
+        let displayAnnotations = clusterMemoryAnnotations(annotations, span: region.span)
+
+        let currentManaged = uiView.annotations.filter {
+            $0 is MemoryMapAnnotation || $0 is MemoryClusterAnnotation
+        }
+        let currentIDs = Set(currentManaged.compactMap(memoryMapAnnotationID))
+        let newIDs = Set(displayAnnotations.compactMap(memoryMapAnnotationID))
+
+        if currentIDs != newIDs {
+            let toRemove = currentManaged.filter {
+                guard let id = memoryMapAnnotationID($0) else { return false }
+                return !newIDs.contains(id)
+            }
+            let toAdd = displayAnnotations.filter {
+                guard let id = memoryMapAnnotationID($0) else { return false }
+                return !currentIDs.contains(id)
+            }
+            uiView.removeAnnotations(toRemove)
+            uiView.addAnnotations(toAdd)
         }
         
         // Update region if it's significantly different
@@ -67,7 +80,7 @@ struct MemoryMapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            if annotation is MKClusterAnnotation {
+            if annotation is MemoryClusterAnnotation {
                 let view = mapView.dequeueReusableAnnotationView(
                     withIdentifier: "MemoryCluster",
                     for: annotation
@@ -101,12 +114,13 @@ struct MemoryMapView: UIViewRepresentable {
             } else if let annotation = annotation as? MemoryMapAnnotation {
                 parent.onSelect(annotation.section)
                 mapView.deselectAnnotation(annotation, animated: true)
-            } else if let cluster = annotation as? MKClusterAnnotation {
-                let rect = cluster.memberAnnotations.reduce(MKMapRect.null) { rect, annotation in
-                    let point = MKMapPoint(annotation.coordinate)
+            } else if let cluster = annotation as? MemoryClusterAnnotation {
+                mapView.deselectAnnotation(cluster, animated: false)
+                let rect = cluster.members.reduce(MKMapRect.null) { rect, member in
+                    let point = MKMapPoint(member.coordinate)
                     return rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
                 }
-                mapView.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 50, left: 50, bottom: 50, right: 50), animated: true)
+                mapView.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 80, left: 80, bottom: 80, right: 80), animated: true)
             }
         }
         

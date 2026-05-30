@@ -1,0 +1,5 @@
+Same frame names as calico.atlas, but for Arabella (cow cat skin).
+
+Keep each frame at most 512×512 px (longest side).
+
+Example: sit_0.png, sit_1.png, walk_0.png, idle_0.png, ...

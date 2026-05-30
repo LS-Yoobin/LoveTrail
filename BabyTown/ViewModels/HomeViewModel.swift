@@ -1037,11 +1037,11 @@ final class HomeViewModel: ObservableObject {
             }
 
             let seasonGroups = seasons.map { season, seasonSections in
-                SeasonGroup(season: season, sections: seasonSections.sorted { $0.date > $1.date })
+                SeasonGroup(season: season, sections: seasonSections.sorted { $0.timelineSortDate > $1.timelineSortDate })
             }
             .sorted { lhs, rhs in
-                let lhsNewest = lhs.sections.map(\.date).max() ?? .distantPast
-                let rhsNewest = rhs.sections.map(\.date).max() ?? .distantPast
+                let lhsNewest = lhs.sections.map(\.timelineSortDate).max() ?? .distantPast
+                let rhsNewest = rhs.sections.map(\.timelineSortDate).max() ?? .distantPast
                 return lhsNewest > rhsNewest
             }
 

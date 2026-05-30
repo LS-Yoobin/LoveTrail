@@ -46,12 +46,8 @@ struct NicknameView: View {
                     .padding(.vertical, 16)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(.systemBackground))
+                            .fill(Color(.systemGray6))
                             .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.pink.opacity(0.35), lineWidth: 1)
                     )
                     .padding(.horizontal, 40)
                     .onSubmit {

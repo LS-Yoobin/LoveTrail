@@ -69,7 +69,10 @@ struct ContentView: View {
             case .welcome:
                 WelcomeView {
                     withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .storyOnboarding
+                        // Story onboarding is skipped in the main flow; its
+                        // code is preserved (still reachable via Replay story
+                        // and reserved for the partner-invite experience).
+                        screen = .nickname
                     }
                 }
                 .transition(.opacity)
@@ -202,6 +205,7 @@ struct ContentView: View {
                     onOpenPhotoViewer: { _, _ in },
                     onResetApp: {
                         DataPersistenceManager.shared.clearAllData()
+                        StoreManager.shared.resetForTesting()
                         homeViewModel.moments = []
                         homeViewModel.promptMemories = []
                         homeViewModel.pinnedFirstMet = nil
@@ -253,6 +257,9 @@ struct ContentView: View {
             } else if DataPersistenceManager.shared.hasCompletedOnboarding() {
                 screen = .selectPhotos
             }
+        }
+        .task {
+            StoreManager.shared.start()
         }
     }
 }

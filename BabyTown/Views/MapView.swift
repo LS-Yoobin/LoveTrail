@@ -57,11 +57,7 @@ struct MapView: View {
 
     /// Located memories for search, newest first.
     private var searchResultSections: [DaySection] {
-        filteredSections.sorted { lhs, rhs in
-            let lhsDate = lhs.moments.map(\.dateTaken).max() ?? lhs.date
-            let rhsDate = rhs.moments.map(\.dateTaken).max() ?? rhs.date
-            return lhsDate > rhsDate
-        }
+        filteredSections.sorted { $0.timelineSortDate > $1.timelineSortDate }
     }
 
     var body: some View {
@@ -123,13 +119,15 @@ struct MapView: View {
                         Button("All Countries") {
                             selectedCountry = nil
                             updateAnnotations()
-                            centerMapOnMemories()
+                            // Keep the current zoom so grouped markers stay clustered;
+                            // they only re-evaluate when the user zooms (matches search flow).
                         }
                         ForEach(viewModel.availableCountries, id: \.self) { country in
                             Button(country) {
                                 selectedCountry = country
                                 updateAnnotations()
-                                centerMapOnMemories()
+                                // Keep the current zoom so grouped markers stay clustered;
+                                // they only re-evaluate when the user zooms (matches search flow).
                             }
                         }
                     } label: {
@@ -153,7 +151,8 @@ struct MapView: View {
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedYear = year
                                         updateAnnotations()
-                                        centerMapOnMemories()
+                                        // Keep the current zoom so grouped markers stay clustered;
+                                        // they only re-evaluate when the user zooms (matches search flow).
                                     }
                                 }
                             }
@@ -267,12 +266,12 @@ struct MapView: View {
                         Text("Back")
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(
                         Capsule()
-                            .fill(Color(.systemBackground))
+                            .fill(Color.black.opacity(0.35))
                     )
                 }
                 .buttonStyle(.plain)

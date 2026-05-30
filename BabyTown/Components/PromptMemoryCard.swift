@@ -21,7 +21,7 @@ struct PromptMemoryCard: View {
 
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
+        formatter.dateFormat = "EEEE, MMM d • h:mm a"
         formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
         return formatter
     }

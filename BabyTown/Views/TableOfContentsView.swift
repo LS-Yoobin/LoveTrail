@@ -153,9 +153,11 @@ struct TableOfContentsView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(.black.opacity(0.85))
                     }
+                    .buttonStyle(.plain)
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
             .presentationBackground(backgroundColor)
             .fullScreenCover(item: $momentsViewerConfig) { config in

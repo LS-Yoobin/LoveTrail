@@ -29,6 +29,12 @@ enum BabyTownTheme {
     static let textSecondary = Color(.secondaryLabel)
     static let textTertiary = Color(.tertiaryLabel)
 
+    /// Home memory search bar in day mode — fixed light gray (avoids semantic `systemGray` flipping dark).
+    static let daySearchBarFill = Color(red: 0.66, green: 0.66, blue: 0.68)
+    static let daySearchBarText = Color.white
+    static let daySearchBarPlaceholder = Color.white.opacity(0.72)
+    static let daySearchBarIcon = Color.white.opacity(0.85)
+
     // MARK: - Cards
 
     static let cardBackground = Color(red: 0.96, green: 0.82, blue: 0.86)
@@ -43,6 +49,19 @@ enum BabyTownTheme {
         endPoint: .trailing
     )
     static let buttonShadow = Color.pink.opacity(0.3)
+
+    /// Pink → red icon tint used on onboarding access cards and the home camera control.
+    static let accentIconGradient = LinearGradient(
+        colors: [accent, accentDeep],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let accentIconBackdropGradient = LinearGradient(
+        colors: [accent.opacity(0.15), accentDeep.opacity(0.08)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 }
 
 enum PlaceNameFormatting {

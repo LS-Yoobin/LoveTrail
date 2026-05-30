@@ -113,17 +113,17 @@ struct FullScreenPhotoViewer: View {
         .opacity(showSelectButton ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showSelectButton)
         .allowsHitTesting(showSelectButton)
+        .background(alignment: .top) {
+            if showSelectButton {
+                PhotoViewerTopScrim()
+            }
+        }
     }
 
     // MARK: - Close
 
     private var closeButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 30))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white.opacity(0.85))
-        }
+        CircleBackdropCloseButton(action: onDismiss)
     }
     
     private var topSelectButton: some View {

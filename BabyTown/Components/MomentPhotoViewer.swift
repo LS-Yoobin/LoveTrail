@@ -18,6 +18,7 @@ struct MomentPhotoViewer: View {
     @State private var showDeleteConfirmation = false
     @State private var showChrome = true
     @State private var showMapsChooser = false
+    @StateObject private var shareCoordinator = MemoryShareCoordinator()
 
     @Environment(\.openURL) private var openURL
     
@@ -136,6 +137,7 @@ struct MomentPhotoViewer: View {
             }
         }
         .statusBarHidden(true)
+        .memorySharePresentation(coordinator: shareCoordinator)
         .onChange(of: selectedPhotos) { _, newItems in
             Task {
                 await handlePhotoSelection(newItems)
@@ -192,6 +194,11 @@ struct MomentPhotoViewer: View {
         .animation(.easeInOut(duration: 0.2), value: showChrome)
         .animation(.spring(response: 0.42, dampingFraction: 0.82), value: editMode)
         .allowsHitTesting(showChrome)
+        .background(alignment: .top) {
+            if showChrome {
+                PhotoViewerTopScrim()
+            }
+        }
         .background(alignment: .bottom) {
             if showChrome && !editMode {
                 photoViewerBottomGradient
@@ -233,43 +240,53 @@ struct MomentPhotoViewer: View {
     
     private var topBar: some View {
         HStack {
-            Button(action: editMode ? cancelEditing : onDismiss) {
+            Group {
                 if editMode {
-                    Text("Cancel")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.2))
-                        )
+                    Button(action: cancelEditing) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.2))
+                            )
+                    }
                 } else {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 30))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white.opacity(0.85))
+                    CircleBackdropCloseButton(action: onDismiss)
                 }
             }
             
             Spacer()
 
-            if !editMode, hasNavigationDestination {
-                Button {
-                    showMapsChooser = true
-                } label: {
-                    Image(systemName: "location.north.fill")
-                        .font(.system(size: 15, weight: .bold))
+            if !editMode {
+                Button(action: shareCurrentMoment) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
-                        .rotationEffect(.degrees(45))
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color.green))
+                        .background(Circle().fill(Color.white.opacity(0.2)))
                 }
                 .padding(.trailing, 4)
-                .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
-                    Button("Apple Maps") { openInMaps(useGoogle: false) }
-                    Button("Google Maps") { openInMaps(useGoogle: true) }
-                    Button("Cancel", role: .cancel) {}
+
+                if hasNavigationDestination {
+                    Button {
+                        showMapsChooser = true
+                    } label: {
+                        Image(systemName: "location.north.fill")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .rotationEffect(.degrees(45))
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.green))
+                    }
+                    .padding(.trailing, 4)
+                    .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
+                        Button("Apple Maps") { openInMaps(useGoogle: false) }
+                        Button("Google Maps") { openInMaps(useGoogle: true) }
+                        Button("Cancel", role: .cancel) {}
+                    }
                 }
             }
 
@@ -287,6 +304,29 @@ struct MomentPhotoViewer: View {
         }
         .padding(.top, 12)
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Share
+
+    private func shareCurrentMoment() {
+        let moment = currentMoment
+        let payload = MemorySharePayload(
+            id: moment.id,
+            date: moment.dateTaken,
+            placeName: moment.placeName,
+            isPlaceNameUserSet: moment.isPlaceNameUserSet,
+            promptText: moment.promptText,
+            loveNote: moment.caption,
+            photoSources: [
+                MemorySharePhotoSource(
+                    id: moment.id,
+                    thumbnail: moment.thumbnail,
+                    assetIdentifier: moment.assetIdentifier,
+                    isLocked: moment.isLocked
+                )
+            ]
+        )
+        shareCoordinator.share(payload)
     }
 
     // MARK: - Navigation (open place in Maps)

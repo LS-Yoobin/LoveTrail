@@ -22,8 +22,10 @@ struct DaySection: Identifiable {
 
     var displayTitle: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: date)
+        formatter.dateFormat = "EEEE, MMM d • h:mm a"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        let referenceDate = moments.first?.dateTaken ?? date
+        return formatter.string(from: referenceDate)
     }
 
     var placeDisplay: String {
@@ -53,6 +55,11 @@ struct DaySection: Identifiable {
         return formatter.string(from: firstMoment.dateTaken)
     }
 
+    /// Latest capture time in this section; used for timeline ordering.
+    var timelineSortDate: Date {
+        moments.map(\.dateTaken).max() ?? date
+    }
+
     static func grouped(from moments: [Moment]) -> [DaySection] {
         guard let laTimeZone = TimeZone(identifier: "America/Los_Angeles") else {
             return []
@@ -76,8 +83,8 @@ struct DaySection: Identifiable {
             )
         }
         .sorted { lhs, rhs in
-            if lhs.date != rhs.date {
-                return lhs.date > rhs.date
+            if lhs.timelineSortDate != rhs.timelineSortDate {
+                return lhs.timelineSortDate > rhs.timelineSortDate
             }
             return lhs.id < rhs.id
         }

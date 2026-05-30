@@ -33,12 +33,22 @@ final class DataPersistenceManager {
     private var promptMemoriesFileURL: URL {
         documentsDirectory.appendingPathComponent("prompt_memories.json")
     }
+
+    private var userLettersFileURL: URL {
+        documentsDirectory.appendingPathComponent("user_letters.json")
+    }
+
+    private var petStateFileURL: URL {
+        documentsDirectory.appendingPathComponent("pet_state.json")
+    }
     
     private let userDefaults = UserDefaults.standard
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     private let lastActiveScreenKey = "lastActiveScreen"
     private let userNicknameKey = "userNickname"
     private let readInAppNotificationIDsKey = "readInAppNotificationIDs"
+    private let isPartnerUnlockedKey = "isPartnerUnlocked"
+    private let partnerInviteCodeKey = "partnerInviteCode"
     
     private init() {
         createDirectoriesIfNeeded()
@@ -107,13 +117,71 @@ final class DataPersistenceManager {
         }
         return memories
     }
+
+    func saveUserLetters(_ letters: [UserLetter]) {
+        guard let data = try? encoder.encode(letters) else { return }
+        try? data.write(to: userLettersFileURL)
+    }
+
+    func loadUserLetters() -> [UserLetter] {
+        guard fileManager.fileExists(atPath: userLettersFileURL.path),
+              let data = try? Data(contentsOf: userLettersFileURL),
+              let letters = try? decoder.decode([UserLetter].self, from: data) else {
+            return []
+        }
+        return letters
+    }
+
+    func appendUserLetter(_ letter: UserLetter) {
+        var letters = loadUserLetters()
+        letters.append(letter)
+        saveUserLetters(letters)
+    }
     
+    // MARK: - Pet (Adopt a Pet)
+
+    func savePetState(_ state: PetState) {
+        guard let data = try? encoder.encode(state) else { return }
+        try? data.write(to: petStateFileURL)
+    }
+
+    func loadPetState() -> PetState {
+        guard fileManager.fileExists(atPath: petStateFileURL.path),
+              let data = try? Data(contentsOf: petStateFileURL),
+              let state = try? decoder.decode(PetState.self, from: data) else {
+            return PetState()
+        }
+        return state
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
     
     func hasCompletedOnboarding() -> Bool {
         return userDefaults.bool(forKey: hasCompletedOnboardingKey)
+    }
+
+    /// Whether the paid "Invite Partner to Town" tier has been unlocked.
+    /// NOTE: currently set by a stubbed purchase; replace with a real StoreKit
+    /// entitlement check when billing is wired up.
+    func setPartnerUnlocked(_ unlocked: Bool) {
+        userDefaults.set(unlocked, forKey: isPartnerUnlockedKey)
+    }
+
+    func isPartnerUnlocked() -> Bool {
+        return userDefaults.bool(forKey: isPartnerUnlockedKey)
+    }
+
+    /// Returns the persisted partner invite code, generating + saving one on
+    /// first use so it stays stable across launches.
+    func loadOrCreatePartnerInviteCode() -> String {
+        if let existing = userDefaults.string(forKey: partnerInviteCodeKey), !existing.isEmpty {
+            return existing
+        }
+        let code = PartnerInvite.generateCode()
+        userDefaults.set(code, forKey: partnerInviteCodeKey)
+        return code
     }
     
     func saveLastActiveScreen(_ screen: String) {
@@ -154,9 +222,13 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: firstMetPhotoURL)
         try? fileManager.removeItem(at: officialPhotoURL)
         try? fileManager.removeItem(at: promptMemoriesFileURL)
+        try? fileManager.removeItem(at: userLettersFileURL)
+        try? fileManager.removeItem(at: petStateFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
         userDefaults.removeObject(forKey: readInAppNotificationIDsKey)
+        userDefaults.removeObject(forKey: isPartnerUnlockedKey)
+        userDefaults.removeObject(forKey: partnerInviteCodeKey)
     }
 }

@@ -1,0 +1,99 @@
+<h2>Paywall layout — two directions</h2>
+<p class="subtitle">Same content & pricing, different emphasis. Tap the one whose structure feels right (we'll polish copy & visuals after). Pricing shown is my recommendation: annual hero $39.99/yr w/ free trial, monthly $6.99, optional lifetime $99 — one purchase covers <em>both</em> partners.</p>
+
+<style>
+  .pw-phone{width:300px;background:#fff;border-radius:34px;border:1px solid #eadfe2;
+    box-shadow:0 16px 40px rgba(200,40,80,.12);overflow:hidden;font-family:-apple-system,system-ui,sans-serif;}
+  .pw-screen{background:linear-gradient(#fff, #fdeef1);padding:22px 18px 18px;min-height:560px;display:flex;flex-direction:column;}
+  .pw-icon{width:64px;height:64px;border-radius:18px;margin:4px auto 14px;
+    background:linear-gradient(135deg,#ff7aa0,#e0385f);display:flex;align-items:center;justify-content:center;font-size:30px;
+    box-shadow:0 8px 20px rgba(224,56,95,.35);}
+  .pw-title{font-size:22px;font-weight:800;color:#2b2b2b;text-align:center;line-height:1.2;letter-spacing:-.3px;}
+  .pw-sub{font-size:12.5px;color:#8a7e82;text-align:center;margin:6px 14px 16px;line-height:1.35;}
+  .pw-ben{display:flex;align-items:flex-start;gap:11px;margin:10px 4px;}
+  .pw-ben .b-ic{width:26px;height:26px;border-radius:8px;flex:0 0 26px;background:rgba(224,56,95,.10);
+    display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .pw-ben .b-tx{font-size:12.5px;color:#3a3338;line-height:1.3;}
+  .pw-ben .b-tx b{color:#1f1b1e;font-weight:700;font-size:13px;}
+  .pw-plan{border:1.5px solid #f0d6dd;border-radius:14px;padding:11px 13px;margin:7px 0;display:flex;
+    justify-content:space-between;align-items:center;background:#fff;}
+  .pw-plan.hero{border-color:#e0385f;background:linear-gradient(135deg,#fff,#fff0f3);position:relative;}
+  .pw-plan .p-l{font-size:13px;font-weight:700;color:#2b2b2b;}
+  .pw-plan .p-s{font-size:11px;color:#8a7e82;margin-top:1px;}
+  .pw-plan .p-r{font-size:14px;font-weight:800;color:#2b2b2b;}
+  .pw-badge{position:absolute;top:-9px;right:12px;background:#e0385f;color:#fff;font-size:9px;font-weight:800;
+    padding:2px 8px;border-radius:8px;letter-spacing:.3px;}
+  .pw-cta{margin-top:auto;background:linear-gradient(90deg,#ff7aa0,#e0385f);color:#fff;text-align:center;
+    font-size:15px;font-weight:800;padding:15px;border-radius:26px;box-shadow:0 8px 18px rgba(224,56,95,.32);}
+  .pw-fine{font-size:9.5px;color:#a99ea3;text-align:center;margin-top:9px;}
+  .pw-benrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:4px 0 12px;}
+  .pw-chip{font-size:10.5px;color:#7a3148;background:rgba(224,56,95,.08);border-radius:20px;padding:5px 10px;font-weight:600;}
+  .frame-h{font-size:12px;font-weight:700;color:#e0385f;text-align:center;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
+</style>
+
+<div class="cards" style="gap:26px;justify-content:center;flex-wrap:wrap;">
+
+  <!-- ================= DIRECTION A ================= -->
+  <div class="card" data-choice="A" onclick="toggleSelect(this)" style="background:transparent;border:none;box-shadow:none;padding:0;width:auto;">
+    <div class="frame-h">A · Benefit-forward</div>
+    <div class="pw-phone"><div class="pw-screen">
+      <div class="pw-icon">💞</div>
+      <div class="pw-title">Invite your partner<br>to Town</div>
+      <div class="pw-sub">Your private world for two — backed up, in sync, and yours forever.</div>
+
+      <div class="pw-ben"><div class="b-ic">☁️</div><div class="b-tx"><b>Private cloud backup</b><br>Your memories, safe forever</div></div>
+      <div class="pw-ben"><div class="b-ic">🔒</div><div class="b-tx"><b>Just the two of you</b><br>A vault no one else can see</div></div>
+      <div class="pw-ben"><div class="b-ic">📸</div><div class="b-tx"><b>Add moments together</b><br>Both upload in real time</div></div>
+      <div class="pw-ben"><div class="b-ic">💌</div><div class="b-tx"><b>Unlimited history</b><br>Letters never expire</div></div>
+      <div class="pw-ben"><div class="b-ic">📍</div><div class="b-tx"><b>Places you've been</b><br>Your shared map grows</div></div>
+
+      <div class="pw-plan hero" style="margin-top:14px;">
+        <span class="pw-badge">7-DAY FREE TRIAL</span>
+        <div><div class="p-l">Yearly</div><div class="p-s">$3.33/mo · save 45%</div></div>
+        <div class="p-r">$39.99</div>
+      </div>
+      <div style="font-size:11px;color:#8a7e82;text-align:center;margin:2px 0 4px;">Monthly $6.99 · Lifetime $99</div>
+
+      <div class="pw-cta">Start free trial</div>
+      <div class="pw-fine">Cancel anytime · Restore purchase</div>
+    </div></div>
+  </div>
+
+  <!-- ================= DIRECTION B ================= -->
+  <div class="card" data-choice="B" onclick="toggleSelect(this)" style="background:transparent;border:none;box-shadow:none;padding:0;width:auto;">
+    <div class="frame-h">B · Plan-forward</div>
+    <div class="pw-phone"><div class="pw-screen">
+      <div class="pw-icon">💞</div>
+      <div class="pw-title">Bring your partner<br>to Town</div>
+      <div class="pw-sub">Everything you make together, private & synced.</div>
+
+      <div class="pw-benrow">
+        <span class="pw-chip">☁️ Cloud backup</span>
+        <span class="pw-chip">🔒 Private to you two</span>
+        <span class="pw-chip">📸 Upload together</span>
+        <span class="pw-chip">💌 Letters never expire</span>
+        <span class="pw-chip">📍 Shared places map</span>
+      </div>
+
+      <div class="pw-plan hero">
+        <span class="pw-badge">BEST VALUE</span>
+        <div><div class="p-l">Yearly</div><div class="p-s">$3.33/mo · 7-day free trial</div></div>
+        <div class="p-r">$39.99</div>
+      </div>
+      <div class="pw-plan">
+        <div><div class="p-l">Monthly</div><div class="p-s">Billed every month</div></div>
+        <div class="p-r">$6.99</div>
+      </div>
+      <div class="pw-plan">
+        <div><div class="p-l">Lifetime</div><div class="p-s">One payment, forever</div></div>
+        <div class="p-r">$99</div>
+      </div>
+
+      <div style="font-size:11px;color:#8a7e82;text-align:center;margin:12px 4px 0;line-height:1.3;">One purchase unlocks Town for <b>both</b> of you 💕</div>
+
+      <div class="pw-cta" style="margin-top:14px;">Continue</div>
+      <div class="pw-fine">Cancel anytime · Restore purchase</div>
+    </div></div>
+  </div>
+
+</div>

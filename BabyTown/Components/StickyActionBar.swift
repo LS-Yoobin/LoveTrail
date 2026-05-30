@@ -34,7 +34,11 @@ struct StickyActionBar: View {
                     Button(action: onCapture) {
                         Image(systemName: "camera")
                             .font(.system(size: Metrics.fontSize, weight: .medium))
-                            .foregroundStyle(isNightMode ? .white : BabyTownTheme.accent)
+                            .foregroundStyle(
+                                isNightMode
+                                    ? AnyShapeStyle(.white)
+                                    : AnyShapeStyle(BabyTownTheme.accentIconGradient)
+                            )
                             .frame(width: Metrics.iconSize + Metrics.verticalPadding * 2,
                                    height: Metrics.iconSize + Metrics.verticalPadding * 2)
                             .background(

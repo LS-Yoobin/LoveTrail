@@ -47,7 +47,7 @@ struct BabyTownHeader: View {
                     onNotificationsTap?()
                 } label: {
                     ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell.fill")
+                        Image(systemName: "envelope.fill")
                             .font(.system(size: 18))
                             .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
                             .frame(width: 44, height: 44)

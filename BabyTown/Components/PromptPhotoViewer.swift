@@ -128,6 +128,11 @@ struct PromptPhotoViewer: View {
         .animation(.easeInOut(duration: 0.2), value: showChrome)
         .animation(.spring(response: 0.42, dampingFraction: 0.82), value: editMode)
         .allowsHitTesting(showChrome)
+        .background(alignment: .top) {
+            if showChrome {
+                PhotoViewerTopScrim()
+            }
+        }
     }
 
     @ViewBuilder
@@ -157,22 +162,21 @@ struct PromptPhotoViewer: View {
     
     private var topBar: some View {
         HStack {
-            Button(action: editMode ? cancelEditing : onDismiss) {
+            Group {
                 if editMode {
-                    Text("Cancel")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.2))
-                        )
+                    Button(action: cancelEditing) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.2))
+                            )
+                    }
                 } else {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 30))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white.opacity(0.85))
+                    CircleBackdropCloseButton(action: onDismiss)
                 }
             }
             

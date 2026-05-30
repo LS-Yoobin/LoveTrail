@@ -6,8 +6,10 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationManager = NotificationManager.shared
+    @ObservedObject private var store = StoreManager.shared
     var onResetApp: () -> Void
     var onReplayStory: () -> Void
+    var onVisitPet: () -> Void
     
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
@@ -41,7 +43,47 @@ struct SettingsSheet: View {
                 } header: {
                     Text("App")
                 }
-                
+
+                Section {
+                    NavigationLink {
+                        SubscriptionDetailView(store: store)
+                    } label: {
+                        HStack {
+                            Image(systemName: "heart.circle")
+                                .font(.system(size: 16))
+                            Text("Subscription")
+                                .font(.system(size: 16))
+                            Spacer()
+                            Text(store.isPartnerUnlocked ? (store.activePlan?.displayName ?? "Active") : "Free")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Subscription")
+                }
+
+                Section {
+                    Button {
+                        dismiss()
+                        onVisitPet()
+                    } label: {
+                        HStack {
+                            Image(systemName: "pawprint.circle")
+                                .font(.system(size: 16))
+                            Text("Visit Pet")
+                                .font(.system(size: 16))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                } header: {
+                    Text("Pet")
+                }
+
                 Section {
                     HStack {
                         Text("Notifications")
@@ -168,5 +210,5 @@ private struct AppIconViewerOverlay: View {
 }
 
 #Preview {
-    SettingsSheet(onResetApp: {}, onReplayStory: {})
+    SettingsSheet(onResetApp: {}, onReplayStory: {}, onVisitPet: {})
 }

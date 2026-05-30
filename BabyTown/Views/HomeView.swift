@@ -23,6 +23,9 @@ struct HomeView: View {
     @State private var showCameraSheet = false
     @State private var showCameraFullScreen = false
     @State private var showSettings = false
+    @State private var showVisitPet = false
+    @State private var showPartnerPaywall = false
+    @ObservedObject private var store = StoreManager.shared
     @State private var memorySearchText = ""
     @State private var cachedMemorySearchRows: [MemorySearchRow] = []
     @FocusState private var isMemorySearchFocused: Bool
@@ -105,6 +108,7 @@ struct HomeView: View {
                 if !nightModeManager.isNightMode {
                     LoopingVideoPlayer(videoName: "transparent_flowers")
                         .frame(height: 300)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .opacity(0.4)
                         .allowsHitTesting(false)
                         .offset(y: 50)
@@ -151,6 +155,12 @@ struct HomeView: View {
                                 if isMemorySearchActive {
                                     inlineMemorySearchResults
                                 } else {
+                                    if !store.isPartnerUnlocked {
+                                        InvitePartnerBanner {
+                                            showPartnerPaywall = true
+                                        }
+                                    }
+
                                     // On This Day section (cached; never computed in body)
                                     let onThisDayMatches = viewModel.onThisDaySections
                                     if !onThisDayMatches.isEmpty {
@@ -454,7 +464,20 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsSheet(
                     onResetApp: { onResetApp?() },
-                    onReplayStory: { onReplayStory?() }
+                    onReplayStory: { onReplayStory?() },
+                    onVisitPet: { showVisitPet = true }
+                )
+            }
+            .fullScreenCover(isPresented: $showVisitPet) {
+                NavigationStack {
+                    AdoptAPetRootView()
+                }
+            }
+            .fullScreenCover(isPresented: $showPartnerPaywall) {
+                InvitePartnerPaywallView(
+                    store: store,
+                    onUnlock: { showPartnerPaywall = false },
+                    onDismiss: { showPartnerPaywall = false }
                 )
             }
             .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshUnreadNotifications) {
@@ -670,6 +693,18 @@ struct HomeView: View {
         cachedMemorySearchRows = rows
     }
 
+    private var memorySearchBarIconColor: Color {
+        nightModeManager.isNightMode ? .white.opacity(0.55) : BabyTownTheme.daySearchBarIcon
+    }
+
+    private var memorySearchBarPlaceholderColor: Color {
+        nightModeManager.isNightMode ? .white.opacity(0.45) : BabyTownTheme.daySearchBarPlaceholder
+    }
+
+    private var memorySearchBarTextColor: Color {
+        nightModeManager.isNightMode ? .white : BabyTownTheme.daySearchBarText
+    }
+
     private var memorySearchBarPlaceholder: some View {
         Button {
             isSearchBarPinned = true
@@ -680,19 +715,11 @@ struct HomeView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(
-                        nightModeManager.isNightMode
-                            ? .white.opacity(0.55)
-                            : BabyTownTheme.textPrimary.opacity(0.45)
-                    )
+                    .foregroundStyle(memorySearchBarIconColor)
 
                 Text("Search places, dates, love notes...")
                     .font(.system(size: 16))
-                    .foregroundStyle(
-                        nightModeManager.isNightMode
-                            ? .white.opacity(0.45)
-                            : BabyTownTheme.textPrimary.opacity(0.4)
-                    )
+                    .foregroundStyle(memorySearchBarPlaceholderColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 14)
@@ -707,15 +734,17 @@ struct HomeView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(
-                    nightModeManager.isNightMode
-                        ? .white.opacity(0.55)
-                        : BabyTownTheme.textPrimary.opacity(0.45)
-                )
+                .foregroundStyle(memorySearchBarIconColor)
 
-            TextField("Search places, dates, love notes...", text: $memorySearchText)
+            TextField(
+                "",
+                text: $memorySearchText,
+                prompt: Text("Search places, dates, love notes...")
+                    .foregroundStyle(memorySearchBarPlaceholderColor)
+            )
                 .font(.system(size: 16))
-                .foregroundStyle(nightModeManager.isNightMode ? .white : BabyTownTheme.textPrimary)
+                .foregroundStyle(memorySearchBarTextColor)
+                .tint(memorySearchBarTextColor)
                 .focused($isMemorySearchFocused)
                 .submitLabel(.search)
 
@@ -725,11 +754,7 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(
-                            nightModeManager.isNightMode
-                                ? .white.opacity(0.45)
-                                : BabyTownTheme.textPrimary.opacity(0.4)
-                        )
+                        .foregroundStyle(memorySearchBarPlaceholderColor)
                 }
             }
         }
@@ -744,7 +769,7 @@ struct HomeView: View {
             .fill(
                 nightModeManager.isNightMode
                     ? Color.white.opacity(0.1)
-                    : Color(.systemGray6)
+                    : BabyTownTheme.daySearchBarFill
             )
     }
 
@@ -1333,7 +1358,7 @@ struct HomeView: View {
         var date: Date {
             switch self {
             case .daySection(let section):
-                return section.date
+                return section.timelineSortDate
             case .promptMemory(let memory):
                 return memory.date
             case .processingMemory(let memory):
@@ -1477,13 +1502,16 @@ struct HomeView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(BabyTownTheme.accentGradient)
+                        .fill(BabyTownTheme.accentIconBackdropGradient)
                         .frame(width: 64, height: 64)
+                        .overlay(
+                            Circle().stroke(BabyTownTheme.accent.opacity(0.25), lineWidth: 1.5)
+                        )
                         .shadow(color: BabyTownTheme.buttonShadow, radius: 12, y: 4)
-                    
+
                     Image(systemName: "camera.fill")
                         .font(.system(size: 26))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(BabyTownTheme.accentIconGradient)
                 }
             }
             .padding(.bottom, 32)

@@ -189,23 +189,17 @@ private struct AccessLevelCard: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
-                        isRecommended
-                            ? LinearGradient(
-                                colors: [.pink.opacity(0.15), .red.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            : LinearGradient(
-                                colors: [Color(.systemGray6), Color(.systemGray5)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                        LinearGradient(
+                            colors: [.pink.opacity(0.15), .red.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
                     .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(isRecommended ? Color.pink : .black.opacity(0.45))
+                    .foregroundStyle(BabyTownTheme.accentIconGradient)
             }
 
             VStack(alignment: .leading, spacing: 4) {

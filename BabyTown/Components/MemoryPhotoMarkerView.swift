@@ -27,7 +27,6 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        clusteringIdentifier = "memoryCluster"
         displayPriority = .required
         clipsToBounds = false
         canShowCallout = false

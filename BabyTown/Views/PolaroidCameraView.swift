@@ -179,7 +179,11 @@ struct PolaroidCameraView: View {
             }
             .accessibilityLabel("Flip camera")
 
-            circleControlButton(systemName: flashIconName) {
+            circleControlButton(
+                systemName: flashIconName,
+                isActive: cameraController.flashMode == .on,
+                activeIconColor: .yellow
+            ) {
                 cameraController.cycleFlashMode()
             }
             .disabled(cameraController.position == .front)
@@ -202,19 +206,22 @@ struct PolaroidCameraView: View {
     private func circleControlButton(
         systemName: String,
         isActive: Bool = false,
+        activeIconColor: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let showsPinkActiveChrome = isActive && activeIconColor == nil
+
+        return Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(isActive ? (activeIconColor ?? .white) : .white)
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial)
-                .background(isActive ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.22) : Color.clear)
+                .background(showsPinkActiveChrome ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.22) : Color.clear)
                 .clipShape(Circle())
                 .overlay(
                     Circle().stroke(
-                        isActive ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.5) : Color.clear,
+                        showsPinkActiveChrome ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.5) : Color.clear,
                         lineWidth: 1
                     )
                 )
