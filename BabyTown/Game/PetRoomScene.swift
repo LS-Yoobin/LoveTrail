@@ -78,6 +78,7 @@ final class PetRoomScene: SKScene {
     private var wallWashNode: SKSpriteNode?
     private var pictureFrameNode: SKNode?
     private var draggableNodes: [String: SKNode] = [:]
+    private var propInstallOffsets: [String: CGPoint] = [:]
     private var draggingKey: String?
     private var dragTouchOffset = CGPoint.zero
 
@@ -212,8 +213,8 @@ final class PetRoomScene: SKScene {
             roomProp: nil,
             defaultPoint: NormalizedPoint(x: 0.84, y: 0.30),
             placeholderSize: CGSize(width: 120, height: 220),
-            draggableInCustomize: false,
-            pixelOffset: CGPoint(x: 0, y: -50)
+            draggableInCustomize: true,
+            pixelOffset: CGPoint(x: 0, y: -15)
         )
         installProp(
             key: PetRoomPropKey.foodBowl,
@@ -277,7 +278,8 @@ final class PetRoomScene: SKScene {
         draggableInCustomize: Bool,
         pixelOffset: CGPoint = .zero
     ) {
-        let normalized = layoutState.propPositions[key] ?? defaultPoint
+        propInstallOffsets[key] = pixelOffset
+        let normalized = clampNormalizedToFloor(layoutState.propPositions[key] ?? defaultPoint)
         var point = scenePoint(from: normalized)
         point.x += pixelOffset.x
         point.y += pixelOffset.y
@@ -339,6 +341,13 @@ final class PetRoomScene: SKScene {
         CGPoint(x: normalized.x * size.width, y: normalized.y * size.height)
     }
 
+    private func clampNormalizedToFloor(_ point: NormalizedPoint) -> NormalizedPoint {
+        NormalizedPoint(
+            x: min(max(point.x, 0.06), 0.94),
+            y: min(max(point.y, floorBand.lowerBound), floorBand.upperBound)
+        )
+    }
+
     private func normalizedPoint(from scenePoint: CGPoint) -> NormalizedPoint {
         NormalizedPoint(
             x: min(max(scenePoint.x / max(size.width, 1), 0.06), 0.94),
@@ -346,7 +355,25 @@ final class PetRoomScene: SKScene {
         )
     }
 
-    private func clampToFloorBand(_ point: CGPoint) -> CGPoint {
+    /// Floor contact point for a prop — bottom-center for sprites, bottom-center for placeholders.
+    private func propFloorAnchor(for node: SKNode) -> CGPoint {
+        if let sprite = node as? SKSpriteNode {
+            return sprite.position
+        }
+        let frame = node.calculateAccumulatedFrame()
+        return CGPoint(x: frame.midX, y: frame.minY)
+    }
+
+    private func setPropFloorAnchor(_ node: SKNode, to anchor: CGPoint) {
+        if let sprite = node as? SKSpriteNode {
+            sprite.position = anchor
+        } else {
+            let halfH = node.calculateAccumulatedFrame().height / 2
+            node.position = CGPoint(x: anchor.x, y: anchor.y + halfH)
+        }
+    }
+
+    private func clampPropAnchor(_ point: CGPoint) -> CGPoint {
         CGPoint(
             x: min(max(point.x, size.width * 0.06), size.width * 0.94),
             y: min(max(point.y, size.height * floorBand.lowerBound), size.height * floorBand.upperBound)
@@ -541,15 +568,8 @@ final class PetRoomScene: SKScene {
         let location = touch.location(in: self)
 
         if isCustomizeMode, let key = draggingKey, let node = draggableNodes[key] {
-            let target = clampToFloorBand(
-                CGPoint(x: location.x + dragTouchOffset.x, y: location.y + dragTouchOffset.y)
-            )
-            if let sprite = node as? SKSpriteNode {
-                sprite.position = CGPoint(x: target.x, y: target.y)
-            } else {
-                let halfH = node.calculateAccumulatedFrame().height / 2
-                node.position = CGPoint(x: target.x, y: target.y + halfH)
-            }
+            let rawAnchor = CGPoint(x: location.x + dragTouchOffset.x, y: location.y + dragTouchOffset.y)
+            setPropFloorAnchor(node, to: clampPropAnchor(rawAnchor))
             return
         }
 
@@ -573,7 +593,8 @@ final class PetRoomScene: SKScene {
             let frame = node.calculateAccumulatedFrame()
             if frame.insetBy(dx: -12, dy: -12).contains(location) {
                 draggingKey = key
-                dragTouchOffset = CGPoint(x: frame.midX - location.x, y: frame.midY - location.y)
+                let anchor = propFloorAnchor(for: node)
+                dragTouchOffset = CGPoint(x: anchor.x - location.x, y: anchor.y - location.y)
                 node.zPosition = 20
                 return
             }
@@ -585,13 +606,11 @@ final class PetRoomScene: SKScene {
             draggingKey = nil
             return
         }
-        let anchorY: CGFloat
-        if node is SKSpriteNode {
-            anchorY = node.position.y
-        } else {
-            anchorY = node.position.y - node.calculateAccumulatedFrame().height / 2
-        }
-        let normalized = normalizedPoint(from: CGPoint(x: node.position.x, y: anchorY))
+        let anchor = propFloorAnchor(for: node)
+        let offset = propInstallOffsets[key] ?? .zero
+        let normalized = normalizedPoint(
+            from: CGPoint(x: anchor.x - offset.x, y: anchor.y - offset.y)
+        )
         var positions = layoutState.propPositions
         positions[key] = normalized
         layoutState.propPositions = positions

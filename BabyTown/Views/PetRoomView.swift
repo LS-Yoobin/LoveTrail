@@ -22,6 +22,8 @@ struct PetRoomView: View {
     @State private var showMarket = false
     @State private var isCustomizing = false
     @State private var showMomentPicker = false
+    @State private var customizeSnapshot: [String: NormalizedPoint] = [:]
+    @State private var showCustomizeExitPrompt = false
 
     var body: some View {
         GeometryReader { geo in
@@ -30,16 +32,21 @@ struct PetRoomView: View {
             sceneView(geo: geo)
                 .ignoresSafeArea()
                 .overlay(alignment: .bottom) {
-                    VStack(spacing: 10) {
-                        if isPlaying {
-                            laserPlayProgressBar
-                            Text("Drag the laser to fill the bar")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.secondary)
+                    if isCustomizing {
+                        saveRoomButton
+                            .padding(.bottom, geo.safeAreaInsets.bottom + 12)
+                    } else {
+                        VStack(spacing: 10) {
+                            if isPlaying {
+                                laserPlayProgressBar
+                                Text("Drag the laser to fill the bar")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                            playButton
                         }
-                        playButton
+                        .padding(.bottom, geo.safeAreaInsets.bottom + 12)
                     }
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 12)
                 }
                 .overlay(alignment: .center) {
                     if let burst = coinBurst {
@@ -90,38 +97,59 @@ struct PetRoomView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("Back")
-                            .font(.system(size: 17))
+                if isCustomizing {
+                    Button("Cancel") {
+                        requestExitCustomize()
+                    }
+                    .font(.system(size: 17))
+                } else {
+                    Button {
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 17))
+                        }
                     }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    Button {
-                        showMarket = true
-                    } label: {
-                        Image(systemName: "storefront.fill")
-                            .font(.system(size: 18))
-                    }
-                    .accessibilityLabel("Market")
-
-                    Menu {
+            if !isCustomizing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 16) {
                         Button {
-                            beginCustomizeRoom()
+                            showMarket = true
                         } label: {
-                            Label("Customize Room", systemImage: "square.dashed")
+                            Image(systemName: "storefront.fill")
+                                .font(.system(size: 18))
                         }
-                        Button("Choose a different pet", systemImage: "arrow.triangle.2.circlepath", action: onChangePet)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                        .accessibilityLabel("Market")
+
+                        Menu {
+                            Button {
+                                beginCustomizeRoom()
+                            } label: {
+                                Label("Customize Room", systemImage: "square.dashed")
+                            }
+                            Button("Choose a different pet", systemImage: "arrow.triangle.2.circlepath", action: onChangePet)
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
                     }
                 }
+            }
+        }
+        .confirmationDialog(
+            "Do you want to save before you leave?",
+            isPresented: $showCustomizeExitPrompt,
+            titleVisibility: .visible
+        ) {
+            Button("Yes") {
+                saveCustomizeRoom()
+            }
+            Button("No", role: .destructive) {
+                discardCustomizeChanges()
             }
         }
         .safeAreaInset(edge: .top, spacing: 8) {
@@ -165,24 +193,20 @@ struct PetRoomView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Customize Room")
                     .font(.system(size: 14, weight: .bold))
-                Text("Drag bowls & furniture on the floor")
+                Text("Drag bowls, furniture & the cat tree")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Done") {
-                endCustomizeRoom()
-            }
-            .font(.system(size: 14, weight: .semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(BabyTownTheme.accentGradient))
-            .foregroundStyle(.white)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal, 16)
+    }
+
+    private var customizeHasChanges: Bool {
+        viewModel.roomLayout.propPositions != customizeSnapshot
     }
 
     // MARK: Scene
@@ -233,16 +257,50 @@ struct PetRoomView: View {
     }
 
     private func beginCustomizeRoom() {
+        customizeSnapshot = viewModel.roomLayout.propPositions
         isCustomizing = true
         inspect = nil
         selectedStat = nil
         scene?.setCustomizeMode(true)
     }
 
-    private func endCustomizeRoom() {
+    private func saveCustomizeRoom() {
         isCustomizing = false
         scene?.setCustomizeMode(false)
+        customizeSnapshot = viewModel.roomLayout.propPositions
         showToast("Room layout saved")
+    }
+
+    private func exitCustomizeMode() {
+        isCustomizing = false
+        scene?.setCustomizeMode(false)
+    }
+
+    private func requestExitCustomize() {
+        if customizeHasChanges {
+            showCustomizeExitPrompt = true
+        } else {
+            exitCustomizeMode()
+        }
+    }
+
+    private func discardCustomizeChanges() {
+        viewModel.updatePropPositions(customizeSnapshot)
+        refreshRoomLayout()
+        exitCustomizeMode()
+    }
+
+    private var saveRoomButton: some View {
+        Button(action: saveCustomizeRoom) {
+            Label("Save Room", systemImage: "checkmark")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 14)
+                .background(BabyTownTheme.buttonGradient)
+                .clipShape(Capsule())
+                .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
+        }
     }
 
     private var laserPlayProgressBar: some View {
