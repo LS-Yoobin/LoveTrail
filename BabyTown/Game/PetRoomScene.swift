@@ -213,7 +213,7 @@ final class PetRoomScene: SKScene {
             defaultPoint: NormalizedPoint(x: 0.84, y: 0.30),
             placeholderSize: CGSize(width: 120, height: 220),
             draggableInCustomize: false,
-            pixelOffset: CGPoint(x: 0, y: 150)
+            pixelOffset: CGPoint(x: 0, y: -50)
         )
         installProp(
             key: PetRoomPropKey.foodBowl,
