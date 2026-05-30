@@ -37,11 +37,21 @@ final class PetRoomScene: SKScene {
     private let floorBand: ClosedRange<CGFloat> = 0.12...0.38
     /// Points/second the cat walks.
     private let walkSpeed: CGFloat = 70
+    /// On-screen cat height; width follows each frame's aspect ratio.
+    private let catDisplayHeight: CGFloat = 150
 
     // MARK: Nodes
 
-    private let cat = SKNode()            // movable container
+    private struct CatFrame {
+        let name: String
+        let texture: SKTexture
+    }
+
+    private let cat = SKNode()             // movable container
+    private let catFacing = SKNode()       // left/right mirror only
     private let catVisual = SKSpriteNode() // the drawn/animated body
+    private var frameDisplaySizes: [String: CGSize] = [:]
+    private var currentFrameName: String?
 
     /// Interactive prop nodes, for tap hit-testing and walk-to targets.
     private var propNodes: [RoomProp: SKNode] = [:]
@@ -88,6 +98,7 @@ final class PetRoomScene: SKScene {
         super.init(size: size)
         scaleMode = .resizeFill
         anchorPoint = .zero
+        preloadFrameDisplaySizes()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -202,7 +213,7 @@ final class PetRoomScene: SKScene {
             defaultPoint: NormalizedPoint(x: 0.84, y: 0.30),
             placeholderSize: CGSize(width: 120, height: 220),
             draggableInCustomize: false,
-            pixelOffset: CGPoint(x: 0, y: -200)
+            pixelOffset: CGPoint(x: 0, y: 150)
         )
         installProp(
             key: PetRoomPropKey.foodBowl,
@@ -349,14 +360,38 @@ final class PetRoomScene: SKScene {
         cat.zPosition = 1
         addChild(cat)
 
+        cat.addChild(catFacing)
         catVisual.anchorPoint = CGPoint(x: 0.5, y: 0) // feet at the node origin
-        cat.addChild(catVisual)
+        catFacing.addChild(catVisual)
 
-        if let idle = frames(for: .idle).first {
-            catVisual.texture = idle
-            catVisual.size = idle.size().scaledToHeight(150)
+        if let frame = frames(for: .idle).first {
+            applyCatFrame(frame)
             currentAction = .idle
         }
+    }
+
+    private func preloadFrameDisplaySizes() {
+        for name in atlas.textureNames {
+            let texture = atlas.textureNamed(name)
+            frameDisplaySizes[name] = Self.displaySize(for: texture, targetHeight: catDisplayHeight)
+        }
+    }
+
+    /// Sets the cat sprite frame and resizes from that frame's pixel aspect ratio.
+    private func applyCatFrame(_ frame: CatFrame) {
+        catVisual.texture = frame.texture
+        currentFrameName = frame.name
+        catVisual.size = frameDisplaySizes[frame.name]
+            ?? Self.displaySize(for: frame.texture, targetHeight: catDisplayHeight)
+    }
+
+    private static func displaySize(for texture: SKTexture, targetHeight: CGFloat) -> CGSize {
+        let cg = texture.cgImage()
+        guard cg.height > 0 else {
+            return texture.size().scaledToHeight(targetHeight)
+        }
+        let aspect = CGFloat(cg.width) / CGFloat(cg.height)
+        return CGSize(width: targetHeight * aspect, height: targetHeight)
     }
 
     // MARK: Ambient behavior loop
@@ -423,22 +458,26 @@ final class PetRoomScene: SKScene {
         catVisual.removeAction(forKey: "anim")
         catVisual.removeAction(forKey: "pounce")
 
-        let textures = frames(for: state)
-        if textures.count > 1 {
+        let actionFrames = frames(for: state)
+        if actionFrames.count > 1 {
+            applyCatFrame(actionFrames[0])
             let timePerFrame: TimeInterval = state == .walk ? 0.08 : 0.18
-            catVisual.run(.repeatForever(.animate(with: textures, timePerFrame: timePerFrame)), withKey: "anim")
+            catVisual.run(
+                .repeatForever(.animate(with: actionFrames.map(\.texture), timePerFrame: timePerFrame)),
+                withKey: "anim"
+            )
             resetVisualTransform()
             return
         }
-        if let single = textures.first {
-            catVisual.texture = single
+        if let single = actionFrames.first {
+            applyCatFrame(single)
             resetVisualTransform()
             return
         }
 
         // No dedicated frames — reuse stand/idle art for locomotion states.
         if state == .walk || state == .pounce, let stand = frames(for: .idle).first {
-            catVisual.texture = stand
+            applyCatFrame(stand)
             resetVisualTransform()
             return
         }
@@ -448,20 +487,23 @@ final class PetRoomScene: SKScene {
 
     /// Clears procedural motion transforms so real sprite art displays cleanly.
     private func resetVisualTransform() {
-        applyVisualScale(1.0)
+        catVisual.xScale = 1
+        catVisual.yScale = 1
         catVisual.zRotation = 0
-    }
-
-    /// Applies uniform scale while preserving the cat's left/right facing.
-    private func applyVisualScale(_ scale: CGFloat) {
-        catVisual.xScale = facesLeft ? -scale : scale
-        catVisual.yScale = scale
+        if let name = currentFrameName, let size = frameDisplaySizes[name] {
+            catVisual.size = size
+        }
+        updateFacingFlip()
     }
 
     private func face(towards x: CGFloat) {
-        // Real sprites are drawn facing right; flip for leftward targets.
+        // Real sprites are drawn facing right; mirror via a dedicated parent node.
         facesLeft = x < cat.position.x
-        applyVisualScale(abs(catVisual.yScale) > 0.001 ? abs(catVisual.yScale) : abs(catVisual.xScale))
+        updateFacingFlip()
+    }
+
+    private func updateFacingFlip() {
+        catFacing.xScale = facesLeft ? -1 : 1
     }
 
     // MARK: Interaction
@@ -774,13 +816,12 @@ final class PetRoomScene: SKScene {
 
     /// Returns the ordered animation frames for an action from the skin's atlas,
     /// or an empty array if none are present.
-    private func frames(for action: CatAction) -> [SKTexture] {
+    private func frames(for action: CatAction) -> [CatFrame] {
         let prefixes = framePrefixes(for: action)
         let names = atlas.textureNames
             .filter { name in prefixes.contains(where: { name.hasPrefix($0) }) }
             .sorted { frameIndex($0) < frameIndex($1) }
-        guard !names.isEmpty else { return [] }
-        return names.map { atlas.textureNamed($0) }
+        return names.map { CatFrame(name: $0, texture: atlas.textureNamed($0)) }
     }
 
     /// Atlas file prefixes for each action. Real art uses `stand_*` for idle.
