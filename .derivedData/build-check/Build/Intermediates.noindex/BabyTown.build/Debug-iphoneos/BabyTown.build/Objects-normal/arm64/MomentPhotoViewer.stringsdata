@@ -1,0 +1,152 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/MomentPhotoViewer.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Remove Photo Permanently?",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove Photo?",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keep this founding photo",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 160
+        }
+      },
+      {
+        "comment": "",
+        "key": "No photos to display",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 151
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "This photo was taken with the in-app camera and will be removed permanently from the app.",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 157
+        }
+      },
+      {
+        "comment": "",
+        "key": "Would you like to remove this photo from the app?",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "This memory needs a photo. Use the picker below to replace it instead of removing it.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open this place in",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 291
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 252
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apple Maps",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 292
+        }
+      },
+      {
+        "comment": "",
+        "key": "Google Maps",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 293
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 294
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 300
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 300
+        }
+      }
+    ]
+  },
+  "version": 1
+}

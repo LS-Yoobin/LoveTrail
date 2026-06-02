@@ -1,0 +1,208 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/CaptionEditorSheet.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photos",
+        "location": {
+          "startingColumn": 69,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit Memory",
+        "location": {
+          "startingColumn": 80,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 78
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 105
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add a love note for this memory",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 154
+        }
+      },
+      {
+        "comment": "",
+        "key": "Type your caption here...",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "Place name",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 259
+        }
+      },
+      {
+        "comment": "",
+        "key": "Suggestions",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 303
+        }
+      },
+      {
+        "comment": "",
+        "key": "Which place is this?",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 360
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 380
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap to add a location",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 407
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photos in this Memory",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 429
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 435
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open Gallery",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 550
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading photos…",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 577
+        }
+      },
+      {
+        "comment": "",
+        "key": "No nearby photos found",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 591
+        }
+      },
+      {
+        "comment": "",
+        "key": "Use Open Gallery to add more",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 594
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photo Access Needed",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 607
+        }
+      },
+      {
+        "comment": "",
+        "key": "Allow photo access in Settings to browse photos for this memory.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 609
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open Settings",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 618
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 642
+        }
+      }
+    ]
+  },
+  "version": 1
+}

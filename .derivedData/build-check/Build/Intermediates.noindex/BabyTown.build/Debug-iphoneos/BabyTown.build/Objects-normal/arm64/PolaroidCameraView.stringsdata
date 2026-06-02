@@ -1,0 +1,136 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PolaroidCameraView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Preparing camera…",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 63
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 167
+        }
+      },
+      {
+        "comment": "",
+        "key": "Flip camera",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 180
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save to Photos on",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 198
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save to Photos off",
+        "location": {
+          "startingColumn": 77,
+          "startingLine": 198
+        }
+      },
+      {
+        "comment": "",
+        "key": "Capturing Vibe",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stop recording",
+        "location": {
+          "startingColumn": 71,
+          "startingLine": 386
+        }
+      },
+      {
+        "comment": "",
+        "key": "Record reel",
+        "location": {
+          "startingColumn": 90,
+          "startingLine": 386
+        }
+      },
+      {
+        "comment": "",
+        "key": "Take photo with vibe",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 350
+        }
+      },
+      {
+        "comment": "",
+        "key": "Take photo",
+        "location": {
+          "startingColumn": 77,
+          "startingLine": 350
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 416
+        }
+      },
+      {
+        "comment": "",
+        "key": "Records until you stop · last %@ saved",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 488
+        }
+      },
+      {
+        "comment": "",
+        "key": "Auto-stops after %@",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 489
+        }
+      },
+      {
+        "comment": "",
+        "key": "Take another photo if you'd like",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 548
+        }
+      },
+      {
+        "comment": "",
+        "key": "Camera access is required",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 571
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open Settings",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 574
+        }
+      }
+    ]
+  },
+  "version": 1
+}
