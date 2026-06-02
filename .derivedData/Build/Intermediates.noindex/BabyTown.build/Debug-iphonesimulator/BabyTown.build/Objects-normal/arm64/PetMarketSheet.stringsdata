@@ -1,0 +1,104 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PetMarketSheet.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Market",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 57
+        }
+      },
+      {
+        "comment": "",
+        "key": "Spruce up the room",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Spend coins on trees, beds, bowls, cat food, collars, and room décor.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Active",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Owned",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Buy · %lld",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 260
+        }
+      },
+      {
+        "comment": "",
+        "key": "Need %lld more",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 262
+        }
+      },
+      {
+        "comment": "",
+        "key": "Selected",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 339
+        }
+      },
+      {
+        "comment": "",
+        "key": "Need %lld more",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 341
+        }
+      }
+    ]
+  },
+  "version": 1
+}

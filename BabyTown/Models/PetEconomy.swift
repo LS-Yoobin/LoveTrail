@@ -48,7 +48,7 @@ enum PetEconomy {
 
     /// Coins for petting; only granted once per `petCooldown`.
     static let petCoinReward = 2
-    static let petCooldown: TimeInterval = 2 * 3600   // 2h
+    static let petCooldown: TimeInterval = 3600   // 1h
 
     static let playCooldown: TimeInterval = 2 * 3600   // 2h
 
@@ -64,8 +64,8 @@ enum PetEconomy {
 
     // MARK: Shop catalog
 
-    static let foodPackCost = 10
-    static let foodPackServings = 5
+    /// One-time cosmetic rename — priced between basic cat food (8) and wall color (18).
+    static let renameCost = 15
 
     /// Friendly copy when petting is still on the coin cooldown.
     static func petCooldownMessage(remaining: TimeInterval) -> String {

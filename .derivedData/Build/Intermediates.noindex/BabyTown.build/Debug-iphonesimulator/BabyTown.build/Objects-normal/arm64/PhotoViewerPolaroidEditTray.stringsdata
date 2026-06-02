@@ -1,0 +1,16 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/PhotoViewerPolaroidEditTray.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Edit photo",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 44
+        }
+      }
+    ]
+  },
+  "version": 1
+}

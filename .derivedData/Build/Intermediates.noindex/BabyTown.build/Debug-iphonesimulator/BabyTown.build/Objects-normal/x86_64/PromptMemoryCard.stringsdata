@@ -1,0 +1,104 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/PromptMemoryCard.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Remove this memory?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 57
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove Memory",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 61
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "This action cannot be undone.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Share Memory",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 130
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unpin Memory",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pin Memory",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit Memory",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove Memory",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generate Love Note",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 188
+        }
+      },
+      {
+        "comment": "",
+        "key": "Prompt Memory",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 216
+        }
+      },
+      {
+        "comment": "",
+        "key": "Locked",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 446
+        }
+      }
+    ]
+  },
+  "version": 1
+}

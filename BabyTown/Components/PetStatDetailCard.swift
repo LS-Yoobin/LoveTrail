@@ -1,36 +1,42 @@
 import SwiftUI
 
-/// Popover shown when the user taps a need meter in the pet-room HUD.
+/// Popover shown when the user taps the need meters in the pet-room HUD.
 struct PetStatDetailCard: View {
-    let stat: PetNeedStat
-    let value: Int
+    let hunger: Int
+    let thirst: Int
+    let litter: Int
+    let happiness: Int
     var onClose: () -> Void
 
-    private struct Config {
-        let title: String
-        let emoji: String
-        let detail: String
-        let tint: Color
+    private struct StatRow: Identifiable {
+        let stat: PetNeedStat
+        let value: Int
+
+        var id: PetNeedStat { stat }
     }
 
-    private var config: Config {
+    private var rows: [StatRow] {
+        PetNeedStat.allCases.map { stat in
+            StatRow(
+                stat: stat,
+                value: value(for: stat)
+            )
+        }
+    }
+
+    private func value(for stat: PetNeedStat) -> Int {
         switch stat {
-        case .hunger:
-            return Config(title: "Hunger", emoji: "🍗", detail: "Food bowl fullness", tint: .orange)
-        case .thirst:
-            return Config(title: "Thirst", emoji: "💧", detail: "Water bowl level", tint: .blue)
-        case .litter:
-            return Config(title: "Litter Box", emoji: "🧹", detail: "Cleanliness", tint: .brown)
-        case .happiness:
-            return Config(title: "Happiness", emoji: "😻", detail: "How your kitty is feeling", tint: BabyTownTheme.accent)
+        case .hunger: return hunger
+        case .thirst: return thirst
+        case .litter: return litter
+        case .happiness: return happiness
         }
     }
 
     var body: some View {
-        let c = config
         VStack(spacing: 16) {
             HStack {
-                Text("\(c.emoji) \(c.title)")
+                Text("Kitty Needs")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(BabyTownTheme.textPrimary)
                 Spacer()
@@ -41,30 +47,45 @@ struct PetStatDetailCard: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(c.detail)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.black.opacity(0.10)).frame(height: 18)
-                    GeometryReader { geo in
-                        Capsule()
-                            .fill(c.tint)
-                            .frame(width: geo.size.width * CGFloat(value) / 100, height: 18)
-                    }
-                    .frame(height: 18)
+            VStack(spacing: 18) {
+                ForEach(rows) { row in
+                    statSection(row)
                 }
-                .frame(height: 18)
-
-                Text("\(value)%")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
             }
         }
         .padding(20)
         .background(BabyTownTheme.background, in: RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius))
         .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
         .padding(.horizontal, 32)
+    }
+
+    private func statSection(_ row: StatRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                PetNeedEmoji(stat: row.stat, size: 15)
+                Text(row.stat.label)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                Spacer()
+                Text("\(row.value)%")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+            }
+
+            Text(row.stat.detail)
+                .font(.system(size: 14))
+                .foregroundStyle(.black)
+
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.black.opacity(0.10)).frame(height: 14)
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(row.stat.tint)
+                        .frame(width: geo.size.width * CGFloat(row.value) / 100, height: 14)
+                }
+                .frame(height: 14)
+            }
+            .frame(height: 14)
+        }
     }
 }

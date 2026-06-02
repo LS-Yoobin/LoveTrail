@@ -1,49 +1,41 @@
 import SwiftUI
+import PhotosUI
 
 /// Pick a Baby Town photo to display in the purchased memory frame.
 struct PetMomentGalleryPickerSheet: View {
 
+    var currentMomentID: UUID?
     var onSelect: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var photos: [PetGalleryPhoto] = []
+    @State private var highlightedPhotoID: UUID?
+    @State private var showSystemGallery = false
+    @State private var isImportingPhotos = false
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10)
-    ]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+
+    private var highlightedPhoto: PetGalleryPhoto? {
+        guard let id = highlightedPhotoID else { return nil }
+        return photos.first { $0.id == id }
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if photos.isEmpty {
-                    ContentUnavailableView(
-                        "No moments yet",
-                        systemImage: "photo.on.rectangle.angled",
-                        description: Text("Add memories on the home feed, then come back to fill your frame.")
-                    )
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(photos) { photo in
-                                Button {
-                                    onSelect(photo.id)
-                                    dismiss()
-                                } label: {
-                                    Image(uiImage: photo.thumbnail)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(minWidth: 0, maxWidth: .infinity)
-                                        .aspectRatio(1, contentMode: .fill)
-                                        .clipped()
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(16)
+            VStack(spacing: 0) {
+                framePreview
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
+
+                Group {
+                    if photos.isEmpty {
+                        emptyGridState
+                    } else {
+                        photoGrid
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(BabyTownTheme.backgroundGradient.ignoresSafeArea())
             .navigationTitle("Choose a moment")
@@ -53,9 +45,194 @@ struct PetMomentGalleryPickerSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                openGalleryBottomBar
+            }
+            .fullScreenCover(isPresented: $showSystemGallery) {
+                PhotoPickerView(
+                    selectedImages: .constant([]),
+                    selectionLimit: 0,
+                    onFinish: { results in
+                        showSystemGallery = false
+                        Task { await handleSystemGalleryPicks(results) }
+                    }
+                )
+                .ignoresSafeArea()
+            }
             .onAppear {
-                photos = PetGalleryPhotoLoader.loadAllPhotos()
+                reloadPhotos()
+                if highlightedPhotoID == nil {
+                    highlightedPhotoID = currentMomentID ?? photos.first?.id
+                }
             }
         }
+    }
+
+    // MARK: - Frame preview
+
+    private var framePreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(red: 0.45, green: 0.28, blue: 0.18))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                )
+                .frame(width: 120, height: 140)
+                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+
+            Group {
+                if let image = highlightedPhoto?.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                } else {
+                    Text("♥")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            .offset(y: 2)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel("Memory frame preview")
+    }
+
+    // MARK: - Grid
+
+    private var photoGrid: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVGrid(columns: columns, spacing: 2) {
+                ForEach(photos) { photo in
+                    Button {
+                        highlightedPhotoID = photo.id
+                        onSelect(photo.id)
+                        dismiss()
+                    } label: {
+                        gridCell(for: photo)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(2)
+            .padding(.bottom, 16)
+        }
+    }
+
+    private func gridCell(for photo: PetGalleryPhoto) -> some View {
+        let isHighlighted = highlightedPhotoID == photo.id
+
+        return Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                Image(uiImage: photo.thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay {
+                if isHighlighted {
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    private var emptyGridState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 38, weight: .thin))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.35))
+            Text("No moments yet")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Use Open Gallery to add photos to Baby Town")
+                .font(.system(size: 13))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: - Open Gallery
+
+    private var openGalleryBottomBar: some View {
+        Button {
+            showSystemGallery = true
+        } label: {
+            HStack(spacing: 10) {
+                if isImportingPhotos {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(0.9)
+                } else {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                Text(isImportingPhotos ? "Adding photos…" : "Open Gallery")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                Capsule()
+                    .fill(BabyTownTheme.accentGradient)
+                    .shadow(color: BabyTownTheme.accent.opacity(0.35), radius: 12, y: 6)
+            )
+        }
+        .disabled(isImportingPhotos)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .safeAreaPadding(.bottom, 12)
+        .background {
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func reloadPhotos() {
+        photos = PetGalleryPhotoLoader.loadAllPhotos()
+        if let highlightedPhotoID,
+           !photos.contains(where: { $0.id == highlightedPhotoID }) {
+            self.highlightedPhotoID = photos.first?.id
+        }
+    }
+
+    private func handleSystemGalleryPicks(_ results: [PHPickerResult]) async {
+        guard !results.isEmpty else { return }
+        isImportingPhotos = true
+        defer { isImportingPhotos = false }
+
+        let newMoments = await SelectPhotosViewModel().createMomentsFromPickerResults(results)
+        guard !newMoments.isEmpty else { return }
+
+        mergeMomentsIntoBabyTown(newMoments)
+        reloadPhotos()
+
+        if let newest = newMoments.sorted(by: { $0.dateTaken > $1.dateTaken }).first {
+            highlightedPhotoID = newest.id
+        }
+    }
+
+    private func mergeMomentsIntoBabyTown(_ newMoments: [Moment]) {
+        var combined = DataPersistenceManager.shared.loadMoments() + newMoments
+
+        var seen = Set<UUID>()
+        combined = combined.filter { moment in
+            if seen.contains(moment.id) { return false }
+            seen.insert(moment.id)
+            return true
+        }
+
+        combined.sort { $0.dateTaken > $1.dateTaken }
+        DataPersistenceManager.shared.saveMoments(combined)
     }
 }

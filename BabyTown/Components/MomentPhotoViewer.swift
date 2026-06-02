@@ -16,6 +16,7 @@ struct MomentPhotoViewer: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var updatedMoments: [Moment]
     @State private var showDeleteConfirmation = false
+    @State private var showFoundingDeleteBlockedAlert = false
     @State private var showChrome = true
     @State private var showMapsChooser = false
     @StateObject private var shareCoordinator = MemoryShareCoordinator()
@@ -155,6 +156,11 @@ struct MomentPhotoViewer: View {
             Text(isFromCamera 
                 ? "This photo was taken with the in-app camera and will be removed permanently from the app."
                 : "Would you like to remove this photo from the app?")
+        }
+        .alert("Keep this founding photo", isPresented: $showFoundingDeleteBlockedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This memory needs a photo. Use the picker below to replace it instead of removing it.")
         }
     }
     
@@ -372,13 +378,17 @@ struct MomentPhotoViewer: View {
 
     private func finishEditing() {
         if editMode {
-            onUpdateMoments(updatedMoments)
-            momentsBeforeEdit = nil
-            editMode = false
+            commitEditingChanges()
         } else {
             momentsBeforeEdit = updatedMoments
             editMode = true
         }
+    }
+
+    private func commitEditingChanges() {
+        onUpdateMoments(updatedMoments)
+        momentsBeforeEdit = nil
+        editMode = false
     }
 
     private func cancelEditing() {
@@ -450,17 +460,36 @@ struct MomentPhotoViewer: View {
         
         if let data = try? await item.loadTransferable(type: Data.self),
            let image = UIImage(data: data) {
+            // Replace only the photo; preserve every other field so the moment
+            // keeps its identity (prompt, pin state, location, voice note, etc.).
+            // Dropping these previously turned founding prompt moments into
+            // ordinary, prompt-less timeline entries.
+            let existing = updatedMoments[currentIndex]
             updatedMoments[currentIndex] = Moment(
-                id: updatedMoments[currentIndex].id,
-                dateTaken: updatedMoments[currentIndex].dateTaken,
+                id: existing.id,
+                dateTaken: existing.dateTaken,
                 assetIdentifier: nil,
                 thumbnail: image,
-                placeName: updatedMoments[currentIndex].placeName,
-                caption: updatedMoments[currentIndex].caption
+                placeName: existing.placeName,
+                caption: existing.caption,
+                voiceNotePath: existing.voiceNotePath,
+                promptText: existing.promptText,
+                isPinned: existing.isPinned,
+                pinnedAt: existing.pinnedAt,
+                isLocked: existing.isLocked,
+                unlockTime: existing.unlockTime,
+                latitude: existing.latitude,
+                longitude: existing.longitude,
+                isAddedFromOnThisDay: existing.isAddedFromOnThisDay,
+                isPlaceNameUserSet: existing.isPlaceNameUserSet,
+                country: existing.country
             )
+
+            selectedPhotos = []
+            commitEditingChanges()
+        } else {
+            selectedPhotos = []
         }
-        
-        selectedPhotos = []
     }
     
     private var photoViewerMetadataBackground: some View {
@@ -514,6 +543,14 @@ struct MomentPhotoViewer: View {
     }
 
     // MARK: - Delete Photo
+
+    private func requestRemoveCurrentPhoto() {
+        if foundingPromptText != nil, updatedMoments.count == 1 {
+            showFoundingDeleteBlockedAlert = true
+            return
+        }
+        showDeleteConfirmation = true
+    }
     
     private func deleteCurrentPhoto() {
         let momentToDelete = currentMoment

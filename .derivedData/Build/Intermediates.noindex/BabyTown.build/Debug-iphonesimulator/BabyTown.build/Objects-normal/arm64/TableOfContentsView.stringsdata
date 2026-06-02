@@ -1,0 +1,32 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/TableOfContentsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "BabyTown",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Table of Contents",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld Memories Saved",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 52
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/FullScreenPhotoViewer.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Selected",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 138
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 138
+        }
+      },
+      {
+        "comment": "",
+        "key": "Deselect",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 161
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -165,6 +165,20 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    private static let foundingTimelineOrder = ["When we became official", "When we first met"]
+
+    /// Every founding slot in timeline order — moment + section when present, nil when missing (shows placeholder).
+    var foundingTimelineSlots: [(promptText: String, moment: Moment?, section: DaySection?)] {
+        Self.foundingTimelineOrder.map { prompt in
+            let matches = moments.filter { $0.promptText == prompt }
+            guard let moment = matches.first(where: { !$0.isPinned }) ?? matches.first else {
+                return (prompt, nil, nil)
+            }
+            let section = DaySection(date: moment.dateTaken, placeName: moment.placeName, moments: [moment])
+            return (prompt, moment, section)
+        }
+    }
+
     private static func isFoundingMoment(_ moment: Moment) -> Bool {
         guard let prompt = moment.promptText else { return false }
         return foundingPrompts.contains(prompt)
@@ -209,6 +223,52 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    /// Recreates founding timeline rows from persisted pinned JPEGs when moments were deleted.
+    private func ensureFoundingMomentsFromPinnedPhotos() {
+        restoreFoundingMomentIfMissing(
+            promptText: "When we became official",
+            image: pinnedOfficial,
+            pinnedAt: Date()
+        )
+
+        if let firstMetImage = pinnedFirstMet ?? DataPersistenceManager.shared.loadPinnedFirstMet() {
+            restoreFoundingMomentIfMissing(
+                promptText: "When we first met",
+                image: firstMetImage,
+                pinnedAt: Date().addingTimeInterval(-1)
+            )
+        }
+    }
+
+    private func restoreFoundingMomentIfMissing(
+        promptText: String,
+        image: UIImage,
+        pinnedAt: Date
+    ) {
+        guard !moments.contains(where: { $0.promptText == promptText }) else { return }
+
+        let dateTaken = resolvedFoundingPhotoDate(promptText: promptText)
+        upsertFoundingMoment(
+            promptText: promptText,
+            image: image,
+            dateTaken: dateTaken,
+            assetIdentifier: nil,
+            latitude: nil,
+            longitude: nil,
+            pinnedAt: pinnedAt
+        )
+    }
+
+    private func resolvedFoundingPhotoDate(promptText: String) -> Date {
+        if let saved = DataPersistenceManager.shared.loadFoundingPhotoDate(promptText: promptText) {
+            return saved
+        }
+        if let fileDate = DataPersistenceManager.shared.pinnedPhotoFileModificationDate(promptText: promptText) {
+            return fileDate
+        }
+        return Date()
+    }
+
     func upsertFoundingMoment(
         promptText: String,
         image: UIImage,
@@ -219,6 +279,13 @@ final class HomeViewModel: ObservableObject {
         pinnedAt: Date
     ) {
         guard Self.foundingPrompts.contains(promptText) else { return }
+
+        DataPersistenceManager.shared.saveFoundingPhotoDate(dateTaken, promptText: promptText)
+        if promptText == "When we became official" {
+            pinnedOfficial = image
+        } else if promptText == "When we first met" {
+            pinnedFirstMet = image
+        }
 
         moments.removeAll { $0.promptText == promptText }
 
@@ -331,6 +398,7 @@ final class HomeViewModel: ObservableObject {
         
         isInitializing = false
         ensureFoundingTimelineMoments()
+        ensureFoundingMomentsFromPinnedPhotos()
         refreshOnThisDay()
 
         setupPolaroidStoreObserver()

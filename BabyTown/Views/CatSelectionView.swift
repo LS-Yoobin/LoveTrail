@@ -15,7 +15,7 @@ struct CatSelectionView: View {
                     Text("Adopt a Pet")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(BabyTownTheme.textPrimary)
-                    Text("Choose a kitty to join your town. They'll live in their own cozy room.")
+                    Text("Each kitty has their own room — pick who you'd like to visit.")
                         .font(.system(size: 15))
                         .foregroundStyle(BabyTownTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -38,7 +38,7 @@ struct CatSelectionView: View {
                 Button {
                     onAdopt(selected)
                 } label: {
-                    Text("Adopt \(selected.petName)")
+                    Text("Visit \(selected.petName)")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)

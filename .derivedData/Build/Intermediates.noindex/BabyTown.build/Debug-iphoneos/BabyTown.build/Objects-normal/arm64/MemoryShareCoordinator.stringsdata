@@ -1,0 +1,32 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Services/MemoryShareCoordinator.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Couldn't Share",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 77
+        }
+      },
+      {
+        "comment": "",
+        "key": "Creating share image…",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 78
+        }
+      }
+    ]
+  },
+  "version": 1
+}

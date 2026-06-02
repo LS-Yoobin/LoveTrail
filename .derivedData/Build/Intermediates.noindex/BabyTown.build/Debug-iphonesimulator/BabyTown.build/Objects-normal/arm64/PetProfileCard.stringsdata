@@ -1,0 +1,24 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/PetProfileCard.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Pet Profile",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "Origin Story",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 245
+        }
+      }
+    ]
+  },
+  "version": 1
+}

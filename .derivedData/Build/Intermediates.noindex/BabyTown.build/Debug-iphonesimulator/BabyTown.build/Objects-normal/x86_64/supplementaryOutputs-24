@@ -1,0 +1,100 @@
+{
+  "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/GeneratedAssetSymbols.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/AppDelegate.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/AppDelegate.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/AppDelegate.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/AppDelegate.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/AppDelegate.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/BabyTownApp.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/BabyTownApp.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/BabyTownApp.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/BabyTownApp.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/BabyTownApp.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/BabyTownApp.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/ContentView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ContentView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ContentView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ContentView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ContentView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PolaroidCameraView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PolaroidCameraView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PolaroidCameraView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PolaroidCameraView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PolaroidCameraView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PolaroidCameraView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PromptMemoryBuilderView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptMemoryBuilderView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptMemoryBuilderView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptMemoryBuilderView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptMemoryBuilderView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptMemoryBuilderView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PromptPhotoSelectionView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptPhotoSelectionView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptPhotoSelectionView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptPhotoSelectionView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptPhotoSelectionView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/PromptPhotoSelectionView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/ScanView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ScanView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ScanView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ScanView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ScanView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ScanView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/SelectPhotosView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SelectPhotosView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SelectPhotosView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SelectPhotosView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SelectPhotosView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SelectPhotosView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/StoryOnboardingFlow.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/StoryOnboardingFlow.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/StoryOnboardingFlow.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/StoryOnboardingFlow.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/StoryOnboardingFlow.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/StoryOnboardingFlow.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/SubscriptionDetailView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SubscriptionDetailView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SubscriptionDetailView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SubscriptionDetailView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SubscriptionDetailView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/SubscriptionDetailView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/TableOfContentsView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/TableOfContentsView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/TableOfContentsView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/TableOfContentsView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/TableOfContentsView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/TableOfContentsView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/ValentineCardDetailView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ValentineCardDetailView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ValentineCardDetailView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ValentineCardDetailView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ValentineCardDetailView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/ValentineCardDetailView.swiftdeps"
+  },
+  "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/WelcomeView.swift" : {
+    "const-values" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/WelcomeView.swiftconstvalues",
+    "dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/WelcomeView.d",
+    "diagnostics" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/WelcomeView.dia",
+    "object" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/WelcomeView.o",
+    "swift-dependencies" : "/Users/justinseo/Desktop/BabyTown/.derivedData/Build/Intermediates.noindex/BabyTown.build/Debug-iphonesimulator/BabyTown.build/Objects-normal/x86_64/WelcomeView.swiftdeps"
+  }
+}

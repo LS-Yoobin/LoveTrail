@@ -1,0 +1,16 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/BowlInspectCard.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 104
+        }
+      }
+    ]
+  },
+  "version": 1
+}

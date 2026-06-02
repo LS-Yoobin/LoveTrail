@@ -11,6 +11,10 @@ import SwiftUI
 struct BabyTownApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {
+        _ = DataPersistenceManager.shared.loadOrCreateAppJoinedDate()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

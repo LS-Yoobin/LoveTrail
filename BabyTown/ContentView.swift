@@ -171,6 +171,11 @@ struct ContentView: View {
                         onboardingMoments.append(firstMetMomentUnpinned)
                     }
                     
+                    DataPersistenceManager.shared.saveFoundingPhotoDate(officialPhotoDate, promptText: "When we became official")
+                    if let firstMetDate {
+                        DataPersistenceManager.shared.saveFoundingPhotoDate(firstMetDate, promptText: "When we first met")
+                    }
+
                     homeViewModel.addMoments(onboardingMoments)
                     
                     withAnimation(.easeInOut(duration: 0.4)) {

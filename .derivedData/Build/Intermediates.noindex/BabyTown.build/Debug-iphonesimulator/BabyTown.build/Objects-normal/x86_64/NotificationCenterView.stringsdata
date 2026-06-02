@@ -1,0 +1,40 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/NotificationCenterView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Letters",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 50
+        }
+      },
+      {
+        "comment": "",
+        "key": "No letters yet",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap the envelope to write your first letter.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 141
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 272
+        }
+      }
+    ]
+  },
+  "version": 1
+}

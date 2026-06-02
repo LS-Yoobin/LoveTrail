@@ -9,6 +9,7 @@ struct BowlInspectCard: View {
     let litter: Int
     let foodServings: Int
     var onAction: () -> Void
+    var onSecondaryAction: (() -> Void)?
     var onClose: () -> Void
 
     private struct Config {
@@ -16,24 +17,53 @@ struct BowlInspectCard: View {
         let imageName: String
         let value: Int
         let fullnessLabel: String
-        let button: String
+        let primaryButton: String
+        let secondaryButton: String?
         let tint: Color
     }
 
     private var config: Config {
         switch prop {
         case .foodBowl:
-            return Config(title: "Food Bowl", imageName: "prop_food_bowl", value: hunger,
-                          fullnessLabel: "Fullness · \(foodServings) serving\(foodServings == 1 ? "" : "s") left",
-                          button: "Refill and Buy Food", tint: .orange)
+            return Config(
+                title: "Food Bowl",
+                imageName: "prop_food_bowl",
+                value: hunger,
+                fullnessLabel: "Fullness · \(foodServings) serving\(foodServings == 1 ? "" : "s") left",
+                primaryButton: "Refill",
+                secondaryButton: "Buy Food",
+                tint: .orange
+            )
         case .waterBowl:
-            return Config(title: "Water Bowl", imageName: "prop_water_bowl", value: thirst,
-                          fullnessLabel: "Fullness", button: "Refill", tint: .blue)
+            return Config(
+                title: "Water Bowl",
+                imageName: "prop_water_bowl",
+                value: thirst,
+                fullnessLabel: "Fullness",
+                primaryButton: "Refill",
+                secondaryButton: nil,
+                tint: .blue
+            )
         case .litterBox:
-            return Config(title: "Litter Box", imageName: "prop_litter_box", value: litter,
-                          fullnessLabel: "Cleanliness", button: "Clean", tint: .brown)
+            return Config(
+                title: "Litter Box",
+                imageName: "prop_litter_box",
+                value: litter,
+                fullnessLabel: "Cleanliness",
+                primaryButton: "Clean",
+                secondaryButton: nil,
+                tint: .brown
+            )
         case .cat:
-            return Config(title: "", imageName: "", value: 0, fullnessLabel: "", button: "", tint: .pink)
+            return Config(
+                title: "",
+                imageName: "",
+                value: 0,
+                fullnessLabel: "",
+                primaryButton: "",
+                secondaryButton: nil,
+                tint: .pink
+            )
         }
     }
 
@@ -60,7 +90,7 @@ struct BowlInspectCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(c.fullnessLabel)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.black.opacity(0.10)).frame(height: 12)
                     GeometryReader { geo in
@@ -73,18 +103,38 @@ struct BowlInspectCard: View {
                 .frame(height: 12)
                 Text("\(c.value)%")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button(action: onAction) {
-                Text(c.button)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .background(BabyTownTheme.buttonGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            VStack(spacing: 10) {
+                Button(action: onAction) {
+                    Text(c.primaryButton)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(BabyTownTheme.buttonGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                if let secondary = c.secondaryButton, let onSecondaryAction {
+                    Button(action: onSecondaryAction) {
+                        Text(secondary)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(BabyTownTheme.accentDeep)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(BabyTownTheme.accent.opacity(0.45), lineWidth: 1.5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.white.opacity(0.92))
+                                    )
+                            )
+                    }
+                }
             }
         }
         .padding(18)

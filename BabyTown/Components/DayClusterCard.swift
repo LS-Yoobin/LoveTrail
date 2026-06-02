@@ -102,6 +102,11 @@ struct DayClusterCard: View {
         }
     }
 
+    private var isFoundingMemory: Bool {
+        guard let prompt = section.moments.first?.promptText else { return false }
+        return prompt == "When we first met" || prompt == "When we became official"
+    }
+
     private var memoryMenu: some View {
         Menu {
                 Button {
@@ -122,10 +127,12 @@ struct DayClusterCard: View {
                     Label("Edit Memory", systemImage: "pencil")
                 }
                 
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Remove Memory", systemImage: "trash")
+                if !isFoundingMemory {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Remove Memory", systemImage: "trash")
+                    }
                 }
         } label: {
             Image(systemName: "ellipsis")

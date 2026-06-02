@@ -1,0 +1,96 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/PromptPhotoViewer.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Remove Photo Permanently?",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 83
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove Photo?",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 83
+        }
+      },
+      {
+        "comment": "",
+        "key": "No photos to display",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "This photo was taken with the in-app camera and will be removed permanently from the app.",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
+        "key": "Would you like to remove this photo from the app?",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 168
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 186
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 186
+        }
+      }
+    ]
+  },
+  "version": 1
+}

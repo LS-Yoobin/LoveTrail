@@ -1,0 +1,272 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PetRoomView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Do you want to save before you leave?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "+%lld 🪙",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 188
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 199
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@, pet profile",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 216
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opens profile with name, birth date, breed, and origin story",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 217
+        }
+      },
+      {
+        "comment": "",
+        "key": "Market",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 228
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose a different pet",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 256
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customize Room",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pet Profile",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "Rename",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "Trick Training",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 254
+        }
+      },
+      {
+        "comment": "",
+        "key": "Yes",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 269
+        }
+      },
+      {
+        "comment": "",
+        "key": "No",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 272
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customize Room",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 335
+        }
+      },
+      {
+        "comment": "",
+        "key": "Drag bowls, furniture & the cat tree",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "Trick Training",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 382
+        }
+      },
+      {
+        "comment": "",
+        "key": "Heard: \"%@\"",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 393
+        }
+      },
+      {
+        "comment": "",
+        "key": "Listening... Try saying \"Paw\" and more!",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 395
+        }
+      },
+      {
+        "comment": "",
+        "key": "Setting up microphone…",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 398
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap Exit to leave training",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 402
+        }
+      },
+      {
+        "comment": "",
+        "key": "Drag the laser to fill the bar",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 464
+        }
+      },
+      {
+        "comment": "",
+        "key": "Exit",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 478
+        }
+      },
+      {
+        "comment": "",
+        "key": "Snack",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 543
+        }
+      },
+      {
+        "comment": "",
+        "key": "Drag onto the floor to feed your cat a treat",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 544
+        }
+      },
+      {
+        "comment": "",
+        "key": "Trick Book",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 493
+        }
+      },
+      {
+        "comment": "",
+        "key": "🐟",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 508
+        }
+      },
+      {
+        "comment": "",
+        "key": "Drag",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 510
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stash",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 779
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save Room",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 779
+        }
+      },
+      {
+        "comment": "",
+        "key": "Train",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 849
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done Playing",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 875
+        }
+      },
+      {
+        "comment": "",
+        "key": "Play (Laser)",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 875
+        }
+      }
+    ]
+  },
+  "version": 1
+}

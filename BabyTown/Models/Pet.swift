@@ -16,11 +16,25 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Short descriptor shown on the adoption card.
+    /// Short descriptor shown on the adoption card and profile.
     var breedName: String {
         switch self {
         case .calico: return "Calico"
         case .cowCat: return "Cow Cat"
+        }
+    }
+
+    /// Shelter backstory for the Visit Pet profile card.
+    var originStory: String {
+        switch self {
+        case .calico:
+            return """
+            At the shelter, Artemis was only six months old, already a mama to a whole litter of kittens. One by one, her babies found loving homes, until the room grew quiet and she was the only one left. It was a lonely chapter, but every kitten's happy ending led to hers: you brought her home to your town. She is Baby Town's gentlest soul, so sweet she would never hurt a fly.
+            """
+        case .cowCat:
+            return """
+            Arabella was still a tiny kitten when she first stepped into the world of people, all goofy ears, a silly little face, and far more confidence than one cat should have. You saw her and knew she belonged in your town right away. She has not slowed down since. Baby Town's resident troublemaker, happy to devour anything and everything in her path.
+            """
         }
     }
 
@@ -38,6 +52,14 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return "portrait_calico"
         case .cowCat: return "portrait_cowcat"
+        }
+    }
+
+    /// Sitting pose used on the Visit Pet profile card.
+    var profileSitAsset: String {
+        switch self {
+        case .calico: return "profile_calico_sit"
+        case .cowCat: return "profile_cowcat_sit"
         }
     }
 
@@ -73,6 +95,15 @@ struct StoredNeed: Codable {
 /// Persisted pet state. Decoding tolerates missing keys (older save files) by
 /// falling back to defaults, so the format can keep growing safely.
 struct PetState: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case adoptedSkin, adoptedDate, coins, foodServings
+        case hunger, thirst, litter, happiness
+        case lastPetAt, lastPlayAt, customPetNames
+        case roomLayout
+        case roomLayoutsByPet
+        case trickTraining
+    }
+
     var adoptedSkin: CatSkin?
     var adoptedDate: Date?
 
@@ -87,7 +118,14 @@ struct PetState: Codable {
     var lastPetAt: Date?
     var lastPlayAt: Date?
 
-    var roomLayout: PetRoomLayoutState
+    /// Custom display names keyed by `CatSkin.rawValue`.
+    var customPetNames: [String: String]
+
+    /// Per-pet room décor + prop layout, keyed by `CatSkin.rawValue`.
+    var roomLayoutsByPet: [String: PetRoomLayoutState]
+
+    /// Voice-command trick training progress (unlock order, levels, successes).
+    var trickTraining: PetTrickTrainingState
 
     init(adoptedSkin: CatSkin? = nil, adoptedDate: Date? = nil) {
         self.adoptedSkin = adoptedSkin
@@ -101,7 +139,26 @@ struct PetState: Codable {
         self.happiness = StoredNeed(value: 100, asOf: now)
         self.lastPetAt = nil
         self.lastPlayAt = nil
-        self.roomLayout = PetRoomLayoutState()
+        self.customPetNames = [:]
+        self.roomLayoutsByPet = [:]
+        self.trickTraining = PetTrickTrainingState()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(adoptedSkin, forKey: .adoptedSkin)
+        try c.encodeIfPresent(adoptedDate, forKey: .adoptedDate)
+        try c.encode(coins, forKey: .coins)
+        try c.encode(foodServings, forKey: .foodServings)
+        try c.encode(hunger, forKey: .hunger)
+        try c.encode(thirst, forKey: .thirst)
+        try c.encode(litter, forKey: .litter)
+        try c.encode(happiness, forKey: .happiness)
+        try c.encodeIfPresent(lastPetAt, forKey: .lastPetAt)
+        try c.encodeIfPresent(lastPlayAt, forKey: .lastPlayAt)
+        try c.encode(customPetNames, forKey: .customPetNames)
+        try c.encode(roomLayoutsByPet, forKey: .roomLayoutsByPet)
+        try c.encode(trickTraining, forKey: .trickTraining)
     }
 
     init(from decoder: Decoder) throws {
@@ -117,6 +174,45 @@ struct PetState: Codable {
         happiness = try c.decodeIfPresent(StoredNeed.self, forKey: .happiness) ?? StoredNeed(value: 100, asOf: now)
         lastPetAt = try c.decodeIfPresent(Date.self, forKey: .lastPetAt)
         lastPlayAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayAt)
-        roomLayout = try c.decodeIfPresent(PetRoomLayoutState.self, forKey: .roomLayout) ?? PetRoomLayoutState()
+        customPetNames = try c.decodeIfPresent([String: String].self, forKey: .customPetNames) ?? [:]
+        roomLayoutsByPet = try c.decodeIfPresent([String: PetRoomLayoutState].self, forKey: .roomLayoutsByPet) ?? [:]
+        if roomLayoutsByPet.isEmpty,
+           let legacy = try c.decodeIfPresent(PetRoomLayoutState.self, forKey: .roomLayout) {
+            if let skin = adoptedSkin {
+                roomLayoutsByPet[skin.rawValue] = legacy
+            } else {
+                for skin in CatSkin.allCases {
+                    roomLayoutsByPet[skin.rawValue] = legacy
+                }
+            }
+        }
+        trickTraining = try c.decodeIfPresent(PetTrickTrainingState.self, forKey: .trickTraining) ?? PetTrickTrainingState()
+    }
+
+    func roomLayout(for skin: CatSkin) -> PetRoomLayoutState {
+        roomLayoutsByPet[skin.rawValue] ?? PetRoomLayoutState()
+    }
+
+    mutating func updateRoomLayout(for skin: CatSkin, _ body: (inout PetRoomLayoutState) -> Void) {
+        var layout = roomLayout(for: skin)
+        body(&layout)
+        roomLayoutsByPet[skin.rawValue] = layout
+    }
+
+    mutating func updateActiveRoomLayout(_ body: (inout PetRoomLayoutState) -> Void) {
+        guard let skin = adoptedSkin else { return }
+        updateRoomLayout(for: skin, body)
+    }
+
+    mutating func migrateAllRoomLayoutsIfNeeded() -> Bool {
+        var changed = false
+        for key in roomLayoutsByPet.keys {
+            let previous = roomLayoutsByPet[key]?.builtInLayoutVersion
+            roomLayoutsByPet[key]?.migrateBuiltInLayoutIfNeeded()
+            if roomLayoutsByPet[key]?.builtInLayoutVersion != previous {
+                changed = true
+            }
+        }
+        return changed
     }
 }

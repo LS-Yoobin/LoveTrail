@@ -179,8 +179,10 @@ struct HomeView: View {
                                         divider
                                     }
 
-                                    pinnedSection
-                                    divider
+                                    if showsPinnedSection {
+                                        pinnedSection
+                                        divider
+                                    }
 
                                     if viewModel.isEmpty {
                                         emptyState
@@ -948,6 +950,36 @@ struct HomeView: View {
         }
     }
 
+    private var hasOfficialPinned: Bool {
+        viewModel.pinnedItems.contains { item in
+            switch item {
+            case .moment(let m, _): return m.promptText == "When we became official"
+            case .prompt(let p): return p.promptText == "When we became official"
+            }
+        }
+    }
+
+    private var hasOfficialFoundingPhoto: Bool {
+        viewModel.moments.contains { $0.promptText == "When we became official" }
+    }
+
+    private var hasFirstMetFoundingPhoto: Bool {
+        viewModel.moments.contains { $0.promptText == "When we first met" }
+    }
+
+    /// Placeholders are for empty slots only — not when a founding photo exists but was unpinned.
+    private var showsOfficialPinnedPlaceholder: Bool {
+        !hasOfficialPinned && !hasOfficialFoundingPhoto
+    }
+
+    private var showsFirstMetPinnedPlaceholder: Bool {
+        !hasFirstMetPinned && !hasFirstMetFoundingPhoto
+    }
+
+    private var showsPinnedSection: Bool {
+        !viewModel.pinnedItems.isEmpty || showsOfficialPinnedPlaceholder || showsFirstMetPinnedPlaceholder
+    }
+
     private var pinnedSection: some View {
         VStack(spacing: 12) {
             sectionLabel("Pinned Memories", icon: "pin.fill")
@@ -955,9 +987,23 @@ struct HomeView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    // Placeholder for "When we first met" if not yet pinned
-                    if !hasFirstMetPinned {
-                        FirstMetPlaceholderCard {
+                    if showsOfficialPinnedPlaceholder {
+                        FoundingPlaceholderCard(
+                            title: "When we became official",
+                            showsPinnedLabel: true
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showingPinnedViewer = .official
+                            }
+                        }
+                        .frame(width: 180)
+                    }
+
+                    if showsFirstMetPinnedPlaceholder {
+                        FoundingPlaceholderCard(
+                            title: "When we first met",
+                            showsPinnedLabel: true
+                        ) {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 showingPinnedViewer = .firstMet
                             }
@@ -1059,7 +1105,7 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingMoments.count
+                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingTimelineSlots.count
                 )
 
                 let rows = timelineRows
@@ -1244,9 +1290,8 @@ struct HomeView: View {
                     .padding(.top, 8)
 
                     // Founding moments anchored at the very bottom
-                    ForEach(Array(viewModel.foundingDaySections.enumerated()), id: \.element.id) { idx, section in
-                        let moment = viewModel.foundingMoments[idx]
-
+                    ForEach(Array(viewModel.foundingTimelineSlots.enumerated()), id: \.offset) { _, slot in
+                        if let section = slot.section, let moment = slot.moment {
                         VStack(spacing: 12) {
                             DayClusterCard(
                                 section: section,
@@ -1305,10 +1350,53 @@ struct HomeView: View {
                             foundingMomentLabel(moment)
                         }
                         .padding(.top, 16)
+                        } else {
+                            VStack(spacing: 12) {
+                                FoundingPlaceholderCard(
+                                    title: slot.promptText,
+                                    showsPinnedLabel: false
+                                ) {
+                                    openFoundingPhotoPicker(for: slot.promptText)
+                                }
+                                .padding(.horizontal, 20)
+
+                                foundingMomentLabelPlaceholder(promptText: slot.promptText)
+                            }
+                            .padding(.top, 16)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func openFoundingPhotoPicker(for promptText: String) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if promptText == "When we became official" {
+                showingPinnedViewer = .official
+            } else {
+                showingPinnedViewer = .firstMet
+            }
+        }
+    }
+
+    private func foundingMomentLabelPlaceholder(promptText: String) -> some View {
+        HStack(spacing: 8) {
+            HeartbeatIconView()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(promptText)
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(foundingMomentTitleColor)
+
+                Text("Tap to add your photo")
+                    .font(.system(size: 13, weight: .regular, design: .serif))
+                    .foregroundStyle(foundingMomentDateColor)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 32)
     }
 
     private var foundingMomentTitleColor: Color {
@@ -1571,10 +1659,12 @@ private struct PulsingHeartView: View {
     }
 }
 
-// MARK: - First Met Placeholder Card
+// MARK: - Founding Placeholder Card
 
-private struct FirstMetPlaceholderCard: View {
+private struct FoundingPlaceholderCard: View {
 
+    let title: String
+    var showsPinnedLabel: Bool = false
     var onTap: () -> Void
     @State private var pulse = false
 
@@ -1604,18 +1694,20 @@ private struct FirstMetPlaceholderCard: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("When we first met")
+                Text(title)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(BabyTownTheme.textPrimary)
                     .lineLimit(2)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 8))
-                    Text("Pinned")
-                        .font(.system(size: 10))
+                if showsPinnedLabel {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 8))
+                        Text("Pinned")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
                 }
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
             }
         }
         .padding(10)

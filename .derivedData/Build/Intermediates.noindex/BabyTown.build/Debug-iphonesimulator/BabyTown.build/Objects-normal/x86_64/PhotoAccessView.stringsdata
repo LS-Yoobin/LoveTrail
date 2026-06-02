@@ -1,0 +1,40 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/PhotoAccessView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Save your\nmoments",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Fill your timeline with memories you've\nalready made—or capture new ones together.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
+        "key": "Continue",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recommended",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 212
+        }
+      }
+    ]
+  },
+  "version": 1
+}

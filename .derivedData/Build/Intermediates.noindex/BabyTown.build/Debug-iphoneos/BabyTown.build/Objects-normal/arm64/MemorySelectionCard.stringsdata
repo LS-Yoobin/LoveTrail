@@ -1,0 +1,16 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/MemorySelectionCard.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Optional",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 70
+        }
+      }
+    ]
+  },
+  "version": 1
+}

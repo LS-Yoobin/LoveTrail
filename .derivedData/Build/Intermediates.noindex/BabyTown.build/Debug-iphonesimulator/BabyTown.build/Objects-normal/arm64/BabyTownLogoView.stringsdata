@@ -1,0 +1,48 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/BabyTownLogoView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "BabyTown App Icon",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "1024x1024 App Store",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 75
+        }
+      },
+      {
+        "comment": "",
+        "key": "180x180",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 84
+        }
+      },
+      {
+        "comment": "",
+        "key": "120x120",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "87x87",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 96
+        }
+      }
+    ]
+  },
+  "version": 1
+}

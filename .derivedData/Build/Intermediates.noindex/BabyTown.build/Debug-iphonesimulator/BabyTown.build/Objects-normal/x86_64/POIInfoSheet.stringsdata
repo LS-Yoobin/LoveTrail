@@ -1,0 +1,16 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Components/POIInfoSheet.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 43
+        }
+      }
+    ]
+  },
+  "version": 1
+}

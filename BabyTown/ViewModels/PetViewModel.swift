@@ -25,10 +25,9 @@ final class PetViewModel: ObservableObject {
 
     init() {
         var loaded = DataPersistenceManager.shared.loadPetState()
-        let previousLayoutVersion = loaded.roomLayout.builtInLayoutVersion
-        loaded.roomLayout.migrateBuiltInLayoutIfNeeded()
+        let layoutsChanged = loaded.migrateAllRoomLayoutsIfNeeded()
         self.state = loaded
-        if loaded.roomLayout.builtInLayoutVersion != previousLayoutVersion {
+        if layoutsChanged {
             DataPersistenceManager.shared.savePetState(loaded)
         }
     }
@@ -39,12 +38,48 @@ final class PetViewModel: ObservableObject {
     var adoptedSkin: CatSkin? { state.adoptedSkin }
 
     func adopt(_ skin: CatSkin) {
-        state = PetState(adoptedSkin: skin, adoptedDate: Date())
+        state.adoptedSkin = skin
+        if state.adoptedDate == nil {
+            state.adoptedDate = Date()
+        }
+        if state.roomLayoutsByPet[skin.rawValue] == nil {
+            state.roomLayoutsByPet[skin.rawValue] = PetRoomLayoutState()
+        }
     }
 
-    /// Returns to the selection screen (lets the user choose a different cat).
+    func displayName(for skin: CatSkin) -> String {
+        if let custom = state.customPetNames[skin.rawValue]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !custom.isEmpty {
+            return custom
+        }
+        return skin.petName
+    }
+
+    func renamePet(for skin: CatSkin, to rawName: String) -> CareResult {
+        let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return CareResult(coinsAwarded: 0, blockedReason: "Enter a name")
+        }
+        guard trimmed.count <= 24 else {
+            return CareResult(coinsAwarded: 0, blockedReason: "Keep it under 24 characters")
+        }
+        guard trimmed != displayName(for: skin) else {
+            return CareResult(coinsAwarded: 0, blockedReason: "That's already their name")
+        }
+        guard state.coins >= PetEconomy.renameCost else {
+            return CareResult(coinsAwarded: 0, blockedReason: "Not enough coins")
+        }
+
+        state.coins -= PetEconomy.renameCost
+        state.customPetNames[skin.rawValue] = trimmed
+        return .none
+    }
+
+    /// Returns to the selection screen so the user can visit another adopted cat.
+    /// Per-pet room layouts, names, and care progress are preserved.
     func releasePet() {
-        state = PetState()
+        state.adoptedSkin = nil
     }
 
     // MARK: Live need values (decay applied at read), 0…100
@@ -98,7 +133,7 @@ final class PetViewModel: ObservableObject {
     func feed() -> CareResult {
         let level = state.hunger.current(decayPerHour: PetEconomy.hungerDecayPerHour)
         guard state.foodServings > 0 else {
-            return CareResult(coinsAwarded: 0, blockedReason: "Out of food — tap Refill and Buy Food")
+            return CareResult(coinsAwarded: 0, blockedReason: "Out of food — buy some in the Market")
         }
         guard level < PetEconomy.feedThirstGate else {
             return CareResult(coinsAwarded: 0, blockedReason: "The bowl's still full")
@@ -109,29 +144,9 @@ final class PetViewModel: ObservableObject {
         return award(.feed)
     }
 
-    /// Refills the food bowl when needed; buys a food pack first if servings are empty.
-    func refillAndBuyFood() -> CareResult {
-        let level = state.hunger.current(decayPerHour: PetEconomy.hungerDecayPerHour)
-        let needsRefill = level < PetEconomy.feedThirstGate
-
-        if needsRefill {
-            if state.foodServings == 0 {
-                let buyResult = buyFood()
-                if buyResult.blockedReason != nil { return buyResult }
-            }
-            return feed()
-        }
-
-        return buyFood()
-    }
-
-    func buyFood() -> CareResult {
-        guard state.coins >= PetEconomy.foodPackCost else {
-            return CareResult(coinsAwarded: 0, blockedReason: "Not enough coins for food")
-        }
-        state.coins -= PetEconomy.foodPackCost
-        state.foodServings += PetEconomy.foodPackServings
-        return CareResult(coinsAwarded: 0, blockedReason: nil)
+    /// Puts a serving from the pantry into the food bowl.
+    func refillFood() -> CareResult {
+        feed()
     }
 
     /// Happiness boost when laser play starts; coins come from `completePlay()`.
@@ -187,31 +202,91 @@ final class PetViewModel: ObservableObject {
 
     // MARK: - Room shop & layout
 
-    var roomLayout: PetRoomLayoutState { state.roomLayout }
+    var roomLayout: PetRoomLayoutState {
+        guard let skin = state.adoptedSkin else { return PetRoomLayoutState() }
+        return state.roomLayout(for: skin)
+    }
+
+    private func mutateActiveRoomLayout(_ transform: (inout PetRoomLayoutState) -> Void) {
+        state.updateActiveRoomLayout(transform)
+    }
 
     func ownsShopItem(_ itemID: String) -> Bool {
-        state.roomLayout.owns(itemID)
+        if let item = PetShopCatalog.item(id: itemID), item.isStarter {
+            return true
+        }
+        return roomLayout.owns(itemID)
     }
 
     func isShopItemSelected(_ itemID: String) -> Bool {
         guard let item = PetShopCatalog.item(id: itemID) else { return false }
+        let layout = roomLayout
+        if let slot = item.equipSlot {
+            let equipped = layout.equippedItemID(for: slot)
+            if item.isStarter { return equipped == nil }
+            return equipped == itemID
+        }
         if item.isWallColor {
-            let activeID = state.roomLayout.wallColorID ?? "wall_blush"
+            let activeID = layout.wallColorID ?? "wall_blush"
             return itemID == activeID
         }
         if item.isPictureFrame {
-            return state.roomLayout.owns(itemID) && state.roomLayout.pictureFrameMomentID != nil
+            return layout.owns(itemID)
+                && layout.pictureFrameMomentID != nil
+                && !layout.isStashed(itemID)
         }
-        return state.roomLayout.owns(itemID)
+        // A placed (owned, not stashed) floor item reads as "selected".
+        return layout.owns(itemID) && !layout.isStashed(itemID)
+    }
+
+    func isShopItemStashed(_ itemID: String) -> Bool {
+        roomLayout.isStashed(itemID)
+    }
+
+    /// Room décor the user owns (starters, purchases, and grants) — excludes consumables.
+    func ownedInventoryItems(in category: PetShopCategory) -> [PetShopItem] {
+        PetShopCatalog.items(in: category).filter { item in
+            guard !item.isCatFood else { return false }
+            return ownsShopItem(item.id)
+        }
+    }
+
+    /// Categories that have at least one owned inventory item.
+    var ownedItemCategories: [PetShopCategory] {
+        PetShopCategory.allCases.filter { !ownedInventoryItems(in: $0).isEmpty }
+    }
+
+    var hasOwnedShopItems: Bool {
+        !ownedItemCategories.isEmpty
+    }
+
+    /// Hides an owned item from the room (still owned; restore from My Items).
+    func stashItem(_ itemID: String) {
+        mutateActiveRoomLayout { layout in
+            guard !layout.stashedItemIDs.contains(itemID) else { return }
+            layout.stashedItemIDs.append(itemID)
+            layout.propPositions.removeValue(forKey: itemID)
+        }
+    }
+
+    /// Toggles a prop's horizontal flip (mirror).
+    func toggleFlip(_ itemID: String) {
+        mutateActiveRoomLayout { layout in
+            if let idx = layout.flippedItemIDs.firstIndex(of: itemID) {
+                layout.flippedItemIDs.remove(at: idx)
+            } else {
+                layout.flippedItemIDs.append(itemID)
+            }
+        }
     }
 
     func pictureFrameImage() -> UIImage? {
-        guard let id = state.roomLayout.pictureFrameMomentID else { return nil }
+        guard let id = roomLayout.pictureFrameMomentID else { return nil }
         return PetGalleryPhotoLoader.image(for: id)
     }
 
     func updatePropPositions(_ positions: [String: NormalizedPoint]) {
-        state.roomLayout.propPositions = positions
+        mutateActiveRoomLayout { $0.propPositions = positions }
     }
 
     /// Purchases or selects a shop item. Returns whether the memory-frame picker should open next.
@@ -220,12 +295,37 @@ final class PetViewModel: ObservableObject {
             return (.none, false)
         }
 
-        if state.roomLayout.owns(itemID) {
-            if item.isWallColor {
-                state.roomLayout.wallColorID = itemID
+        if let servings = item.servingsGranted {
+            guard state.coins >= item.cost else {
+                return (CareResult(coinsAwarded: 0, blockedReason: "Not enough coins"), false)
             }
-            let openPicker = item.isPictureFrame && state.roomLayout.pictureFrameMomentID == nil
+            state.coins -= item.cost
+            state.foodServings += servings
+            return (.none, false)
+        }
+
+        if item.isStarter || roomLayout.owns(itemID) {
+            if let slot = item.equipSlot {
+                equipShopItem(item)
+                return (.none, false)
+            }
+            if item.isWallColor {
+                mutateActiveRoomLayout { $0.wallColorID = itemID }
+            }
+            if (item.isFloorItem || item.isPictureFrame), roomLayout.isStashed(itemID) {
+                mutateActiveRoomLayout { layout in
+                    layout.stashedItemIDs.removeAll { $0 == itemID }
+                }
+            }
+            let openPicker = item.isPictureFrame && roomLayout.pictureFrameMomentID == nil
             return (.none, openPicker)
+        }
+
+        if item.cost == 0 {
+            if let slot = item.equipSlot {
+                equipShopItem(item)
+            }
+            return (.none, false)
         }
 
         guard state.coins >= item.cost else {
@@ -233,20 +333,133 @@ final class PetViewModel: ObservableObject {
         }
 
         state.coins -= item.cost
-        state.roomLayout.ownedItemIDs.append(itemID)
+        mutateActiveRoomLayout { $0.ownedItemIDs.append(itemID) }
 
-        if item.isWallColor {
-            state.roomLayout.wallColorID = itemID
+        if let slot = item.equipSlot {
+            equipShopItem(item)
+        } else if item.isWallColor {
+            mutateActiveRoomLayout { $0.wallColorID = itemID }
         }
 
-        let openPicker = item.isPictureFrame && state.roomLayout.pictureFrameMomentID == nil
+        let openPicker = item.isPictureFrame && roomLayout.pictureFrameMomentID == nil
         return (.none, openPicker)
     }
 
-    func setPictureFrameMoment(_ momentID: UUID) {
-        state.roomLayout.pictureFrameMomentID = momentID
-        if !state.roomLayout.owns(PetShopCatalog.pictureFrameID) {
-            state.roomLayout.ownedItemIDs.append(PetShopCatalog.pictureFrameID)
+    private func equipShopItem(_ item: PetShopItem) {
+        guard let slot = item.equipSlot else { return }
+        mutateActiveRoomLayout { layout in
+            if item.isStarter {
+                layout.setEquippedItem(nil, for: slot)
+            } else {
+                layout.setEquippedItem(item.id, for: slot)
+            }
         }
+    }
+
+    func setPictureFrameMoment(_ momentID: UUID) {
+        mutateActiveRoomLayout { layout in
+            layout.pictureFrameMomentID = momentID
+            if !layout.owns(PetShopCatalog.pictureFrameID) {
+                layout.ownedItemIDs.append(PetShopCatalog.pictureFrameID)
+            }
+        }
+    }
+
+    // MARK: - Trick training
+
+    var trickTraining: PetTrickTrainingState { state.trickTraining }
+
+    func trickProgress(for trick: PetTrick) -> PetTrickProgress {
+        state.trickTraining.progress(for: trick)
+    }
+
+    func isTrickUnlocked(_ trick: PetTrick) -> Bool {
+        state.trickTraining.isUnlocked(trick)
+    }
+
+    /// Outcome of a spoken trick command.
+    enum TrickAttemptOutcome {
+        case performed(level: Int, leveledUp: Bool, newlyUnlocked: [PetTrick], rewards: TrickTrainingRewards)
+        case ignored(level: Int)
+        case locked(trick: PetTrick)
+    }
+
+    var smartMeterLevel: Int { state.trickTraining.smartMeterLevel }
+    var smartMeterXP: Int { state.trickTraining.smartMeterXP }
+
+    func smartMeterProgressFraction() -> Double {
+        PetSmartMeterRules.progressFraction(
+            currentXP: state.trickTraining.smartMeterXP,
+            currentLevel: state.trickTraining.smartMeterLevel
+        )
+    }
+
+    /// Resolves a voice command: locked tricks are rejected; a correctly spoken command
+    /// always counts as a completed rep (obedience only affects non-voice paths, if added later).
+    func attemptTrick(_ trick: PetTrick, voiceRecognized: Bool = false) -> TrickAttemptOutcome {
+        guard state.trickTraining.isUnlocked(trick) else {
+            return .locked(trick: trick)
+        }
+
+        var progress = state.trickTraining.progress(for: trick)
+        let level = progress.level
+        if !voiceRecognized {
+            let roll = Double.random(in: 0..<1)
+            guard roll <= progress.obedienceRate else {
+                return .ignored(level: level)
+            }
+        }
+
+        let previousLevel = level
+        let unlockedBefore = Set(PetTrick.allCases.filter { state.trickTraining.isUnlocked($0) })
+
+        progress.successes += 1
+        state.trickTraining.setProgress(progress, for: trick)
+        state.trickTraining.refreshUnlocks()
+
+        let newLevel = progress.level
+        let leveledUp = newLevel > previousLevel
+        let newlyUnlocked = PetTrick.allCases.filter {
+            state.trickTraining.isUnlocked($0) && !unlockedBefore.contains($0)
+        }
+
+        var rewards = TrickTrainingRewards(smartMeterXP: PetSmartMeterRules.successXP(for: trick))
+        if leveledUp {
+            rewards.smartMeterXP += PetSmartMeterRules.levelUpXP
+        }
+        for unlocked in newlyUnlocked {
+            rewards.smartMeterXP += PetSmartMeterRules.unlockXP
+            rewards.coins += PetSmartMeterRules.unlockBonusCoins(for: unlocked)
+        }
+
+        state.trickTraining.addSmartMeterXP(rewards.smartMeterXP)
+        if rewards.coins > 0 {
+            state.coins += rewards.coins
+            lastAward = (rewards.coins, UUID())
+        }
+
+        bumpHappiness(by: 3)
+        return .performed(
+            level: newLevel,
+            leveledUp: leveledUp,
+            newlyUnlocked: newlyUnlocked,
+            rewards: rewards
+        )
+    }
+
+    /// Treat teaser during trick training — small Smart Meter XP, gated by cooldown.
+    func rewardTreatTeaser() -> TrickTrainingRewards {
+        let now = Date()
+        if let last = state.trickTraining.lastTreatTeaserAt {
+            let elapsed = now.timeIntervalSince(last)
+            if elapsed < PetSmartMeterRules.treatTeaserCooldown {
+                return TrickTrainingRewards()
+            }
+        }
+        state.trickTraining.lastTreatTeaserAt = now
+        let xp = PetSmartMeterRules.treatTeaserXP
+        state.trickTraining.addSmartMeterXP(xp)
+        bumpHappiness(by: 2)
+        return TrickTrainingRewards(smartMeterXP: xp)
     }
 }

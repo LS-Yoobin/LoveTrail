@@ -49,6 +49,9 @@ final class DataPersistenceManager {
     private let readInAppNotificationIDsKey = "readInAppNotificationIDs"
     private let isPartnerUnlockedKey = "isPartnerUnlocked"
     private let partnerInviteCodeKey = "partnerInviteCode"
+    private let appJoinedDateKey = "appJoinedDate"
+    private let foundingOfficialDateKey = "foundingOfficialPhotoDate"
+    private let foundingFirstMetDateKey = "foundingFirstMetPhotoDate"
     
     private init() {
         createDirectoriesIfNeeded()
@@ -102,6 +105,32 @@ final class DataPersistenceManager {
             return nil
         }
         return UIImage(data: data)
+    }
+
+    func saveFoundingPhotoDate(_ date: Date, promptText: String) {
+        let key = promptText == "When we became official"
+            ? foundingOfficialDateKey
+            : foundingFirstMetDateKey
+        userDefaults.set(date.timeIntervalSince1970, forKey: key)
+    }
+
+    func loadFoundingPhotoDate(promptText: String) -> Date? {
+        let key = promptText == "When we became official"
+            ? foundingOfficialDateKey
+            : foundingFirstMetDateKey
+        let interval = userDefaults.double(forKey: key)
+        guard interval > 0 else { return nil }
+        return Date(timeIntervalSince1970: interval)
+    }
+
+    func pinnedPhotoFileModificationDate(promptText: String) -> Date? {
+        let url = promptText == "When we became official" ? officialPhotoURL : firstMetPhotoURL
+        guard fileManager.fileExists(atPath: url.path),
+              let attrs = try? fileManager.attributesOfItem(atPath: url.path),
+              let modified = attrs[.modificationDate] as? Date else {
+            return nil
+        }
+        return modified
     }
     
     func savePromptMemories(_ memories: [PromptMemory]) {
@@ -160,6 +189,17 @@ final class DataPersistenceManager {
     
     func hasCompletedOnboarding() -> Bool {
         return userDefaults.bool(forKey: hasCompletedOnboardingKey)
+    }
+
+    /// The day the user first opened Baby Town — used as each kitty's "birth date"
+    /// on the Visit Pet profile. Backfills from an existing adoption date when upgrading.
+    func loadOrCreateAppJoinedDate() -> Date {
+        if let stored = userDefaults.object(forKey: appJoinedDateKey) as? Date {
+            return stored
+        }
+        let fallback = loadPetState().adoptedDate ?? Date()
+        userDefaults.set(fallback, forKey: appJoinedDateKey)
+        return fallback
     }
 
     /// Whether the paid "Invite Partner to Town" tier has been unlocked.
@@ -230,5 +270,8 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: readInAppNotificationIDsKey)
         userDefaults.removeObject(forKey: isPartnerUnlockedKey)
         userDefaults.removeObject(forKey: partnerInviteCodeKey)
+        userDefaults.removeObject(forKey: appJoinedDateKey)
+        userDefaults.removeObject(forKey: foundingOfficialDateKey)
+        userDefaults.removeObject(forKey: foundingFirstMetDateKey)
     }
 }

@@ -1,0 +1,16 @@
+{
+  "source": "/Users/justinseo/Desktop/BabyTown/BabyTown/Views/LaunchScreenView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Loading BabyTown...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 38
+        }
+      }
+    ]
+  },
+  "version": 1
+}
