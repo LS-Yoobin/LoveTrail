@@ -11,6 +11,7 @@ struct ContentView: View {
 
     enum Screen {
         case launch, welcome, storyOnboarding, nickname, firstMemories, howItWorks, photoAccess, home, selectPhotos
+        case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
     }
 
     @State private var screen: Screen = .launch
@@ -49,6 +50,9 @@ struct ContentView: View {
                 moments: []
             ))
         }
+        // TEMP (Slice 1): jump straight to the Love Garden for verification.
+        // Remove this line (and the enum case + switch case below) to restore normal flow.
+        _targetScreen = State(initialValue: .loveGarden)
     }
 
     var body: some View {
@@ -254,6 +258,10 @@ struct ContentView: View {
                 .onAppear {
                     DataPersistenceManager.shared.saveLastActiveScreen("selectPhotos")
                 }
+
+            case .loveGarden:
+                LoveGardenView()
+                    .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
