@@ -53,3 +53,10 @@ public struct GardenElement: Equatable, Sendable {
         self.position = position
     }
 }
+
+/// The garden's mood. `resting` is the kind dormancy state (calm palette) the
+/// garden enters after a quiet stretch — it never wilts or loses progress.
+public enum GardenSeason: String, Codable, Equatable, Sendable {
+    case blooming
+    case resting
+}
