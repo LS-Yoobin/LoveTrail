@@ -21,7 +21,8 @@ struct ContentView: View {
     @State private var selectedPrompt: PromptItem?
     @State private var shouldScrollToNewMemory = false
     @StateObject private var homeViewModel: HomeViewModel
-    
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         let hasCompletedOnboarding = DataPersistenceManager.shared.hasCompletedOnboarding()
         
@@ -272,6 +273,14 @@ struct ContentView: View {
         }
         .task {
             StoreManager.shared.start()
+        }
+        .onAppear {
+            NotificationManager.shared.refresh()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                NotificationManager.shared.refresh()
+            }
         }
     }
 }

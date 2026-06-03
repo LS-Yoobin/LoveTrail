@@ -232,6 +232,7 @@ final class DataPersistenceManager {
     func saveCoupleProfile(_ profile: CoupleProfile) {
         guard let data = try? encoder.encode(profile) else { return }
         try? data.write(to: coupleProfileFileURL)
+        NotificationManager.shared.refresh()
     }
 
     /// Tolerant load — returns an empty profile when nothing is stored.
