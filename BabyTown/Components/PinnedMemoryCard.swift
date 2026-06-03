@@ -70,20 +70,19 @@ struct PinnedMemoryCard: View {
     @ViewBuilder
     private var photoArea: some View {
         ZStack {
-            if !slides.isEmpty {
-                ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
-                    Image(uiImage: slide.image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(minWidth: 0, maxWidth: .infinity)
-                        .frame(height: 150)
-                        .blur(radius: slide.isLocked ? 20 : 0)
-                        .opacity(index == currentPhotoIndex % slides.count ? 1 : 0)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            if slides.isEmpty {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 150)
+            } else {
+                let activeIndex = currentPhotoIndex % slides.count
+                let activeSlide = slides[activeIndex]
 
-                let currentSlide = slides[currentPhotoIndex % slides.count]
-                if currentSlide.isLocked {
+                slideImage(activeSlide)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .animation(nil, value: activeIndex)
+
+                if activeSlide.isLocked {
                     RoundedRectangle(cornerRadius: 14)
                         .fill(.black.opacity(0.4))
 
@@ -92,18 +91,24 @@ struct PinnedMemoryCard: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white)
 
-                        if let unlockTime = currentSlide.unlockTime {
+                        if let unlockTime = activeSlide.unlockTime {
                             TimeUntilUnlockView(unlockTime: unlockTime)
                         }
                     }
                 }
-            } else {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 150)
             }
         }
         .frame(height: 150)
+        .animation(nil, value: currentPhotoIndex)
+    }
+
+    private func slideImage(_ slide: PinnedSlide) -> some View {
+        Image(uiImage: slide.image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(minWidth: 0, maxWidth: .infinity)
+            .frame(height: 150)
+            .blur(radius: slide.isLocked ? 20 : 0)
     }
 
     // MARK: - Text
@@ -150,11 +155,13 @@ struct PinnedMemoryCard: View {
     private func startSlideshow() {
         guard slides.count > 1 else { return }
         
-        slideshowTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.35)) {
                 currentPhotoIndex = (currentPhotoIndex + 1) % slides.count
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        slideshowTimer = timer
     }
     
     private func stopSlideshow() {

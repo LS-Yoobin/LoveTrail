@@ -141,7 +141,7 @@ final class PetSpeechCommandRecognizer: ObservableObject {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest else { throw RecognitionError.requestFailed }
         recognitionRequest.shouldReportPartialResults = true
-        recognitionRequest.taskHint = .search
+        recognitionRequest.taskHint = .confirmation
         recognitionRequest.contextualStrings = PetTrick.allCases.flatMap(\.voicePhrases)
 
         let inputNode = audioEngine.inputNode
@@ -202,6 +202,8 @@ final class PetSpeechCommandRecognizer: ObservableObject {
 
         liveTranscript = PetTrickTrainingState.displayTranscript(slice)
 
+        // Wait for a finalized utterance so partial "hi" from "high five" doesn't trigger Speak.
+        guard isFinal else { return }
         guard let trick = PetTrickTrainingState.trick(matching: slice) else { return }
 
         let now = Date()

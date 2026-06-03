@@ -4,7 +4,13 @@ import SwiftUI
 /// the paywall — that journey lives on the couple page.
 struct CoupleSpaceCard: View {
 
+    private static let avatarSize: CGFloat = 40
+    /// How much of the partner circle stays visible to the left of the user avatar.
+    private static let partnerRevealFraction: CGFloat = 0.45
+
     var avatar: UIImage?
+    /// Partner portrait when available; `nil` shows the invite heart placeholder.
+    var partnerAvatar: UIImage? = nil
     var bloomCount: Int
     /// True when the user has purchased but has not finished inviting their partner.
     var isReadyToInvite: Bool
@@ -84,31 +90,74 @@ struct CoupleSpaceCard: View {
         }
     }
 
-    @ViewBuilder
+    /// Partner behind, user in front — same vertical center, ~45% of partner visible.
     private var avatarThumbnail: some View {
+        HStack(spacing: -Self.avatarSize * (1 - Self.partnerRevealFraction)) {
+            partnerAvatarCircle
+            userAvatarCircle
+        }
+        .frame(
+            width: Self.avatarSize + Self.avatarSize * Self.partnerRevealFraction,
+            height: Self.avatarSize,
+            alignment: .leading
+        )
+    }
+
+    private var userAvatarCircle: some View {
+        avatarCircle(image: avatar, placeholderSystemName: "person.fill")
+        .zIndex(1)
+    }
+
+    private var partnerAvatarCircle: some View {
+        Group {
+            if let partnerAvatar {
+                avatarCircle(image: partnerAvatar, placeholderSystemName: "heart.circle")
+            } else {
+                partnerInvitePlaceholder
+            }
+        }
+        .zIndex(0)
+    }
+
+    private var partnerInvitePlaceholder: some View {
         ZStack {
-            if let avatar {
-                Image(uiImage: avatar)
+            Circle().fill(.ultraThinMaterial)
+            Circle()
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                .foregroundStyle(Color.secondary.opacity(0.5))
+            Image(systemName: "heart.circle")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
+        .overlay(Circle().stroke(.white, lineWidth: 2))
+    }
+
+    private func avatarCircle(image: UIImage?, placeholderSystemName: String) -> some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
             } else {
                 Circle().fill(Color(.quaternaryLabel))
-                Image(systemName: "person.fill")
+                Image(systemName: placeholderSystemName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 40, height: 40)
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
         .clipShape(Circle())
         .overlay(Circle().stroke(.white, lineWidth: 2))
     }
 }
 
-#Preview {
+#Preview("With photos") {
     CoupleSpaceCard(
         avatar: nil,
+        partnerAvatar: nil,
         bloomCount: 8,
-        isReadyToInvite: false,
+        isReadyToInvite: true,
         onTap: {}
     )
     .padding(.vertical, 40)

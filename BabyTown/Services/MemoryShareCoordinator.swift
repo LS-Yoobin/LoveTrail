@@ -13,7 +13,8 @@ final class MemoryShareCoordinator: ObservableObject {
         guard !isGenerating else { return }
 
         let sources = shareablePhotoSources(from: payload)
-        guard !sources.isEmpty else {
+        let hasShareableText = payload.promptText != nil || payload.loveNote != nil
+        guard !sources.isEmpty || hasShareableText else {
             errorMessage = "This memory has no photos available to share."
             showError = true
             return
@@ -23,8 +24,10 @@ final class MemoryShareCoordinator: ObservableObject {
 
         Task {
             let sources = Array(sources.prefix(MemorySharePhotoCollage.maxPhotos))
-            let images = await MemoryShareImageLoader.loadImages(for: sources)
-            guard !images.isEmpty else {
+            let images = sources.isEmpty
+                ? []
+                : await MemoryShareImageLoader.loadImages(for: sources)
+            if !sources.isEmpty, images.isEmpty {
                 isGenerating = false
                 errorMessage = "Couldn't load photos for sharing."
                 showError = true

@@ -2,6 +2,10 @@ import SwiftUI
 
 /// Top chrome while editing the garden: Back (discard) and Save pills.
 struct EditGardenHeaderView: View {
+    static let estimatedHeight: CGFloat = 44
+    static let overlayTopPadding: CGFloat = 0
+    static var scrollTopClearance: CGFloat { estimatedHeight + overlayTopPadding }
+
     let onBack: () -> Void
     let onSave: () -> Void
 

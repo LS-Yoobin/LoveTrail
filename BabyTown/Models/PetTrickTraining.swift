@@ -39,7 +39,10 @@ enum PetTrick: String, Codable, CaseIterable, Identifiable {
     var voicePhrases: [String] {
         switch self {
         case .paw:       return ["paw", "paul", "give paw", "shake"]
-        case .highFive:  return ["high five", "high-five", "highfive"]
+        case .highFive:  return [
+            "high five", "high-five", "highfive", "high 5", "high5",
+            "gh five", "hive five", "hai five",
+        ]
         case .up:        return ["up", "stand up", "stand"]
         case .spin:      return ["spin", "turn around", "turn"]
         case .down:      return ["down", "lay down", "lie down"]
@@ -367,13 +370,23 @@ struct PetTrickTrainingState: Codable, Equatable {
         }
     }
 
-    /// Speech often mishears "paw" as "paul"; show the intended command in the UI.
+    /// Maps common speech-recognition mishears to the command the user likely said.
     static func displayTranscript(_ transcript: String) -> String {
-        transcript.replacingOccurrences(
-            of: "\\bpaul\\b",
-            with: "Paw",
-            options: [.regularExpression, .caseInsensitive]
-        )
+        var text = transcript
+        let corrections: [(pattern: String, replacement: String)] = [
+            (#"\b(?:gh|hive|hai)\s+five\b"#, "High five"),
+            (#"\bhigh\s*[-]?\s*5\b"#, "High five"),
+            (#"\bhighfive\b"#, "High five"),
+            (#"\bpaul\b"#, "Paw"),
+        ]
+        for (pattern, replacement) in corrections {
+            text = text.replacingOccurrences(
+                of: pattern,
+                with: replacement,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+        return text
     }
 
     /// Maps recognized speech text to a trick, if any phrase matches.
@@ -411,8 +424,18 @@ struct PetTrickTrainingState: Codable, Equatable {
     }
 
     private static func normalizedTranscript(_ transcript: String) -> String {
-        transcript.lowercased()
+        var text = transcript.lowercased()
             .replacingOccurrences(of: "-", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let mishearToCanonical: [(pattern: String, replacement: String)] = [
+            (#"\b(?:gh|hive|hai)\s+five\b"#, "high five"),
+            (#"\bhigh\s*5\b"#, "high five"),
+            (#"\bhighfive\b"#, "high five"),
+            (#"\bhigh5\b"#, "high five"),
+        ]
+        for (pattern, replacement) in mishearToCanonical {
+            text = text.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+        }
+        return text
     }
 }

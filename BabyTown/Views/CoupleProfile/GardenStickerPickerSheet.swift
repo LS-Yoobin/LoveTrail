@@ -61,7 +61,7 @@ struct GardenStickerPickerSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("BABYTOWN GALLERY OF MOMENTS THEY SAVED")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.black)
                 .tracking(0.4)
             Text("Pick a photo to turn into a sticker for your garden.")
                 .font(.subheadline)

@@ -40,7 +40,8 @@ final class LoveGardenScene: SKScene {
             addChild(node)
             elementNodes[element.sourceID] = node
 
-            animateGrowth(node, delay: Double(index) * 0.03)
+            let depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
+            animateGrowth(node, targetScale: depthScale, delay: Double(index) * 0.03)
             addSway(to: node, seed: element.position.x)
         }
         addAmbientParticles()
@@ -53,6 +54,17 @@ final class LoveGardenScene: SKScene {
 
     private func screenPosition(for p: GardenPoint) -> CGPoint {
         CGPoint(x: CGFloat(p.x) * size.width, y: CGFloat(p.y) * size.height)
+    }
+
+    /// Matches `GardenComposer` planting band — lower on screen reads closer/larger.
+    private func bloomDepthScale(normalizedY: CGFloat) -> CGFloat {
+        let bandLow: CGFloat = 0.08
+        let bandHigh: CGFloat = 0.42
+        let span = max(bandHigh - bandLow, 0.001)
+        let t = min(max((normalizedY - bandLow) / span, 0), 1)
+        let frontScale: CGFloat = 1.24
+        let backScale: CGFloat = 0.76
+        return frontScale + (backScale - frontScale) * t
     }
 
     private func drawGround() {
@@ -265,12 +277,13 @@ final class LoveGardenScene: SKScene {
     // MARK: Living layer — growth, sway, particles
 
     /// Sprout → bloom: pop up from nothing with a gentle overshoot.
-    private func animateGrowth(_ node: SKNode, delay: TimeInterval) {
+    private func animateGrowth(_ node: SKNode, targetScale: CGFloat, delay: TimeInterval) {
         node.setScale(0)
+        let overshoot = targetScale * 1.08
         let grow = SKAction.sequence([
             .wait(forDuration: delay),
-            .scale(to: 1.08, duration: 0.28),
-            .scale(to: 1.0, duration: 0.12),
+            .scale(to: overshoot, duration: 0.28),
+            .scale(to: targetScale, duration: 0.12),
         ])
         grow.timingMode = .easeOut
         node.run(grow)
@@ -323,8 +336,9 @@ final class LoveGardenScene: SKScene {
         var node: SKNode? = atPoint(location)
         while let current = node {
             if let name = current.name, let id = UUID(uuidString: name) {
-                let bump = SKAction.sequence([.scale(to: 1.18, duration: 0.08),
-                                              .scale(to: 1.0, duration: 0.12)])
+                let rest = current.xScale
+                let bump = SKAction.sequence([.scale(to: rest * 1.18, duration: 0.08),
+                                              .scale(to: rest, duration: 0.12)])
                 current.run(bump)
                 onTapElement?(id)
                 return

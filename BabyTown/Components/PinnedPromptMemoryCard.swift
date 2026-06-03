@@ -66,8 +66,9 @@ struct PinnedPromptMemoryCard: View {
     private var photoArea: some View {
         ZStack {
             if !memory.photos.isEmpty {
-                let currentPhoto = memory.photos[currentPhotoIndex]
-                
+                let activeIndex = currentPhotoIndex % memory.photos.count
+                let currentPhoto = memory.photos[activeIndex]
+
                 Image(uiImage: currentPhoto.thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -75,9 +76,8 @@ struct PinnedPromptMemoryCard: View {
                     .frame(height: 150)
                     .blur(radius: isPhotoLocked(currentPhoto) ? 20 : 0)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .id(currentPhotoIndex)
-                    .transition(.opacity)
-                
+                    .animation(nil, value: activeIndex)
+
                 if isPhotoLocked(currentPhoto) {
                     RoundedRectangle(cornerRadius: 14)
                         .fill(.black.opacity(0.4))
@@ -99,6 +99,7 @@ struct PinnedPromptMemoryCard: View {
             }
         }
         .frame(height: 150)
+        .animation(nil, value: currentPhotoIndex)
     }
 
     // MARK: - Text Area
@@ -151,11 +152,13 @@ struct PinnedPromptMemoryCard: View {
     private func startSlideshow() {
         guard memory.photos.count > 1 else { return }
         
-        slideshowTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.5)) {
                 currentPhotoIndex = (currentPhotoIndex + 1) % memory.photos.count
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        slideshowTimer = timer
     }
     
     private func stopSlideshow() {

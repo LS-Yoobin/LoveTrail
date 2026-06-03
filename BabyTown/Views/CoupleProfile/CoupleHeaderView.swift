@@ -6,7 +6,7 @@ struct CoupleHeaderView: View {
     /// Height of the button row (excluding safe area).
     static let estimatedHeight: CGFloat = 52
     /// Padding above the row when floating over scroll content (`8` inner + `4` outer).
-    static let overlayTopPadding: CGFloat = 12
+    static let overlayTopPadding: CGFloat = 0
     /// Scroll top inset below the status bar so content clears this header.
     static var scrollTopClearance: CGFloat { estimatedHeight + overlayTopPadding }
 

@@ -1,6 +1,22 @@
 import SwiftUI
 import PhotosUI
 
+/// Sheet payload so add vs edit context is passed atomically (avoids `isPresented`
+/// reading stale `editing` state on first presentation).
+struct SpecialDateEditorPresentation: Identifiable {
+    let id: UUID
+    let editing: SpecialDate?
+    let initialImage: UIImage?
+
+    static func add() -> SpecialDateEditorPresentation {
+        SpecialDateEditorPresentation(id: UUID(), editing: nil, initialImage: nil)
+    }
+
+    static func edit(_ date: SpecialDate, image: UIImage?) -> SpecialDateEditorPresentation {
+        SpecialDateEditorPresentation(id: date.id, editing: date, initialImage: image)
+    }
+}
+
 /// Add or edit a special date: title, date, optional photo. `onSave` receives the
 /// edited `SpecialDate` and the chosen image (nil = no change requested by the
 /// caller's convention: see CoupleProfileView). `onDelete` is nil when adding.

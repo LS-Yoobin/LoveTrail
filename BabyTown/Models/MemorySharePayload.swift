@@ -82,6 +82,31 @@ struct MemorySharePayload: Identifiable {
         )
     }
 
+    init(special: SpecialDate, image: UIImage?) {
+        let sources: [MemorySharePhotoSource]
+        if let image {
+            sources = [
+                MemorySharePhotoSource(
+                    id: special.id,
+                    thumbnail: image,
+                    assetIdentifier: nil,
+                    isLocked: false
+                ),
+            ]
+        } else {
+            sources = []
+        }
+        self.init(
+            id: special.id,
+            date: special.date,
+            placeName: nil,
+            isPlaceNameUserSet: false,
+            promptText: special.title,
+            loveNote: nil,
+            photoSources: sources
+        )
+    }
+
     init(pinned: PinnedItem) {
         switch pinned {
         case .moment(let primary, let all):

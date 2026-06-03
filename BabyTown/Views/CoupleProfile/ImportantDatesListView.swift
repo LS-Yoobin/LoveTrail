@@ -94,9 +94,7 @@ struct ImportantDatesListView: View {
     let onDeleteSpecial: (SpecialDate) -> Void
 
     @State private var photoViewerContext: ImportantDatePhotoViewerContext?
-    @State private var showDateEditor = false
-    @State private var editingDate: SpecialDate?
-    @State private var editingDateImage: UIImage?
+    @State private var dateEditorPresentation: SpecialDateEditorPresentation?
 
     private static let dateFormat: Date.FormatStyle =
         .dateTime.month(.abbreviated).day().year()
@@ -165,31 +163,30 @@ struct ImportantDatesListView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: photoViewerContext != nil)
-        .sheet(isPresented: $showDateEditor) {
+        .sheet(item: $dateEditorPresentation) { presentation in
             SpecialDateEditorSheet(
-                editing: editingDate,
-                initialImage: editingDateImage,
+                editing: presentation.editing,
+                initialImage: presentation.initialImage,
                 onSave: { date, image in
                     onSaveSpecial(date, image)
                 },
-                onDelete: editingDate == nil ? nil : { onDeleteSpecial($0) }
+                onDelete: presentation.editing == nil ? nil : { onDeleteSpecial($0) }
             )
         }
     }
 
     private func beginAddSpecial() {
-        editingDate = nil
-        editingDateImage = nil
-        showDateEditor = true
+        dateEditorPresentation = .add()
     }
 
     private func beginEditSpecial(id: String) {
         guard let uid = UUID(uuidString: id),
               let match = specialDates.first(where: { $0.id == uid }) else { return }
         photoViewerContext = nil
-        editingDate = match
-        editingDateImage = DataPersistenceManager.shared.loadSpecialDatePhoto(id: uid)
-        showDateEditor = true
+        dateEditorPresentation = .edit(
+            match,
+            image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: uid)
+        )
     }
 
     @ViewBuilder

@@ -55,6 +55,9 @@ struct HomeView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
     @State private var scrollToNewMemory = false
+    @State private var scrollToTop = false
+    /// Aligns the initial rest position with the scroll-to-top button's target.
+    @State private var didAlignInitialScroll = false
     @State private var showNotifications = false
     @State private var hasUnreadNotifications = AppNotification.hasUnread()
     @State private var showOnThisDayViewer = false
@@ -151,6 +154,10 @@ struct HomeView: View {
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: isMemorySearchActive ? 16 : 28) {
+                                Color.clear
+                                    .frame(height: 0)
+                                    .id("homeScrollTop")
+
                                 if !isUsingMemorySearch {
                                     MapPullHintView(
                                         progress: min(currentPullProgress, 1),
@@ -256,6 +263,25 @@ struct HomeView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     scrollToNewMemory = false
                                 }
+                            }
+                        }
+                        .onChange(of: scrollToTop) { _, newValue in
+                            if newValue {
+                                withAnimation {
+                                    proxy.scrollTo("homeScrollTop", anchor: .top)
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    scrollToTop = false
+                                }
+                            }
+                        }
+                        .onAppear {
+                            // Rest at the same spot the scroll-to-top button targets,
+                            // so the default position isn't 18pt below it.
+                            guard !didAlignInitialScroll else { return }
+                            didAlignInitialScroll = true
+                            DispatchQueue.main.async {
+                                proxy.scrollTo("homeScrollTop", anchor: .top)
                             }
                         }
                     }
@@ -394,6 +420,21 @@ struct HomeView: View {
                     .transition(.opacity)
                     .zIndex(12)
                 }
+
+                if let context = importantDatePhotoViewer {
+                    ImportantDatePhotoViewer(
+                        title: context.title,
+                        date: context.date,
+                        image: context.image,
+                        onDismiss: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                importantDatePhotoViewer = nil
+                            }
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(13)
+                }
                 
                 if showOnThisDayViewer {
                     OnThisDayPhotoViewer(
@@ -524,6 +565,15 @@ struct HomeView: View {
 
     private func shareMemory(_ payload: MemorySharePayload) {
         shareCoordinator.share(payload)
+    }
+
+    private func shareHomeSpecialDate(_ special: SpecialDate) {
+        shareMemory(
+            MemorySharePayload(
+                special: special,
+                image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id)
+            )
+        )
     }
     
     // MARK: - Map pull reveal
@@ -680,9 +730,19 @@ struct HomeView: View {
     private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
         showUpButton = topOffset > 100
 
-        // Avoid re-rendering search results on every scroll frame (causes card recycling glitches).
+        // Avoid re-rendering the feed on every scroll frame (pinned photos can flash,
+        // especially over the animated night background). Search keeps scrollOffset frozen.
         if !isMemorySearchActive {
-            scrollOffset = topOffset
+            if topOffset < 80 {
+                if scrollOffset != topOffset {
+                    scrollOffset = topOffset
+                }
+            } else {
+                let coarseOffset = (topOffset / 32).rounded() * 32
+                if scrollOffset < 80 || abs(coarseOffset - scrollOffset) >= 32 {
+                    scrollOffset = coarseOffset
+                }
+            }
         }
 
         guard !isUsingMemorySearch else {
@@ -1168,6 +1228,7 @@ struct HomeView: View {
                                 image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
                                 isPinned: true,
                                 onTap: { openHomeSpecialDate(special) },
+                                onShare: { shareHomeSpecialDate(special) },
                                 onEdit: { beginEditHomeSpecialDate(special) },
                                 onDelete: { deleteHomeSpecialDate(special) },
                                 onTogglePin: { toggleHomeSpecialDatePin(special) }
@@ -1441,8 +1502,12 @@ struct HomeView: View {
                                 title: special.title,
                                 date: special.date,
                                 image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
+                                style: .timeline,
                                 isPinned: special.isPinned,
+                                isLeftAligned: index.isMultiple(of: 2),
+                                index: index,
                                 onTap: { openHomeSpecialDate(special) },
+                                onShare: { shareHomeSpecialDate(special) },
                                 onEdit: { beginEditHomeSpecialDate(special) },
                                 onDelete: { deleteHomeSpecialDate(special) },
                                 onTogglePin: { toggleHomeSpecialDatePin(special) }
@@ -1805,7 +1870,7 @@ struct HomeView: View {
                 Spacer()
                 
                 Button {
-                    scrollToNewMemory = true
+                    scrollToTop = true
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 44))

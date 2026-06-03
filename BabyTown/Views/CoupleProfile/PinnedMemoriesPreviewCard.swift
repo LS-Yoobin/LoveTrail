@@ -72,6 +72,14 @@ struct PinnedMemoriesPreviewCard: View {
                                 image: photoForSpecialDate(special.id),
                                 isPinned: true,
                                 onTap: { onTapSpecialDate(special) },
+                                onShare: {
+                                    onSharePinned(
+                                        MemorySharePayload(
+                                            special: special,
+                                            image: photoForSpecialDate(special.id)
+                                        )
+                                    )
+                                },
                                 onEdit: { onEditSpecialDate(special) },
                                 onDelete: { onDeleteSpecialDate(special) },
                                 onTogglePin: { onUnpinSpecialDate(special) }

@@ -93,6 +93,8 @@ final class PetRoomScene: SKScene {
     /// The cat shrinks more aggressively with depth than props, so it doesn't
     /// tower over furniture at the back of the room.
     private let catDepthBackScale: CGFloat = 0.375
+    /// Secret-garden backdrop: ~30% gentler shrink so cats stay larger toward the hills.
+    private let gardenCatDepthBackScale: CGFloat = 0.5625
     /// Front (closest) edge of the prop drag region — props may slide all the way
     /// down to near the bottom of the screen, ahead of the cat's floor band.
     private let propFrontBound: CGFloat = 0.02
@@ -1296,8 +1298,9 @@ final class PetRoomScene: SKScene {
     /// size at the front of the band, shrinking toward the back. Shared by props
     /// and the cat so they recede together.
     private func depthPerspectiveScale(baseY: CGFloat, backScale: CGFloat) -> CGFloat {
-        let floorBottom = size.height * floorBand.lowerBound
-        let seam = size.height * floorBand.upperBound
+        let band = perspectiveFloorBand
+        let floorBottom = size.height * band.lowerBound
+        let seam = size.height * band.upperBound
         let span = max(seam - floorBottom, 1)
         let t = min(max((baseY - floorBottom) / span, 0), 1)   // 0 front … 1 back
         return depthFrontScale + (backScale - depthFrontScale) * t
@@ -1343,7 +1346,7 @@ final class PetRoomScene: SKScene {
     /// lower (closer) Y draws in front of higher (deeper) Y.
     private func propDepthZ(for baseY: CGFloat) -> CGFloat {
         let frontEdge = size.height * propFrontBound
-        let backEdge = size.height * floorBand.upperBound
+        let backEdge = size.height * perspectiveFloorBand.upperBound
         let span = max(backEdge - frontEdge, 1)
         let t = min(max((baseY - frontEdge) / span, 0), 1) // 0 front ... 1 back
         return propDepthFrontZ + (propDepthBackZ - propDepthFrontZ) * t
@@ -2284,7 +2287,7 @@ final class PetRoomScene: SKScene {
             x: min(max(next.x, minX), maxX),
             y: min(max(next.y, minY), maxY)
         )
-        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
+        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: activeCatDepthBackScale))
     }
 
     private func dropCarriedCat() {
@@ -2297,7 +2300,7 @@ final class PetRoomScene: SKScene {
         catVisual.anchorPoint = CGPoint(x: 0.5, y: 0)
         startAnimation(.idle)
         cat.position = clampCatPosition(feetPoint)
-        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
+        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: activeCatDepthBackScale))
         updateCatFloorDepthLayering()
         isInteracting = false
         runBehavior()
@@ -3452,7 +3455,7 @@ final class PetRoomScene: SKScene {
         // Match the props' floor perspective: the cat shrinks as it walks toward
         // the back of the room and grows as it comes forward. Scales around its
         // feet (the cat node's origin), so it stays planted on the floor.
-        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
+        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: activeCatDepthBackScale))
         if !isCarryingCat {
             cat.position = clampCatPosition(cat.position)
         }
@@ -3801,7 +3804,16 @@ final class PetRoomScene: SKScene {
     }
 
     /// Grass band on the Couples Profile garden backdrop (fraction of scene height).
-    private let gardenFloorBand: ClosedRange<CGFloat> = 0.08...0.36
+    private let gardenFloorBand: ClosedRange<CGFloat> = 0.08...0.46
+
+    /// Floor band used for perspective scale and draw order (garden vs pet room).
+    private var perspectiveFloorBand: ClosedRange<CGFloat> {
+        isGardenBackdrop ? gardenFloorBand : floorBand
+    }
+
+    private var activeCatDepthBackScale: CGFloat {
+        isGardenBackdrop ? gardenCatDepthBackScale : catDepthBackScale
+    }
 
     /// Vertical band the cat may walk in — same front reach as play mode
     /// (`laserFloorLowerBound`), with a small back inset so it stays off the seam.

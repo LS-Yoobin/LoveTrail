@@ -2,14 +2,14 @@ import SwiftUI
 
 /// Fixed footer actions while editing the garden layout.
 struct EditGardenFooterBar: View {
-    let onAddLoveStory: () -> Void
+    let onAddNote: () -> Void
     let onCreateStickers: () -> Void
 
     private static let buttonFill = Color(red: 0.93, green: 0.55, blue: 0.52)
 
     var body: some View {
         HStack(spacing: 12) {
-            actionButton(title: "Add Love Story", action: onAddLoveStory)
+            actionButton(title: "Add Note", action: onAddNote)
             actionButton(title: "Create Stickers", action: onCreateStickers)
         }
         .padding(.horizontal, 16)

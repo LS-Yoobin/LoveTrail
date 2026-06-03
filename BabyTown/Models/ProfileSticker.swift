@@ -29,10 +29,10 @@ struct ProfileSticker: Codable, Identifiable, Equatable {
     static let cutoutBaseSize: CGFloat = 84
 
     /// Default normalized position for a freshly synced partner-invite sticker
-    /// (lower-right of the open canvas, beside the user avatar).
-    static let defaultPartnerPosition = NormalizedPoint(x: 0.70, y: 0.62)
+    /// (garden band directly below the profile cards).
+    static let defaultPartnerPosition = NormalizedPoint(x: 0.68, y: 0.46)
     /// Default normalized position for a freshly synced user-avatar sticker.
-    static let defaultUserAvatarPosition = NormalizedPoint(x: 0.30, y: 0.62)
+    static let defaultUserAvatarPosition = NormalizedPoint(x: 0.32, y: 0.46)
 
     /// Side length on screen for a sticker at the given scale.
     static func renderedSize(scale: CGFloat) -> CGFloat {

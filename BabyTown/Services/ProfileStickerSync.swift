@@ -44,13 +44,18 @@ enum ProfileStickerSync {
             }
         }
 
-        ensureUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
+        syncUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
-        ensurePartnerInviteSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
+        dedupePartnerInviteStickers(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
         if let idx = stickers.firstIndex(where: { $0.kind == .userAvatar }),
-           Self.isLegacyUserAvatarPosition(stickers[idx].position) {
+           Self.shouldMigrateToDefaultProfilePosition(stickers[idx].position, kind: .userAvatar) {
             stickers[idx].position = ProfileSticker.defaultUserAvatarPosition
+        }
+
+        if let idx = stickers.firstIndex(where: { $0.kind == .partnerInvite }),
+           Self.shouldMigrateToDefaultProfilePosition(stickers[idx].position, kind: .partnerInvite) {
+            stickers[idx].position = ProfileSticker.defaultPartnerPosition
         }
 
         for date in profile.specialDates {
@@ -92,76 +97,80 @@ enum ProfileStickerSync {
     /// Legacy default for user avatar stickers (customize mode only).
     static let canonicalUserAvatarPosition = NormalizedPoint(x: 0.19, y: 0.138)
 
-    /// Guarantees exactly one persistent user-avatar sticker. When a profile photo
-    /// exists it carries the cutout; with no photo it keeps the sticker (no stored
-    /// image) so it renders the "Profile Photo" placeholder, still draggable.
-    private static func ensureUserAvatarSticker(
+    /// Updates an existing user-avatar sticker cutout when the profile photo changes.
+    /// Does **not** create a sticker if the user removed it from the garden.
+    private static func syncUserAvatarSticker(
         stickers: inout [ProfileSticker],
         bySource: inout [String: ProfileSticker],
         dpm: DataPersistenceManager
     ) {
         let key = "userAvatar"
-        let image = dpm.loadUserAvatar()
+        guard var sticker = bySource[key] else { return }
 
-        if var sticker = bySource[key] {
-            if let image {
-                let processed = SubjectLiftService.stickerImage(from: image)
-                dpm.saveStickerImage(processed.image, id: sticker.id)
-                sticker.usedSubjectLift = processed.usedSubjectLift
-            } else {
-                // No photo: drop any stored cutout so it renders the placeholder.
-                dpm.deleteStickerImage(id: sticker.id)
-                sticker.usedSubjectLift = false
-            }
-            if let idx = stickers.firstIndex(where: { $0.id == sticker.id }) {
-                stickers[idx] = sticker
-            }
-            bySource[key] = sticker
+        if let image = dpm.loadUserAvatar() {
+            let processed = SubjectLiftService.stickerImage(from: image)
+            dpm.saveStickerImage(processed.image, id: sticker.id)
+            sticker.usedSubjectLift = processed.usedSubjectLift
         } else {
-            var sticker = ProfileSticker(
-                kind: .userAvatar,
-                sourceKey: key,
-                position: ProfileSticker.defaultUserAvatarPosition,
-                rotation: 0,
-                scale: ProfileSticker.defaultScale
-            )
-            if let image {
-                let processed = SubjectLiftService.stickerImage(from: image)
-                dpm.saveStickerImage(processed.image, id: sticker.id)
-                sticker.usedSubjectLift = processed.usedSubjectLift
-            }
-            stickers.append(sticker)
-            bySource[key] = sticker
+            dpm.deleteStickerImage(id: sticker.id)
+            sticker.usedSubjectLift = false
         }
+        if let idx = stickers.firstIndex(where: { $0.id == sticker.id }) {
+            stickers[idx] = sticker
+        }
+        bySource[key] = sticker
     }
 
-    /// Guarantees exactly one persistent partner-invite sticker. It renders a heart
-    /// placeholder (no stored image) and is draggable like any other sticker.
-    private static func ensurePartnerInviteSticker(
+    /// Adds a user-avatar garden sticker after the user saves a profile photo.
+    /// Call from the profile editor — not from routine `sync`.
+    static func addUserAvatarStickerIfMissing(
+        profile: inout CoupleProfile,
+        dpm: DataPersistenceManager
+    ) {
+        let key = "userAvatar"
+        guard profile.stickers.first(where: { $0.sourceKey == key }) == nil,
+              let image = dpm.loadUserAvatar() else { return }
+
+        var sticker = ProfileSticker(
+            kind: .userAvatar,
+            sourceKey: key,
+            position: ProfileSticker.defaultUserAvatarPosition,
+            rotation: 0,
+            scale: ProfileSticker.defaultScale
+        )
+        let processed = SubjectLiftService.stickerImage(from: image)
+        dpm.saveStickerImage(processed.image, id: sticker.id)
+        sticker.usedSubjectLift = processed.usedSubjectLift
+        profile.stickers.append(sticker)
+    }
+
+    /// Collapses duplicate partner-invite stickers only; never re-adds one the user removed.
+    private static func dedupePartnerInviteStickers(
         stickers: inout [ProfileSticker],
         bySource: inout [String: ProfileSticker],
         dpm: DataPersistenceManager
     ) {
         let existing = stickers.filter { $0.kind == .partnerInvite }
-        // Collapse any duplicates down to the first; delete extras' images.
-        if existing.count > 1 {
-            for extra in existing.dropFirst() {
-                dpm.deleteStickerImage(id: extra.id)
-            }
-            let keepID = existing.first!.id
-            stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
+        guard existing.count > 1 else { return }
+        for extra in existing.dropFirst() {
+            dpm.deleteStickerImage(id: extra.id)
+            bySource.removeValue(forKey: extra.sourceKey)
         }
-        if existing.isEmpty {
-            let sticker = ProfileSticker(
-                kind: .partnerInvite,
-                sourceKey: "partnerInvite",
-                position: ProfileSticker.defaultPartnerPosition,
-                rotation: 0,
-                scale: ProfileSticker.defaultScale
-            )
-            stickers.append(sticker)
-            bySource[sticker.sourceKey] = sticker
-        }
+        let keepID = existing.first!.id
+        stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
+    }
+
+    private static func shouldMigrateToDefaultProfilePosition(
+        _ point: NormalizedPoint,
+        kind: ProfileSticker.Kind
+    ) -> Bool {
+        if isLegacyUserAvatarPosition(point) { return kind == .userAvatar }
+        let xs: [CGFloat] = kind == .userAvatar ? [0.30, 0.32] : [0.68, 0.70]
+        guard xs.contains(where: { abs(point.x - $0) < 0.06 }) else { return false }
+        // Legacy positions from earlier layout passes (including the brief above-cards band).
+        return abs(point.y - 0.62) < 0.04
+            || abs(point.y - 0.50) < 0.04
+            || abs(point.y - 0.12) < 0.04
     }
 
     private static func isLegacyUserAvatarPosition(_ point: NormalizedPoint) -> Bool {
@@ -172,8 +181,8 @@ enum ProfileStickerSync {
         let specials = existing.filter { $0.kind == .specialDate }
         let index = specials.count
         let x = 0.18 + CGFloat(index % 3) * 0.20
-        let y = 0.30 + CGFloat(index / 3) * 0.10
+        let y = 0.22 + CGFloat(index / 3) * 0.10
         _ = key
-        return NormalizedPoint(x: min(x, 0.72), y: min(y, 0.44))
+        return NormalizedPoint(x: min(x, 0.72), y: min(y, 0.36))
     }
 }

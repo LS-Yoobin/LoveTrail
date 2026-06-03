@@ -10,9 +10,16 @@ enum SubjectLiftService {
     static func stickerImage(from source: UIImage, maxDimension: CGFloat = 320) -> (image: UIImage, usedSubjectLift: Bool) {
         let scaled = downscaled(source, maxDimension: maxDimension)
         if let lifted = liftSubject(from: scaled) {
+            #if DEBUG
+            print("🟣[Lift] subject lift SUCCEEDED — output size=\(lifted.size)")
+            #endif
             return (lifted, true)
         }
-        return (circularCrop(scaled), false)
+        let cropped = circularCrop(scaled)
+        #if DEBUG
+        print("🟣[Lift] subject lift FAILED — fell back to circular crop, size=\(cropped.size)")
+        #endif
+        return (cropped, false)
     }
 
     private static func liftSubject(from image: UIImage) -> UIImage? {

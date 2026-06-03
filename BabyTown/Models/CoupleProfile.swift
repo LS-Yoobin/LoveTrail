@@ -9,15 +9,27 @@ struct CoupleProfile: Codable, Equatable {
     var displayName: String?
     var specialDates: [SpecialDate]
     var stickers: [ProfileSticker]
+    /// Short note shown on the garden canvas below the profile photo stickers.
+    var profileNote: String?
+    /// Normalized position of the note center on the sticker canvas (0…1).
+    var profileNotePosition: NormalizedPoint?
 
-    init(displayName: String? = nil, specialDates: [SpecialDate] = [], stickers: [ProfileSticker] = []) {
+    init(
+        displayName: String? = nil,
+        specialDates: [SpecialDate] = [],
+        stickers: [ProfileSticker] = [],
+        profileNote: String? = nil,
+        profileNotePosition: NormalizedPoint? = nil
+    ) {
         self.displayName = displayName
         self.specialDates = specialDates
         self.stickers = stickers
+        self.profileNote = profileNote
+        self.profileNotePosition = profileNotePosition
     }
 
     enum CodingKeys: String, CodingKey {
-        case displayName, specialDates, stickers
+        case displayName, specialDates, stickers, profileNote, profileNotePosition
     }
 
     init(from decoder: Decoder) throws {
@@ -25,5 +37,7 @@ struct CoupleProfile: Codable, Equatable {
         displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
         specialDates = try c.decodeIfPresent([SpecialDate].self, forKey: .specialDates) ?? []
         stickers = try c.decodeIfPresent([ProfileSticker].self, forKey: .stickers) ?? []
+        profileNote = try c.decodeIfPresent(String.self, forKey: .profileNote)
+        profileNotePosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .profileNotePosition)
     }
 }

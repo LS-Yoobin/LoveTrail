@@ -160,8 +160,19 @@ struct PinnedMemoriesFeedView: View {
                 title: special.title,
                 date: special.date,
                 image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
+                style: .timeline,
                 isPinned: true,
+                isLeftAligned: index.isMultiple(of: 2),
+                index: index,
                 onTap: { openSpecialDate(special) },
+                onShare: {
+                    onShare(
+                        MemorySharePayload(
+                            special: special,
+                            image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id)
+                        )
+                    )
+                },
                 onEdit: { onEditSpecialDate(special) },
                 onDelete: { onDeleteSpecialDate(special) },
                 onTogglePin: { onTogglePinSpecialDate(special) }

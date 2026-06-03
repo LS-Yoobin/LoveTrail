@@ -13,10 +13,14 @@ struct ProfileStickerView: View {
     var onDelete: (() -> Void)?
     let onPositionChanged: (NormalizedPoint) -> Void
     let onScaleChanged: (CGFloat) -> Void
+    /// Set for garden moment stickers only; profile avatars omit this.
+    var onRotationChanged: ((Double) -> Void)?
 
     @State private var dragOrigin: NormalizedPoint?
     @State private var pinchBaseScale: CGFloat = 1
     @State private var pinchPreviewScale: CGFloat?
+    @State private var rotationBase: Double = 0
+    @State private var rotationPreview: Double?
 
     private static let minScale: CGFloat = 0.5
     private static let maxScale: CGFloat = 4.0
@@ -25,6 +29,14 @@ struct ProfileStickerView: View {
 
     private var effectiveScale: CGFloat {
         pinchPreviewScale ?? sticker.scale
+    }
+
+    private var effectiveRotation: Double {
+        rotationPreview ?? sticker.rotation
+    }
+
+    private var canRotate: Bool {
+        onRotationChanged != nil
     }
 
     var body: some View {
@@ -48,7 +60,7 @@ struct ProfileStickerView: View {
             }
         }
         .contentShape(Rectangle())
-        .rotationEffect(.degrees(sticker.rotation))
+        .rotationEffect(.degrees(effectiveRotation))
         .overlay(alignment: .top) {
             if isCustomizing, isSelected, let onDelete {
                 Button(action: onDelete) {
@@ -66,16 +78,19 @@ struct ProfileStickerView: View {
         }
         .position(center)
         .allowsHitTesting(isCustomizing || onTap != nil)
-        .onAppear { pinchBaseScale = sticker.scale }
+        .onAppear {
+            pinchBaseScale = sticker.scale
+            rotationBase = sticker.rotation
+        }
         .onChange(of: sticker.scale) { _, newScale in
             pinchBaseScale = newScale
             pinchPreviewScale = nil
         }
-        .gesture(
-            isCustomizing
-                ? SimultaneousGesture(dragGesture, pinchGesture)
-                : nil
-        )
+        .onChange(of: sticker.rotation) { _, newRotation in
+            rotationBase = newRotation
+            rotationPreview = nil
+        }
+        .gesture(isCustomizing ? customizeGestures : nil)
         .onTapGesture {
             if isCustomizing {
                 onSelect?()
@@ -118,24 +133,26 @@ struct ProfileStickerView: View {
     }
 
     private func userAvatarPlaceholderBody(side: CGFloat) -> some View {
-        ZStack {
-            Circle().fill(.ultraThinMaterial)
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: side * 0.52))
-                .foregroundStyle(.white.opacity(0.85))
-        }
-        .overlay(Circle().stroke(.white, lineWidth: 3))
+        profileSlotPlaceholder(side: side, systemImage: "person.crop.circle.badge.plus")
     }
 
     private func partnerInviteBody(side: CGFloat) -> some View {
+        profileSlotPlaceholder(side: side, systemImage: "heart.circle")
+    }
+
+    /// Matches the invite-partner circle: same diameter, dashed ring, and icon scale.
+    private static let emptyAvatarFill = Color(red: 0.36, green: 0.56, blue: 0.90)
+
+    private func profileSlotPlaceholder(side: CGFloat, systemImage: String) -> some View {
         ZStack {
-            Circle().fill(.ultraThinMaterial)
+            Circle().fill(Self.emptyAvatarFill)
             Circle().strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5]))
                 .foregroundStyle(.white.opacity(0.7))
-            Image(systemName: "heart.circle")
+            Image(systemName: systemImage)
                 .font(.title)
                 .foregroundStyle(.white.opacity(0.85))
         }
+        .frame(width: side, height: side)
         .overlay(Circle().stroke(.white, lineWidth: 3))
     }
 
@@ -165,5 +182,29 @@ struct ProfileStickerView: View {
                 pinchPreviewScale = nil
                 onScaleChanged(final)
             }
+    }
+
+    private var rotationGesture: some Gesture {
+        RotationGesture()
+            .onChanged { angle in
+                guard canRotate else { return }
+                rotationPreview = rotationBase + angle.degrees
+            }
+            .onEnded { angle in
+                guard canRotate else { return }
+                let final = rotationBase + angle.degrees
+                rotationBase = final
+                rotationPreview = nil
+                onRotationChanged?(final)
+            }
+    }
+
+    /// A single concrete gesture type (required by `some Gesture`); rotation is
+    /// gated inside `rotationGesture` via `canRotate`.
+    private var customizeGestures: some Gesture {
+        SimultaneousGesture(
+            dragGesture,
+            SimultaneousGesture(pinchGesture, rotationGesture)
+        )
     }
 }
