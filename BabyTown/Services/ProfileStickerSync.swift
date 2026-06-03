@@ -44,8 +44,7 @@ enum ProfileStickerSync {
             }
         }
 
-        ensure(.userAvatar, sourceKey: "userAvatar", image: dpm.loadUserAvatar(),
-               defaultPosition: ProfileSticker.defaultUserAvatarPosition)
+        ensureUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
         ensurePartnerInviteSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
@@ -92,6 +91,49 @@ enum ProfileStickerSync {
 
     /// Legacy default for user avatar stickers (customize mode only).
     static let canonicalUserAvatarPosition = NormalizedPoint(x: 0.19, y: 0.138)
+
+    /// Guarantees exactly one persistent user-avatar sticker. When a profile photo
+    /// exists it carries the cutout; with no photo it keeps the sticker (no stored
+    /// image) so it renders the "Profile Photo" placeholder, still draggable.
+    private static func ensureUserAvatarSticker(
+        stickers: inout [ProfileSticker],
+        bySource: inout [String: ProfileSticker],
+        dpm: DataPersistenceManager
+    ) {
+        let key = "userAvatar"
+        let image = dpm.loadUserAvatar()
+
+        if var sticker = bySource[key] {
+            if let image {
+                let processed = SubjectLiftService.stickerImage(from: image)
+                dpm.saveStickerImage(processed.image, id: sticker.id)
+                sticker.usedSubjectLift = processed.usedSubjectLift
+            } else {
+                // No photo: drop any stored cutout so it renders the placeholder.
+                dpm.deleteStickerImage(id: sticker.id)
+                sticker.usedSubjectLift = false
+            }
+            if let idx = stickers.firstIndex(where: { $0.id == sticker.id }) {
+                stickers[idx] = sticker
+            }
+            bySource[key] = sticker
+        } else {
+            var sticker = ProfileSticker(
+                kind: .userAvatar,
+                sourceKey: key,
+                position: ProfileSticker.defaultUserAvatarPosition,
+                rotation: 0,
+                scale: ProfileSticker.defaultScale
+            )
+            if let image {
+                let processed = SubjectLiftService.stickerImage(from: image)
+                dpm.saveStickerImage(processed.image, id: sticker.id)
+                sticker.usedSubjectLift = processed.usedSubjectLift
+            }
+            stickers.append(sticker)
+            bySource[key] = sticker
+        }
+    }
 
     /// Guarantees exactly one persistent partner-invite sticker. It renders a heart
     /// placeholder (no stored image) and is draggable like any other sticker.

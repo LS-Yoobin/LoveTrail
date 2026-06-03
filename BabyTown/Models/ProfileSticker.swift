@@ -23,6 +23,8 @@ struct ProfileSticker: Codable, Identifiable, Equatable {
 
     /// Default rendered size multiplier for new stickers on the profile canvas.
     static let defaultScale: CGFloat = 1
+    /// Freshly created photo stickers spawn ~20% larger than the base size.
+    static let newStickerScale: CGFloat = 1.2
     /// Base cutout size — matches the profile header slots in browse mode.
     static let cutoutBaseSize: CGFloat = 84
 

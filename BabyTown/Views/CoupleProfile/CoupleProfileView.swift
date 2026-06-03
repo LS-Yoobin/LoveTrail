@@ -47,7 +47,7 @@ struct CoupleProfileView: View {
 
     /// Open canvas height below the cards where stickers float (also the edit-mode
     /// scroll anchor target). Tall enough to arrange several stickers.
-    private let stickerCanvasHeight: CGFloat = 420
+    private let stickerCanvasHeight: CGFloat = 820
 
     private var dateItems: [ImportantDateItem] {
         ImportantDatesComposer().compose(
@@ -128,7 +128,7 @@ struct CoupleProfileView: View {
     }
 
     var body: some View {
-        GeometryReader { rootGeo in
+        GeometryReader { _ in
             ZStack {
                 Color(red: 0.78, green: 0.90, blue: 0.98)
                     .ignoresSafeArea()
@@ -139,7 +139,6 @@ struct CoupleProfileView: View {
                     showsLivePet: !isCustomizing,
                     petSkins: gardenPetSkins
                 )
-                .frame(width: rootGeo.size.width, height: rootGeo.size.height)
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -151,9 +150,8 @@ struct CoupleProfileView: View {
                             )
                         } else {
                             CoupleHeaderView(
-                                showsAddPhoto: !hasUserProfileSticker,
                                 onBack: onBack,
-                                onAddPhoto: { showEditProfile = true }
+                                onInvite: { showPartnerPaywall = true }
                             )
                         }
                     }
@@ -250,14 +248,15 @@ struct CoupleProfileView: View {
             case .importantDates:
                 ImportantDatesListView(
                     items: dateItems,
+                    specialDates: sortedSpecialDates,
                     photoForItem: { photo(for: $0) },
                     userAvatar: userAvatar,
                     userName: displayName,
                     partnerSlotTitle: partnerSlotTitle,
                     onBack: { activeSubpage = nil },
                     onPartnerTap: handlePartnerSlotTap,
-                    onAdd: beginAddSpecial,
-                    onEditSpecial: { beginEditSpecial(id: $0) }
+                    onSaveSpecial: saveSpecial,
+                    onDeleteSpecial: deleteSpecial
                 )
             case .pinnedMemories:
                 if let homeViewModel {
@@ -415,7 +414,6 @@ struct CoupleProfileView: View {
                 )
             }
         }
-        .customizeDottedOutline(isCustomizing, cornerRadius: 16, padding: 6)
         .allowsHitTesting(!isCustomizing)
     }
 
@@ -633,9 +631,12 @@ struct CoupleProfileView: View {
         let sticker = ProfileSticker(
             kind: .moment,
             sourceKey: momentID.uuidString,
-            position: NormalizedPoint(x: 0.52, y: 0.42),
+            position: NormalizedPoint(
+                x: CGFloat.random(in: 0.28...0.72),
+                y: CGFloat.random(in: 0.74...0.86)
+            ),
             rotation: Double.random(in: -10...10),
-            scale: ProfileSticker.defaultScale,
+            scale: ProfileSticker.newStickerScale,
             usedSubjectLift: processed.usedSubjectLift
         )
         dpm.saveStickerImage(processed.image, id: sticker.id)
@@ -669,12 +670,6 @@ struct CoupleProfileView: View {
             guard let id = UUID(uuidString: item.id) else { return nil }
             return dpm.loadSpecialDatePhoto(id: id)
         }
-    }
-
-    private func beginAddSpecial() {
-        editingDate = nil
-        editingDateImage = nil
-        showDateEditor = true
     }
 
     private func presentPhotoViewer(for item: ImportantDateItem) {

@@ -19,7 +19,7 @@ struct ProfileStickerView: View {
     @State private var pinchPreviewScale: CGFloat?
 
     private static let minScale: CGFloat = 0.5
-    private static let maxScale: CGFloat = 2.5
+    private static let maxScale: CGFloat = 4.0
     /// Lower = finer pinch control (0.25 ≈ quarter of native sensitivity).
     private static let pinchSensitivity: CGFloat = 0.22
 
@@ -91,6 +91,8 @@ struct ProfileStickerView: View {
             switch sticker.kind {
             case .partnerInvite:
                 partnerInviteBody(side: side)
+            case .userAvatar where image == nil:
+                userAvatarPlaceholderBody(side: side)
             default:
                 if let image {
                     Image(uiImage: image)
@@ -113,6 +115,16 @@ struct ProfileStickerView: View {
                     )
             }
         }
+    }
+
+    private func userAvatarPlaceholderBody(side: CGFloat) -> some View {
+        ZStack {
+            Circle().fill(.ultraThinMaterial)
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: side * 0.52))
+                .foregroundStyle(.white.opacity(0.85))
+        }
+        .overlay(Circle().stroke(.white, lineWidth: 3))
     }
 
     private func partnerInviteBody(side: CGFloat) -> some View {

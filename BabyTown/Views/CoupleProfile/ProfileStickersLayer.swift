@@ -78,6 +78,7 @@ struct ProfileStickersLayer: View {
     private func label(for sticker: ProfileSticker) -> String? {
         switch sticker.kind {
         case .userAvatar:
+            if images[sticker.id] == nil { return "Profile Photo" }
             return userName.isEmpty ? "You" : userName
         case .partnerInvite:
             return partnerTitle
