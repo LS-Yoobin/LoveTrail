@@ -284,6 +284,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: promptMemoriesFileURL)
         try? fileManager.removeItem(at: userLettersFileURL)
         try? fileManager.removeItem(at: petStateFileURL)
+        try? fileManager.removeItem(at: gardenStateFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)

@@ -6,7 +6,7 @@ final class GardenStateTests: XCTestCase {
 
     func testRegisteringActAfterRestRevives() {
         let now = Date()
-        var state = GardenState(lastActivity: now.addingTimeInterval(-days(30)))
+        let state = GardenState(lastActivity: now.addingTimeInterval(-days(30)))
         let result = state.registering(actAt: now)
         XCTAssertTrue(result.didRevive, "garden was resting and should revive")
         XCTAssertEqual(result.state.lastActivity, now)
@@ -15,7 +15,7 @@ final class GardenStateTests: XCTestCase {
 
     func testRegisteringActWhileBloomingDoesNotRevive() {
         let now = Date()
-        var state = GardenState(lastActivity: now.addingTimeInterval(-days(2)))
+        let state = GardenState(lastActivity: now.addingTimeInterval(-days(2)))
         let result = state.registering(actAt: now)
         XCTAssertFalse(result.didRevive)
         XCTAssertEqual(result.state.lastActivity, now)
@@ -23,7 +23,7 @@ final class GardenStateTests: XCTestCase {
 
     func testFirstEverActDoesNotCountAsRevival() {
         let now = Date()
-        var state = GardenState(lastActivity: nil)
+        let state = GardenState(lastActivity: nil)
         let result = state.registering(actAt: now)
         XCTAssertFalse(result.didRevive, "a brand-new garden isn't 'reviving'")
         XCTAssertEqual(result.state.lastActivity, now)

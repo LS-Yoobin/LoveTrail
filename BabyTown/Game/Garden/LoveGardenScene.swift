@@ -189,6 +189,9 @@ final class LoveGardenScene: SKScene {
         addChild(emitter)
     }
 
+    // Slice 1 surfaces a memory card only for moment-sourced blooms. Tapping a
+    // tree (letter-sourced) reports its id, but the host has no letter card yet —
+    // intentional scope gap; the letter card arrives in a later slice.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
