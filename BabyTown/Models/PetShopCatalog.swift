@@ -857,16 +857,53 @@ enum PetShopCatalog {
     }
 
     /// Size and center for the photo layer behind a frame's transparent window.
-    static func pictureFramePhotoPlacement(frameSize: CGSize, photo: UIImage) -> (size: CGSize, position: CGPoint) {
-        // Normalized opening in the frame art (portrait window sits slightly above center
-        // and a touch right of the frame center to match the asymmetric mat).
-        let openingWidth = frameSize.width * 0.58
-        let openingHeight = frameSize.height * 0.59
-        let openingCenter = CGPoint(x: frameSize.width * 0.045, y: frameSize.height * -0.05)
+    static func pictureFramePhotoPlacement(
+        frameSize: CGSize,
+        photo: UIImage,
+        frameImageName: String? = nil
+    ) -> (size: CGSize, position: CGPoint) {
+        let layout = framePhotoLayout(for: frameImageName)
+        let openingWidth = frameSize.width * layout.openingWidthFraction
+        let openingHeight = frameSize.height * layout.openingHeightFraction
+        let openingCenter = CGPoint(
+            x: frameSize.width * layout.centerXFraction,
+            y: frameSize.height * layout.centerYFraction
+        )
 
         let displayPhoto = photo.normalizedForSpriteKit()
         let filledSize = displayPhoto.sizeAspectFilling(CGSize(width: openingWidth, height: openingHeight))
         return (filledSize, openingCenter)
+    }
+
+    private struct FramePhotoLayout {
+        let openingWidthFraction: CGFloat
+        let openingHeightFraction: CGFloat
+        let centerXFraction: CGFloat
+        let centerYFraction: CGFloat
+    }
+
+    /// Measured transparent-window layout for each frame asset (fractions of frame size).
+    private static let framePhotoLayouts: [String: FramePhotoLayout] = [
+        "prop_frame_cat": FramePhotoLayout(openingWidthFraction: 0.464, openingHeightFraction: 0.522, centerXFraction: 0.022, centerYFraction: -0.023),
+        "prop_frame_floral": FramePhotoLayout(openingWidthFraction: 0.487, openingHeightFraction: 0.519, centerXFraction: 0.001, centerYFraction: -0.012),
+        "prop_frame_hearts": FramePhotoLayout(openingWidthFraction: 0.549, openingHeightFraction: 0.562, centerXFraction: -0.003, centerYFraction: -0.034),
+        "prop_frame_ribbon": FramePhotoLayout(openingWidthFraction: 0.510, openingHeightFraction: 0.562, centerXFraction: -0.009, centerYFraction: -0.034),
+        "prop_frame_moon": FramePhotoLayout(openingWidthFraction: 0.504, openingHeightFraction: 0.580, centerXFraction: 0.004, centerYFraction: -0.002),
+        "prop_frame_leaves": FramePhotoLayout(openingWidthFraction: 0.568, openingHeightFraction: 0.595, centerXFraction: 0.010, centerYFraction: -0.009),
+        "prop_frame_bear": FramePhotoLayout(openingWidthFraction: 0.503, openingHeightFraction: 0.578, centerXFraction: 0.010, centerYFraction: -0.010),
+        "prop_frame_ornate": FramePhotoLayout(openingWidthFraction: 0.566, openingHeightFraction: 0.586, centerXFraction: -0.006, centerYFraction: -0.005),
+    ]
+
+    private static func framePhotoLayout(for imageName: String?) -> FramePhotoLayout {
+        guard let imageName, let layout = framePhotoLayouts[imageName] else {
+            return FramePhotoLayout(
+                openingWidthFraction: 0.52,
+                openingHeightFraction: 0.56,
+                centerXFraction: 0.004,
+                centerYFraction: -0.016
+            )
+        }
+        return layout
     }
 
     private static func removeBlackMatteIfNeeded(from image: UIImage) -> UIImage {
@@ -892,6 +929,35 @@ enum PetShopCatalog {
         func isNearBlack(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Bool {
             r <= 24 && g <= 24 && b <= 24
         }
+
+        // Only strip a black export matte when the image border is mostly black.
+        // Pre-made transparent PNGs (e.g. frame art with dark eyes or line art) must be left alone.
+        var borderOpaque = 0
+        var borderBlack = 0
+        for x in stride(from: 0, to: width, by: max(1, width / 80)) {
+            for y in [0, height - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaque += 1
+                    if isNearBlack(r, g, b) { borderBlack += 1 }
+                }
+            }
+        }
+        for y in stride(from: 0, to: height, by: max(1, height / 80)) {
+            for x in [0, width - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaque += 1
+                    if isNearBlack(r, g, b) { borderBlack += 1 }
+                }
+            }
+        }
+
+        guard borderOpaque > 0 else { return image }
+        let borderBlackRatio = Double(borderBlack) / Double(borderOpaque)
+        guard borderBlackRatio >= 0.80 else { return image }
 
         for i in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
             let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]

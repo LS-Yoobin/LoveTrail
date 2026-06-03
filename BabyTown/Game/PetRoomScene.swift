@@ -219,6 +219,7 @@ final class PetRoomScene: SKScene {
     private let pictureFrameZ: CGFloat = -2
     /// Raised while customizing so the frame can be tapped above floor décor.
     private let pictureFrameCustomizeZ: CGFloat = 25
+    private let pictureFrameWallScale: CGFloat = 1.2
     private var collarNode: SKNode?
     private var draggableNodes: [String: SKNode] = [:]
     /// Bed prop showing the skin-specific occupied sprite while the cat is hidden.
@@ -529,13 +530,18 @@ final class PetRoomScene: SKScene {
         container.position = center
         container.zPosition = isCustomizeMode ? pictureFrameCustomizeZ : pictureFrameZ
 
-        let frameSize = item.defaultSize
+        let catalogSize = item.defaultSize
+        let frameSize = CGSize(
+            width: catalogSize.width * pictureFrameWallScale,
+            height: catalogSize.height * pictureFrameWallScale
+        )
 
         if let pictureFrameImage {
             let displayPhoto = pictureFrameImage.normalizedForSpriteKit()
             let placement = PetShopCatalog.pictureFramePhotoPlacement(
                 frameSize: frameSize,
-                photo: displayPhoto
+                photo: displayPhoto,
+                frameImageName: item.imageName
             )
             let tex = SKTexture(image: displayPhoto)
             let photo = SKSpriteNode(texture: tex)
@@ -1694,6 +1700,11 @@ final class PetRoomScene: SKScene {
         isCatBedKey(key) || key == PetRoomPropKey.catTree
     }
 
+    /// True when the cat overlaps `location` and draws in front of the given furniture node.
+    private func catObscuresFurnitureTap(at location: CGPoint, furnitureNode: SKNode) -> Bool {
+        isCatHit(at: location) && cat.zPosition > furnitureNode.zPosition
+    }
+
     /// Tap target for the cat bed and cat tree (draggable décor, not in `propNodes`).
     private func furnitureTapHit(at location: CGPoint) -> (key: String, node: SKNode)? {
         var topHit: (key: String, node: SKNode, z: CGFloat)?
@@ -2261,6 +2272,13 @@ final class PetRoomScene: SKScene {
         }
 
         if let furniture = furnitureTapHit(at: location) {
+            // Cat tree / bed sit when the prop is reachable, but if the cat is
+            // already drawn on top at this spot, treat the tap as the cat.
+            if canBeginCatPickUp(),
+               catObscuresFurnitureTap(at: location, furnitureNode: furniture.node) {
+                beginCatPickUpCandidate(at: location)
+                return
+            }
             walkToFurnitureAndSit(key: furniture.key, node: furniture.node)
             return
         }
@@ -3558,12 +3576,20 @@ final class PetRoomScene: SKScene {
 
     private func updateNeedThoughtBubblePosition() {
         guard let bubble = needThoughtBubbleNode else { return }
+        guard let anchor = catHeadAnchorPoint(verticalOffset: 56) else { return }
+        bubble.position = anchor
+    }
+
+    /// Scene point for anchoring the level pill above the cat (nil when the cat is hidden).
+    func catHeadAnchorPoint(verticalOffset: CGFloat = 34) -> CGPoint? {
+        guard cat.alpha > 0.5 else { return nil }
         let catFrame = cat.calculateAccumulatedFrame()
+        guard catFrame.width > 1, catFrame.height > 1 else { return nil }
         let headX = catFrame.midX
-        let headY = catFrame.maxY
-        bubble.position = CGPoint(
+        let headY = catFrame.maxY + verticalOffset
+        return CGPoint(
             x: min(max(headX, 46), size.width - 46),
-            y: min(max(headY + 56, 64), size.height - 46)
+            y: min(max(headY, 64), size.height - 46)
         )
     }
 

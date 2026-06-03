@@ -13,6 +13,7 @@ struct SettingsSheet: View {
     
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
+    @State private var showPaywall = false
     
     var body: some View {
         NavigationStack {
@@ -45,8 +46,8 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    NavigationLink {
-                        SubscriptionDetailView(store: store)
+                    Button {
+                        showPaywall = true
                     } label: {
                         HStack {
                             Image(systemName: "heart.circle")
@@ -59,6 +60,7 @@ struct SettingsSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .foregroundStyle(.primary)
                 } header: {
                     Text("Subscription")
                 }
@@ -170,6 +172,13 @@ struct SettingsSheet: View {
             }
             .fullScreenCover(isPresented: $showAppIconViewer) {
                 AppIconViewerOverlay()
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                InvitePartnerPaywallView(
+                    store: store,
+                    onUnlock: { showPaywall = false },
+                    onDismiss: { showPaywall = false }
+                )
             }
             .confirmationDialog(
                 "Reset Baby Town?",

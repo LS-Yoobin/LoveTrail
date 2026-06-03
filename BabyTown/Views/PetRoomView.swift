@@ -370,7 +370,6 @@ struct PetRoomView: View {
             } else if !isInspectingPictureFrame && !isRefillingFood {
                 TimelineView(.periodic(from: .now, by: 5)) { _ in
                     PetHUDView(coins: viewModel.coins,
-                               level: viewModel.smartMeterLevel,
                                hunger: viewModel.hunger,
                                thirst: viewModel.thirst,
                                litter: viewModel.litter,
@@ -380,8 +379,7 @@ struct PetRoomView: View {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             showStatsDetail = true
                         }
-                    },
-                               onLevelLongPress: toggleSecondPetAdoptionBypassIfNeeded)
+                    })
                 }
             }
         }
@@ -467,6 +465,9 @@ struct PetRoomView: View {
                 Text("\(viewModel.coins)")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -476,6 +477,28 @@ struct PetRoomView: View {
         .accessibilityLabel("My items")
         .accessibilityValue("\(viewModel.coins) coins")
         .accessibilityHint("Opens décor you own for this room")
+    }
+
+    /// Level badge tracks the cat in scene space (same anchor logic as need-thought bubbles).
+    private var catLevelPillOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+            GeometryReader { overlayGeo in
+                if let anchor = scene?.catHeadAnchorPoint() {
+                    PetLevelPill(
+                        level: viewModel.smartMeterLevel,
+                        onLongPress: toggleSecondPetAdoptionBypassIfNeeded
+                    )
+                    .position(
+                        viewPoint(
+                            fromScene: anchor,
+                            geo: overlayGeo,
+                            sceneSize: scene?.size ?? overlayGeo.size
+                        )
+                    )
+                }
+            }
+        }
+        .allowsHitTesting(true)
     }
 
     private var customizeBanner: some View {
@@ -1184,6 +1207,11 @@ struct PetRoomView: View {
                         )
                 }
                 .allowsHitTesting(true)
+            }
+        }
+        .overlay {
+            if !isTrickMode, !isInspectingPictureFrame {
+                catLevelPillOverlay
             }
         }
         .onChange(of: skin) { _, newSkin in

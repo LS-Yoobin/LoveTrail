@@ -82,7 +82,8 @@ struct PetMomentGalleryPickerSheet: View {
                 if let photo = highlightedPhoto?.thumbnail {
                     let placement = PetShopCatalog.pictureFramePhotoPlacement(
                         frameSize: previewFrameSize,
-                        photo: photo
+                        photo: photo,
+                        frameImageName: frameImageName
                     )
                     Image(uiImage: photo.normalizedForSpriteKit())
                         .resizable()
