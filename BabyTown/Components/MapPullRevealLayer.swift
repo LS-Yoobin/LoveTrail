@@ -9,7 +9,7 @@ struct MapPullHintView: View {
         HStack(spacing: 6) {
             Image(systemName: "chevron.compact.down")
                 .font(.system(size: 11, weight: .semibold))
-            Text("Pull down to explore your map")
+            Text("Pull down to Visit Pet")
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundStyle(isNightMode ? .white.opacity(0.55) : BabyTownTheme.textPrimary.opacity(0.45))

@@ -58,7 +58,10 @@ struct NicknameView: View {
 
                 Spacer()
 
-                continueButton
+                VStack(spacing: 14) {
+                    continueButton
+                    OnboardingLegalLinks()
+                }
             }
             .opacity(contentOpacity)
         }
@@ -114,7 +117,7 @@ struct NicknameView: View {
         }
         .disabled(!canContinue)
         .padding(.horizontal, 40)
-        .padding(.bottom, 50)
+        .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.3), value: canContinue)
     }
 

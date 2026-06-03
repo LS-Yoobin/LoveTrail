@@ -8,6 +8,10 @@ struct BowlInspectCard: View {
     let thirst: Int
     let litter: Int
     let foodServings: Int
+    /// Clean-frame art of the equipped litter box, shown for the litter inspect card.
+    var litterImage: UIImage? = nil
+    /// Status line shown for plants in place of a fullness bar (cooldown-aware).
+    var plantStatusText: String? = nil
     var onAction: () -> Void
     var onSecondaryAction: (() -> Void)?
     var onClose: () -> Void
@@ -20,6 +24,9 @@ struct BowlInspectCard: View {
         let primaryButton: String
         let secondaryButton: String?
         let tint: Color
+        /// Plants show a status line instead of a fullness bar.
+        var showsFullnessBar: Bool = true
+        var statusText: String? = nil
     }
 
     private var config: Config {
@@ -29,7 +36,7 @@ struct BowlInspectCard: View {
                 title: "Food Bowl",
                 imageName: "prop_food_bowl",
                 value: hunger,
-                fullnessLabel: "Fullness · \(foodServings) serving\(foodServings == 1 ? "" : "s") left",
+                fullnessLabel: "Fullness",
                 primaryButton: "Refill",
                 secondaryButton: "Buy Food",
                 tint: .orange
@@ -54,7 +61,29 @@ struct BowlInspectCard: View {
                 secondaryButton: nil,
                 tint: .brown
             )
+        case .smallPlant, .bigPlant:
+            return Config(
+                title: prop == .smallPlant ? "Tulip Pot Plant" : "Monstera Pot Plant",
+                imageName: prop == .smallPlant ? "prop_small_plant" : "prop_big_plant",
+                value: 0,
+                fullnessLabel: "",
+                primaryButton: "Water",
+                secondaryButton: nil,
+                tint: Color(red: 0.30, green: 0.70, blue: 0.45),
+                showsFullnessBar: false,
+                statusText: plantStatusText ?? "Give your plant a drink 💧"
+            )
         case .cat:
+            return Config(
+                title: "",
+                imageName: "",
+                value: 0,
+                fullnessLabel: "",
+                primaryButton: "",
+                secondaryButton: nil,
+                tint: .pink
+            )
+        case .toiletPaperMess:
             return Config(
                 title: "",
                 imageName: "",
@@ -82,30 +111,45 @@ struct BowlInspectCard: View {
                 }
             }
 
-            Image(c.imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(height: 96)
+            Group {
+                if prop == .litterBox, let litterImage {
+                    Image(uiImage: litterImage)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image(c.imageName)
+                        .resizable()
+                        .scaledToFit()
+                }
+            }
+            .frame(height: 96)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(c.fullnessLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.black.opacity(0.10)).frame(height: 12)
-                    GeometryReader { geo in
-                        Capsule()
-                            .fill(c.tint)
-                            .frame(width: geo.size.width * CGFloat(c.value) / 100)
+            if c.showsFullnessBar {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(c.fullnessLabel)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.black.opacity(0.10)).frame(height: 12)
+                        GeometryReader { geo in
+                            Capsule()
+                                .fill(c.tint)
+                                .frame(width: geo.size.width * CGFloat(c.value) / 100)
+                        }
+                        .frame(height: 12)
                     }
                     .frame(height: 12)
+                    Text("\(c.value)%")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                 }
-                .frame(height: 12)
-                Text("\(c.value)%")
-                    .font(.system(size: 12, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let statusText = c.statusText {
+                Text(statusText)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(BabyTownTheme.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 10) {
                 Button(action: onAction) {

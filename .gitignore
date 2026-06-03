@@ -2,6 +2,7 @@
 build/
 DerivedData/
 .derivedData/
+.derivedData-*/
 *.xcactivitylog
 *.xcuserstate
 *.mode1v3

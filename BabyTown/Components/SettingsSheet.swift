@@ -123,8 +123,20 @@ struct SettingsSheet: View {
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
+                    
+                    NavigationLink {
+                        LegalDocumentView(document: .privacyPolicy)
+                    } label: {
+                        Text("Privacy Policy")
+                    }
+                    
+                    NavigationLink {
+                        LegalDocumentView(document: .termsOfService)
+                    } label: {
+                        Text("Terms of Service")
+                    }
                 } header: {
-                    Text("About")
+                    Text("About me")
                 }
             }
             .navigationTitle("Settings")

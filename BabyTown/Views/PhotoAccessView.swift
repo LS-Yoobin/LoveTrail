@@ -27,7 +27,10 @@ struct PhotoAccessView: View {
 
                 Spacer()
 
-                buttonSection
+                VStack(spacing: 14) {
+                    buttonSection
+                    OnboardingLegalLinks()
+                }
             }
             .opacity(contentOpacity)
         }
@@ -150,7 +153,7 @@ struct PhotoAccessView: View {
         }
         .disabled(isRequesting)
         .padding(.horizontal, 40)
-        .padding(.bottom, 50)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Permission Request

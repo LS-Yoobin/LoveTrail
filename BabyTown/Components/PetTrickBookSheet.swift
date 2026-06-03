@@ -9,9 +9,10 @@ struct PetTrickBookSheet: View {
     private let bodyText = Color(red: 0.13, green: 0.11, blue: 0.13)
     /// Slightly muted dark for captions, still clearly legible on the cream card.
     private let mutedText = Color(red: 0.32, green: 0.29, blue: 0.31)
-    /// Soft red for locked trick icons on the cream pillow background.
-    private let lockedIconTint = BabyTownTheme.accentDeep.opacity(0.38)
-    private let lockedIconBackdrop = BabyTownTheme.accentDeep.opacity(0.08)
+    /// Soft, lighter red for locked trick icons — clearly legible on the cream
+    /// pillow background without the harsh, washed-out look of the deep accent.
+    private let lockedIconTint = Color(red: 0.84, green: 0.41, blue: 0.45)
+    private let lockedIconBackdrop = Color(red: 0.84, green: 0.41, blue: 0.45).opacity(0.14)
 
     var body: some View {
         NavigationStack {

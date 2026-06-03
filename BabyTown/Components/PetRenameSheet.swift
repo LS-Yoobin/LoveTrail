@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Bottom panel for renaming the adopted cat. Tapping the coin CTA once arms confirmation.
+/// Pull-up sheet for renaming the adopted cat. Tapping the coin CTA once arms confirmation.
 struct PetRenameSheet: View {
+
+    private static let sheetHeight: CGFloat = 360
 
     let defaultName: String
     let currentName: String
@@ -47,11 +49,6 @@ struct PetRenameSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Capsule()
-                .fill(BabyTownTheme.accentDeep.opacity(0.28))
-                .frame(width: 36, height: 5)
-                .padding(.top, 4)
-
             VStack(spacing: 8) {
                 Text("Change Name")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -137,18 +134,16 @@ struct PetRenameSheet: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 20)
-        .padding(.top, 10)
-        .frame(maxWidth: .infinity)
-        .background(panelBackground)
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                topTrailingRadius: 24,
-                style: .continuous
-            )
-        )
-        .shadow(color: BabyTownTheme.accent.opacity(0.15), radius: 16, y: -4)
+        .padding(.bottom, 24)
+        .padding(.top, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(panelBackground.ignoresSafeArea())
+        .presentationDetents([.height(Self.sheetHeight)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground {
+            panelBackground
+        }
+        .presentationCornerRadius(24)
         .onAppear {
             nameInput = currentName == defaultName ? "" : currentName
             awaitingConfirm = false

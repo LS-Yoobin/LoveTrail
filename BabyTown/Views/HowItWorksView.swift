@@ -26,7 +26,10 @@ struct HowItWorksView: View {
 
                 Spacer()
 
-                enterButton
+                VStack(spacing: 14) {
+                    enterButton
+                    OnboardingLegalLinks()
+                }
             }
             .opacity(contentOpacity)
         }
@@ -122,7 +125,7 @@ struct HowItWorksView: View {
                 )
         }
         .padding(.horizontal, 40)
-        .padding(.bottom, 50)
+        .padding(.bottom, 8)
         .opacity(buttonOpacity)
     }
 }

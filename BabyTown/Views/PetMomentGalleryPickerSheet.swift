@@ -1,9 +1,10 @@
 import SwiftUI
 import PhotosUI
 
-/// Pick a Baby Town photo to display in the purchased memory frame.
+/// Pick a Baby Town photo to display in a purchased picture frame.
 struct PetMomentGalleryPickerSheet: View {
 
+    var frameImageName: String?
     var currentMomentID: UUID?
     var onSelect: (UUID) -> Void
 
@@ -72,32 +73,53 @@ struct PetMomentGalleryPickerSheet: View {
 
     private var framePreview: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(red: 0.45, green: 0.28, blue: 0.18))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
-                )
-                .frame(width: 120, height: 140)
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+            if let frameImageName,
+               let frameImage = PetShopCatalog.frameArtImage(named: frameImageName) {
+                let previewFrameHeight: CGFloat = 140
+                let previewFrameWidth = previewFrameHeight * (frameImage.size.width / max(frameImage.size.height, 1))
+                let previewFrameSize = CGSize(width: previewFrameWidth, height: previewFrameHeight)
 
-            Group {
-                if let image = highlightedPhoto?.thumbnail {
-                    Image(uiImage: image)
+                if let photo = highlightedPhoto?.thumbnail {
+                    let placement = PetShopCatalog.pictureFramePhotoPlacement(
+                        frameSize: previewFrameSize,
+                        photo: photo
+                    )
+                    Image(uiImage: photo.normalizedForSpriteKit())
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 96, height: 96)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                } else {
-                    Text("♥")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .scaledToFill()
+                        .frame(width: placement.size.width, height: placement.size.height)
+                        .clipped()
+                        .offset(x: placement.position.x, y: -placement.position.y)
                 }
+
+                Image(uiImage: frameImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: previewFrameWidth, height: previewFrameHeight)
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(red: 0.45, green: 0.28, blue: 0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                    )
+                    .frame(width: 120, height: 140)
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                    .overlay {
+                        if let photo = highlightedPhoto?.thumbnail {
+                            Image(uiImage: photo)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 96, height: 96)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .offset(y: 2)
+                        }
+                    }
             }
-            .offset(y: 2)
         }
         .frame(maxWidth: .infinity)
-        .accessibilityLabel("Memory frame preview")
+        .accessibilityLabel("Picture frame preview")
     }
 
     // MARK: - Grid

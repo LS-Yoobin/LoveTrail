@@ -115,30 +115,36 @@ struct PetCoinIcon: View {
 /// meters (incl. happiness, so the user can check how the cat's feeling).
 struct PetHUDView: View {
     let coins: Int
+    let level: Int
     let hunger: Int
     let thirst: Int
     let litter: Int
     let happiness: Int
     var onInventoryTap: () -> Void = {}
     var onStatsTap: () -> Void = {}
+    var onLevelLongPress: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center) {
-            Button(action: onInventoryTap) {
-                HStack(spacing: 6) {
-                    PetCoinIcon(size: 22)
-                    Text("\(coins)")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
+            HStack(spacing: 8) {
+                Button(action: onInventoryTap) {
+                    HStack(spacing: 6) {
+                        PetCoinIcon(size: 22)
+                        Text("\(coins)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .buttonStyle(.plain)
+                .accessibilityLabel("My items")
+                .accessibilityValue("\(coins) coins")
+                .accessibilityHint("Opens décor you own for this room")
+
+                levelPill
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("My items")
-            .accessibilityValue("\(coins) coins")
-            .accessibilityHint("Opens décor you own for this room")
 
             Spacer()
 
@@ -158,6 +164,20 @@ struct PetHUDView: View {
             .accessibilityHint("Shows hunger, thirst, litter, and happiness")
         }
         .padding(.horizontal, 16)
+    }
+
+    private var levelPill: some View {
+        Text("Lvl \(level)")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(BabyTownTheme.accentDeep)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(BabyTownTheme.accent.opacity(0.16), in: Capsule())
+            .onLongPressGesture(minimumDuration: 1.2) {
+                onLevelLongPress?()
+            }
+            .accessibilityLabel("Pet level")
+            .accessibilityValue("Level \(level)")
     }
 }
 
@@ -182,7 +202,7 @@ private struct PetMeter: View {
     ZStack {
         Color.pink.opacity(0.2)
         VStack {
-            PetHUDView(coins: 128, hunger: 70, thirst: 35, litter: 90, happiness: 55)
+            PetHUDView(coins: 128, level: 7, hunger: 70, thirst: 35, litter: 90, happiness: 55)
             Spacer()
         }
     }

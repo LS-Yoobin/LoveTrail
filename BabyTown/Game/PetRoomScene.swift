@@ -26,7 +26,7 @@ final class PetRoomScene: SKScene {
     /// Tappable things in the room. Reported to SwiftUI via `onTapProp` so the
     /// view can show the right inspect card / run the matching care action.
     enum RoomProp {
-        case cat, foodBowl, waterBowl, litterBox
+        case cat, foodBowl, waterBowl, litterBox, toiletPaperMess, smallPlant, bigPlant
     }
 
     /// Kind of reaction the view can ask the cat to perform after a care action.
@@ -42,20 +42,44 @@ final class PetRoomScene: SKScene {
     /// Vertical band (fraction of height) the cat may wander within — a shallow
     /// strip near the bottom that reads as the room floor.
     private let floorBand: ClosedRange<CGFloat> = 0.12...0.30
+    private let laserFloorLowerBound: CGFloat = 0.06
     /// Points/second the cat walks.
     private let walkSpeed: CGFloat = 70
     /// On-screen cat height; width follows each frame's aspect ratio.
     private let catDisplayHeight: CGFloat = 150
+    /// Pick-up pose is drawn smaller in the source art — scale up to match standing size.
+    private let catPickUpDisplayHeight: CGFloat = 220
     /// Extra padding so the cat sprite never touches the screen edge.
     private let catScreenEdgeInset: CGFloat = 8
-    /// Default draw order for the cat on the floor (care props use 5).
-    private let catDefaultZ: CGFloat = 1
     /// Draw order while eating/drinking so the cat renders in front of the bowl.
     private let catAtBowlZ: CGFloat = 8
+    /// While sleeping, nudge the cat slightly behind its floor-depth z for overlap polish.
+    private let catSleepDepthOffset: CGFloat = 0.5
+    /// Floor prop draw-order band: back props render lower, front props higher.
+    private let propDepthBackZ: CGFloat = 4.7
+    private let propDepthFrontZ: CGFloat = 6.3
+    /// Toilet-paper mess draws above all floor props (it sits "on top" of the mess).
+    private let toiletPaperZ: CGFloat = 8
     /// How far in front of a bowl (toward the camera / bottom of screen) the cat stops.
     private let bowlApproachFrontInset: CGFloat = 22
+    /// Eat/drink poses lower the muzzle — negative inset raises the landing point
+    /// toward the bowl so the head sits over the rim instead of below it.
+    private let bowlEatDrinkFrontInset: CGFloat = -36
     /// Horizontal gap from the bowl's visual center to the cat's feet.
     private let bowlApproachLateralGap: CGFloat = 30
+    /// Tighter side offset for eat/drink so the muzzle lines up with the bowl opening.
+    private let bowlEatDrinkLateralGap: CGFloat = 22
+    /// Extra shift right at the water bowl so the drink pose lines up with the rim.
+    private let bowlDrinkRightShift: CGFloat = 18
+    /// Extra upward nudge when eating a floor snack so the lowered head aligns.
+    private let snackApproachRaise: CGFloat = 12
+    /// Shop item ids for cat beds that support occupied art (`_0` calico, `_1` cow cat).
+    private static let catBedItemIDs: Set<String> = [
+        "furniture_cat_bed_1",
+        "furniture_cat_bed_2",
+        "furniture_cat_bed_3",
+        PetRoomPropKey.catBed
+    ]
 
     // MARK: Prop depth (perspective on the floor)
 
@@ -75,13 +99,20 @@ final class PetRoomScene: SKScene {
     /// Smallest a prop may shrink. Also caps how far back a prop's base may go,
     /// so even at its smallest the prop's top never crosses the floor/wall seam.
     private let depthMinScale: CGFloat = 0.45
-    /// Props taller than this may lean on the wall (e.g. the cat tree); shorter
-    /// props are kept fully on the floor.
-    private let depthTallPropThreshold: CGFloat = 140
+    /// Props taller than this may lean on the wall; shorter props are kept fully
+    /// on the floor (top stays under the seam). Set high so tall floor décor like
+    /// plants stay bounded to the floorband rather than floating up the wall.
+    private let depthTallPropThreshold: CGFloat = 320
     /// Reference height for a wall-leaning prop's back limit — gives it the same
     /// deep drag range as a small floor prop instead of being held down by its
     /// own height.
     private let depthWallLeanReference: CGFloat = 36
+
+    /// Extra "midpoint lift" used only for the cat tree's draw-order switch.
+    /// The scene otherwise orders by prop base (feet) Y; shifting the tree's
+    /// effective depth base makes the cat go in-front/behind at a higher point
+    /// on tall props.
+    private let catTreeZMidpointLift: CGFloat = 28
 
     // MARK: Nodes
 
@@ -98,6 +129,49 @@ final class PetRoomScene: SKScene {
 
     /// Interactive prop nodes, for tap hit-testing and walk-to targets.
     private var propNodes: [RoomProp: SKNode] = [:]
+    private weak var litterBoxSprite: SKSpriteNode?
+    private var isLitterBoxDirty = false
+    private var toiletPaperMessNode: SKNode?
+    private var isToiletPaperMessVisible = false
+    /// Sticky floor anchor for the active toilet-paper mess so room-layout
+    /// rebuilds (for other props) don't make it jump around.
+    private var toiletPaperMessStableAnchor: CGPoint?
+    /// Each litter box is a horizontal 6-frame sheet:
+    /// clean, dirty, calico-use A/B, cow-use A/B.
+    private static let litterBoxFrameCount = 6
+    /// Cached sheet texture for the currently equipped box, keyed by sheet name
+    /// so it reloads when the player swaps litter boxes.
+    private var litterBoxSheetName: String?
+    private var litterBoxSheetTexture: SKTexture?
+    private static let toiletPaperAssetName = "prop_toilet_paper"
+    private enum LitterBoxFrame: Int {
+        case clean = 0
+        case dirty = 1
+        case calicoUseA = 2
+        case calicoUseB = 3
+        case cowUseA = 4
+        case cowUseB = 5
+    }
+
+    /// Whether the equipped litter box is the self-cleaning auto box.
+    private var isAutoLitterEquipped: Bool {
+        PetShopCatalog.isAutoLitter(equippedItemID: layoutState.equippedItemID(for: .litterBox))
+    }
+
+    /// Loads (and caches) the 6-frame sheet for the equipped litter box.
+    private func currentLitterSheetTexture() -> SKTexture? {
+        let name = PetShopCatalog.litterSheetName(
+            forEquippedItemID: layoutState.equippedItemID(for: .litterBox)
+        )
+        if litterBoxSheetName == name, let cached = litterBoxSheetTexture {
+            return cached
+        }
+        guard let image = UIImage(named: name) else { return nil }
+        let texture = SKTexture(image: image)
+        litterBoxSheetName = name
+        litterBoxSheetTexture = texture
+        return texture
+    }
 
     private var isInteracting = false
     private var currentAction: CatAction = .idle
@@ -108,6 +182,9 @@ final class PetRoomScene: SKScene {
 
     /// Called when the user taps a prop (or the cat). Set by `PetRoomView`.
     var onTapProp: ((RoomProp) -> Void)?
+
+    /// Called when the user taps the wall picture frame.
+    var onTapPictureFrame: (() -> Void)?
 
     var layoutState = PetRoomLayoutState()
     var pictureFrameImage: UIImage?
@@ -136,6 +213,8 @@ final class PetRoomScene: SKScene {
     private let pictureFrameCustomizeZ: CGFloat = 25
     private var collarNode: SKNode?
     private var draggableNodes: [String: SKNode] = [:]
+    /// Bed prop showing the skin-specific occupied sprite while the cat is hidden.
+    private var occupiedBedKey: String?
     private var propInstallOffsets: [String: CGPoint] = [:]
     /// Unscaled (scale == 1) display height per prop, used to size the depth
     /// perspective and keep each prop's top below the floor/wall seam.
@@ -151,11 +230,50 @@ final class PetRoomScene: SKScene {
     private var dragStartLocation = CGPoint.zero
     private var isActivelyDragging = false
     private let dragPromoteThreshold: CGFloat = 10
+
+    // MARK: Pick up & carry (long-press the cat)
+
+    private var isCarryingCat = false
+    private var catPickUpCandidate = false
+    private var catPickUpStartLocation = CGPoint.zero
+    private var catPickUpTouchOffset = CGPoint.zero
+    private var catPickUpStartedAt: TimeInterval = 0
+    private var catPickUpLastLocation = CGPoint.zero
+    private let catPickUpLongPressDuration: TimeInterval = 0.45
+    /// Draw above floor props while the cat is being carried.
+    private let catCarryZPosition: CGFloat = 55
+
     /// Currently selected prop (shows the dotted outline in customize mode).
     private var selectedKey: String?
     private var selectionOverlay: SKNode?
 
     private var isPlaying = false
+    /// Keeps the broader play movement band active briefly after play ends so
+    /// the cat can visibly walk back to recovery targets instead of snapping.
+    private var isPostPlayRecovering = false
+    private var activePlayToyID: String?
+    /// Catnip toy only: each successful bat nudges chase speed up a bit so the
+    /// cat feels progressively more "hyped" while playing.
+    private var catnipHitCount = 0
+    private let catnipToyID = "toy_catnip_pouch"
+    private let catnipSpeedStep: CGFloat = 0.06
+    private let catnipMaxExtraSpeed: CGFloat = 0.9
+    private var playToyNode: SKNode?
+    private var playToyIsStatic = false
+    private let staticPlayToyIDs: Set<String> = ["toy_play_tunnel", "toy_cardboard_box"]
+    private let plantPropKeys: Set<String> = ["furniture_small_plant", "furniture_big_plant"]
+    /// Keep dragged toys away from hard side edges so the cat can always reach.
+    private let playToySideInsetNormalized: CGFloat = 0.14
+    private enum CardboardBoxVisualState {
+        case closed, peek
+    }
+    private enum CardboardBoxCatState {
+        case approachBox, hiddenInBox, staringAtBox, wanderingAway, returningToBox
+    }
+    private var cardboardBoxVisualState: CardboardBoxVisualState = .closed
+    private var cardboardBoxCatState: CardboardBoxCatState = .approachBox
+    private var cardboardBoxStateDeadline: TimeInterval = 0
+    private var cardboardBoxWanderTarget: CGPoint?
     private var isTrickMode = false
     /// The treat the player is dragging / has dropped during trick training.
     private var snackNode: SKNode?
@@ -163,12 +281,25 @@ final class PetRoomScene: SKScene {
     /// so a second drop can't interrupt the eat sequence.
     private var isSnackBeingEaten = false
     private var laserDot: SKShapeNode?
+    private var lastToyBatAt: TimeInterval = 0
+    private let toiletPaperBatInterval: TimeInterval = 30
+    private var nextToiletPaperBatAt: TimeInterval?
+    private var isToiletPaperBatInProgress = false
     private var lastUpdateTime: TimeInterval = 0
     /// Sprites face right by default; true when mirrored to face left.
     private var facesLeft = false
     private var isLaserEngaged = false
     private var playEngagementSeconds: TimeInterval = 0
     private var playDurationMetFired = false
+    private enum NeedThoughtKind {
+        case none, food, water
+    }
+    private var needThoughtKind: NeedThoughtKind = .none
+    private var needThoughtBubbleNode: SKNode?
+    /// Water bowl fill 0–100 (mirrors pet thirst); at 0 the cat shows confused at the bowl.
+    private var waterBowlLevel: Int = 100
+    /// True while `goToBowl` is holding an eat/drink/confused pose at a bowl.
+    private var isHoldingBowlInteraction = false
 
     // MARK: Init
 
@@ -201,6 +332,106 @@ final class PetRoomScene: SKScene {
         rebuildRoomDecor()
     }
 
+    func setLitterBoxDirty(_ dirty: Bool) {
+        guard isLitterBoxDirty != dirty else { return }
+        isLitterBoxDirty = dirty
+        updateLitterBoxAppearance()
+    }
+
+    func setToiletPaperMessVisible(_ visible: Bool) {
+        guard isToiletPaperMessVisible != visible else { return }
+        isToiletPaperMessVisible = visible
+        if !visible {
+            nextToiletPaperBatAt = nil
+            isToiletPaperBatInProgress = false
+            toiletPaperMessStableAnchor = nil
+        }
+        rebuildRoomDecor()
+    }
+
+    /// Updates which need-thought bubble (if any) should appear above the cat.
+    /// Food takes priority when both are low.
+    func setNeedThoughts(showFood: Bool, showWater: Bool) {
+        let next: NeedThoughtKind
+        if showFood {
+            next = .food
+        } else if showWater {
+            next = .water
+        } else {
+            next = .none
+        }
+        guard next != needThoughtKind else { return }
+        needThoughtKind = next
+        rebuildNeedThoughtBubble()
+    }
+
+    /// Syncs bowl fill from the care economy so drink visits can show confused at 0%.
+    func setWaterBowlLevel(_ level: Int) {
+        waterBowlLevel = min(100, max(0, level))
+    }
+
+    /// Scene-space frame for the litter box sprite, used by SwiftUI overlay
+    /// interactions (e.g. drag-to-clean mini game hit-testing).
+    func litterBoxFrameInScene() -> CGRect? {
+        litterBoxSprite?.calculateAccumulatedFrame()
+    }
+
+    /// Scene-space frame for the food bowl sprite, used by SwiftUI overlay
+    /// interactions (e.g. drag-to-refill mini game hit-testing).
+    func foodBowlFrameInScene() -> CGRect? {
+        propNodes[.foodBowl]?.calculateAccumulatedFrame()
+    }
+
+    /// Scene-space frame for a plant sprite, used by the watering mini-game's
+    /// drag-over hit-testing.
+    func plantFrameInScene(for prop: RoomProp) -> CGRect? {
+        propNodes[prop]?.calculateAccumulatedFrame()
+    }
+
+    /// Quick water-splash + bounce delight when a plant finishes being watered.
+    func playPlantWaterReaction(for prop: RoomProp) {
+        guard let node = propNodes[prop] else { return }
+        node.removeAction(forKey: "plantWater")
+        let baseX = node.xScale
+        let baseY = node.yScale
+        let baseRotation = node.zRotation
+        let popScale: CGFloat = 1.045
+        let wobble: CGFloat = 0.07
+
+        let reaction = SKAction.sequence([
+            .group([
+                .scaleX(to: baseX * popScale, duration: 0.10),
+                .scaleY(to: baseY * popScale, duration: 0.10)
+            ]),
+            .group([
+                .rotate(toAngle: baseRotation + wobble, duration: 0.09, shortestUnitArc: true),
+                .scaleX(to: baseX, duration: 0.09),
+                .scaleY(to: baseY, duration: 0.09)
+            ]),
+            .rotate(toAngle: baseRotation - wobble * 0.65, duration: 0.10, shortestUnitArc: true),
+            .rotate(toAngle: baseRotation, duration: 0.11, shortestUnitArc: true)
+        ])
+        node.run(reaction, withKey: "plantWater")
+
+        let frame = node.calculateAccumulatedFrame()
+        for _ in 0..<6 {
+            let drop = SKShapeNode(circleOfRadius: CGFloat.random(in: 2.5...4.5))
+            drop.fillColor = SKColor(red: 0.40, green: 0.72, blue: 0.95, alpha: 0.9)
+            drop.strokeColor = .clear
+            drop.zPosition = node.zPosition + 1
+            drop.position = CGPoint(
+                x: frame.midX + CGFloat.random(in: -frame.width * 0.25...frame.width * 0.25),
+                y: frame.maxY - CGFloat.random(in: 0...frame.height * 0.2)
+            )
+            addChild(drop)
+            let fall = SKAction.moveBy(x: 0, y: -CGFloat.random(in: 24...44), duration: 0.6)
+            drop.run(.sequence([
+                .group([fall, .fadeOut(withDuration: 0.6)]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     private func buildRoom() {
         if let bg = loadImage("room_background") {
             bg.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -231,11 +462,16 @@ final class PetRoomScene: SKScene {
         // Keep the current selection across rebuilds (e.g. after a flip persists
         // and the layout change re-runs this), as long as the prop still exists.
         let keepSelected = selectedKey
+        clearOccupiedBedState(showCat: true)
         clearSelection()
         wallWashNode?.removeFromParent()
         pictureFrameNode?.removeFromParent()
         draggableNodes.values.forEach { $0.removeFromParent() }
         draggableNodes.removeAll()
+        // Built-in care props (food/water/litter) aren't draggable, so they live
+        // only in `propNodes`. Remove them from the scene too, or each rebuild
+        // (e.g. equipping a different litter box) stacks a new one on the old.
+        propNodes.values.forEach { $0.removeFromParent() }
         propNodes.removeAll()
 
         applyWallWash()
@@ -243,6 +479,8 @@ final class PetRoomScene: SKScene {
 
         placeBuiltInProps()
         placeOwnedFurniture()
+        placeToiletPaperMess()
+        updateFloorPropLayering()
         applyCollar()
 
         if let keepSelected, draggableNodes[keepSelected] != nil {
@@ -262,79 +500,129 @@ final class PetRoomScene: SKScene {
     }
 
     private func buildPictureFrame() {
-        guard layoutState.owns(PetShopCatalog.pictureFrameID),
-              layoutState.pictureFrameMomentID != nil,
-              !layoutState.isStashed(PetShopCatalog.pictureFrameID) else { return }
+        guard let frameID = PetShopCatalog.activePictureFrameID(in: layoutState),
+              layoutState.owns(frameID),
+              !layoutState.isStashed(frameID),
+              let item = PetShopCatalog.item(id: frameID) else { return }
 
         let container = SKNode()
         let defaultPoint = NormalizedPoint(x: 0.72, y: 0.62)
         let normalized = clampNormalizedToWall(
-            layoutState.propPositions[PetShopCatalog.pictureFrameID] ?? defaultPoint
+            layoutState.propPositions[frameID] ?? defaultPoint
         )
         let center = scenePoint(from: normalized)
         container.position = center
         container.zPosition = isCustomizeMode ? pictureFrameCustomizeZ : pictureFrameZ
 
-        let frame = SKShapeNode(rectOf: CGSize(width: 92, height: 108), cornerRadius: 6)
-        frame.fillColor = SKColor(red: 0.45, green: 0.28, blue: 0.18, alpha: 1)
-        frame.strokeColor = SKColor(red: 0.88, green: 0.22, blue: 0.38, alpha: 0.9)
-        frame.lineWidth = 3
-        container.addChild(frame)
+        let frameSize = item.defaultSize
 
         if let pictureFrameImage {
-            let tex = SKTexture(image: pictureFrameImage)
+            let displayPhoto = pictureFrameImage.normalizedForSpriteKit()
+            let placement = PetShopCatalog.pictureFramePhotoPlacement(
+                frameSize: frameSize,
+                photo: displayPhoto
+            )
+            let tex = SKTexture(image: displayPhoto)
             let photo = SKSpriteNode(texture: tex)
-            photo.size = CGSize(width: 76, height: 76)
-            photo.position = CGPoint(x: 0, y: 6)
+            photo.size = placement.size
+            photo.position = placement.position
+            photo.zPosition = 0
             container.addChild(photo)
-        } else {
-            let label = SKLabelNode(text: "♥")
-            label.fontSize = 28
-            label.verticalAlignmentMode = .center
-            container.addChild(label)
+        }
+
+        if let frameUIImage = PetShopCatalog.frameArtImage(forItemID: frameID) {
+            let frameTex = SKTexture(image: frameUIImage)
+            let frameSprite = SKSpriteNode(texture: frameTex)
+            frameSprite.size = frameSize
+            frameSprite.zPosition = 1
+            container.addChild(frameSprite)
         }
 
         addChild(container)
         pictureFrameNode = container
-        draggableNodes[PetShopCatalog.pictureFrameID] = container
-        applyFlip(to: container, key: PetShopCatalog.pictureFrameID)
-        if layoutState.propPositions[PetShopCatalog.pictureFrameID] == nil {
+        draggableNodes[frameID] = container
+        applyFlip(to: container, key: frameID)
+        if layoutState.propPositions[frameID] == nil {
             var positions = layoutState.propPositions
-            positions[PetShopCatalog.pictureFrameID] = normalized
+            positions[frameID] = normalized
             layoutState.propPositions = positions
         }
         if isCustomizeMode { highlightDraggable(container) }
     }
 
     private func placeBuiltInProps() {
+        let sharedDepthHeight: CGFloat = 120
         installEquippedProp(
             key: PetRoomPropKey.catTree,
             slot: .catTree,
             roomProp: nil,
             defaultPoint: NormalizedPoint(x: 0.84, y: 0.30),
             pixelOffset: CGPoint(x: 0, y: -15),
-            depthHeight: 120
+            depthHeight: sharedDepthHeight
         )
         installEquippedProp(
             key: PetRoomPropKey.foodBowl,
             slot: .foodBowl,
             roomProp: .foodBowl,
             defaultPoint: NormalizedPoint(x: 0.18, y: 0.22),
-            pixelOffset: CGPoint(x: -14, y: 0)
+            pixelOffset: CGPoint(x: -14, y: 0),
+            depthHeight: sharedDepthHeight,
+            draggableInCustomize: false
         )
         installEquippedProp(
             key: PetRoomPropKey.waterBowl,
             slot: .waterBowl,
             roomProp: .waterBowl,
             defaultPoint: NormalizedPoint(x: 0.34, y: 0.21),
-            pixelOffset: CGPoint(x: -14, y: 0)
+            pixelOffset: waterBowlPixelOffset(
+                for: layoutState.equippedItemID(for: .waterBowl)
+            ),
+            depthHeight: sharedDepthHeight,
+            draggableInCustomize: false
         )
         installEquippedProp(
             key: PetRoomPropKey.litterBox,
             slot: .litterBox,
             roomProp: .litterBox,
-            defaultPoint: NormalizedPoint(x: 0.90, y: 0.12)
+            defaultPoint: NormalizedPoint(x: 0.93, y: 0.12),
+            pixelOffset: litterBoxPixelOffset(
+                for: layoutState.equippedItemID(for: .litterBox)
+            ),
+            depthHeight: sharedDepthHeight,
+            // Litter box can be moved and flipped in customize; only the food and
+            // water bowls stay locked in their fixed positions.
+            draggableInCustomize: true
         )
+    }
+
+    /// Vertical nudge so alternate water bowl art sits on the same floor line as the food bowl.
+    private func waterBowlPixelOffset(for equippedItemID: String?) -> CGPoint {
+        let x: CGFloat = -14
+        switch equippedItemID {
+        case "bowl_water_classic", nil:
+            return CGPoint(x: x, y: 0)
+        case "bowl_water_sky", "bowl_water_flower":
+            return CGPoint(x: x, y: -2)
+        case "bowl_water_luxe":
+            return CGPoint(x: x, y: -5)
+        default:
+            return CGPoint(x: x, y: -3)
+        }
+    }
+
+    /// Horizontal nudge so each litter variant lines up on the floor (art anchors differ).
+    private func litterBoxPixelOffset(for equippedItemID: String?) -> CGPoint {
+        switch equippedItemID {
+        case "litter_auto":
+            return CGPoint(x: 40, y: 0)
+        case "litter_steel", "litter_classic":
+            return CGPoint(x: 30, y: 0)
+        case nil:
+            // Starter classic when nothing is explicitly equipped.
+            return CGPoint(x: 30, y: 0)
+        default:
+            return .zero
+        }
     }
 
     private func installEquippedProp(
@@ -343,7 +631,8 @@ final class PetRoomScene: SKScene {
         roomProp: RoomProp?,
         defaultPoint: NormalizedPoint,
         pixelOffset: CGPoint = .zero,
-        depthHeight: CGFloat? = nil
+        depthHeight: CGFloat? = nil,
+        draggableInCustomize: Bool = true
     ) {
         let equippedID = layoutState.equippedItemID(for: slot)
         let imageName = PetShopCatalog.equippedImageName(for: slot, equippedItemID: equippedID) ?? ""
@@ -355,7 +644,7 @@ final class PetRoomScene: SKScene {
             roomProp: roomProp,
             defaultPoint: defaultPoint,
             placeholderSize: placeholder.size,
-            draggableInCustomize: true,
+            draggableInCustomize: draggableInCustomize,
             pixelOffset: pixelOffset,
             depthHeight: depthHeight
         )
@@ -412,26 +701,140 @@ final class PetRoomScene: SKScene {
     }
 
     private func placeOwnedFurniture() {
+        let sharedDepthHeight: CGFloat = 120
+        // One décor piece per category: even if several are owned (e.g. after the
+        // unlock-all cheat or legacy saves), only the single active item in each
+        // category is placed so beds/plants never stack on top of each other.
+        let activeFloorIDs = Set(
+            PetShopCategory.allCases.compactMap {
+                layoutState.activeItem(among: PetShopCatalog.floorItemIDs(in: $0))
+            }
+        )
         for item in PetShopCatalog.all where item.isFloorItem {
-            guard layoutState.owns(item.id), !layoutState.isStashed(item.id) else { continue }
+            guard activeFloorIDs.contains(item.id) else { continue }
             let key = item.id
             let defaultPoint: NormalizedPoint
+            let depthHeight: CGFloat
+            var roomProp: RoomProp? = nil
             switch key {
-            case PetRoomPropKey.couch: defaultPoint = NormalizedPoint(x: 0.56, y: 0.19)
-            case PetRoomPropKey.catBed: defaultPoint = NormalizedPoint(x: 0.44, y: 0.20)
-            case PetRoomPropKey.yarnBall: defaultPoint = NormalizedPoint(x: 0.70, y: 0.23)
-            default: defaultPoint = NormalizedPoint(x: 0.5, y: 0.2)
+            case PetRoomPropKey.couch:
+                defaultPoint = NormalizedPoint(x: 0.56, y: 0.19)
+                depthHeight = sharedDepthHeight
+            case "furniture_cat_bed_1", "furniture_cat_bed_2", "furniture_cat_bed_3", PetRoomPropKey.catBed:
+                defaultPoint = NormalizedPoint(x: 0.44, y: 0.20)
+                // Beds should obey the same "can’t drag too far up" feel as the cat tree.
+                depthHeight = sharedDepthHeight
+            case PetRoomPropKey.yarnBall:
+                defaultPoint = NormalizedPoint(x: 0.70, y: 0.23)
+                depthHeight = sharedDepthHeight
+            case "furniture_small_plant":
+                defaultPoint = NormalizedPoint(x: 0.30, y: 0.20)
+                // Cap by true height so the whole plant stays under the floor seam.
+                depthHeight = item.defaultSize.height
+                roomProp = .smallPlant
+            case "furniture_big_plant":
+                defaultPoint = NormalizedPoint(x: 0.72, y: 0.20)
+                depthHeight = item.defaultSize.height
+                roomProp = .bigPlant
+            default:
+                defaultPoint = NormalizedPoint(x: 0.5, y: 0.2)
+                depthHeight = sharedDepthHeight
             }
             installProp(
                 key: key,
                 imageName: item.imageName ?? "",
                 caption: item.placeholderCaption,
-                roomProp: nil,
+                roomProp: roomProp,
                 defaultPoint: defaultPoint,
                 placeholderSize: item.defaultSize,
-                draggableInCustomize: true
+                draggableInCustomize: true,
+                depthHeight: depthHeight
             )
         }
+    }
+
+    private func placeToiletPaperMess() {
+        toiletPaperMessNode?.removeFromParent()
+        toiletPaperMessNode = nil
+        propNodes.removeValue(forKey: .toiletPaperMess)
+        guard isToiletPaperMessVisible else { return }
+
+        let node = makeToiletPaperMessNode()
+        let anchor: CGPoint
+        if let stableAnchor = toiletPaperMessStableAnchor {
+            anchor = stableAnchor
+        } else {
+            guard let generatedAnchor = toiletPaperMessAnchor(for: node) else { return }
+            anchor = generatedAnchor
+            toiletPaperMessStableAnchor = generatedAnchor
+        }
+        if let sprite = node as? SKSpriteNode {
+            sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
+            sprite.position = anchor
+            sprite.zPosition = 6
+        } else {
+            let h = node.calculateAccumulatedFrame().height
+            node.position = CGPoint(x: anchor.x, y: anchor.y + h / 2)
+            node.zPosition = 6
+        }
+        addChild(node)
+        toiletPaperMessNode = node
+        propNodes[.toiletPaperMess] = node
+        if nextToiletPaperBatAt == nil {
+            nextToiletPaperBatAt = (lastUpdateTime > 0 ? lastUpdateTime : 0) + toiletPaperBatInterval
+        }
+    }
+
+    private func makeToiletPaperMessNode() -> SKNode {
+        if let image = UIImage(named: Self.toiletPaperAssetName) {
+            let sprite = SKSpriteNode(texture: SKTexture(image: image))
+            sprite.size = sprite.size.scaledToHeight(88)
+            return sprite
+        }
+
+        let fallback = SKLabelNode(text: "🧻")
+        fallback.fontSize = 54
+        fallback.verticalAlignmentMode = .center
+        let container = SKNode()
+        container.addChild(fallback)
+        return container
+    }
+
+    private func toiletPaperMessAnchor(for node: SKNode) -> CGPoint? {
+        let y = size.height * (floorBand.lowerBound + 0.02)
+        let candidates: [CGPoint] = [
+            CGPoint(x: size.width * 0.12, y: y),
+            CGPoint(x: size.width * 0.26, y: y),
+            CGPoint(x: size.width * 0.50, y: y),
+            CGPoint(x: size.width * 0.72, y: y),
+            CGPoint(x: size.width * 0.86, y: y)
+        ].shuffled()
+
+        // Avoid both the built-in care props and every movable floor prop
+        // (beds, couch, cat tree, plants) so the mess never lands on top of them.
+        var obstacles: [SKNode] = propNodes
+            .filter { $0.key != .toiletPaperMess }
+            .map { $0.value }
+        for (key, node) in draggableNodes where !isPictureFrame(key) {
+            if !obstacles.contains(where: { $0 === node }) { obstacles.append(node) }
+        }
+
+        for candidate in candidates {
+            let frame = candidateMessFrame(for: node, anchor: candidate)
+            let overlaps = obstacles.contains {
+                frame.intersects($0.calculateAccumulatedFrame().insetBy(dx: -10, dy: -8))
+            }
+            if !overlaps { return candidate }
+        }
+        return candidates.first
+    }
+
+    private func candidateMessFrame(for node: SKNode, anchor: CGPoint) -> CGRect {
+        let size = node.calculateAccumulatedFrame().size
+        if node is SKSpriteNode {
+            return CGRect(x: anchor.x - size.width / 2, y: anchor.y, width: size.width, height: size.height)
+        }
+        return CGRect(x: anchor.x - size.width / 2, y: anchor.y - size.height / 2, width: size.width, height: size.height)
     }
 
     private func installProp(
@@ -454,9 +857,22 @@ final class PetRoomScene: SKScene {
         var point = scenePoint(from: normalized)
         point.x += pixelOffset.x
         point.y += pixelOffset.y
-        let node = makePropNode(imageName: imageName, caption: caption, placeholderSize: placeholderSize, point: point, roomProp: roomProp)
+        let node = makePropNode(
+            key: key,
+            imageName: imageName,
+            caption: caption,
+            placeholderSize: placeholderSize,
+            point: point,
+            roomProp: roomProp,
+            draggableInCustomize: draggableInCustomize
+        )
         addChild(node)
-        applyDepthTransform(to: node, baseAnchor: clampPropAnchor(point, naturalHeight: naturalHeight), naturalHeight: naturalHeight)
+        applyDepthTransform(
+            to: node,
+            key: key,
+            baseAnchor: clampPropAnchor(point, key: key, naturalHeight: naturalHeight),
+            naturalHeight: naturalHeight
+        )
         applyFlip(to: node, key: key)
         if let roomProp { propNodes[roomProp] = node }
         if draggableInCustomize {
@@ -470,20 +886,38 @@ final class PetRoomScene: SKScene {
     }
 
     private func makePropNode(
+        key: String,
         imageName: String,
         caption: String,
         placeholderSize: CGSize,
         point: CGPoint,
-        roomProp: RoomProp?
+        roomProp: RoomProp?,
+        draggableInCustomize: Bool
     ) -> SKNode {
+        if key == PetRoomPropKey.litterBox {
+            let litterSprite = makeLitterBoxSprite(
+                fallbackImageName: imageName,
+                placeholderSize: placeholderSize,
+                point: point,
+                roomProp: roomProp,
+                draggableInCustomize: draggableInCustomize
+            )
+            litterBoxSprite = litterSprite
+            updateLitterBoxAppearance()
+            return litterSprite
+        }
         if !imageName.isEmpty, let sprite = loadImage(imageName) {
             sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
             sprite.position = point
             if sprite.size.height > 0 {
                 sprite.size = sprite.size.scaledToHeight(placeholderSize.height)
             }
-            sprite.zPosition = roomProp == nil ? 0 : 5
-            if isCustomizeMode { highlightDraggable(sprite) }
+            if roomProp != nil {
+                sprite.zPosition = propDepthZ(for: point.y)
+            } else {
+                sprite.zPosition = 0
+            }
+            if isCustomizeMode, draggableInCustomize { highlightDraggable(sprite) }
             return sprite
         }
 
@@ -492,15 +926,84 @@ final class PetRoomScene: SKScene {
         rect.strokeColor = SKColor(red: 0.88, green: 0.22, blue: 0.38, alpha: 0.6)
         rect.lineWidth = 2
         rect.position = CGPoint(x: point.x, y: point.y + placeholderSize.height / 2)
-        rect.zPosition = roomProp == nil ? 0 : 5
+        rect.zPosition = roomProp == nil ? 0 : propDepthZ(for: point.y)
         let label = SKLabelNode(text: caption)
         label.fontName = "HelveticaNeue-Medium"
         label.fontSize = 14
         label.fontColor = SKColor(red: 0.55, green: 0.15, blue: 0.27, alpha: 1)
         label.verticalAlignmentMode = .center
         rect.addChild(label)
-        if isCustomizeMode { highlightDraggable(rect) }
+        if isCustomizeMode, draggableInCustomize { highlightDraggable(rect) }
         return rect
+    }
+
+    private func makeLitterBoxSprite(
+        fallbackImageName: String,
+        placeholderSize: CGSize,
+        point: CGPoint,
+        roomProp: RoomProp?,
+        draggableInCustomize: Bool
+    ) -> SKSpriteNode {
+        let texture = litterBoxTexture(for: isLitterBoxDirty ? .dirty : .clean)
+            ?? SKTexture(image: UIImage(named: fallbackImageName) ?? UIImage())
+        let sprite = SKSpriteNode(texture: texture)
+        sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
+        sprite.position = point
+        if sprite.size.height > 0 {
+            sprite.size = sprite.size.scaledToHeight(placeholderSize.height)
+        }
+        sprite.zPosition = roomProp == nil ? 0 : propDepthZ(for: point.y)
+        if isCustomizeMode, draggableInCustomize { highlightDraggable(sprite) }
+        return sprite
+    }
+
+    private func updateLitterBoxAppearance() {
+        guard let sprite = litterBoxSprite else { return }
+        sprite.removeAction(forKey: "litterUse")
+        let frame: LitterBoxFrame = isLitterBoxDirty ? .dirty : .clean
+        guard let texture = litterBoxTexture(for: frame) else { return }
+        sprite.texture = texture
+    }
+
+    /// Alternates the cat's two "using" frames for ~10 seconds, then settles on
+    /// the dirty frame (or back to clean for the self-cleaning auto box).
+    func playLitterBoxUseAnimation(for skin: CatSkin) {
+        guard let sprite = litterBoxSprite else { return }
+        let usingFrames: (LitterBoxFrame, LitterBoxFrame) =
+            (skin == .calico) ? (.calicoUseA, .calicoUseB) : (.cowUseA, .cowUseB)
+        guard let textureA = litterBoxTexture(for: usingFrames.0),
+              let textureB = litterBoxTexture(for: usingFrames.1) else {
+            return
+        }
+        let auto = isAutoLitterEquipped
+        let endFrame: LitterBoxFrame = auto ? .clean : .dirty
+        guard let endTexture = litterBoxTexture(for: endFrame) else { return }
+
+        sprite.removeAction(forKey: "litterUse")
+        // ~10s total: each A/B cycle is 1s, repeated 10 times.
+        let cycle = SKAction.sequence([
+            .setTexture(textureA), .wait(forDuration: 0.5),
+            .setTexture(textureB), .wait(forDuration: 0.5)
+        ])
+        let loop = SKAction.repeat(cycle, count: 10)
+        let finish = SKAction.run { [weak self, weak sprite] in
+            guard let self, let sprite else { return }
+            self.isLitterBoxDirty = !auto
+            sprite.texture = endTexture
+        }
+        sprite.run(.sequence([loop, finish]), withKey: "litterUse")
+    }
+
+    private func litterBoxTexture(for frame: LitterBoxFrame) -> SKTexture? {
+        guard let sheet = currentLitterSheetTexture() else { return nil }
+        let width = 1.0 / CGFloat(Self.litterBoxFrameCount)
+        let rect = CGRect(
+            x: CGFloat(frame.rawValue) * width,
+            y: 0,
+            width: width,
+            height: 1.0
+        )
+        return SKTexture(rect: rect, in: sheet)
     }
 
     private func highlightDraggable(_ node: SKNode) {
@@ -551,7 +1054,14 @@ final class PetRoomScene: SKScene {
     }
 
     private func isPictureFrame(_ key: String) -> Bool {
-        key == PetShopCatalog.pictureFrameID
+        PetShopCatalog.item(id: key)?.isPictureFrame == true
+    }
+
+    private func pictureFrameHit(at location: CGPoint) -> Bool {
+        guard let pictureFrameNode else { return false }
+        return pictureFrameNode.calculateAccumulatedFrame()
+            .insetBy(dx: -10, dy: -10)
+            .contains(location)
     }
 
     private func normalizedPoint(from scenePoint: CGPoint) -> NormalizedPoint {
@@ -583,16 +1093,24 @@ final class PetRoomScene: SKScene {
     /// X stays off the side edges. Y stays within the floor band, but its top is
     /// pulled in so that — even at `depthMinScale` — the prop's top never rises
     /// past the floor/wall seam (`floorBand.upperBound`). Keeps props on the floor.
-    private func clampPropAnchor(_ point: CGPoint, naturalHeight: CGFloat) -> CGPoint {
+    private func clampPropAnchor(_ point: CGPoint, key: String, naturalHeight: CGFloat) -> CGPoint {
         let floorBottom = size.height * propFrontBound
         let seam = size.height * floorBand.upperBound
         // Floor-bound props are held back by their own height so their top stays
         // under the seam. Tall props lean on the wall, so they use a small
         // reference height and get the same deep range as the bowls.
         let referenceHeight = naturalHeight <= depthTallPropThreshold ? naturalHeight : depthWallLeanReference
-        let backLimit = seam - depthMinScale * referenceHeight
+        var backLimit = seam - depthMinScale * referenceHeight
+        if key == "furniture_small_plant" || key == "furniture_big_plant" {
+            // Give plants a little more upward travel so they can sit behind
+            // nearby furniture (like beds) while still staying on the floor band.
+            backLimit += 36
+        }
         return CGPoint(
-            x: min(max(point.x, size.width * 0.06), size.width * 0.94),
+            x: min(
+                max(point.x, size.width * (plantPropKeys.contains(key) ? 0.03 : 0.06)),
+                size.width * (plantPropKeys.contains(key) ? 0.97 : 0.94)
+            ),
             y: min(max(point.y, floorBottom), max(backLimit, floorBottom))
         )
     }
@@ -624,8 +1142,12 @@ final class PetRoomScene: SKScene {
         return depthFrontScale + (depthNearScale - depthFrontScale) * f
     }
 
-    private func depthScale(baseY: CGFloat, naturalHeight: CGFloat) -> CGFloat {
-        let perspective = propPerspectiveScale(baseY: baseY)
+    private func depthScale(baseY: CGFloat, key: String, naturalHeight: CGFloat) -> CGFloat {
+        var perspective = propPerspectiveScale(baseY: baseY)
+        if key == "furniture_big_plant" {
+            // Keep the big plant from shrinking too aggressively in deep/back positions.
+            perspective = max(perspective, 0.70)
+        }
         // Tall props lean on the wall: scale by perspective only, no seam cap.
         guard naturalHeight <= depthTallPropThreshold else { return perspective }
         let seam = size.height * floorBand.upperBound
@@ -635,15 +1157,67 @@ final class PetRoomScene: SKScene {
 
     /// Scales a prop for depth and pins its base (feet) to `baseAnchor`, so it
     /// grows upward from the floor rather than around its center.
-    private func applyDepthTransform(to node: SKNode, baseAnchor: CGPoint, naturalHeight: CGFloat) {
-        node.setScale(depthScale(baseY: baseAnchor.y, naturalHeight: naturalHeight))
+    private func applyDepthTransform(to node: SKNode, key: String, baseAnchor: CGPoint, naturalHeight: CGFloat) {
+        node.setScale(depthScale(baseY: baseAnchor.y, key: key, naturalHeight: naturalHeight))
         setPropFloorAnchor(node, to: baseAnchor)
+    }
+
+    /// Draw order for floor props using the same depth direction as perspective:
+    /// lower (closer) Y draws in front of higher (deeper) Y.
+    private func propDepthZ(for baseY: CGFloat) -> CGFloat {
+        let frontEdge = size.height * propFrontBound
+        let backEdge = size.height * floorBand.upperBound
+        let span = max(backEdge - frontEdge, 1)
+        let t = min(max((baseY - frontEdge) / span, 0), 1) // 0 front ... 1 back
+        return propDepthFrontZ + (propDepthBackZ - propDepthFrontZ) * t
+    }
+
+    /// Cat draw order on the floor — same curve as `propDepthZ` so the cat
+    /// naturally renders in front of props closer to the camera and behind
+    /// props farther up the room.
+    private func catFloorDepthZ(for baseY: CGFloat) -> CGFloat {
+        propDepthZ(for: baseY)
+    }
+
+    /// Keeps all floor props (care props + movable furniture + toilet paper mess)
+    /// depth-sorted against each other so dragged props can overlap bowls/litter
+    /// correctly when placed closer to camera.
+    private func updateFloorPropLayering() {
+        var floorNodes: [SKNode] = []
+        for node in propNodes.values where !floorNodes.contains(where: { $0 === node }) {
+            floorNodes.append(node)
+        }
+        for (key, node) in draggableNodes
+        where !isPictureFrame(key) && !floorNodes.contains(where: { $0 === node }) {
+            floorNodes.append(node)
+        }
+
+        let draggingNode: SKNode? = {
+            guard isActivelyDragging, let draggingKey else { return nil }
+            return draggableNodes[draggingKey]
+        }()
+
+        let catTreeNode = draggableNodes[PetRoomPropKey.catTree]
+        for node in floorNodes where node !== draggingNode {
+            if node === toiletPaperMessNode {
+                // Always sits in front of the litter box and food/water bowls.
+                node.zPosition = toiletPaperZ
+            } else {
+                let baseY = propFloorAnchor(for: node).y
+                // Tall props like the cat tree feel better when the switch is tied
+                // to the tree's "mid" instead of its base/feet.
+                if let catTreeNode, node === catTreeNode {
+                    node.zPosition = propDepthZ(for: baseY + catTreeZMidpointLift)
+                } else {
+                    node.zPosition = propDepthZ(for: baseY)
+                }
+            }
+        }
     }
 
     // MARK: Cat
 
     private func buildCat() {
-        cat.zPosition = catDefaultZ
         addChild(cat)
 
         cat.addChild(catFacing)
@@ -655,6 +1229,7 @@ final class PetRoomScene: SKScene {
             currentAction = .idle
         }
         cat.position = clampCatPosition(CGPoint(x: size.width * 0.5, y: randomFloorY()))
+        cat.zPosition = catFloorDepthZ(for: cat.position.y)
     }
 
     private func preloadFrameDisplaySizes() {
@@ -666,6 +1241,7 @@ final class PetRoomScene: SKScene {
 
     /// Sets the cat sprite frame and resizes from that frame's pixel aspect ratio.
     private func applyCatFrame(_ frame: CatFrame) {
+        catVisual.anchorPoint = CGPoint(x: 0.5, y: 0)
         catVisual.texture = frame.texture
         currentFrameName = frame.name
         catVisual.size = frameDisplaySizes[frame.name]
@@ -686,7 +1262,7 @@ final class PetRoomScene: SKScene {
 
     /// The ambient activities the cat picks between when left alone.
     private enum AmbientBehavior: CaseIterable {
-        case wander, sit, groom, sleep, play, eat, drink
+        case wander, sit, groom, sleep, play, eat, drink, peekLitter
     }
 
     /// The previous activity, so we avoid repeating it back-to-back and the
@@ -697,7 +1273,7 @@ final class PetRoomScene: SKScene {
     private var wanderStreak = 0
 
     private func runBehavior() {
-        guard !isInteracting, !isHoldingPose, !isTrickMode else { return }
+        guard !isInteracting, !isHoldingPose, !isTrickMode, !isCarryingCat else { return }
         let choice = pickBehavior()
         lastBehavior = choice
         if choice != .wander { wanderStreak = 0 }
@@ -709,6 +1285,7 @@ final class PetRoomScene: SKScene {
         case .play:   playfulPounce()
         case .eat:    ambientVisitBowl(.eat)
         case .drink:  ambientVisitBowl(.drink)
+        case .peekLitter: ambientPeekLitterBox()
         }
     }
 
@@ -724,6 +1301,7 @@ final class PetRoomScene: SKScene {
         if !isCustomizeMode {
             if propNodes[.foodBowl] != nil { weights[.eat] = 8 }
             if propNodes[.waterBowl] != nil { weights[.drink] = 8 }
+            if propNodes[.litterBox] != nil { weights[.peekLitter] = 5 }
         }
         if let last = lastBehavior, last != .wander { weights[last] = 2 }
         let pool = weights.flatMap { Array(repeating: $0.key, count: $0.value) }
@@ -763,10 +1341,139 @@ final class PetRoomScene: SKScene {
         }
     }
 
-    /// Curls up for a long nap. Petting the cat (`petCat`) cancels this and
-    /// wakes it early.
+    /// Curls up for a long nap. When a purchased bed is in the room, the cat
+    /// walks to it and uses the occupied bed art (composite per skin). Quick naps
+    /// elsewhere use `idleFor(state: .sleep, …)` directly. Petting (`petCat`)
+    /// cancels this and wakes the cat early.
     private func sleep() {
-        idleFor(state: .sleep, duration: 30)
+        if let bed = nearestPlacedCatBed() {
+            goToBedAndSleep(bedKey: bed.key, bed: bed.node, duration: 30)
+        } else {
+            idleFor(state: .sleep, duration: 30)
+        }
+    }
+
+    private func nearestPlacedCatBed() -> (key: String, node: SKNode)? {
+        let beds = Self.catBedItemIDs.compactMap { key -> (String, SKNode)? in
+            guard layoutState.owns(key),
+                  !layoutState.isStashed(key),
+                  let node = draggableNodes[key] else { return nil }
+            return (key, node)
+        }
+        guard !beds.isEmpty else { return nil }
+        return beds.min { lhs, rhs in
+            let la = propFloorAnchor(for: lhs.1)
+            let ra = propFloorAnchor(for: rhs.1)
+            let ld = hypot(la.x - cat.position.x, la.y - cat.position.y)
+            let rd = hypot(ra.x - cat.position.x, ra.y - cat.position.y)
+            return ld < rd
+        }
+    }
+
+    private func catBedBaseImageName(for key: String) -> String? {
+        PetShopCatalog.item(id: key)?.imageName
+    }
+
+    private func catBedOccupiedImageName(for key: String) -> String? {
+        guard let base = catBedBaseImageName(for: key) else { return nil }
+        let suffix = (skin == .calico) ? "_0" : "_1"
+        let occupied = "\(base)\(suffix)"
+        return UIImage(named: occupied) != nil ? occupied : nil
+    }
+
+    private func setCatBedVisualState(key: String, occupied: Bool) {
+        guard let sprite = draggableNodes[key] as? SKSpriteNode else { return }
+        let imageName: String?
+        if occupied {
+            imageName = catBedOccupiedImageName(for: key) ?? catBedBaseImageName(for: key)
+        } else {
+            imageName = catBedBaseImageName(for: key)
+        }
+        // Use the shared asset loader so the black matte is stripped — a raw
+        // SKTexture(image:) here would bring the black background back when the
+        // cat leaves the bed and we swap to the base art.
+        guard let imageName, let texture = textureForAsset(named: imageName) else { return }
+        let displayHeight = sprite.size.height
+        sprite.texture = texture
+        if displayHeight > 0 {
+            sprite.size = sprite.size.scaledToHeight(displayHeight)
+        }
+    }
+
+    private func clearOccupiedBedState(showCat: Bool) {
+        if let key = occupiedBedKey {
+            setCatBedVisualState(key: key, occupied: false)
+        }
+        occupiedBedKey = nil
+        if showCat { cat.alpha = 1 }
+    }
+
+    /// Wakes the cat from a composite bed (occupied art hides the live sprite).
+    private func wakeFromOccupiedBedIfNeeded() {
+        guard let bedKey = occupiedBedKey, let bed = draggableNodes[bedKey] else { return }
+        clearOccupiedBedState(showCat: true)
+        cat.position = catBedWakePoint(near: bed)
+        cat.zPosition = catFloorDepthZ(for: cat.position.y)
+    }
+
+    private func catBedApproachPoint(for bed: SKNode) -> CGPoint {
+        let anchor = propFloorAnchor(for: bed)
+        let frame = bed.calculateAccumulatedFrame()
+        let margin = maxCatHorizontalHalfWidth
+        let targetX = min(max(frame.midX, margin), size.width - margin)
+        let targetY = min(max(anchor.y, size.height * catFloorBand.lowerBound),
+                          size.height * catFloorBand.upperBound)
+        return CGPoint(x: targetX, y: targetY)
+    }
+
+    private func catBedWakePoint(near bed: SKNode) -> CGPoint {
+        let anchor = propFloorAnchor(for: bed)
+        let frame = bed.calculateAccumulatedFrame()
+        let side: CGFloat = Bool.random() ? -1 : 1
+        let lateral = max(44, frame.width * 0.22)
+        let x = min(max(frame.midX + lateral * side, maxCatHorizontalHalfWidth),
+                    size.width - maxCatHorizontalHalfWidth)
+        return clampCatPosition(CGPoint(x: x, y: anchor.y))
+    }
+
+    private func goToBedAndSleep(bedKey: String, bed: SKNode, duration: TimeInterval) {
+        guard !isCustomizeMode else {
+            idleFor(state: .sleep, duration: duration)
+            return
+        }
+        stopMovement()
+        isHoldingPose = true
+        let target = catBedApproachPoint(for: bed)
+        face(towards: target.x)
+        startAnimation(.walk)
+        let distance = hypot(target.x - cat.position.x, target.y - cat.position.y)
+        let move = SKAction.move(to: target, duration: max(0.35, TimeInterval(distance / walkSpeed)))
+        move.timingMode = .easeInEaseOut
+        let arrive = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.occupiedBedKey = bedKey
+            if self.catBedOccupiedImageName(for: bedKey) != nil {
+                self.cat.alpha = 0
+                self.setCatBedVisualState(key: bedKey, occupied: true)
+            } else {
+                self.face(towards: propFloorAnchor(for: bed).x)
+                self.startAnimation(.sleep)
+            }
+            self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
+        }
+        let finish = SKAction.run { [weak self] in
+            guard let self else { return }
+            let wasCompositeBed = self.cat.alpha < 0.01
+            self.clearOccupiedBedState(showCat: true)
+            if wasCompositeBed {
+                self.cat.position = self.catBedWakePoint(near: bed)
+            }
+            self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
+            self.isHoldingPose = false
+            self.startAnimation(.idle)
+            self.runBehavior()
+        }
+        cat.run(.sequence([move, arrive, .wait(forDuration: duration), finish]), withKey: "behavior")
     }
 
     /// A short burst of play: the cat faces a random way and does a couple of
@@ -795,11 +1502,71 @@ final class PetRoomScene: SKScene {
         guard !isCustomizeMode else { runBehavior(); return }
         let slot: RoomProp = pose == .eat ? .foodBowl : .waterBowl
         guard let bowl = propNodes[slot] else { runBehavior(); return }
-        goToBowl(bowl, pose: pose, hold: Double.random(in: 1.8...2.8)) { [weak self] in
+        let resolvedPose = pose == .drink ? waterBowlInteractionPose() : pose
+        goToBowl(bowl, pose: resolvedPose, hold: Double.random(in: 1.8...2.8)) { [weak self] in
             guard let self else { return }
             self.startAnimation(.idle)
             self.runBehavior()
         }
+    }
+
+    /// Cosmetic litter check-in: the cat occasionally walks up to the litter box
+    /// and immediately steps away without using it. This is purely ambient and
+    /// does not affect the timed 8AM/8PM litter-use economy events.
+    private func ambientPeekLitterBox() {
+        guard !isCustomizeMode, let litter = propNodes[.litterBox] else {
+            runBehavior()
+            return
+        }
+
+        stopMovement()
+        catVisual.removeAction(forKey: "anim")
+        let approach = bowlApproachPoint(for: litter, from: cat.position)
+        let approachTarget = clampCatPosition(approach.target)
+        face(towards: approachTarget.x)
+        startAnimation(.walk)
+
+        let approachDistance = hypot(approachTarget.x - cat.position.x, approachTarget.y - cat.position.y)
+        let walkIn = SKAction.move(
+            to: approachTarget,
+            duration: max(0.28, TimeInterval(approachDistance / walkSpeed))
+        )
+        walkIn.timingMode = .easeInEaseOut
+
+        let walkOutTarget = clampCatPosition(CGPoint(
+            x: approachTarget.x + (approach.faceX >= approachTarget.x ? -1 : 1) * CGFloat.random(in: 42...72),
+            y: randomFloorY()
+        ))
+        let walkOutDistance = hypot(walkOutTarget.x - approachTarget.x, walkOutTarget.y - approachTarget.y)
+        let walkOut = SKAction.move(
+            to: walkOutTarget,
+            duration: max(0.28, TimeInterval(walkOutDistance / walkSpeed))
+        )
+        walkOut.timingMode = .easeInEaseOut
+
+        let faceBox = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.face(towards: approach.faceX)
+        }
+        let faceAway = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.face(towards: walkOutTarget.x)
+        }
+        let finish = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
+            self.startAnimation(.idle)
+            self.runBehavior()
+        }
+
+        cat.run(.sequence([
+            walkIn,
+            faceBox,
+            .wait(forDuration: Double.random(in: 0.08...0.2)),
+            faceAway,
+            walkOut,
+            finish
+        ]), withKey: "behavior")
     }
 
     private func idleFor(state: CatAction, duration: TimeInterval) {
@@ -819,7 +1586,7 @@ final class PetRoomScene: SKScene {
         isHoldingPose = false
         cat.removeAction(forKey: "behavior")
         cat.removeAction(forKey: "pounceMove")
-        cat.zPosition = catDefaultZ
+        cat.zPosition = catFloorDepthZ(for: cat.position.y)
     }
 
     private enum PounceHop {
@@ -883,6 +1650,99 @@ final class PetRoomScene: SKScene {
     /// interaction (tap) takes over the loop and restarts it manually.
     private func runBehaviorAction(_ action: SKAction, completion: @escaping () -> Void) {
         cat.run(.sequence([action, .run(completion)]), withKey: "behavior")
+    }
+
+    private func updateToiletPaperAutoBat(currentTime: TimeInterval) {
+        guard isToiletPaperMessVisible,
+              toiletPaperMessNode != nil,
+              !isCustomizeMode,
+              !isPlaying,
+              !isTrickMode,
+              !isInteracting,
+              !isHoldingPose,
+              !isCarryingCat,
+              !isToiletPaperBatInProgress
+        else { return }
+
+        if nextToiletPaperBatAt == nil {
+            nextToiletPaperBatAt = currentTime + toiletPaperBatInterval
+            return
+        }
+        guard let dueAt = nextToiletPaperBatAt, currentTime >= dueAt else { return }
+
+        // Don't interrupt a currently running behavior; retry shortly.
+        guard cat.action(forKey: "behavior") == nil else {
+            nextToiletPaperBatAt = currentTime + 1.5
+            return
+        }
+
+        beginToiletPaperBat(currentTime: currentTime)
+    }
+
+    private func beginToiletPaperBat(currentTime: TimeInterval) {
+        guard let messNode = toiletPaperMessNode else {
+            nextToiletPaperBatAt = currentTime + toiletPaperBatInterval
+            return
+        }
+
+        let messAnchor = propFloorAnchor(for: messNode)
+        let catAnchor = cat.position
+        let approachInsetX: CGFloat = 26
+        let direction: CGFloat = catAnchor.x < messAnchor.x ? -1 : 1
+        let targetX = messAnchor.x + direction * approachInsetX
+        let targetY = min(max(messAnchor.y, size.height * floorBand.lowerBound),
+                          size.height * floorBand.upperBound)
+        let target = clampCatPosition(CGPoint(x: targetX, y: targetY))
+        let distance = hypot(target.x - catAnchor.x, target.y - catAnchor.y)
+        let duration = max(0.24, TimeInterval(distance / walkSpeed))
+
+        isToiletPaperBatInProgress = true
+        stopMovement()
+        face(towards: messAnchor.x)
+        startAnimation(.walk)
+
+        let move = SKAction.move(to: target, duration: duration)
+        move.timingMode = .easeInEaseOut
+        let hit = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.face(towards: messAnchor.x)
+            self.startAnimation(.pounce)
+            let offset = self.pounceTowardOffset(from: self.cat.position, to: messAnchor, distance: 22)
+            self.runPounceAnimation(squash: 0.88, offset: offset)
+        }
+        let contact = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.nudgeToiletPaperMessOnContact()
+            self.startAnimation(.idle)
+            self.isToiletPaperBatInProgress = false
+            self.nextToiletPaperBatAt = max(currentTime, self.lastUpdateTime) + self.toiletPaperBatInterval
+            self.runBehavior()
+        }
+        cat.run(.sequence([move, hit, .wait(forDuration: PounceHop.hopDuration + 0.02), contact]), withKey: "behavior")
+    }
+
+    private func nudgeToiletPaperMessOnContact() {
+        guard let node = toiletPaperMessNode else { return }
+        let anchor = propFloorAnchor(for: node)
+        let nudged = CGPoint(
+            x: anchor.x + CGFloat.random(in: -40...40),
+            y: anchor.y + CGFloat.random(in: -14...18)
+        )
+        let sideInset: CGFloat = 20
+        let clamped = CGPoint(
+            x: min(max(nudged.x, sideInset), max(sideInset, size.width - sideInset)),
+            y: min(max(nudged.y, size.height * floorBand.lowerBound),
+                   size.height * floorBand.upperBound)
+        )
+        toiletPaperMessStableAnchor = clamped
+
+        if let sprite = node as? SKSpriteNode {
+            sprite.run(.move(to: clamped, duration: 0.2))
+        } else {
+            let h = node.calculateAccumulatedFrame().height
+            let center = CGPoint(x: clamped.x, y: clamped.y + h / 2)
+            node.run(.move(to: center, duration: 0.2))
+        }
     }
 
     /// Plays the animation for a state from real atlas frames.
@@ -961,16 +1821,25 @@ final class PetRoomScene: SKScene {
         resetVisualTransform()
     }
 
-    /// Stand in front of and beside a bowl so the lowered head lines up with the prop.
-    private func bowlApproachPoint(for bowl: SKNode, from catPosition: CGPoint) -> (target: CGPoint, faceX: CGFloat) {
+    /// Stand beside a bowl; eat/drink land higher and closer so the lowered muzzle
+    /// meets the bowl opening instead of dipping below the rim.
+    private func bowlApproachPoint(
+        for bowl: SKNode,
+        from catPosition: CGPoint,
+        pose: CatAction? = nil
+    ) -> (target: CGPoint, faceX: CGFloat) {
         let anchor = propFloorAnchor(for: bowl)
         let frame = bowl.calculateAccumulatedFrame()
         let bowlCenterX = frame.midX
-        let lateralGap = max(bowlApproachLateralGap, frame.width * 0.32)
+        let forEatDrink = pose == .eat || pose == .drink
+        let lateralGap = forEatDrink
+            ? max(bowlEatDrinkLateralGap, frame.width * 0.22)
+            : max(bowlApproachLateralGap, frame.width * 0.32)
         let side: CGFloat = catPosition.x < bowlCenterX ? -1 : 1
         let margin = maxCatHorizontalHalfWidth
         let targetX = min(max(bowlCenterX + lateralGap * side, margin), size.width - margin)
-        let frontY = anchor.y - bowlApproachFrontInset
+        let frontInset = forEatDrink ? bowlEatDrinkFrontInset : bowlApproachFrontInset
+        let frontY = anchor.y - frontInset
         let targetY = min(max(frontY, size.height * catFloorBand.lowerBound),
                           size.height * catFloorBand.upperBound)
         return (CGPoint(x: targetX, y: targetY), bowlCenterX)
@@ -1024,6 +1893,133 @@ final class PetRoomScene: SKScene {
         catFacing.xScale = facesLeft ? -1 : 1
     }
 
+    private var pickUpAssetName: String {
+        skin == .calico ? "pick_up_0" : "pick_up_1"
+    }
+
+    private func canBeginCatPickUp() -> Bool {
+        !isCustomizeMode
+            && !isPlaying
+            && !isPostPlayRecovering
+            && !isTrickMode
+            && !isCarryingCat
+            && currentAction != .eat
+            && currentAction != .drink
+            && currentAction != .confused
+            && currentAction != .snack
+            && currentAction != .sleep
+    }
+
+    private func isCatHit(at location: CGPoint) -> Bool {
+        cat.calculateAccumulatedFrame().insetBy(dx: -24, dy: -24).contains(location)
+    }
+
+    /// Tap target for care props. Litter uses a tight zone on the tray graphic so
+    /// sheet padding at the corners doesn't block taps on props behind it.
+    private func propTapHitFrame(for prop: RoomProp, node: SKNode) -> CGRect {
+        let frame = node.calculateAccumulatedFrame()
+        guard prop == .litterBox else {
+            return frame.insetBy(dx: -16, dy: -16)
+        }
+        let width = frame.width * 0.56
+        let height = frame.height * 0.48
+        return CGRect(
+            x: frame.midX - width / 2,
+            y: frame.midY - height / 2,
+            width: width,
+            height: height
+        )
+    }
+
+    private func beginCatPickUpCandidate(at location: CGPoint) {
+        catPickUpCandidate = true
+        catPickUpStartLocation = location
+        catPickUpLastLocation = location
+        catPickUpStartedAt = CACurrentMediaTime()
+        catPickUpTouchOffset = CGPoint(x: cat.position.x - location.x, y: cat.position.y - location.y)
+    }
+
+    private func cancelCatPickUpCandidate() {
+        catPickUpCandidate = false
+    }
+
+    private func evaluateCatPickUp(at location: CGPoint) {
+        guard catPickUpCandidate, !isCarryingCat else { return }
+        let moved = hypot(location.x - catPickUpStartLocation.x, location.y - catPickUpStartLocation.y)
+        if moved >= dragPromoteThreshold {
+            cancelCatPickUpCandidate()
+            return
+        }
+        if CACurrentMediaTime() - catPickUpStartedAt >= catPickUpLongPressDuration {
+            beginCarryingCat(at: location)
+        }
+    }
+
+    private func applyPickUpPose() {
+        catVisual.removeAction(forKey: "anim")
+        catVisual.removeAction(forKey: "pounce")
+        cat.removeAction(forKey: "pounceMove")
+        guard let texture = textureForAsset(named: pickUpAssetName) else {
+            startAnimation(.idle)
+            return
+        }
+        currentAction = .idle
+        currentFrameName = pickUpAssetName
+        catVisual.texture = texture
+        catVisual.anchorPoint = CGPoint(x: 0.5, y: 0.88)
+        catVisual.size = Self.displaySize(for: texture, targetHeight: catPickUpDisplayHeight)
+        collarNode?.removeFromParent()
+        collarNode = nil
+        resetVisualTransform()
+    }
+
+    private func beginCarryingCat(at location: CGPoint) {
+        guard canBeginCatPickUp() else { return }
+        cancelCatPickUpCandidate()
+        stopMovement()
+        catVisual.removeAllActions()
+        isInteracting = true
+        isCarryingCat = true
+        applyPickUpPose()
+        catPickUpTouchOffset = .zero
+        moveCarriedCat(to: location)
+        cat.zPosition = catCarryZPosition
+    }
+
+    private func moveCarriedCat(to location: CGPoint) {
+        let next = CGPoint(
+            x: location.x + catPickUpTouchOffset.x,
+            y: location.y + catPickUpTouchOffset.y
+        )
+        let halfW = maxCatHorizontalHalfWidth
+        let minX = halfW
+        let maxX = max(minX, size.width - halfW)
+        let band = catFloorBand
+        let minY = size.height * band.lowerBound
+        let maxY = size.height * band.upperBound
+        cat.position = CGPoint(
+            x: min(max(next.x, minX), maxX),
+            y: min(max(next.y, minY), maxY)
+        )
+        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
+    }
+
+    private func dropCarriedCat() {
+        guard isCarryingCat else { return }
+        isCarryingCat = false
+        let feetPoint = CGPoint(
+            x: cat.position.x,
+            y: cat.calculateAccumulatedFrame().minY
+        )
+        catVisual.anchorPoint = CGPoint(x: 0.5, y: 0)
+        startAnimation(.idle)
+        cat.position = clampCatPosition(feetPoint)
+        cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
+        updateCatFloorDepthLayering()
+        isInteracting = false
+        runBehavior()
+    }
+
     // MARK: Interaction
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -1042,26 +2038,55 @@ final class PetRoomScene: SKScene {
 
         if isPlaying {
             isLaserEngaged = true
-            moveLaser(to: location)
+            movePlayTarget(to: location)
             return
         }
 
-        let catHit = cat.calculateAccumulatedFrame().insetBy(dx: -24, dy: -24)
-        if catHit.contains(location) {
-            handleTap(.cat)
+        if pictureFrameHit(at: location) {
+            onTapPictureFrame?()
             return
         }
+
+        // Prioritize care props over the cat hit target so taps near bowls/litter
+        // still open the inspect card even when the cat is standing in front.
+        var topPropHit: (prop: RoomProp, z: CGFloat)?
         for (prop, node) in propNodes {
-            if node.calculateAccumulatedFrame().insetBy(dx: -16, dy: -16).contains(location) {
-                handleTap(prop)
-                return
+            let hitFrame = propTapHitFrame(for: prop, node: node)
+            guard hitFrame.contains(location) else { continue }
+            if topPropHit == nil || node.zPosition > topPropHit!.z {
+                topPropHit = (prop, node.zPosition)
             }
+        }
+        if let topPropHit {
+            handleTap(topPropHit.prop)
+            return
+        }
+
+        if isCarryingCat {
+            moveCarriedCat(to: location)
+            return
+        }
+
+        if canBeginCatPickUp(), isCatHit(at: location) {
+            beginCatPickUpCandidate(at: location)
+            return
         }
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
+
+        if isCarryingCat {
+            moveCarriedCat(to: location)
+            return
+        }
+
+        if catPickUpCandidate {
+            catPickUpLastLocation = location
+            evaluateCatPickUp(at: location)
+            return
+        }
 
         if isCustomizeMode, let key = dragCandidateKey, let node = draggableNodes[key] {
             // Promote a press into a drag only once the finger moves enough,
@@ -1082,20 +2107,33 @@ final class PetRoomScene: SKScene {
             }
             let naturalHeight = propNaturalHeights[key] ?? node.calculateAccumulatedFrame().height
             let rawAnchor = CGPoint(x: location.x + dragTouchOffset.x, y: location.y + dragTouchOffset.y)
-            let anchor = clampPropAnchor(rawAnchor, naturalHeight: naturalHeight)
-            applyDepthTransform(to: node, baseAnchor: anchor, naturalHeight: naturalHeight)
+            let anchor = clampPropAnchor(rawAnchor, key: key, naturalHeight: naturalHeight)
+            applyDepthTransform(to: node, key: key, baseAnchor: anchor, naturalHeight: naturalHeight)
             applyFlip(to: node, key: key)
+            updateFloorPropLayering()
             return
         }
 
         guard isPlaying else { return }
         isLaserEngaged = true
-        moveLaser(to: location)
+        movePlayTarget(to: location)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         if isPlaying { isLaserEngaged = false }
-        let location = touches.first?.location(in: self)
+        let location = touches.first?.location(in: self) ?? .zero
+        if isCarryingCat {
+            dropCarriedCat()
+            return
+        }
+        if catPickUpCandidate {
+            let wasQuickTap = CACurrentMediaTime() - catPickUpStartedAt < catPickUpLongPressDuration
+            cancelCatPickUpCandidate()
+            if wasQuickTap, isCatHit(at: location) {
+                handleTap(.cat)
+            }
+            return
+        }
         if isCustomizeMode {
             finishCustomizeTouch(at: location)
             return
@@ -1105,6 +2143,10 @@ final class PetRoomScene: SKScene {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         if isPlaying { isLaserEngaged = false }
+        if isCarryingCat {
+            dropCarriedCat()
+        }
+        cancelCatPickUpCandidate()
         if isActivelyDragging {
             endCustomizeDrag(at: touches.first?.location(in: self))
         }
@@ -1138,7 +2180,11 @@ final class PetRoomScene: SKScene {
         if isActivelyDragging {
             endCustomizeDrag(at: location)
         } else if let key = dragCandidateKey {
-            selectProp(key)
+            if isPictureFrame(key) {
+                onTapPictureFrame?()
+            } else {
+                selectProp(key)
+            }
         } else {
             clearSelection()
         }
@@ -1175,7 +2221,7 @@ final class PetRoomScene: SKScene {
         positions[key] = normalized
         layoutState.propPositions = positions
         onLayoutPositionsChanged?(positions)
-        node.zPosition = propNodes.values.contains(where: { $0 === node }) ? 5 : 0
+        updateFloorPropLayering()
         draggingKey = nil
     }
 
@@ -1252,7 +2298,19 @@ final class PetRoomScene: SKScene {
     /// Mirrors a node if its prop is flipped. Call after any `setScale`, which
     /// resets the sign of `xScale`.
     private func applyFlip(to node: SKNode, key: String) {
-        node.xScale = abs(node.xScale) * (layoutState.isFlipped(key) ? -1 : 1)
+        let mirrored = propShouldMirrorHorizontally(key: key)
+        node.xScale = abs(node.xScale) * (mirrored ? -1 : 1)
+    }
+
+    /// Litter box art opens toward the room center by default (right-side placement).
+    /// Arabella's box faces the opposite way by default; a user flip toggles from
+    /// whichever default the current cat has.
+    private func propShouldMirrorHorizontally(key: String) -> Bool {
+        if key == PetRoomPropKey.litterBox {
+            let defaultMirrored = (skin != .cowCat)
+            return defaultMirrored != layoutState.isFlipped(key)   // XOR: flip from default
+        }
+        return layoutState.isFlipped(key)
     }
 
     /// Point in scene coordinates for centering SwiftUI Flip/Stash pills above a prop.
@@ -1294,6 +2352,8 @@ final class PetRoomScene: SKScene {
     func setCustomizeMode(_ enabled: Bool) {
         isCustomizeMode = enabled
         if enabled {
+            if isCarryingCat { dropCarriedCat() }
+            cancelCatPickUpCandidate()
             stopMovement()
             catVisual.removeAction(forKey: "anim")
             catVisual.removeAction(forKey: "pounce")
@@ -1329,7 +2389,7 @@ final class PetRoomScene: SKScene {
 
     /// Asks the cat to perform a reaction the view triggers after a care action.
     func playReaction(_ kind: ReactionKind) {
-        guard !isPlaying, !isTrickMode else { return }
+        guard !isPlaying, !isTrickMode, !isCarryingCat else { return }
         if isCustomizeMode, kind == .eat || kind == .drink { return }
         stopMovement()
         switch kind {
@@ -1345,18 +2405,25 @@ final class PetRoomScene: SKScene {
         isInteracting = true
         goToBowl(bowl, pose: .eat, hold: 2.2) { [weak self] in
             guard let self else { return }
+            self.spawnHearts(count: 2)
             self.isInteracting = false
             self.startAnimation(.idle)
             self.runBehavior()
         }
     }
 
+    /// Pose at the water bowl: drink when there is water, confused when the bowl is empty.
+    private func waterBowlInteractionPose() -> CatAction {
+        waterBowlLevel > 0 ? .drink : .confused
+    }
+
     /// Walks the cat to the water bowl and plays the drink animation, then resumes.
     private func drinkAtBowl() {
         guard let bowl = propNodes[.waterBowl] else { petCat(); return }
         isInteracting = true
-        goToBowl(bowl, pose: .drink, hold: 2.2) { [weak self] in
+        goToBowl(bowl, pose: waterBowlInteractionPose(), hold: 2.2) { [weak self] in
             guard let self else { return }
+            self.spawnHearts(count: 2)
             self.isInteracting = false
             self.startAnimation(.idle)
             self.runBehavior()
@@ -1376,7 +2443,7 @@ final class PetRoomScene: SKScene {
         isInteracting = true
         goToBowl(food, pose: .eat, hold: 1.8) { [weak self] in
             guard let self else { return }
-            self.goToBowl(water, pose: .drink, hold: 1.8) { [weak self] in
+            self.goToBowl(water, pose: self.waterBowlInteractionPose(), hold: 1.8) { [weak self] in
                 guard let self else { return }
                 self.isInteracting = false
                 self.startAnimation(.idle)
@@ -1388,29 +2455,67 @@ final class PetRoomScene: SKScene {
     /// Walks the cat beside `bowl`, turns to face it, holds the eat/drink pose
     /// for `hold` seconds, then calls `completion`. Cancelable via the shared
     /// "behavior" key so customize/trick mode can interrupt it cleanly.
+    /// Alignment pose for standing at a bowl (confused at an empty water bowl uses drink spacing).
+    private func bowlApproachPose(for interaction: CatAction) -> CatAction? {
+        switch interaction {
+        case .eat: return .eat
+        case .drink, .confused: return .drink
+        case .snack: return .snack
+        default: return nil
+        }
+    }
+
     private func goToBowl(_ bowl: SKNode, pose: CatAction, hold: TimeInterval, completion: @escaping () -> Void) {
-        if isCustomizeMode, pose == .eat || pose == .drink {
+        if isCustomizeMode, pose == .eat || pose == .drink || pose == .confused {
             completion()
             return
         }
         stopMovement()
         catVisual.removeAction(forKey: "anim")
         cat.zPosition = max(bowl.zPosition + 1, catAtBowlZ)
-        let approach = bowlApproachPoint(for: bowl, from: cat.position)
-        face(towards: approach.target.x)
+        let approachPose = bowlApproachPose(for: pose) ?? pose
+        let approach = bowlApproachPoint(for: bowl, from: cat.position, pose: approachPose)
+        var target = approach.target
+        if pose == .eat || pose == .drink || pose == .confused {
+            // Pull the landing point toward bowl center so the lowered muzzle
+            // sits over the food/water instead of missing to one side.
+            let bowlCenterX = bowl.calculateAccumulatedFrame().midX
+            let centerDelta = bowlCenterX - target.x
+            let maxCenterPull: CGFloat = 20
+            let centerPull = max(-maxCenterPull, min(maxCenterPull, centerDelta * 0.6))
+            target.x += centerPull
+            if pose == .drink || pose == .confused {
+                target.x = min(size.width - maxCatHorizontalHalfWidth, target.x + bowlDrinkRightShift)
+            }
+        } else if pose == .snack {
+            // Floor snacks read better when the cat stops slightly farther "up"
+            // (toward the back of the floor band), so the lowered muzzle lands
+            // directly over the treat instead of dipping below it.
+            target.y = min(size.height * catFloorBand.upperBound, target.y + snackApproachRaise)
+        }
+        face(towards: target.x)
         startAnimation(.walk)
-        let distance = hypot(approach.target.x - cat.position.x, approach.target.y - cat.position.y)
-        let move = SKAction.move(to: approach.target, duration: max(0.3, TimeInterval(distance / walkSpeed)))
+        let distance = hypot(target.x - cat.position.x, target.y - cat.position.y)
+        let move = SKAction.move(to: target, duration: max(0.3, TimeInterval(distance / walkSpeed)))
         move.timingMode = .easeInEaseOut
         let arrive = SKAction.run { [weak self] in
             guard let self else { return }
             self.cat.zPosition = max(bowl.zPosition + 1, self.catAtBowlZ)
-            self.face(towards: approach.faceX)
+            self.isHoldingBowlInteraction = pose == .eat || pose == .drink || pose == .confused || pose == .snack
+            if pose == .eat || pose == .drink || pose == .confused {
+                // Bowls are fixed at the lower-left corner; keep eat/drink frames
+                // in their original orientation so the head aligns with the bowl.
+                self.facesLeft = false
+                self.updateFacingFlip()
+            } else {
+                self.face(towards: approach.faceX)
+            }
             self.applyBowlPose(pose)
         }
         let finish = SKAction.run { [weak self] in
             guard let self else { return }
-            self.cat.zPosition = self.catDefaultZ
+            self.isHoldingBowlInteraction = false
+            self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
             completion()
         }
         cat.run(.sequence([move, arrive, .wait(forDuration: hold), finish]), withKey: "behavior")
@@ -1418,11 +2523,12 @@ final class PetRoomScene: SKScene {
 
     // MARK: Laser play
 
-    /// Enters laser-pointer play: a glowing dot appears and the cat chases it
-    /// (steered each frame in `update`). The dot follows the user's touch.
-    func startLaserPlay() {
+    /// Enters play mode. `selectedToyID == nil` uses the laser pointer.
+    func startPlay(selectedToyID: String?) {
         guard !isPlaying, !isTrickMode else { return }
         isPlaying = true
+        activePlayToyID = selectedToyID
+        playToyIsStatic = selectedToyID.map { staticPlayToyIDs.contains($0) } ?? false
         isInteracting = true
         isLaserEngaged = false
         playEngagementSeconds = 0
@@ -1431,9 +2537,15 @@ final class PetRoomScene: SKScene {
         stopMovement()
         catVisual.removeAction(forKey: "anim")
         resetVisualTransform()
+        wakeFromOccupiedBedIfNeeded()
 
         // Wake from sleep (or any idle pose) into standing before chasing.
         startAnimation(.idle)
+
+        if let toyID = selectedToyID {
+            spawnPlayToy(id: toyID)
+            return
+        }
 
         let dot = SKShapeNode(circleOfRadius: 9)
         dot.fillColor = SKColor(red: 1.0, green: 0.18, blue: 0.22, alpha: 0.95)
@@ -1441,10 +2553,41 @@ final class PetRoomScene: SKScene {
         dot.glowWidth = 6
         dot.lineWidth = 4
         dot.zPosition = 40
-        dot.position = CGPoint(x: size.width * 0.5, y: size.height * floorBand.lowerBound)
+        dot.position = CGPoint(x: size.width * 0.5, y: size.height * laserFloorBand.lowerBound)
         addChild(dot)
         laserDot = dot
         face(towards: dot.position.x)
+    }
+
+    /// Backward-compat wrapper: defaults to laser play.
+    func startLaserPlay() {
+        startPlay(selectedToyID: nil)
+    }
+
+    /// While play mode is active, switching hotbar toys updates the spawned target.
+    func setPlayToySelection(_ selectedToyID: String?) {
+        activePlayToyID = selectedToyID
+        playToyIsStatic = selectedToyID.map { staticPlayToyIDs.contains($0) } ?? false
+        catnipHitCount = 0
+        resetCardboardBoxRoutineState()
+        guard isPlaying else { return }
+        laserDot?.removeFromParent()
+        laserDot = nil
+        playToyNode?.removeFromParent()
+        playToyNode = nil
+        if let selectedToyID {
+            spawnPlayToy(id: selectedToyID)
+        } else {
+            let dot = SKShapeNode(circleOfRadius: 9)
+            dot.fillColor = SKColor(red: 1.0, green: 0.18, blue: 0.22, alpha: 0.95)
+            dot.strokeColor = SKColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.5)
+            dot.glowWidth = 6
+            dot.lineWidth = 4
+            dot.zPosition = 40
+            dot.position = CGPoint(x: size.width * 0.5, y: size.height * laserFloorBand.lowerBound)
+            addChild(dot)
+            laserDot = dot
+        }
     }
 
     /// Exits laser play and returns the cat to its ambient routine.
@@ -1457,9 +2600,38 @@ final class PetRoomScene: SKScene {
         onPlayProgress?(0)
         laserDot?.removeFromParent()
         laserDot = nil
+        playToyNode?.removeFromParent()
+        playToyNode = nil
+        activePlayToyID = nil
+        playToyIsStatic = false
+        catnipHitCount = 0
+        resetCardboardBoxRoutineState()
         isInteracting = false
-        startAnimation(.idle)
-        if !isTrickMode { runBehavior() }
+        if !isTrickMode, !isCustomizeMode {
+            isPostPlayRecovering = true
+            runPostPlayRecoveryRoutine()
+        } else {
+            isPostPlayRecovering = false
+            startAnimation(.idle)
+            if !isTrickMode { runBehavior() }
+        }
+    }
+
+    /// After active laser play, the cat cools down by taking a drink and then a
+    /// short nap before returning to ambient behavior.
+    private func runPostPlayRecoveryRoutine() {
+        guard let water = propNodes[.waterBowl] else {
+            isPostPlayRecovering = false
+            idleFor(state: .sleep, duration: 10)
+            return
+        }
+        isInteracting = true
+        goToBowl(water, pose: waterBowlInteractionPose(), hold: 1.8) { [weak self] in
+            guard let self else { return }
+            self.isInteracting = false
+            self.isPostPlayRecovering = false
+            self.idleFor(state: .sleep, duration: 10)
+        }
     }
 
     // MARK: Trick training
@@ -1473,12 +2645,16 @@ final class PetRoomScene: SKScene {
             if isPlaying { endLaserPlay() }
             stopMovement()
             catVisual.removeAction(forKey: "anim")
+            resetVisualTransform()
+            wakeFromOccupiedBedIfNeeded()
             isInteracting = false
             isHoldingPose = false
             walkToCenterAndSit()
         } else {
             clearSnack()
+            stopMovement()
             isInteracting = false
+            isHoldingPose = false
             startAnimation(.idle)
             runBehavior()
         }
@@ -1500,8 +2676,9 @@ final class PetRoomScene: SKScene {
             if isTrickMode {
                 beginTrickModeAttentiveSit()
             } else {
-                isHoldingPose = true
-                startAnimation(.sit)
+                isHoldingPose = false
+                startAnimation(.idle)
+                runBehavior()
             }
             return
         }
@@ -1513,8 +2690,9 @@ final class PetRoomScene: SKScene {
             if self.isTrickMode {
                 self.beginTrickModeAttentiveSit()
             } else {
-                self.isHoldingPose = true
-                self.startAnimation(.sit)
+                self.isHoldingPose = false
+                self.startAnimation(.idle)
+                self.runBehavior()
             }
         }
         cat.run(.sequence([move, arrive]), withKey: "behavior")
@@ -1660,10 +2838,250 @@ final class PetRoomScene: SKScene {
     }
 
     private func moveLaser(to point: CGPoint) {
-        // Keep the dot within the floor band so the cat can reach it.
-        let y = min(max(point.y, size.height * catFloorBand.lowerBound), size.height * catFloorBand.upperBound)
+        // Let the beam travel lower toward screen-bottom controls while still
+        // keeping it on the floor region where chase behavior feels natural.
+        let y = min(max(point.y, size.height * laserFloorBand.lowerBound), size.height * laserFloorBand.upperBound)
         laserDot?.position = CGPoint(x: point.x, y: y)
         face(towards: point.x)
+    }
+
+    private func movePlayTarget(to point: CGPoint) {
+        if activePlayToyID == nil {
+            moveLaser(to: point)
+            return
+        }
+        let x = min(
+            max(point.x, size.width * playToySideInsetNormalized),
+            size.width * (1 - playToySideInsetNormalized)
+        )
+        let next = CGPoint(x: x, y: point.y)
+        playToyNode?.position = next
+        if let toy = playToyNode {
+            applyPlayToyFloorDepth(for: toy)
+        }
+        face(towards: x)
+    }
+
+    /// Front edge matches other floor props; back edge uses the same height-based
+    /// cap as the cat bed so box/tunnel can't slide as far up the room.
+    private func playToyBackLimitY() -> CGFloat {
+        let floorBottom = size.height * propFrontBound
+        let seam = size.height * floorBand.upperBound
+        let referenceHeight: CGFloat = 120
+        return max(seam - depthMinScale * referenceHeight, floorBottom)
+    }
+
+    private func clampPlayToyFloorY(_ y: CGFloat) -> CGFloat {
+        let floorBottom = size.height * propFrontBound
+        return min(max(y, floorBottom), playToyBackLimitY())
+    }
+
+    /// Floor depth for play toys — feet/base Y on static box/tunnel, bottom edge otherwise.
+    private func playToyDepthBaseY(for node: SKNode) -> CGFloat {
+        if let sprite = node as? SKSpriteNode, sprite.anchorPoint.y == 0 {
+            return sprite.position.y
+        }
+        return node.calculateAccumulatedFrame().minY
+    }
+
+    private func spawnPlayToy(id: String) {
+        playToyNode?.removeFromParent()
+        let node = makePlayToyNode(id: id)
+        let midY = size.height * (catFloorBand.lowerBound + catFloorBand.upperBound) / 2
+        let spawnPoint = CGPoint(x: size.width * 0.5, y: midY)
+        node.position = spawnPoint
+        addChild(node)
+        playToyNode = node
+        applyPlayToyFloorDepth(for: node)
+        resetCardboardBoxRoutineState()
+        face(towards: node.position.x)
+    }
+
+    private func makePlayToyNode(id: String) -> SKNode {
+        guard let item = PetShopCatalog.item(id: id),
+              let imageName = item.imageName,
+              let sprite = loadImage(imageName) else {
+            let fallback = SKLabelNode(text: "🧶")
+            fallback.fontSize = 36
+            fallback.verticalAlignmentMode = .center
+            let container = SKNode()
+            container.addChild(fallback)
+            return container
+        }
+
+        // Box/tunnel use floor feet like other props so depth sorting matches the cat.
+        sprite.anchorPoint = staticPlayToyIDs.contains(id)
+            ? CGPoint(x: 0.5, y: 0)
+            : CGPoint(x: 0.5, y: 0.5)
+        let displayHeight: CGFloat
+        switch id {
+        case "toy_play_tunnel":
+            displayHeight = 110
+        case "toy_cardboard_box":
+            displayHeight = 94
+        case "toy_yarn_ball":
+            displayHeight = 48.4
+        case "toy_catnip_pouch":
+            displayHeight = 48.4
+        default:
+            displayHeight = 44
+        }
+        if sprite.size.height > 0 {
+            sprite.size = sprite.size.scaledToHeight(displayHeight)
+        }
+        return sprite
+    }
+
+    private func setCardboardBoxVisualState(_ state: CardboardBoxVisualState) {
+        cardboardBoxVisualState = state
+        guard activePlayToyID == "toy_cardboard_box" || activePlayToyID == "toy_play_tunnel",
+              let sprite = playToyNode as? SKSpriteNode else { return }
+        let imageName: String
+        switch state {
+        case .closed:
+            imageName = activePlayToyID == "toy_play_tunnel" ? "prop_cat_toy_tunnel" : "prop_cat_toy_box"
+        case .peek:
+            if activePlayToyID == "toy_play_tunnel" {
+                imageName = (skin == .calico) ? "prop_cat_toy_tunnel_0" : "prop_cat_toy_tunnel_1"
+            } else {
+                imageName = (skin == .calico) ? "prop_cat_toy_box_0" : "prop_cat_toy_box_1"
+            }
+        }
+        guard let texture = textureForAsset(named: imageName) else { return }
+        sprite.texture = texture
+        let baseDisplayHeight: CGFloat = activePlayToyID == "toy_play_tunnel" ? 110 : 94
+        let displayHeight: CGFloat = (state == .peek) ? baseDisplayHeight * 1.10 : baseDisplayHeight
+        sprite.size = sprite.size.scaledToHeight(displayHeight)
+        if let toy = playToyNode {
+            applyPlayToyFloorDepth(for: toy)
+        }
+    }
+
+    private func resetCardboardBoxRoutineState() {
+        cardboardBoxCatState = .approachBox
+        cardboardBoxStateDeadline = 0
+        cardboardBoxWanderTarget = nil
+        cat.alpha = 1
+        setCardboardBoxVisualState(.closed)
+    }
+
+    private func walkCatToward(_ target: CGPoint, dt: TimeInterval, speedMultiplier: CGFloat) -> Bool {
+        let dx = target.x - cat.position.x
+        let dy = target.y - cat.position.y
+        let distance = hypot(dx, dy)
+        guard distance > 12 else {
+            startAnimation(.idle)
+            return true
+        }
+        face(towards: target.x)
+        let step = min(CGFloat(walkSpeed * speedMultiplier) * CGFloat(dt), distance)
+        cat.position = clampCatPosition(CGPoint(
+            x: cat.position.x + dx / distance * step,
+            y: cat.position.y + dy / distance * step
+        ))
+        if catVisual.action(forKey: "anim") == nil || currentAction != .walk {
+            startAnimation(.walk)
+        }
+        return false
+    }
+
+    /// Special loop for the cardboard box toy while the player leaves the scene
+    /// idling: approach -> hide up to 10s -> peek -> stare -> brief wander/return.
+    private func updateCardboardBoxRoutine(currentTime: TimeInterval, dt: TimeInterval) {
+        guard let boxNode = playToyNode else { return }
+        let boxPosition = boxNode.position
+        switch cardboardBoxCatState {
+        case .approachBox:
+            if walkCatToward(boxPosition, dt: dt, speedMultiplier: 1.45) {
+                cat.alpha = 0
+                setCardboardBoxVisualState(.peek)
+                cardboardBoxStateDeadline = currentTime + Double.random(in: 0.8...10.0)
+                cardboardBoxCatState = .hiddenInBox
+            }
+        case .hiddenInBox:
+            guard currentTime >= cardboardBoxStateDeadline else { return }
+            cat.alpha = 1
+            let emergeSide: CGFloat = Bool.random() ? -1 : 1
+            let emergeX = min(max(boxPosition.x + 52 * emergeSide, maxCatHorizontalHalfWidth),
+                              size.width - maxCatHorizontalHalfWidth)
+            cat.position = clampCatPosition(CGPoint(x: emergeX, y: boxPosition.y))
+            setCardboardBoxVisualState(.closed)
+            face(towards: boxPosition.x)
+            startAnimation(.idle)
+            cardboardBoxStateDeadline = currentTime + Double.random(in: 0.7...2.0)
+            cardboardBoxCatState = .staringAtBox
+        case .staringAtBox:
+            face(towards: boxPosition.x)
+            guard currentTime >= cardboardBoxStateDeadline else { return }
+            if Double.random(in: 0...1) < 0.55 {
+                let direction: CGFloat = cat.position.x < boxPosition.x ? -1 : 1
+                let wanderX = min(max(cat.position.x + CGFloat.random(in: 70...130) * direction, maxCatHorizontalHalfWidth),
+                                  size.width - maxCatHorizontalHalfWidth)
+                let wanderY = min(max(boxPosition.y + CGFloat.random(in: -24...22),
+                                      size.height * catFloorBand.lowerBound),
+                                  size.height * catFloorBand.upperBound)
+                cardboardBoxWanderTarget = CGPoint(x: wanderX, y: wanderY)
+                cardboardBoxCatState = .wanderingAway
+            } else {
+                cardboardBoxCatState = .returningToBox
+            }
+        case .wanderingAway:
+            guard let target = cardboardBoxWanderTarget else {
+                cardboardBoxCatState = .returningToBox
+                return
+            }
+            if walkCatToward(target, dt: dt, speedMultiplier: 1.55) {
+                cardboardBoxWanderTarget = nil
+                cardboardBoxStateDeadline = currentTime + Double.random(in: 1.0...2.0)
+                cardboardBoxCatState = .returningToBox
+            }
+        case .returningToBox:
+            if currentTime < cardboardBoxStateDeadline {
+                face(towards: boxPosition.x)
+                startAnimation(.idle)
+                return
+            }
+            cardboardBoxStateDeadline = 0
+            if walkCatToward(boxPosition, dt: dt, speedMultiplier: 1.6) {
+                cat.alpha = 0
+                setCardboardBoxVisualState(.peek)
+                cardboardBoxStateDeadline = currentTime + Double.random(in: 0.8...10.0)
+                cardboardBoxCatState = .hiddenInBox
+            }
+        }
+    }
+
+    /// Keeps play toys on the same perspective scale and z-order curve as floor
+    /// props and the cat (`propDepthZ`), so they pass in front/behind correctly.
+    private func applyPlayToyFloorDepth(for node: SKNode) {
+        var baseY = playToyDepthBaseY(for: node)
+        let clampedBaseY = clampPlayToyFloorY(baseY)
+        if abs(clampedBaseY - baseY) > 0.5 {
+            node.position.y += clampedBaseY - baseY
+        }
+        baseY = clampedBaseY
+        node.setScale(playToyDepthScale(for: baseY))
+        node.zPosition = propDepthZ(for: baseY)
+    }
+
+    /// Food/water bowls use the same front/back depth curve as other floor props
+    /// (refreshed each frame so the cat layers correctly as it walks).
+    private func applyCareBowlFloorDepth(for prop: RoomProp, key: String) {
+        guard let node = propNodes[prop] else { return }
+        let naturalHeight = propNaturalHeights[key] ?? node.calculateAccumulatedFrame().height
+        let anchor = propFloorAnchor(for: node)
+        let clamped = clampPropAnchor(anchor, key: key, naturalHeight: naturalHeight)
+        applyDepthTransform(to: node, key: key, baseAnchor: clamped, naturalHeight: naturalHeight)
+        node.zPosition = propDepthZ(for: clamped.y)
+    }
+
+    private func refreshCareBowlDepthLayering() {
+        applyCareBowlFloorDepth(for: .foodBowl, key: PetRoomPropKey.foodBowl)
+        applyCareBowlFloorDepth(for: .waterBowl, key: PetRoomPropKey.waterBowl)
+    }
+
+    private func playToyDepthScale(for baseY: CGFloat) -> CGFloat {
+        propPerspectiveScale(baseY: baseY)
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -1674,7 +3092,19 @@ final class PetRoomScene: SKScene {
         // the back of the room and grows as it comes forward. Scales around its
         // feet (the cat node's origin), so it stays planted on the floor.
         cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: catDepthBackScale))
-        cat.position = clampCatPosition(cat.position)
+        if !isCarryingCat {
+            cat.position = clampCatPosition(cat.position)
+        }
+        if catPickUpCandidate {
+            evaluateCatPickUp(at: catPickUpLastLocation)
+        }
+        updateCatFloorDepthLayering()
+        refreshCareBowlDepthLayering()
+        if let toy = playToyNode {
+            applyPlayToyFloorDepth(for: toy)
+        }
+        updateNeedThoughtBubblePosition()
+        updateToiletPaperAutoBat(currentTime: currentTime)
 
         if isPlaying, isLaserEngaged {
             playEngagementSeconds += dt
@@ -1686,15 +3116,28 @@ final class PetRoomScene: SKScene {
             }
         }
 
-        guard isPlaying, let dot = laserDot, !isHoldingPose else { return }
+        guard isPlaying, !isHoldingPose else { return }
+        if activePlayToyID == "toy_cardboard_box" || activePlayToyID == "toy_play_tunnel" {
+            updateCardboardBoxRoutine(currentTime: currentTime, dt: dt)
+            return
+        }
+        let targetPoint: CGPoint
+        if let toy = playToyNode {
+            targetPoint = toy.position
+        } else if let dot = laserDot {
+            targetPoint = dot.position
+        } else {
+            return
+        }
 
-        let dx = dot.position.x - cat.position.x
-        let dy = dot.position.y - cat.position.y
+        let dx = targetPoint.x - cat.position.x
+        let dy = targetPoint.y - cat.position.y
         let distance = hypot(dx, dy)
-        face(towards: dot.position.x)
+        face(towards: targetPoint.x)
 
         if distance > 12 {
-            let step = min(CGFloat(walkSpeed * 1.6) * CGFloat(dt), distance)
+            let chaseSpeedMultiplier = currentPlayChaseSpeedMultiplier()
+            let step = min(CGFloat(walkSpeed * chaseSpeedMultiplier) * CGFloat(dt), distance)
             cat.position = clampCatPosition(CGPoint(
                 x: cat.position.x + dx / distance * step,
                 y: cat.position.y + dy / distance * step
@@ -1703,15 +3146,60 @@ final class PetRoomScene: SKScene {
         } else if catVisual.action(forKey: "pounce") == nil {
             // Caught up — leap toward the dot, then keep chasing.
             startAnimation(.pounce)
-            let offset = pounceTowardOffset(from: cat.position, to: dot.position, distance: PounceHop.laserDistance)
+            let offset = pounceTowardOffset(from: cat.position, to: targetPoint, distance: PounceHop.laserDistance)
             runPounceAnimation(squash: 0.88, offset: offset)
+            if let toy = playToyNode, !playToyIsStatic, currentTime - lastToyBatAt > 0.25 {
+                // Light bat/kick reaction for small toys the cat can move.
+                lastToyBatAt = currentTime
+                if activePlayToyID == catnipToyID {
+                    catnipHitCount += 1
+                }
+                let nudged = CGPoint(
+                    x: toy.position.x + CGFloat.random(in: -36...36),
+                    y: toy.position.y + CGFloat.random(in: -14...18)
+                )
+                let clampedX = min(
+                    max(nudged.x, size.width * playToySideInsetNormalized),
+                    size.width * (1 - playToySideInsetNormalized)
+                )
+                toy.position = CGPoint(x: clampedX, y: nudged.y)
+                applyPlayToyFloorDepth(for: toy)
+                toy.run(.move(to: toy.position, duration: 0.18))
+            }
         }
+    }
+
+    private func currentPlayChaseSpeedMultiplier() -> CGFloat {
+        let base: CGFloat = 1.6
+        guard activePlayToyID == catnipToyID else { return base }
+        let extra = min(CGFloat(catnipHitCount) * catnipSpeedStep, catnipMaxExtraSpeed)
+        return base + extra
+    }
+
+    /// Matches the cat's draw order to floor props (bed, tree, bowls, litter, etc.)
+    /// using the same depth curve as `updateFloorPropLayering`.
+    private func updateCatFloorDepthLayering() {
+        if isCarryingCat {
+            cat.zPosition = catCarryZPosition
+            return
+        }
+        // While explicit interactions drive z-order (eat/drink/snack/confused at bowl), keep that.
+        if isHoldingBowlInteraction
+            || currentAction == .eat || currentAction == .drink || currentAction == .snack {
+            return
+        }
+        if currentAction == .sleep {
+            cat.zPosition = catFloorDepthZ(for: cat.position.y) - catSleepDepthOffset
+            return
+        }
+        cat.zPosition = catFloorDepthZ(for: cat.position.y)
     }
 
     private func petCat() {
         guard !isInteracting else { return }
         isInteracting = true
         stopMovement()
+        wakeFromOccupiedBedIfNeeded()
         // Wake to a standing pose first, so petting a sleeping/grooming cat
         // reads as "woke up", then it bounces happily.
         startAnimation(.idle)
@@ -1730,8 +3218,8 @@ final class PetRoomScene: SKScene {
         }
     }
 
-    private func spawnHearts() {
-        for i in 0..<4 {
+    private func spawnHearts(count: Int = 4) {
+        for i in 0..<count {
             let heart = SKLabelNode(text: "♥")
             heart.fontSize = CGFloat.random(in: 18...28)
             heart.fontColor = SKColor(red: 0.92, green: 0.30, blue: 0.45, alpha: 1)
@@ -1753,15 +3241,89 @@ final class PetRoomScene: SKScene {
         }
     }
 
+    private func rebuildNeedThoughtBubble() {
+        needThoughtBubbleNode?.removeFromParent()
+        needThoughtBubbleNode = nil
+        guard needThoughtKind != .none else { return }
+
+        let bubble = SKNode()
+        bubble.zPosition = 52
+
+        let bubbleBody = SKShapeNode(ellipseOf: CGSize(width: 64, height: 50))
+        bubbleBody.fillColor = .white
+        bubbleBody.strokeColor = SKColor(white: 0.8, alpha: 1)
+        bubbleBody.lineWidth = 2
+        bubble.addChild(bubbleBody)
+
+        let tailMid = SKShapeNode(circleOfRadius: 5.5)
+        tailMid.fillColor = .white
+        tailMid.strokeColor = bubbleBody.strokeColor
+        tailMid.lineWidth = 1.4
+        tailMid.position = CGPoint(x: -16, y: -30)
+        bubble.addChild(tailMid)
+
+        let tailEnd = SKShapeNode(circleOfRadius: 3.5)
+        tailEnd.fillColor = .white
+        tailEnd.strokeColor = bubbleBody.strokeColor
+        tailEnd.lineWidth = 1.2
+        tailEnd.position = CGPoint(x: -25, y: -40)
+        bubble.addChild(tailEnd)
+
+        let iconNode: SKNode
+        switch needThoughtKind {
+        case .food:
+            if let image = UIImage(named: "prop_cat_food_kibble") {
+                let sprite = SKSpriteNode(texture: SKTexture(image: image))
+                sprite.size = sprite.size.scaledToHeight(24)
+                iconNode = sprite
+            } else {
+                let label = SKLabelNode(text: "🍖")
+                label.fontSize = 20
+                label.verticalAlignmentMode = .center
+                iconNode = label
+            }
+        case .water:
+            let label = SKLabelNode(text: "💧")
+            label.fontSize = 22
+            label.verticalAlignmentMode = .center
+            iconNode = label
+        case .none:
+            return
+        }
+        iconNode.position = CGPoint(x: 0, y: 0)
+        bubble.addChild(iconNode)
+
+        addChild(bubble)
+        needThoughtBubbleNode = bubble
+        updateNeedThoughtBubblePosition()
+    }
+
+    private func updateNeedThoughtBubblePosition() {
+        guard let bubble = needThoughtBubbleNode else { return }
+        let catFrame = cat.calculateAccumulatedFrame()
+        let headX = catFrame.midX
+        let headY = catFrame.maxY
+        bubble.position = CGPoint(
+            x: min(max(headX, 46), size.width - 46),
+            y: min(max(headY + 56, 64), size.height - 46)
+        )
+    }
+
     // MARK: Asset helpers
 
     private static let maxTextureDimension: CGFloat = 2048
 
     /// Loads a sprite from a catalog image name, or nil if missing.
     private func loadImage(_ name: String) -> SKSpriteNode? {
-        guard let image = UIImage(named: name) else { return nil }
-        let texture = SKTexture(image: Self.imageFittingTextureLimits(image))
+        guard let texture = textureForAsset(named: name) else { return nil }
         return SKSpriteNode(texture: texture)
+    }
+
+    /// Builds a SpriteKit texture with black-matte removal for catalog PNGs.
+    private func textureForAsset(named name: String) -> SKTexture? {
+        guard let image = UIImage(named: name) else { return nil }
+        let alphaFixed = Self.imageByRemovingBlackMatteIfNeeded(image)
+        return SKTexture(image: Self.imageFittingTextureLimits(alphaFixed))
     }
 
     /// Downscales oversized art so SpriteKit never exceeds the GPU texture limit.
@@ -1775,6 +3337,71 @@ final class PetRoomScene: SKScene {
         return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
+    }
+
+    /// Some imported PNGs have an opaque black matte instead of true alpha.
+    /// If the border is mostly black, convert near-black fully-opaque pixels to transparent.
+    private static func imageByRemovingBlackMatteIfNeeded(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let width = cg.width
+        let height = cg.height
+        guard width > 1, height > 1 else { return image }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        let bitsPerComponent = 8
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        guard let ctx = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        func isNearBlack(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Bool {
+            r <= 24 && g <= 24 && b <= 24
+        }
+
+        var borderOpaqueCount = 0
+        var borderBlackCount = 0
+        for x in stride(from: 0, to: width, by: max(1, width / 80)) {
+            for y in [0, height - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaqueCount += 1
+                    if isNearBlack(r, g, b) { borderBlackCount += 1 }
+                }
+            }
+        }
+        for y in stride(from: 0, to: height, by: max(1, height / 80)) {
+            for x in [0, width - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaqueCount += 1
+                    if isNearBlack(r, g, b) { borderBlackCount += 1 }
+                }
+            }
+        }
+
+        guard borderOpaqueCount > 0 else { return image }
+        let blackBorderRatio = Double(borderBlackCount) / Double(borderOpaqueCount)
+        guard blackBorderRatio >= 0.80 else { return image }
+
+        for i in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
+            let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+            if a >= 245 && isNearBlack(r, g, b) {
+                pixels[i + 3] = 0
+            }
+        }
+
+        guard let out = ctx.makeImage() else { return image }
+        return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
     }
 
     /// Returns the ordered animation frames for an action from the skin's atlas,
@@ -1804,11 +3431,22 @@ final class PetRoomScene: SKScene {
         return 0
     }
 
-    /// The cat keeps a little forward of the back wall so it never looks like
-    /// it's standing on the seam — a shallower slice of `floorBand`.
+    /// Vertical band the cat may walk in — same front reach as play mode
+    /// (`laserFloorLowerBound`), with a small back inset so it stays off the seam.
     private var catFloorBand: ClosedRange<CGFloat> {
         let backInset: CGFloat = 0.035
-        return floorBand.lowerBound...max(floorBand.lowerBound, floorBand.upperBound - backInset)
+        let lower = max(0.01, min(laserFloorLowerBound, floorBand.upperBound))
+        return lower...max(lower, floorBand.upperBound - backInset)
+    }
+
+    /// Play mode uses the same walk band as ambient (kept for call sites that
+    /// reference it explicitly, e.g. laser dot placement and small chase toys).
+    private var laserFloorBand: ClosedRange<CGFloat> {
+        catFloorBand
+    }
+
+    private var activeCatMovementBand: ClosedRange<CGFloat> {
+        catFloorBand
     }
 
     private func randomFloorY() -> CGFloat {
@@ -1829,8 +3467,9 @@ final class PetRoomScene: SKScene {
         let halfW = measured > catScreenEdgeInset ? measured : maxCatHorizontalHalfWidth
         let minX = halfW
         let maxX = max(minX, size.width - halfW)
-        let minY = size.height * catFloorBand.lowerBound
-        let maxY = size.height * catFloorBand.upperBound
+        let movementBand = activeCatMovementBand
+        let minY = size.height * movementBand.lowerBound
+        let maxY = size.height * movementBand.upperBound
         return CGPoint(
             x: min(max(point.x, minX), maxX),
             y: min(max(point.y, minY), maxY)

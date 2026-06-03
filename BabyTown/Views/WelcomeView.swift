@@ -62,32 +62,36 @@ struct WelcomeView: View {
                 Spacer()
 
                 // Continue button
-                Button(action: onContinue) {
-                    Text("Let's go.")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.pink,
-                                            Color.pink.opacity(0.8)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                VStack(spacing: 14) {
+                    Button(action: onContinue) {
+                        Text("Let's go.")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.pink,
+                                                Color.pink.opacity(0.8)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                )
-                                .shadow(
-                                    color: .pink.opacity(0.3),
-                                    radius: 12, y: 6
-                                )
-                        )
+                                    .shadow(
+                                        color: .pink.opacity(0.3),
+                                        radius: 12, y: 6
+                                    )
+                            )
+                    }
+                    .padding(.horizontal, 40)
+
+                    OnboardingLegalLinks()
                 }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 60)
+                .padding(.bottom, 42)
                 .opacity(buttonOpacity)
             }
         }

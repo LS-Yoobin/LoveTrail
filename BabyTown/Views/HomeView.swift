@@ -432,8 +432,16 @@ struct HomeView: View {
                         .zIndex(20)
                         .transition(.opacity)
                 }
+
+                if showVisitPet {
+                    visitPetOverlay
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .zIndex(25)
+                        .transition(.opacity)
+                }
             } // Close ZStack
             .animation(.easeInOut(duration: 0.3), value: showMapView)
+            .animation(.easeInOut(duration: 0.3), value: showVisitPet)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
             .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
             .sheet(isPresented: $showPromptSheet) {
@@ -470,11 +478,6 @@ struct HomeView: View {
                     onVisitPet: { showVisitPet = true }
                 )
             }
-            .fullScreenCover(isPresented: $showVisitPet) {
-                NavigationStack {
-                    AdoptAPetRootView()
-                }
-            }
             .fullScreenCover(isPresented: $showPartnerPaywall) {
                 InvitePartnerPaywallView(
                     store: store,
@@ -505,6 +508,18 @@ struct HomeView: View {
     }
     
     // MARK: - Map pull reveal
+
+    @ViewBuilder
+    private var visitPetOverlay: some View {
+        NavigationStack {
+            AdoptAPetRootView {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showVisitPet = false
+                }
+            }
+        }
+        .background(BabyTownTheme.background.ignoresSafeArea())
+    }
     
     @ViewBuilder
     private var memoryMapOverlay: some View {
@@ -598,7 +613,7 @@ struct HomeView: View {
         let wasPulling = peakPullOffset > 2
         if wasPulling && pull < 2 {
             if peakPullOffset >= mapOpenThreshold {
-                openMap()
+                openVisitPet()
             }
             peakPullOffset = 0
             didCrossMapOpenThreshold = false
@@ -616,6 +631,14 @@ struct HomeView: View {
         mapOpenHapticTick += 1
         withAnimation(.easeInOut(duration: 0.3)) {
             showMapView = true
+        }
+    }
+
+    private func openVisitPet() {
+        guard !showVisitPet else { return }
+        mapOpenHapticTick += 1
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showVisitPet = true
         }
     }
 

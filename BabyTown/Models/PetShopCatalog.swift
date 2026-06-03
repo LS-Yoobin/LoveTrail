@@ -16,10 +16,11 @@ enum PetShopCategory: String, CaseIterable, Identifiable {
     case catFood
     case litterBoxes
     case collars
-    case furniture
     case catToys
-    case wallColors
+    case plants
     case pictureFrames
+    case furniture
+    case wallColors
 
     var id: String { rawValue }
 
@@ -33,6 +34,7 @@ enum PetShopCategory: String, CaseIterable, Identifiable {
         case .collars: return "Collar"
         case .furniture: return "Couch"
         case .catToys: return "Cat Toys"
+        case .plants: return "Plants"
         case .wallColors: return "Wall Color"
         case .pictureFrames: return "Picture Frames"
         }
@@ -48,6 +50,7 @@ enum PetShopCategory: String, CaseIterable, Identifiable {
         case .collars: return "bell.fill"
         case .furniture: return "sofa.fill"
         case .catToys: return "balloon.fill"
+        case .plants: return "leaf.fill"
         case .wallColors: return "paintpalette.fill"
         case .pictureFrames: return "photo.artframe"
         }
@@ -66,6 +69,7 @@ struct PetShopItem: Identifiable, Equatable {
     let placeholderCaption: String
     let defaultSize: CGSize
     let isFloorItem: Bool
+    let isPlayToy: Bool
     let isWallColor: Bool
     let isPictureFrame: Bool
     let equipSlot: PetEquipSlot?
@@ -73,6 +77,9 @@ struct PetShopItem: Identifiable, Equatable {
     let servingsGranted: Int?
     /// Free classic style; selected when nothing else is equipped for the slot.
     let isStarter: Bool
+    /// Auto-cleaning litter box: never goes dirty and passively collects the
+    /// litter coins for the player.
+    let isAutoLitter: Bool
 
     var isCatFood: Bool { servingsGranted != nil }
 
@@ -87,11 +94,13 @@ struct PetShopItem: Identifiable, Equatable {
         placeholderCaption: String,
         defaultSize: CGSize,
         isFloorItem: Bool,
+        isPlayToy: Bool = false,
         isWallColor: Bool,
         isPictureFrame: Bool,
         equipSlot: PetEquipSlot? = nil,
         servingsGranted: Int? = nil,
-        isStarter: Bool = false
+        isStarter: Bool = false,
+        isAutoLitter: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -103,17 +112,31 @@ struct PetShopItem: Identifiable, Equatable {
         self.placeholderCaption = placeholderCaption
         self.defaultSize = defaultSize
         self.isFloorItem = isFloorItem
+        self.isPlayToy = isPlayToy
         self.isWallColor = isWallColor
         self.isPictureFrame = isPictureFrame
         self.equipSlot = equipSlot
         self.servingsGranted = servingsGranted
         self.isStarter = isStarter
+        self.isAutoLitter = isAutoLitter
     }
 }
 
 enum PetShopCatalog {
 
-    static let pictureFrameID = "decor_memory_frame"
+    static let legacyPictureFrameID = "decor_memory_frame"
+    static let defaultPictureFrameID = "decor_frame_cat"
+
+    static let pictureFrameItemIDs: [String] = [
+        "decor_frame_cat",
+        "decor_frame_floral",
+        "decor_frame_hearts",
+        "decor_frame_ribbon",
+        "decor_frame_moon",
+        "decor_frame_leaves",
+        "decor_frame_bear",
+        "decor_frame_ornate",
+    ]
 
     static let all: [PetShopItem] = [
         // MARK: Cat Tree
@@ -126,7 +149,7 @@ enum PetShopCatalog {
             imageName: "prop_cat_tree",
             systemImage: "tree.fill",
             placeholderCaption: "Cat Tree",
-            defaultSize: CGSize(width: 120, height: 220),
+            defaultSize: CGSize(width: 150, height: 275),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
@@ -135,14 +158,14 @@ enum PetShopCatalog {
         ),
         PetShopItem(
             id: "cat_tree_sky",
-            name: "Sky Tower",
-            detail: "A taller perch for bird-watching daydreams.",
+            name: "Sage Garden Tower",
+            detail: "A premium multi-level lounge with leafy dangling toys.",
             category: .catTrees,
-            cost: 48,
-            imageName: nil,
+            cost: 95,
+            imageName: "prop_cat_tree_1",
             systemImage: "tree.fill",
             placeholderCaption: "Sky Tower",
-            defaultSize: CGSize(width: 120, height: 240),
+            defaultSize: CGSize(width: 150, height: 300),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
@@ -150,14 +173,14 @@ enum PetShopCatalog {
         ),
         PetShopItem(
             id: "cat_tree_cozy",
-            name: "Cozy Perch",
-            detail: "Extra platforms for afternoon sun naps.",
+            name: "Royal Lavender Loft",
+            detail: "Top-tier luxury cat tree with plush loft and scratch ramp.",
             category: .catTrees,
-            cost: 38,
-            imageName: nil,
+            cost: 120,
+            imageName: "prop_cat_tree_2",
             systemImage: "leaf.fill",
             placeholderCaption: "Perch",
-            defaultSize: CGSize(width: 110, height: 200),
+            defaultSize: CGSize(width: 137.5, height: 250),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
@@ -182,21 +205,6 @@ enum PetShopCatalog {
             isStarter: true
         ),
         PetShopItem(
-            id: "bowl_food_rose",
-            name: "Rose Ceramic Bowl",
-            detail: "A deeper dish for hearty dinner portions.",
-            category: .bowls,
-            cost: 22,
-            imageName: nil,
-            systemImage: "circle.fill",
-            placeholderCaption: "Rose Bowl",
-            defaultSize: CGSize(width: 52, height: 40),
-            isFloorItem: false,
-            isWallColor: false,
-            isPictureFrame: false,
-            equipSlot: .foodBowl
-        ),
-        PetShopItem(
             id: "bowl_water_classic",
             name: "Classic Water Bowl",
             detail: "Fresh water, always within paw's reach.",
@@ -218,10 +226,40 @@ enum PetShopCatalog {
             detail: "Cool ceramic for crisp, clean sips.",
             category: .bowls,
             cost: 20,
-            imageName: nil,
+            imageName: "prop_water_bowl_2",
             systemImage: "drop.circle.fill",
             placeholderCaption: "Water",
-            defaultSize: CGSize(width: 52, height: 40),
+            defaultSize: CGSize(width: 72, height: 56),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: false,
+            equipSlot: .waterBowl
+        ),
+        PetShopItem(
+            id: "bowl_water_flower",
+            name: "Garden Bloom Water Bowl",
+            detail: "A floral ceramic bowl for calm hydration breaks.",
+            category: .bowls,
+            cost: 34,
+            imageName: "prop_water_bowl_1",
+            systemImage: "camera.macro.circle.fill",
+            placeholderCaption: "Water",
+            defaultSize: CGSize(width: 72, height: 56),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: false,
+            equipSlot: .waterBowl
+        ),
+        PetShopItem(
+            id: "bowl_water_luxe",
+            name: "Luxe Stone Water Bowl",
+            detail: "Premium stone finish that keeps water cool.",
+            category: .bowls,
+            cost: 48,
+            imageName: "prop_water_bowl_4",
+            systemImage: "sparkles",
+            placeholderCaption: "Water",
+            defaultSize: CGSize(width: 72, height: 56),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
@@ -234,8 +272,8 @@ enum PetShopCatalog {
             name: "Dry Kibble",
             detail: "Everyday crunch — 5 servings for the bowl.",
             category: .catFood,
-            cost: 8,
-            imageName: nil,
+            cost: 9,
+            imageName: "prop_cat_food_kibble",
             systemImage: "leaf.fill",
             placeholderCaption: "Kibble",
             defaultSize: .zero,
@@ -245,14 +283,14 @@ enum PetShopCatalog {
             servingsGranted: 5
         ),
         PetShopItem(
-            id: "food_wet_food",
-            name: "Wet Food",
-            detail: "Savory pâté — 4 hearty servings.",
+            id: "food_wet_chicken",
+            name: "Wet Food, Chicken",
+            detail: "Tender chicken recipe — 4 hearty servings.",
             category: .catFood,
-            cost: 12,
-            imageName: nil,
+            cost: 14,
+            imageName: "prop_cat_food_chicken",
             systemImage: "drop.fill",
-            placeholderCaption: "Wet",
+            placeholderCaption: "Chicken",
             defaultSize: .zero,
             isFloorItem: false,
             isWallColor: false,
@@ -260,29 +298,29 @@ enum PetShopCatalog {
             servingsGranted: 4
         ),
         PetShopItem(
-            id: "food_dental_treats",
-            name: "Dental Treats",
-            detail: "Crunchy bites for shiny teeth — 3 servings.",
+            id: "food_wet_tuna",
+            name: "Wet Food, Tuna",
+            detail: "Rich tuna bites — 4 flavorful servings.",
             category: .catFood,
-            cost: 14,
-            imageName: nil,
-            systemImage: "sparkles",
-            placeholderCaption: "Dental",
+            cost: 16,
+            imageName: "prop_cat_food_tuna",
+            systemImage: "fish.fill",
+            placeholderCaption: "Tuna",
             defaultSize: .zero,
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
-            servingsGranted: 3
+            servingsGranted: 4
         ),
         PetShopItem(
-            id: "food_catnip_treats",
-            name: "Catnip Treats",
-            detail: "A playful sprinkle — 3 servings of fun.",
+            id: "food_sashimi_premium",
+            name: "Sashimi for Cats",
+            detail: "Premium-grade sashimi — 3 luxury servings.",
             category: .catFood,
-            cost: 10,
-            imageName: nil,
-            systemImage: "leaf.circle.fill",
-            placeholderCaption: "Catnip",
+            cost: 32,
+            imageName: "prop_cat_food_sashimi",
+            systemImage: "sparkles",
+            placeholderCaption: "Sashimi",
             defaultSize: .zero,
             isFloorItem: false,
             isWallColor: false,
@@ -294,13 +332,13 @@ enum PetShopCatalog {
         PetShopItem(
             id: "litter_classic",
             name: "Classic Litter Box",
-            detail: "The tidy box already in the corner.",
+            detail: "The tidy blue box already in the corner.",
             category: .litterBoxes,
             cost: 0,
-            imageName: "prop_litter_box",
+            imageName: "prop_litter_box_1_sheet",
             systemImage: "shippingbox.fill",
             placeholderCaption: "Litter",
-            defaultSize: CGSize(width: 200, height: 120),
+            defaultSize: CGSize(width: 250, height: 150),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
@@ -308,34 +346,50 @@ enum PetShopCatalog {
             isStarter: true
         ),
         PetShopItem(
-            id: "litter_covered",
-            name: "Covered Litter Box",
-            detail: "A hooded box for extra privacy.",
+            id: "litter_steel",
+            name: "Stainless Steel Litter Box",
+            detail: "A sleek brushed-metal tray that wipes clean.",
             category: .litterBoxes,
-            cost: 28,
-            imageName: nil,
-            systemImage: "house.fill",
-            placeholderCaption: "Covered",
-            defaultSize: CGSize(width: 200, height: 130),
+            cost: 40,
+            imageName: "prop_litter_box_2_sheet",
+            systemImage: "tray.fill",
+            placeholderCaption: "Litter",
+            defaultSize: CGSize(width: 250, height: 150),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
             equipSlot: .litterBox
         ),
         PetShopItem(
-            id: "litter_corner",
-            name: "Corner Litter Box",
-            detail: "Space-saving design for small rooms.",
+            id: "litter_hooded",
+            name: "Hooded Litter Box",
+            detail: "A cozy pink hood for extra privacy.",
             category: .litterBoxes,
-            cost: 32,
-            imageName: nil,
-            systemImage: "square.split.2x1.fill",
-            placeholderCaption: "Corner",
-            defaultSize: CGSize(width: 180, height: 110),
+            cost: 70,
+            imageName: "prop_litter_box_3_sheet",
+            systemImage: "house.fill",
+            placeholderCaption: "Litter",
+            defaultSize: CGSize(width: 237.5, height: 175),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: false,
             equipSlot: .litterBox
+        ),
+        PetShopItem(
+            id: "litter_auto",
+            name: "Auto-Clean Litter Box",
+            detail: "Cleans itself and collects the coins for you — never scoop again.",
+            category: .litterBoxes,
+            cost: 2500,
+            imageName: "prop_litter_box_4_sheet",
+            systemImage: "gearshape.2.fill",
+            placeholderCaption: "Litter",
+            defaultSize: CGSize(width: 237.5, height: 187.5),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: false,
+            equipSlot: .litterBox,
+            isAutoLitter: true
         ),
 
         // MARK: Collars
@@ -387,15 +441,43 @@ enum PetShopCatalog {
 
         // MARK: Cat Bed
         PetShopItem(
-            id: "furniture_cat_bed",
-            name: "Plush Cat Bed",
-            detail: "A soft nest for afternoon naps.",
+            id: "furniture_cat_bed_1",
+            name: "Garden Charm Bed",
+            detail: "Soft green bed with a ribbon charm for cozy naps.",
             category: .catBeds,
             cost: 35,
-            imageName: "prop_cat_bed",
+            imageName: "prop_cat_bed_1",
             systemImage: "bed.double.fill",
             placeholderCaption: "Cat Bed",
-            defaultSize: CGSize(width: 90, height: 56),
+            defaultSize: CGSize(width: 230, height: 150),
+            isFloorItem: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "furniture_cat_bed_2",
+            name: "Pink Snuggle Bed",
+            detail: "A plush pink bed with sweet kitty pattern accents.",
+            category: .catBeds,
+            cost: 35,
+            imageName: "prop_cat_bed_2",
+            systemImage: "heart.fill",
+            placeholderCaption: "Cat Bed",
+            defaultSize: CGSize(width: 230, height: 150),
+            isFloorItem: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "furniture_cat_bed_3",
+            name: "Blue Paw Cloud Bed",
+            detail: "Round cloud-soft bed with a paw design and star toy.",
+            category: .catBeds,
+            cost: 35,
+            imageName: "prop_cat_bed_3",
+            systemImage: "star.fill",
+            placeholderCaption: "Cat Bed",
+            defaultSize: CGSize(width: 230, height: 150),
             isFloorItem: true,
             isWallColor: false,
             isPictureFrame: false
@@ -417,18 +499,109 @@ enum PetShopCatalog {
             isPictureFrame: false
         ),
 
+        // MARK: Plants
+        PetShopItem(
+            id: "furniture_small_plant",
+            name: "Tulip Pot Plant",
+            detail: "A leafy little plant in a tulip pot. Tap to water it.",
+            category: .plants,
+            cost: 45,
+            imageName: "prop_small_plant",
+            systemImage: "leaf.fill",
+            placeholderCaption: "Plant",
+            defaultSize: CGSize(width: 105, height: 126),
+            isFloorItem: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "furniture_big_plant",
+            name: "Monstera Pot Plant",
+            detail: "A lush statement monstera. Tap to water it.",
+            category: .plants,
+            cost: 80,
+            imageName: "prop_big_plant",
+            systemImage: "leaf.fill",
+            placeholderCaption: "Plant",
+            defaultSize: CGSize(width: 150.5, height: 182),
+            isFloorItem: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+
         // MARK: Cat Toys
         PetShopItem(
             id: "toy_yarn_ball",
             name: "Yarn Ball",
-            detail: "Rolls around when the cat pounces.",
+            detail: "A classic pink yarn ball for playful chase sessions.",
             category: .catToys,
-            cost: 22,
-            imageName: nil,
+            cost: 24,
+            imageName: "prop_cat_toy_0",
             systemImage: "circle.fill",
             placeholderCaption: "Yarn",
-            defaultSize: CGSize(width: 36, height: 36),
-            isFloorItem: true,
+            defaultSize: CGSize(width: 39.6, height: 39.6),
+            isFloorItem: false,
+            isPlayToy: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "toy_little_fish",
+            name: "Little Fish",
+            detail: "A catnip fish plush for bouncy pounce practice.",
+            category: .catToys,
+            cost: 28,
+            imageName: "prop_cat_toy_1",
+            systemImage: "fish.fill",
+            placeholderCaption: "Fish",
+            defaultSize: CGSize(width: 54, height: 28),
+            isFloorItem: false,
+            isPlayToy: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "toy_catnip_pouch",
+            name: "Catnip Pouch",
+            detail: "A fragrant catnip pouch for focused toy training.",
+            category: .catToys,
+            cost: 32,
+            imageName: "prop_cat_toy_2",
+            systemImage: "leaf.fill",
+            placeholderCaption: "Catnip",
+            defaultSize: CGSize(width: 63.8, height: 35.2),
+            isFloorItem: false,
+            isPlayToy: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "toy_cardboard_box",
+            name: "Cardboard Box",
+            detail: "Every cat's favorite hideout. Free forever.",
+            category: .catToys,
+            cost: 0,
+            imageName: "prop_cat_toy_box",
+            systemImage: "shippingbox.fill",
+            placeholderCaption: "Box",
+            defaultSize: CGSize(width: 64, height: 52),
+            isFloorItem: false,
+            isPlayToy: true,
+            isWallColor: false,
+            isPictureFrame: false
+        ),
+        PetShopItem(
+            id: "toy_play_tunnel",
+            name: "Play Tunnel",
+            detail: "A crinkly tunnel toy for zoomies and ambushes.",
+            category: .catToys,
+            cost: 36,
+            imageName: "prop_cat_toy_tunnel",
+            systemImage: "circle.dashed.inset.filled",
+            placeholderCaption: "Tunnel",
+            defaultSize: CGSize(width: 72, height: 40),
+            isFloorItem: false,
+            isPlayToy: true,
             isWallColor: false,
             isPictureFrame: false
         ),
@@ -479,15 +652,113 @@ enum PetShopCatalog {
 
         // MARK: Picture Frames
         PetShopItem(
-            id: pictureFrameID,
-            name: "Memory Frame",
-            detail: "Hang a Baby Town moment on your wall.",
+            id: "decor_frame_cat",
+            name: "Peek-a-Boo Cat Frame",
+            detail: "A curious kitten peeks over your favorite moment.",
             category: .pictureFrames,
             cost: 32,
-            imageName: nil,
+            imageName: "prop_frame_cat",
             systemImage: "photo.artframe",
             placeholderCaption: "Frame",
-            defaultSize: CGSize(width: 88, height: 100),
+            defaultSize: CGSize(width: 76, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_floral",
+            name: "Floral Scallop Frame",
+            detail: "Soft flowers and a little heart for sweet memories.",
+            category: .pictureFrames,
+            cost: 38,
+            imageName: "prop_frame_floral",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 90, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_hearts",
+            name: "Sweetheart Frame",
+            detail: "Tiny hearts on every side for extra love.",
+            category: .pictureFrames,
+            cost: 34,
+            imageName: "prop_frame_hearts",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 87, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_ribbon",
+            name: "Ribbon Tag Frame",
+            detail: "A bow and paw-print tag for your wall gallery.",
+            category: .pictureFrames,
+            cost: 42,
+            imageName: "prop_frame_ribbon",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 85, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_moon",
+            name: "Starry Night Frame",
+            detail: "Moon, stars, and clouds for dreamy snapshots.",
+            category: .pictureFrames,
+            cost: 40,
+            imageName: "prop_frame_moon",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 81, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_leaves",
+            name: "Garden Vine Frame",
+            detail: "Climbing leaves for a calm, natural look.",
+            category: .pictureFrames,
+            cost: 36,
+            imageName: "prop_frame_leaves",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 83, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_bear",
+            name: "Teddy Bear Frame",
+            detail: "A cozy bear friend guards your cutest photo.",
+            category: .pictureFrames,
+            cost: 44,
+            imageName: "prop_frame_bear",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 75, height: 100),
+            isFloorItem: false,
+            isWallColor: false,
+            isPictureFrame: true
+        ),
+        PetShopItem(
+            id: "decor_frame_ornate",
+            name: "Ribbon Heart Frame",
+            detail: "Ornate scallops with a ribbon banner finish.",
+            category: .pictureFrames,
+            cost: 48,
+            imageName: "prop_frame_ornate",
+            systemImage: "photo.artframe",
+            placeholderCaption: "Frame",
+            defaultSize: CGSize(width: 78, height: 100),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: true
@@ -498,8 +769,135 @@ enum PetShopCatalog {
         all.first { $0.id == id }
     }
 
+    /// Default litter box sheet (the free blue starter) used when nothing is equipped.
+    static let defaultLitterSheetName = "prop_litter_box_1_sheet"
+
+    /// 6-frame sprite sheet for the currently equipped litter box.
+    static func litterSheetName(forEquippedItemID equippedItemID: String?) -> String {
+        if let equippedItemID, let item = item(id: equippedItemID), let sheet = item.imageName {
+            return sheet
+        }
+        return starter(for: .litterBox)?.imageName ?? defaultLitterSheetName
+    }
+
+    /// Whether the equipped litter box is the self-cleaning auto box.
+    static func isAutoLitter(equippedItemID: String?) -> Bool {
+        guard let equippedItemID, let item = item(id: equippedItemID) else { return false }
+        return item.isAutoLitter
+    }
+
+    /// Number of frames packed left-to-right in a litter box sheet.
+    static let litterFrameCount = 6
+
+    private static let litterCleanCropCache = NSCache<NSString, UIImage>()
+
+    /// Crops the first (clean) frame out of a 6-frame litter box sheet, for
+    /// market thumbnails and the inspect card.
+    static func litterCleanCrop(sheetName: String) -> UIImage? {
+        let key = NSString(string: "\(sheetName)#clean")
+        if let cached = litterCleanCropCache.object(forKey: key) { return cached }
+        guard let original = UIImage(named: sheetName), let cg = original.cgImage else { return nil }
+        let frameWidth = cg.width / litterFrameCount
+        guard frameWidth > 0 else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: frameWidth, height: cg.height)
+        guard let cropped = cg.cropping(to: rect) else { return nil }
+        let image = UIImage(cgImage: cropped, scale: original.scale, orientation: original.imageOrientation)
+        litterCleanCropCache.setObject(image, forKey: key)
+        return image
+    }
+
+    /// Clean-frame art for the litter box currently equipped (or the starter).
+    static func equippedLitterCleanCrop(equippedItemID: String?) -> UIImage? {
+        litterCleanCrop(sheetName: litterSheetName(forEquippedItemID: equippedItemID))
+    }
+
+    /// Floor décor IDs in a category, in catalog (declaration) order. This is the
+    /// priority order used to pick the single piece shown for "one at a time"
+    /// categories (beds, couch, plants), so the room never stacks duplicates and
+    /// the market marks exactly one item "Active". Both the scene and the
+    /// view-model must read this same order to agree on which item is active.
+    static func floorItemIDs(in category: PetShopCategory) -> [String] {
+        all.filter { $0.isFloorItem && $0.category == category }.map(\.id)
+    }
+
+    /// The single picture frame currently placed on the wall, if any.
+    static func activePictureFrameID(in layout: PetRoomLayoutState) -> String? {
+        layout.activeItem(among: pictureFrameItemIDs)
+    }
+
+    private static let frameArtCache = NSCache<NSString, UIImage>()
+
+    /// Frame PNG with any export matte keyed to transparency.
+    static func frameArtImage(named name: String) -> UIImage? {
+        let key = NSString(string: name)
+        if let cached = frameArtCache.object(forKey: key) { return cached }
+        guard let original = UIImage(named: name) else { return nil }
+        let processed = removeBlackMatteIfNeeded(from: original)
+        frameArtCache.setObject(processed, forKey: key)
+        return processed
+    }
+
+    /// Art for a placed picture frame, keyed by shop item id.
+    static func frameArtImage(forItemID itemID: String) -> UIImage? {
+        guard let imageName = item(id: itemID)?.imageName else { return nil }
+        return frameArtImage(named: imageName)
+    }
+
+    /// Size and center for the photo layer behind a frame's transparent window.
+    static func pictureFramePhotoPlacement(frameSize: CGSize, photo: UIImage) -> (size: CGSize, position: CGPoint) {
+        // Normalized opening in the frame art (portrait window sits slightly above center
+        // and a touch right of the frame center to match the asymmetric mat).
+        let openingWidth = frameSize.width * 0.58
+        let openingHeight = frameSize.height * 0.59
+        let openingCenter = CGPoint(x: frameSize.width * 0.045, y: frameSize.height * -0.05)
+
+        let displayPhoto = photo.normalizedForSpriteKit()
+        let filledSize = displayPhoto.sizeAspectFilling(CGSize(width: openingWidth, height: openingHeight))
+        return (filledSize, openingCenter)
+    }
+
+    private static func removeBlackMatteIfNeeded(from image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let width = cg.width
+        let height = cg.height
+        guard width > 1, height > 1 else { return image }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        guard let ctx = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        func isNearBlack(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Bool {
+            r <= 24 && g <= 24 && b <= 24
+        }
+
+        for i in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
+            let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+            if a >= 245 && isNearBlack(r, g, b) {
+                pixels[i + 3] = 0
+            }
+        }
+
+        guard let out = ctx.makeImage() else { return image }
+        return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     static func items(in category: PetShopCategory) -> [PetShopItem] {
-        all.filter { $0.category == category }
+        all
+            .filter { $0.category == category }
+            .sorted { lhs, rhs in
+                if lhs.cost != rhs.cost { return lhs.cost < rhs.cost }
+                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
     }
 
     static func starter(for slot: PetEquipSlot) -> PetShopItem? {

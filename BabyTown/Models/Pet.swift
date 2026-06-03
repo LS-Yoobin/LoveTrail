@@ -97,15 +97,19 @@ struct StoredNeed: Codable {
 struct PetState: Codable {
     private enum CodingKeys: String, CodingKey {
         case adoptedSkin, adoptedDate, coins, foodServings
+        case ownedSkins
         case hunger, thirst, litter, happiness
-        case lastPetAt, lastPlayAt, customPetNames
+        case lastPetAt, lastPlayAt, lastPlantWaterAt, customPetNames
         case roomLayout
         case roomLayoutsByPet
+        case toiletPaperMessByPet
+        case trickTrainingByPet
         case trickTraining
     }
 
     var adoptedSkin: CatSkin?
     var adoptedDate: Date?
+    var ownedSkins: [CatSkin]
 
     var coins: Int
     var foodServings: Int
@@ -117,6 +121,8 @@ struct PetState: Codable {
 
     var lastPetAt: Date?
     var lastPlayAt: Date?
+    /// Last time each plant was watered for coins, keyed by plant item id.
+    var lastPlantWaterAt: [String: Date]
 
     /// Custom display names keyed by `CatSkin.rawValue`.
     var customPetNames: [String: String]
@@ -124,12 +130,15 @@ struct PetState: Codable {
     /// Per-pet room décor + prop layout, keyed by `CatSkin.rawValue`.
     var roomLayoutsByPet: [String: PetRoomLayoutState]
 
-    /// Voice-command trick training progress (unlock order, levels, successes).
-    var trickTraining: PetTrickTrainingState
+    /// Per-pet voice-command trick training progress, keyed by `CatSkin.rawValue`.
+    var trickTrainingByPet: [String: PetTrickTrainingState]
+    /// Per-pet toilet-paper mess scheduler + active state.
+    var toiletPaperMessByPet: [String: ToiletPaperMessState]
 
     init(adoptedSkin: CatSkin? = nil, adoptedDate: Date? = nil) {
         self.adoptedSkin = adoptedSkin
         self.adoptedDate = adoptedDate
+        self.ownedSkins = adoptedSkin.map { [$0] } ?? []
         self.coins = PetEconomy.startingCoins
         self.foodServings = PetEconomy.startingFoodServings
         let now = Date()
@@ -139,15 +148,18 @@ struct PetState: Codable {
         self.happiness = StoredNeed(value: 100, asOf: now)
         self.lastPetAt = nil
         self.lastPlayAt = nil
+        self.lastPlantWaterAt = [:]
         self.customPetNames = [:]
         self.roomLayoutsByPet = [:]
-        self.trickTraining = PetTrickTrainingState()
+        self.trickTrainingByPet = [:]
+        self.toiletPaperMessByPet = [:]
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(adoptedSkin, forKey: .adoptedSkin)
         try c.encodeIfPresent(adoptedDate, forKey: .adoptedDate)
+        try c.encode(ownedSkins, forKey: .ownedSkins)
         try c.encode(coins, forKey: .coins)
         try c.encode(foodServings, forKey: .foodServings)
         try c.encode(hunger, forKey: .hunger)
@@ -156,9 +168,11 @@ struct PetState: Codable {
         try c.encode(happiness, forKey: .happiness)
         try c.encodeIfPresent(lastPetAt, forKey: .lastPetAt)
         try c.encodeIfPresent(lastPlayAt, forKey: .lastPlayAt)
+        try c.encode(lastPlantWaterAt, forKey: .lastPlantWaterAt)
         try c.encode(customPetNames, forKey: .customPetNames)
         try c.encode(roomLayoutsByPet, forKey: .roomLayoutsByPet)
-        try c.encode(trickTraining, forKey: .trickTraining)
+        try c.encode(trickTrainingByPet, forKey: .trickTrainingByPet)
+        try c.encode(toiletPaperMessByPet, forKey: .toiletPaperMessByPet)
     }
 
     init(from decoder: Decoder) throws {
@@ -166,6 +180,10 @@ struct PetState: Codable {
         let now = Date()
         adoptedSkin = try c.decodeIfPresent(CatSkin.self, forKey: .adoptedSkin)
         adoptedDate = try c.decodeIfPresent(Date.self, forKey: .adoptedDate)
+        ownedSkins = try c.decodeIfPresent([CatSkin].self, forKey: .ownedSkins) ?? []
+        if ownedSkins.isEmpty, let adoptedSkin {
+            ownedSkins = [adoptedSkin]
+        }
         coins = try c.decodeIfPresent(Int.self, forKey: .coins) ?? PetEconomy.startingCoins
         foodServings = try c.decodeIfPresent(Int.self, forKey: .foodServings) ?? PetEconomy.startingFoodServings
         hunger = try c.decodeIfPresent(StoredNeed.self, forKey: .hunger) ?? StoredNeed(value: 100, asOf: now)
@@ -174,6 +192,7 @@ struct PetState: Codable {
         happiness = try c.decodeIfPresent(StoredNeed.self, forKey: .happiness) ?? StoredNeed(value: 100, asOf: now)
         lastPetAt = try c.decodeIfPresent(Date.self, forKey: .lastPetAt)
         lastPlayAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayAt)
+        lastPlantWaterAt = try c.decodeIfPresent([String: Date].self, forKey: .lastPlantWaterAt) ?? [:]
         customPetNames = try c.decodeIfPresent([String: String].self, forKey: .customPetNames) ?? [:]
         roomLayoutsByPet = try c.decodeIfPresent([String: PetRoomLayoutState].self, forKey: .roomLayoutsByPet) ?? [:]
         if roomLayoutsByPet.isEmpty,
@@ -186,7 +205,29 @@ struct PetState: Codable {
                 }
             }
         }
-        trickTraining = try c.decodeIfPresent(PetTrickTrainingState.self, forKey: .trickTraining) ?? PetTrickTrainingState()
+
+        trickTrainingByPet = try c.decodeIfPresent([String: PetTrickTrainingState].self, forKey: .trickTrainingByPet) ?? [:]
+        toiletPaperMessByPet = try c.decodeIfPresent([String: ToiletPaperMessState].self, forKey: .toiletPaperMessByPet) ?? [:]
+        if trickTrainingByPet.isEmpty {
+            let legacyTraining = try c.decodeIfPresent(PetTrickTrainingState.self, forKey: .trickTraining)
+            if let adoptedSkin {
+                trickTrainingByPet[adoptedSkin.rawValue] = legacyTraining ?? PetTrickTrainingState()
+            } else if let legacyTraining {
+                for skin in CatSkin.allCases {
+                    trickTrainingByPet[skin.rawValue] = legacyTraining
+                }
+            }
+        }
+    }
+
+    func toiletPaperMessState(for skin: CatSkin) -> ToiletPaperMessState {
+        toiletPaperMessByPet[skin.rawValue] ?? ToiletPaperMessState()
+    }
+
+    mutating func updateToiletPaperMessState(for skin: CatSkin, _ body: (inout ToiletPaperMessState) -> Void) {
+        var mess = toiletPaperMessState(for: skin)
+        body(&mess)
+        toiletPaperMessByPet[skin.rawValue] = mess
     }
 
     func roomLayout(for skin: CatSkin) -> PetRoomLayoutState {
@@ -204,6 +245,16 @@ struct PetState: Codable {
         updateRoomLayout(for: skin, body)
     }
 
+    func trickTraining(for skin: CatSkin) -> PetTrickTrainingState {
+        trickTrainingByPet[skin.rawValue] ?? PetTrickTrainingState()
+    }
+
+    mutating func updateTrickTraining(for skin: CatSkin, _ body: (inout PetTrickTrainingState) -> Void) {
+        var training = trickTraining(for: skin)
+        body(&training)
+        trickTrainingByPet[skin.rawValue] = training
+    }
+
     mutating func migrateAllRoomLayoutsIfNeeded() -> Bool {
         var changed = false
         for key in roomLayoutsByPet.keys {
@@ -214,5 +265,29 @@ struct PetState: Codable {
             }
         }
         return changed
+    }
+}
+
+/// Weekly schedule + active-state tracker for the random toilet-paper mess.
+struct ToiletPaperMessState: Codable, Equatable {
+    /// Year/week key in Pacific time (e.g. "2026-W23").
+    var weekKey: String
+    /// Randomly generated mess times (seconds since 1970) for the active week.
+    var scheduledEventTimes: [TimeInterval]
+    /// Event indices already cleaned up by the user.
+    var consumedEventIndices: [Int]
+    /// Current visible mess event index, nil when no mess is on the floor.
+    var activeEventIndex: Int?
+
+    init(
+        weekKey: String = "",
+        scheduledEventTimes: [TimeInterval] = [],
+        consumedEventIndices: [Int] = [],
+        activeEventIndex: Int? = nil
+    ) {
+        self.weekKey = weekKey
+        self.scheduledEventTimes = scheduledEventTimes
+        self.consumedEventIndices = consumedEventIndices
+        self.activeEventIndex = activeEventIndex
     }
 }

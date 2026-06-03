@@ -52,7 +52,13 @@ struct PetProfileCard: View {
     let skin: CatSkin
     let displayName: String
     let birthDate: Date
+    let smartnessLevel: Int
+    let knownTricks: [PetTrick]
+    var showsBirthDate: Bool = true
+    var showsTrainingDetails: Bool = true
     var onClose: () -> Void
+    var onRenameName: (() -> Void)? = nil
+    var onLevelLongPress: (() -> Void)? = nil
 
     private static let birthDateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -92,6 +98,18 @@ struct PetProfileCard: View {
         }
         .shadow(color: .black.opacity(0.14), radius: 28, y: 14)
         .padding(.horizontal, 24)
+    }
+
+    private var levelPill: some View {
+        Text("Lvl \(smartnessLevel)")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(BabyTownTheme.accentDeep)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.8), in: Capsule())
+            .onLongPressGesture(minimumDuration: 1.2) {
+                onLevelLongPress?()
+            }
     }
 
     private var cardChrome: some View {
@@ -146,6 +164,7 @@ struct PetProfileCard: View {
             .padding(.horizontal, 16)
 
             HStack {
+                levelPill
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -168,18 +187,34 @@ struct PetProfileCard: View {
                 .textCase(.uppercase)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            profileField(
-                icon: "tag.fill",
-                label: "Name",
-                value: displayName
-            )
+            if onRenameName != nil {
+                Button(action: { onRenameName?() }) {
+                    profileField(
+                        icon: "tag.fill",
+                        label: "Name",
+                        value: displayName,
+                        showsEditHint: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Name, \(displayName)")
+                .accessibilityHint("Opens rename sheet")
+            } else {
+                profileField(
+                    icon: "tag.fill",
+                    label: "Name",
+                    value: displayName
+                )
+            }
 
-            profileField(
-                icon: "gift.fill",
-                label: "Birth Date",
-                value: Self.birthDateFormatter.string(from: birthDate),
-                footnote: "The day they joined your town"
-            )
+            if showsBirthDate {
+                profileField(
+                    icon: "gift.fill",
+                    label: "Birth Date",
+                    value: Self.birthDateFormatter.string(from: birthDate),
+                    footnote: "The day they joined your town"
+                )
+            }
 
             profileField(
                 icon: "pawprint.fill",
@@ -188,6 +223,9 @@ struct PetProfileCard: View {
             )
 
             originStoryBlock
+            if showsTrainingDetails {
+                tricksBlock
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
@@ -198,7 +236,8 @@ struct PetProfileCard: View {
         icon: String,
         label: String,
         value: String,
-        footnote: String? = nil
+        footnote: String? = nil,
+        showsEditHint: Bool = false
     ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
@@ -214,9 +253,16 @@ struct PetProfileCard: View {
                     .foregroundStyle(inkMuted)
                     .textCase(.uppercase)
 
-                Text(value)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ink)
+                HStack(spacing: 6) {
+                    Text(value)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ink)
+                    if showsEditHint {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(BabyTownTheme.accentDeep)
+                    }
+                }
 
                 if let footnote {
                     Text(footnote)
@@ -263,6 +309,78 @@ struct PetProfileCard: View {
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         }
     }
+
+    private var tricksBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+                Text("Tricks")
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundStyle(inkMuted)
+                    .textCase(.uppercase)
+            }
+
+            HStack(spacing: 8) {
+                Text("Smartness")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(inkMuted)
+                Text("Lv \(smartnessLevel)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(BabyTownTheme.accent.opacity(0.14), in: Capsule())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Known Tricks")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(inkMuted)
+
+                if knownTricks.isEmpty {
+                    Text("Not trained yet")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ink)
+                } else {
+                    tricksWrap
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        }
+    }
+
+    private var tricksWrap: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.adaptive(minimum: 104), spacing: 8, alignment: .leading)
+            ],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(knownTricks) { trick in
+                HStack(spacing: 6) {
+                    Image(systemName: trick.symbolName)
+                        .font(.system(size: 11, weight: .bold))
+                    Text(trick.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(BabyTownTheme.accentDeep)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(BabyTownTheme.accent.opacity(0.12), in: Capsule())
+            }
+        }
+    }
 }
 
 #Preview {
@@ -272,6 +390,8 @@ struct PetProfileCard: View {
             skin: .calico,
             displayName: "Artemis",
             birthDate: Date(),
+            smartnessLevel: 4,
+            knownTricks: [.paw, .highFive, .up],
             onClose: {}
         )
     }

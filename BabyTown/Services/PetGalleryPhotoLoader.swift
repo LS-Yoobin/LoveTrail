@@ -27,6 +27,29 @@ enum PetGalleryPhotoLoader {
     }
 
     static func image(for momentID: UUID) -> UIImage? {
-        loadAllPhotos().first { $0.id == momentID }?.thumbnail
+        guard let thumbnail = loadAllPhotos().first(where: { $0.id == momentID })?.thumbnail else {
+            return nil
+        }
+        return thumbnail.normalizedForSpriteKit()
+    }
+}
+
+extension UIImage {
+    /// SpriteKit ignores `imageOrientation`; bake pixels upright before texturing.
+    func normalizedForSpriteKit() -> UIImage {
+        guard imageOrientation != .up else { return self }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
+    /// Aspect-fill `target` using the image's oriented pixel dimensions.
+    func sizeAspectFilling(_ target: CGSize) -> CGSize {
+        let source = size
+        guard source.width > 0, source.height > 0 else { return target }
+        let scale = max(target.width / source.width, target.height / source.height)
+        return CGSize(width: source.width * scale, height: source.height * scale)
     }
 }

@@ -12,7 +12,7 @@ enum PetEconomy {
     // MARK: Care tasks
 
     enum CareTask {
-        case pet, fillWater, feed, play, cleanLitter
+        case pet, fillWater, feed, play, cleanLitter, waterPlant
 
         /// Coins awarded when the task is performed while it's "needed"/off cooldown.
         var coinReward: Int {
@@ -22,6 +22,7 @@ enum PetEconomy {
             case .feed:        return 5
             case .play:        return playCoinReward
             case .cleanLitter: return 6
+            case .waterPlant:  return plantWaterCoinReward
             }
         }
     }
@@ -56,16 +57,45 @@ enum PetEconomy {
     static let playDurationRequired: TimeInterval = 8
     static let playCoinReward = 8
 
+    /// Watering rewards by plant size.
+    static let smallPlantWaterCoinReward = 4
+    static let bigPlantWaterCoinReward = 6
+    /// Back-compat/default reward for generic plant-water task contexts.
+    static let plantWaterCoinReward = bigPlantWaterCoinReward
+    static let plantWaterCooldown: TimeInterval = 3 * 3600   // 3h
+    /// Seconds the watering can must stay over the plant before coins are awarded.
+    static let plantWaterDurationRequired: TimeInterval = 5
+
     // MARK: Happiness boosts from interactions
 
     static let happinessFromPet: Double = 15
     static let happinessFromPlay: Double = 25
     static let happinessFromFeed: Double = 5
+    static let happinessFromWater: Double = 10
 
     // MARK: Shop catalog
 
     /// One-time cosmetic rename — priced between basic cat food (8) and wall color (18).
     static let renameCost = 15
+    static let secondPetUnlockLevel = 20
+
+    // MARK: Smart XP rewards (ELO-style progression across all interactions)
+
+    enum ExperienceSource {
+        case pet, fillWater, feed, play, cleanLitter, rename, adopt
+
+        var smartXP: Int {
+            switch self {
+            case .pet: return 1
+            case .fillWater: return 2
+            case .feed: return 3
+            case .play: return 5
+            case .cleanLitter: return 4
+            case .rename: return 2
+            case .adopt: return 10
+            }
+        }
+    }
 
     /// Friendly copy when petting is still on the coin cooldown.
     static func petCooldownMessage(remaining: TimeInterval) -> String {
@@ -86,5 +116,26 @@ enum PetEconomy {
             return "Play points available again in \(hours)h \(minutes)m"
         }
         return "Play points available again in \(minutes)m"
+    }
+
+    static func plantWaterCooldownMessage(remaining: TimeInterval) -> String {
+        let totalMinutes = max(1, Int(ceil(remaining / 60)))
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours > 0 {
+            return "Watering points available again in \(hours)h \(minutes)m"
+        }
+        return "Watering points available again in \(minutes)m"
+    }
+
+    static func plantWaterCoinReward(for key: String) -> Int {
+        switch key {
+        case "furniture_small_plant":
+            return smallPlantWaterCoinReward
+        case "furniture_big_plant":
+            return bigPlantWaterCoinReward
+        default:
+            return plantWaterCoinReward
+        }
     }
 }

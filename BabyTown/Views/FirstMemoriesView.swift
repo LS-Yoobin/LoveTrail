@@ -16,7 +16,10 @@ struct FirstMemoriesView: View {
                 heroSection
                 cardsSection
                 Spacer()
-                doneButton
+                VStack(spacing: 14) {
+                    doneButton
+                    OnboardingLegalLinks()
+                }
             }
         }
         .onChange(of: viewModel.firstMetItem) { _, _ in
@@ -136,7 +139,7 @@ struct FirstMemoriesView: View {
         }
         .disabled(!viewModel.canFinish)
         .padding(.horizontal, 40)
-        .padding(.bottom, 50)
+        .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.3), value: viewModel.canFinish)
     }
 }

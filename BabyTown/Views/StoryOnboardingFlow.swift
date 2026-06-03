@@ -76,7 +76,10 @@ struct StoryOnboardingFlow: View {
                     action: handleCTAAction
                 )
                 .padding(.horizontal, 32)
-                .padding(.bottom, 40)
+                
+                OnboardingLegalLinks()
+                    .padding(.top, 12)
+                    .padding(.bottom, 30)
             }
         }
         .interactiveDismissDisabled()

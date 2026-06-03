@@ -5,22 +5,22 @@ import SwiftUI
 struct PetOwnedItemsSheet: View {
 
     @ObservedObject var viewModel: PetViewModel
-    var initialCategory: PetShopCategory
+    /// Bound to the host so the last-viewed category is remembered across opens.
+    @Binding var category: PetShopCategory
     var onFrameEquipped: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var category: PetShopCategory
     @State private var toast: String?
+    private static let transparentAssetCache = NSCache<NSString, UIImage>()
 
     init(
         viewModel: PetViewModel,
-        initialCategory: PetShopCategory = .catTrees,
+        category: Binding<PetShopCategory>,
         onFrameEquipped: @escaping () -> Void
     ) {
         self.viewModel = viewModel
-        self.initialCategory = initialCategory
+        self._category = category
         self.onFrameEquipped = onFrameEquipped
-        _category = State(initialValue: initialCategory)
     }
 
     private let previewBoxHeight: CGFloat = 128
@@ -326,8 +326,17 @@ struct PetOwnedItemsSheet: View {
                 .frame(height: 64)
                 .frame(maxWidth: .infinity)
                 .padding(18)
+        } else if item.category == .litterBoxes,
+                  let sheet = item.imageName,
+                  let clean = PetShopCatalog.litterCleanCrop(sheetName: sheet) {
+            // Litter `imageName`s are 6-frame sheets; show just the clean box.
+            Image(uiImage: clean)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(14)
         } else if let imageName = item.imageName, UIImage(named: imageName) != nil {
-            Image(imageName)
+            assetImage(name: imageName)
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -366,7 +375,9 @@ struct PetOwnedItemsSheet: View {
             }
             return
         }
-        if item.isWallColor {
+        if item.isPlayToy {
+            showToast("Toy selected!")
+        } else if item.isWallColor {
             showToast("Walls updated!")
         } else if item.equipSlot != nil {
             showToast("Equipped!")
@@ -379,12 +390,10 @@ struct PetOwnedItemsSheet: View {
 
     private func syncCategorySelection() {
         guard !availableCategories.isEmpty else { return }
+        // Keep the remembered category if it still has owned items; otherwise
+        // fall back to the first available one.
         if availableCategories.contains(category) { return }
-        if availableCategories.contains(initialCategory) {
-            category = initialCategory
-        } else {
-            category = availableCategories[0]
-        }
+        category = availableCategories[0]
     }
 
     private func showToast(_ message: String) {
@@ -392,5 +401,86 @@ struct PetOwnedItemsSheet: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
             if toast == message { withAnimation { toast = nil } }
         }
+    }
+
+    private func assetImage(name: String) -> Image {
+        if let processed = processedAssetImage(named: name) {
+            return Image(uiImage: processed)
+        }
+        return Image(name)
+    }
+
+    private func processedAssetImage(named name: String) -> UIImage? {
+        let key = NSString(string: name)
+        if let cached = Self.transparentAssetCache.object(forKey: key) {
+            return cached
+        }
+        guard let original = UIImage(named: name) else { return nil }
+        let processed = removeBlackMatteIfNeeded(from: original)
+        Self.transparentAssetCache.setObject(processed, forKey: key)
+        return processed
+    }
+
+    /// Detects PNGs with opaque black matte and converts that matte to alpha.
+    private func removeBlackMatteIfNeeded(from image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let width = cg.width
+        let height = cg.height
+        guard width > 1, height > 1 else { return image }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        guard let ctx = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        func isNearBlack(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Bool {
+            r <= 24 && g <= 24 && b <= 24
+        }
+
+        var borderOpaque = 0
+        var borderBlack = 0
+        for x in stride(from: 0, to: width, by: max(1, width / 80)) {
+            for y in [0, height - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaque += 1
+                    if isNearBlack(r, g, b) { borderBlack += 1 }
+                }
+            }
+        }
+        for y in stride(from: 0, to: height, by: max(1, height / 80)) {
+            for x in [0, width - 1] {
+                let i = (y * width + x) * bytesPerPixel
+                let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+                if a > 220 {
+                    borderOpaque += 1
+                    if isNearBlack(r, g, b) { borderBlack += 1 }
+                }
+            }
+        }
+
+        guard borderOpaque > 0 else { return image }
+        let borderBlackRatio = Double(borderBlack) / Double(borderOpaque)
+        guard borderBlackRatio >= 0.80 else { return image }
+
+        for i in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
+            let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+            if a >= 245 && isNearBlack(r, g, b) {
+                pixels[i + 3] = 0
+            }
+        }
+
+        guard let out = ctx.makeImage() else { return image }
+        return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
     }
 }
