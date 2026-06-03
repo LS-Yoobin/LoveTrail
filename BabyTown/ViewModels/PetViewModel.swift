@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import GardenCore
 
 /// The outcome of a care action: how many coins were awarded (0 if none), and a
 /// friendly reason when the action didn't reward anything (e.g. "Not hungry yet").
@@ -318,35 +319,17 @@ final class PetViewModel: ObservableObject {
     }
 
     private func litterUseEventsSinceLastClean(now: Date) -> Int {
-        let pacific = TimeZone(identifier: "America/Los_Angeles") ?? .current
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = pacific
-
-        let cleanDate = state.litter.asOf
-        guard now > cleanDate else { return 0 }
-
-        let useHours = [8, 20]
-        let startDay = calendar.startOfDay(for: cleanDate)
-        let endDay = calendar.startOfDay(for: now)
-
-        var uses = 0
-        var day = startDay
-        while day <= endDay {
-            for hour in useHours {
-                guard let event = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) else { continue }
-                if event > cleanDate, event <= now {
-                    uses += 1
-                }
-            }
-            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = nextDay
-        }
-        return uses
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        return LitterSchedule.useEventsSinceLastClean(
+            cleanedAt: state.litter.asOf, now: now, calendar: calendar)
     }
 
     // MARK: Helpers
 
     private func award(_ task: PetEconomy.CareTask) -> CareResult {
+        state.lastPetInteractionAt = Date()
+        defer { NotificationManager.shared.refresh() }
         let amount = task.coinReward
         state.coins += amount
         lastAward = (amount, UUID())
@@ -359,6 +342,13 @@ final class PetViewModel: ObservableObject {
         case .waterPlant: awardExperience(.fillWater)
         }
         return CareResult(coinsAwarded: amount, blockedReason: nil)
+    }
+
+    /// Records that the user touched the pet/pet-room and reschedules
+    /// state-conditional notifications. Call on room appear + every care action.
+    func registerPetInteraction() {
+        state.lastPetInteractionAt = Date()   // persists via didSet
+        NotificationManager.shared.refresh()
     }
 
     private func awardPlantWater(for key: String) -> CareResult {

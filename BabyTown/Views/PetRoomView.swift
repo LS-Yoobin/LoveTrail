@@ -1259,6 +1259,7 @@ struct PetRoomView: View {
             }
         }
         .onAppear {
+            viewModel.registerPetInteraction()
             if scene == nil {
                 installScene(makeConfiguredScene(skin: skin, size: geo.size), geo: geo)
             }
