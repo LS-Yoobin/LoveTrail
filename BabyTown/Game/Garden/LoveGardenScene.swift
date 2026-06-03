@@ -1,4 +1,5 @@
 import SpriteKit
+import UIKit
 import GardenCore
 
 /// The Love Garden scene. Renders garden elements (grown from the couple's
@@ -27,14 +28,18 @@ final class LoveGardenScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = Self.skyColor(for: season)
         drawGround()
-        for element in elements {
+        for (index, element) in elements.enumerated() {
             let node = makeNode(for: element)
             node.position = screenPosition(for: element.position)
-            node.zPosition = node.position.y   // lower on screen draws in front
+            node.zPosition = node.position.y
             node.name = element.sourceID.uuidString
             addChild(node)
             elementNodes[element.sourceID] = node
+
+            animateGrowth(node, delay: Double(index) * 0.03)
+            addSway(to: node, seed: element.position.x)
         }
+        addAmbientParticles()
     }
 
     // MARK: Layout
@@ -131,5 +136,68 @@ final class LoveGardenScene: SKScene {
         case .blooming: return SKColor(red: 0.55, green: 0.62, blue: 0.95, alpha: 1)
         case .resting:  return SKColor(red: 0.62, green: 0.66, blue: 0.80, alpha: 1)
         }
+    }
+
+    // MARK: Living layer — growth, sway, particles
+
+    /// Sprout → bloom: pop up from nothing with a gentle overshoot.
+    private func animateGrowth(_ node: SKNode, delay: TimeInterval) {
+        node.setScale(0)
+        let grow = SKAction.sequence([
+            .wait(forDuration: delay),
+            .scale(to: 1.08, duration: 0.28),
+            .scale(to: 1.0, duration: 0.12),
+        ])
+        grow.timingMode = .easeOut
+        node.run(grow)
+    }
+
+    /// Gentle, endless sway. The seed offsets each bloom's phase so the field
+    /// doesn't move in lockstep.
+    private func addSway(to node: SKNode, seed: Double) {
+        let amplitude: CGFloat = 0.05
+        let phase = SKAction.sequence([
+            .rotate(toAngle: amplitude, duration: 1.6),
+            .rotate(toAngle: -amplitude, duration: 1.6),
+        ])
+        phase.timingMode = .easeInEaseOut
+        let sway = SKAction.repeatForever(phase)
+        node.run(.sequence([.wait(forDuration: seed.truncatingRemainder(dividingBy: 1.0) * 1.6), sway]))
+    }
+
+    /// Drifting pollen by day, fireflies feel at dusk. Pure code (no art).
+    private func addAmbientParticles() {
+        let emitter = SKEmitterNode()
+        emitter.particleTexture = Self.softDot()
+        emitter.position = CGPoint(x: size.width / 2, y: size.height)
+        emitter.particlePositionRange = CGVector(dx: size.width, dy: 0)
+        emitter.particleBirthRate = 6
+        emitter.particleLifetime = 14
+        emitter.particleSpeed = 18
+        emitter.particleSpeedRange = 10
+        emitter.emissionAngle = -.pi / 2
+        emitter.emissionAngleRange = .pi / 6
+        emitter.particleAlpha = 0.55
+        emitter.particleAlphaRange = 0.3
+        emitter.particleScale = 0.18
+        emitter.particleScaleRange = 0.12
+        emitter.particleColor = (season == .resting)
+            ? SKColor.white
+            : SKColor(red: 1.0, green: 0.95, blue: 0.7, alpha: 1)
+        emitter.particleColorBlendFactor = 1
+        emitter.zPosition = 5000
+        addChild(emitter)
+    }
+
+    /// A small soft circle texture used for particles, generated in code.
+    static func softDot() -> SKTexture {
+        let d: CGFloat = 16
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: d, height: d))
+        let image = renderer.image { ctx in
+            let c = ctx.cgContext
+            c.setFillColor(UIColor.white.cgColor)
+            c.fillEllipse(in: CGRect(x: 0, y: 0, width: d, height: d))
+        }
+        return SKTexture(image: image)
     }
 }
