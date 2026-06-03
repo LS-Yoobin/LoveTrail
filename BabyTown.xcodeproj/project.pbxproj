@@ -24,6 +24,7 @@
 		7A9F6B202F3E7AC900664BD9 /* transparent flowers gif.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */; };
 		7A9F6B222F3E7AE100664BD9 /* heart.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B212F3E7AE100664BD9 /* heart.gif */; };
 		7A9F6B2A2F3E8C3300664BD9 /* babytown font.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B292F3E8C3300664BD9 /* babytown font.png */; };
+		AAAA0000000000000000AA03 /* GardenCore in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA0000000000000000AA02 /* GardenCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAAA0000000000000000AA03 /* GardenCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -135,6 +137,7 @@
 			);
 			name = BabyTown;
 			packageProductDependencies = (
+				AAAA0000000000000000AA02 /* GardenCore */,
 			);
 			productName = BabyTown;
 			productReference = 7A9F69342F3E5CE500664BD9 /* BabyTown.app */;
@@ -164,6 +167,9 @@
 			);
 			mainGroup = 7A9F692B2F3E5CE500664BD9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AAAA0000000000000000AA01 /* XCLocalSwiftPackageReference "GardenCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7A9F69352F3E5CE500664BD9 /* Products */;
 			projectDirPath = "";
@@ -431,6 +437,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AAAA0000000000000000AA01 /* XCLocalSwiftPackageReference "GardenCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = GardenCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AAAA0000000000000000AA02 /* GardenCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GardenCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7A9F692C2F3E5CE500664BD9 /* Project object */;
 }

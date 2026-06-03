@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import GardenCore
 
 @MainActor
 final class DataPersistenceManager {
@@ -41,6 +42,10 @@ final class DataPersistenceManager {
     private var petStateFileURL: URL {
         documentsDirectory.appendingPathComponent("pet_state.json")
     }
+
+    private var gardenStateFileURL: URL {
+        documentsDirectory.appendingPathComponent("garden_state.json")
+    }
     
     private let userDefaults = UserDefaults.standard
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
@@ -52,7 +57,7 @@ final class DataPersistenceManager {
     private let appJoinedDateKey = "appJoinedDate"
     private let foundingOfficialDateKey = "foundingOfficialPhotoDate"
     private let foundingFirstMetDateKey = "foundingFirstMetPhotoDate"
-    
+
     private init() {
         createDirectoriesIfNeeded()
     }
@@ -179,6 +184,21 @@ final class DataPersistenceManager {
               let data = try? Data(contentsOf: petStateFileURL),
               let state = try? decoder.decode(PetState.self, from: data) else {
             return PetState()
+        }
+        return state
+    }
+
+    func saveGardenState(_ state: GardenState) {
+        guard let data = try? encoder.encode(state) else { return }
+        try? data.write(to: gardenStateFileURL)
+    }
+
+    /// Tolerant load — returns a fresh, blooming garden when nothing is stored.
+    func loadGardenState() -> GardenState {
+        guard fileManager.fileExists(atPath: gardenStateFileURL.path),
+              let data = try? Data(contentsOf: gardenStateFileURL),
+              let state = try? decoder.decode(GardenState.self, from: data) else {
+            return GardenState()
         }
         return state
     }
