@@ -213,3 +213,74 @@ be called out to stakeholders so v1 isn't mis-sold as fully shared.
 - Door navigates to the Garden and back without disturbing room state.
 - Local persistence survives app restart (tolerant decode), and the model is
   shaped for future backend migration.
+
+## 15. Build decisions & sequencing (post-design)
+
+Two decisions were made to scope the v1 build:
+
+- **Art approach: code-drawn first, art slots later (Tier 1).** The garden is
+  built entirely in code (procedural blooms, particle systems, seasonal/day-night
+  palettes, growth animation) reusing existing assets (`prop_small_plant`,
+  `prop_big_plant`, `prop_cat_tree`, `TransparentFlowers`). No new image assets
+  are required to ship a living garden. Custom PNGs (distinct bloom species,
+  landmarks, door art, background) are an incremental upgrade slotted into named
+  asset slots later — watch the 16384px SpriteKit texture limit per existing
+  memory. Memories are never gated; only richness upgrades over time.
+- **Sequencing: Garden scene first.** v1 is decomposed into slices; the Garden
+  scene (the tentpole) is built and verified before the door, "Us" page, coin
+  drip, and gating are layered on.
+
+### 15.1 Slice 1 — Love Garden Scene (this build)
+
+A standalone, code-drawn garden that grows from the **local user's** existing
+moments and letters, reachable via a temporary entry point for verification.
+No door, no "Us" page, no coin tie-in, no gating yet.
+
+**Architecture (mirror the room, don't touch it)**
+- New `LoveGardenScene: SKScene` in `BabyTown/Game/`, sibling to `PetRoomScene`
+  — the room scene is left untouched so the cat room can't destabilize.
+- New `LoveGardenView` (SwiftUI wrapper, modeled on `PetRoomView`) hosting the
+  scene and any overlay cards.
+- Verify in the simulator via a temporary entry-point route (per the
+  "verifying UI in the simulator" memory); trust `xcodebuild` over SourceKit
+  diagnostics.
+
+**Data → blooms (read-only, no duplication)**
+- A `GardenComposer` reads `DataPersistenceManager.loadMoments()` and
+  `loadUserLetters()` and maps each act to a garden element:
+  - **Moment** → a flower; tapping surfaces that moment (thumbnail/caption/place).
+  - **Moment with a distinct place/country** → a place-tinted flower variant so
+    travel reads differently.
+  - **Letter** → a tree (taller, fewer, weightier).
+- Each element gets a **deterministic position seeded by the act's `UUID`**, so
+  the garden is stable across launches (no random reshuffle).
+
+**Garden state (new persisted model)**
+- `GardenState: Codable` in `Models/`, persisted via `DataPersistenceManager`
+  with tolerant decode (mirrors `PetState`): stores last-activity timestamp and
+  current season/rest state only. Bloom positions are derived from act IDs, so
+  memories are not duplicated. Shaped for future backend migration (§7/§9).
+
+**Living layer (all code — the "intricate" part)**
+- Procedural blooms (shapes); **sprout→bloom** growth animation for newly added
+  acts (scale + crossfade).
+- Ambient motion: gentle sway (`SKAction`); drifting pollen / dusk fireflies /
+  falling petals via `SKEmitterNode`.
+- Day/night + seasonal palette; existing plant/flower assets as accent dressing.
+
+**Kindness rule (§5.2, non-negotiable)**
+- Inactivity never removes blooms. A quiet stretch → calm resting-season palette,
+  framed warmly. First act after a gap → immediate revival + affirming line.
+  No streaks, no decay, no red/negative states.
+
+**Tap-to-remember**
+- Tapping a bloom surfaces its source memory in an overlay card, reusing existing
+  moment-display patterns.
+
+**Explicitly out of Slice 1:** cat-room door/portal, "Us" page shell, coin drip,
+free/premium gating, co-bloom (needs backend).
+
+**Data caveat — "love notes":** §5.1 lists love notes as a distinct bloom source,
+but the codebase has **moments** and **letters** only; there is no separate note
+store. Slice 1 maps moments + letters; the note → sprout mapping is deferred until
+that data type exists.
