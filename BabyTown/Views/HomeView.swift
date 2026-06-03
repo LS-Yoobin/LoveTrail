@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import Photos
+import GardenCore
 
 enum PinnedMemoryType {
     case firstMet
@@ -24,6 +25,16 @@ struct HomeView: View {
     @State private var showCameraFullScreen = false
     @State private var showSettings = false
     @State private var showVisitPet = false
+    @State private var showCoupleProfile = false
+    /// Cached for `CoupleSpaceCard` — recomputing garden blooms on every scroll frame
+    /// was reloading JSON from disk and tanking Home scroll performance.
+    @State private var coupleSpaceBloomCount = 0
+    @State private var coupleSpaceAvatar: UIImage?
+    @State private var homeSpecialDates: [SpecialDate] = []
+    @State private var showHomeSpecialDateEditor = false
+    @State private var editingHomeSpecialDate: SpecialDate?
+    @State private var editingHomeSpecialDateImage: UIImage?
+    @State private var importantDatePhotoViewer: ImportantDatePhotoViewerContext?
     @State private var showPartnerPaywall = false
     @ObservedObject private var store = StoreManager.shared
     @State private var memorySearchText = ""
@@ -155,11 +166,16 @@ struct HomeView: View {
                                 if isMemorySearchActive {
                                     inlineMemorySearchResults
                                 } else {
-                                    if !store.isPartnerUnlocked {
-                                        InvitePartnerBanner {
-                                            showPartnerPaywall = true
+                                    CoupleSpaceCard(
+                                        avatar: coupleSpaceAvatar,
+                                        bloomCount: coupleSpaceBloomCount,
+                                        isReadyToInvite: store.isPartnerUnlocked,
+                                        onTap: {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                showCoupleProfile = true
+                                            }
                                         }
-                                    }
+                                    )
 
                                     // On This Day section (cached; never computed in body)
                                     let onThisDayMatches = viewModel.onThisDaySections
@@ -351,29 +367,7 @@ struct HomeView: View {
                 }
                 
                 if showingMomentViewer, !showMapView {
-                    MomentPhotoViewer(
-                        moments: viewerMoments,
-                        initialIndex: viewerInitialIndex,
-                        onDismiss: {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                showingMomentViewer = false
-                            }
-                        },
-                        onUpdateMoments: { updatedMoments in
-                            var newMoments = viewModel.moments
-                            for moment in updatedMoments {
-                                if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
-                                    newMoments[index] = moment
-                                }
-                            }
-                            viewModel.moments = newMoments
-                        },
-                        onDeleteMoment: { moment in
-                            withAnimation {
-                                viewModel.deleteMoment(moment)
-                            }
-                        }
-                    )
+                    momentPhotoViewerOverlay
                     .transition(.opacity)
                     .zIndex(11)
                 }
@@ -439,10 +433,19 @@ struct HomeView: View {
                         .zIndex(25)
                         .transition(.opacity)
                 }
+
+                if showCoupleProfile {
+                    coupleProfileOverlay
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .zIndex(26)
+                        .transition(.opacity)
+                }
             } // Close ZStack
             .animation(.easeInOut(duration: 0.3), value: showMapView)
             .animation(.easeInOut(duration: 0.3), value: showVisitPet)
+            .animation(.easeInOut(duration: 0.3), value: showCoupleProfile)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
+            .animation(.easeInOut(duration: 0.25), value: importantDatePhotoViewer != nil)
             .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
             .sheet(isPresented: $showPromptSheet) {
                 JinkyPromptSheetView { prompt in
@@ -475,7 +478,16 @@ struct HomeView: View {
                 SettingsSheet(
                     onResetApp: { onResetApp?() },
                     onReplayStory: { onReplayStory?() },
-                    onVisitPet: { showVisitPet = true }
+                    onVisitPet: { showVisitPet = true },
+                    onOpenCoupleProfile: { showCoupleProfile = true }
+                )
+            }
+            .sheet(isPresented: $showHomeSpecialDateEditor) {
+                SpecialDateEditorSheet(
+                    editing: editingHomeSpecialDate,
+                    initialImage: editingHomeSpecialDateImage,
+                    onSave: { saveHomeSpecialDate($0, image: $1) },
+                    onDelete: editingHomeSpecialDate == nil ? nil : { deleteHomeSpecialDate($0) }
                 )
             }
             .fullScreenCover(isPresented: $showPartnerPaywall) {
@@ -500,6 +512,13 @@ struct HomeView: View {
                     .presentationDragIndicator(.visible)
             }
             .memorySharePresentation(coordinator: shareCoordinator)
+            .onAppear { refreshCoupleSpaceCardMetadata() }
+            .onChange(of: viewModel.moments.count) { _, _ in
+                refreshCoupleSpaceCardMetadata()
+            }
+            .onChange(of: showCoupleProfile) { _, isShowing in
+                if !isShowing { refreshCoupleSpaceCardMetadata() }
+            }
         }
     }
 
@@ -520,6 +539,102 @@ struct HomeView: View {
         }
         .background(BabyTownTheme.background.ignoresSafeArea())
     }
+
+    @ViewBuilder
+    private var coupleProfileOverlay: some View {
+        CoupleProfileView(homeViewModel: viewModel, onBack: {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showCoupleProfile = false
+            }
+        })
+        .background(Color(red: 0.78, green: 0.90, blue: 0.98).ignoresSafeArea())
+    }
+
+    /// Refreshes Us-card metadata off the hot path (scroll / body). Uses in-memory
+    /// `viewModel.moments` so we don't re-read `moments.json` every frame.
+    private func refreshCoupleSpaceCardMetadata() {
+        let dpm = DataPersistenceManager.shared
+        coupleSpaceAvatar = dpm.loadUserAvatar()
+        homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
+        let acts = GardenActMapper.acts(
+            moments: viewModel.moments,
+            letters: dpm.loadUserLetters()
+        )
+        coupleSpaceBloomCount = GardenComposer().compose(acts: acts).count
+    }
+
+    private func openHomeSpecialDate(_ special: SpecialDate) {
+        let dpm = DataPersistenceManager.shared
+        if let image = dpm.loadSpecialDatePhoto(id: special.id) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                importantDatePhotoViewer = ImportantDatePhotoViewerContext(
+                    title: special.title,
+                    date: special.date,
+                    image: image
+                )
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showCoupleProfile = true
+            }
+        }
+    }
+
+    private func beginEditHomeSpecialDate(_ special: SpecialDate) {
+        let dpm = DataPersistenceManager.shared
+        editingHomeSpecialDate = special
+        editingHomeSpecialDateImage = dpm.loadSpecialDatePhoto(id: special.id)
+        showHomeSpecialDateEditor = true
+    }
+
+    private func saveHomeSpecialDate(_ date: SpecialDate, image: UIImage?) {
+        let dpm = DataPersistenceManager.shared
+        var profile = dpm.loadCoupleProfile()
+        if let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) {
+            profile.specialDates[idx] = date
+        } else {
+            profile.specialDates.append(date)
+        }
+        if let image {
+            dpm.saveSpecialDatePhoto(image, id: date.id)
+        }
+        ProfileStickerSync.sync(profile: &profile, dpm: dpm)
+        dpm.saveCoupleProfile(profile)
+        refreshCoupleSpaceCardMetadata()
+    }
+
+    private func updateHomeSpecialDate(_ date: SpecialDate) {
+        let dpm = DataPersistenceManager.shared
+        var profile = dpm.loadCoupleProfile()
+        if let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) {
+            profile.specialDates[idx] = date
+        } else {
+            profile.specialDates.append(date)
+        }
+        ProfileStickerSync.sync(profile: &profile, dpm: dpm)
+        dpm.saveCoupleProfile(profile)
+        refreshCoupleSpaceCardMetadata()
+    }
+
+    private func toggleHomeSpecialDatePin(_ special: SpecialDate) {
+        var updated = special
+        updated.isPinned.toggle()
+        updated.pinnedAt = updated.isPinned ? Date() : nil
+        withAnimation {
+            updateHomeSpecialDate(updated)
+        }
+    }
+
+    private func deleteHomeSpecialDate(_ date: SpecialDate) {
+        let dpm = DataPersistenceManager.shared
+        var profile = dpm.loadCoupleProfile()
+        profile.specialDates.removeAll { $0.id == date.id }
+        dpm.deleteSpecialDatePhoto(id: date.id)
+        ProfileStickerSync.sync(profile: &profile, dpm: dpm)
+        dpm.saveCoupleProfile(profile)
+        refreshCoupleSpaceCardMetadata()
+    }
+
     
     @ViewBuilder
     private var memoryMapOverlay: some View {
@@ -550,29 +665,7 @@ struct HomeView: View {
             )
 
             if showingMomentViewer {
-                MomentPhotoViewer(
-                    moments: viewerMoments,
-                    initialIndex: viewerInitialIndex,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showingMomentViewer = false
-                        }
-                    },
-                    onUpdateMoments: { updatedMoments in
-                        var newMoments = viewModel.moments
-                        for moment in updatedMoments {
-                            if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
-                                newMoments[index] = moment
-                            }
-                        }
-                        viewModel.moments = newMoments
-                    },
-                    onDeleteMoment: { moment in
-                        withAnimation {
-                            viewModel.deleteMoment(moment)
-                        }
-                    }
-                )
+                momentPhotoViewerOverlay
                 .transition(.opacity)
                 .zIndex(1)
             }
@@ -999,8 +1092,40 @@ struct HomeView: View {
         !hasFirstMetPinned && !hasFirstMetFoundingPhoto
     }
 
+    private var pinnedHomeSpecialDates: [SpecialDate] {
+        homeSpecialDates.filter(\.isPinned)
+    }
+
+    private enum PinnedMemoryRowItem: Identifiable {
+        case special(SpecialDate)
+        case pinned(PinnedItem)
+
+        var id: String {
+            switch self {
+            case .special(let date): return "special-\(date.id.uuidString)"
+            case .pinned(let item): return "pinned-\(item.id.uuidString)"
+            }
+        }
+
+        var pinnedAt: Date {
+            switch self {
+            case .special(let date): return date.pinnedAt ?? .distantPast
+            case .pinned(let item): return item.pinnedAt
+            }
+        }
+    }
+
+    private var sortedPinnedMemoryRowItems: [PinnedMemoryRowItem] {
+        var rows: [PinnedMemoryRowItem] = pinnedHomeSpecialDates.map { .special($0) }
+        rows += viewModel.pinnedItems.map { .pinned($0) }
+        return rows.sorted { $0.pinnedAt > $1.pinnedAt }
+    }
+
     private var showsPinnedSection: Bool {
-        !viewModel.pinnedItems.isEmpty || showsOfficialPinnedPlaceholder || showsFirstMetPinnedPlaceholder
+        !viewModel.pinnedItems.isEmpty
+            || showsOfficialPinnedPlaceholder
+            || showsFirstMetPinnedPlaceholder
+            || !pinnedHomeSpecialDates.isEmpty
     }
 
     private var pinnedSection: some View {
@@ -1034,39 +1159,55 @@ struct HomeView: View {
                         .frame(width: 180)
                     }
 
-                    ForEach(viewModel.pinnedItems) { item in
-                        PinnedMemoryCard(
-                            item: item,
-                            onTap: {
-                                switch item {
-                                case .moment(_, let all):
-                                    viewerMoments = all
-                                    viewerInitialIndex = 0
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        showingMomentViewer = true
-                                    }
-                                case .prompt(let p):
-                                    viewerPromptPhotos = p.photos
-                                    viewerPromptPhotoIndex = 0
-                                    viewerPromptText = p.promptText
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        showingPromptPhotoViewer = true
-                                    }
-                                }
-                            },
-                            onUnpin: {
-                                withAnimation {
+                    ForEach(sortedPinnedMemoryRowItems) { row in
+                        switch row {
+                        case .special(let special):
+                            SpecialDateMemoryCard(
+                                title: special.title,
+                                date: special.date,
+                                image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
+                                isPinned: true,
+                                onTap: { openHomeSpecialDate(special) },
+                                onEdit: { beginEditHomeSpecialDate(special) },
+                                onDelete: { deleteHomeSpecialDate(special) },
+                                onTogglePin: { toggleHomeSpecialDatePin(special) }
+                            )
+                            .frame(width: 180)
+
+                        case .pinned(let item):
+                            PinnedMemoryCard(
+                                item: item,
+                                onTap: {
                                     switch item {
-                                    case .moment(let m, _):
-                                        viewModel.unpinMoment(m)
+                                    case .moment(_, let all):
+                                        viewerMoments = all
+                                        viewerInitialIndex = 0
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            showingMomentViewer = true
+                                        }
                                     case .prompt(let p):
-                                        viewModel.togglePromptMemoryPin(p)
+                                        viewerPromptPhotos = p.photos
+                                        viewerPromptPhotoIndex = 0
+                                        viewerPromptText = p.promptText
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            showingPromptPhotoViewer = true
+                                        }
                                     }
-                                }
-                            },
-                            onShare: shareMemory
-                        )
-                        .frame(width: 180)
+                                },
+                                onUnpin: {
+                                    withAnimation {
+                                        switch item {
+                                        case .moment(let m, _):
+                                            viewModel.unpinMoment(m)
+                                        case .prompt(let p):
+                                            viewModel.togglePromptMemoryPin(p)
+                                        }
+                                    }
+                                },
+                                onShare: shareMemory
+                            )
+                            .frame(width: 180)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1128,7 +1269,7 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingTimelineSlots.count
+                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + homeSpecialDates.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingTimelineSlots.count
                 )
 
                 let rows = timelineRows
@@ -1285,6 +1426,26 @@ struct HomeView: View {
                                 onUnlock: {
                                     viewModel.checkAndReleasePhotos()
                                 }
+                            )
+                            .padding(
+                                .leading,
+                                index.isMultiple(of: 2) ? 20 : 46
+                            )
+                            .padding(
+                                .trailing,
+                                index.isMultiple(of: 2) ? 46 : 20
+                            )
+
+                        case .specialDate(let special):
+                            SpecialDateMemoryCard(
+                                title: special.title,
+                                date: special.date,
+                                image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
+                                isPinned: special.isPinned,
+                                onTap: { openHomeSpecialDate(special) },
+                                onEdit: { beginEditHomeSpecialDate(special) },
+                                onDelete: { deleteHomeSpecialDate(special) },
+                                onTogglePin: { toggleHomeSpecialDatePin(special) }
                             )
                             .padding(
                                 .leading,
@@ -1465,6 +1626,7 @@ struct HomeView: View {
         case daySection(DaySection)
         case promptMemory(PromptMemory)
         case processingMemory(ProcessingMemory)
+        case specialDate(SpecialDate)
         
         var date: Date {
             switch self {
@@ -1474,6 +1636,8 @@ struct HomeView: View {
                 return memory.date
             case .processingMemory(let memory):
                 return memory.date
+            case .specialDate(let special):
+                return special.date
             }
         }
 
@@ -1485,6 +1649,8 @@ struct HomeView: View {
                 return "prompt-\(memory.id.uuidString)"
             case .processingMemory(let memory):
                 return "processing-\(memory.id.uuidString)"
+            case .specialDate(let special):
+                return "special-\(special.id.uuidString)"
             }
         }
 
@@ -1496,6 +1662,7 @@ struct HomeView: View {
         
         items += viewModel.daySections.map { .daySection($0) }
         items += viewModel.promptMemories.map { .promptMemory($0) }
+        items += homeSpecialDates.map { .specialDate($0) }
         if let processingMemory = viewModel.processingMemoryForTimeline {
             items.append(.processingMemory(processingMemory))
         }
@@ -1656,6 +1823,63 @@ struct HomeView: View {
         }
         .ignoresSafeArea()
     }
+
+    private var momentPhotoViewerOverlay: some View {
+        MomentPhotoViewer(
+            moments: viewerMoments,
+            initialIndex: viewerInitialIndex,
+            onDismiss: {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showingMomentViewer = false
+                }
+            },
+            onUpdateMoments: { updatedMoments in
+                var newMoments = viewModel.moments
+                for moment in updatedMoments {
+                    if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
+                        newMoments[index] = moment
+                    }
+                }
+                viewModel.moments = newMoments
+            },
+            onDeleteMoment: { moment in
+                withAnimation {
+                    viewModel.deleteMoment(moment)
+                }
+            },
+            onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                viewModel.updateMemory(
+                    section: section,
+                    primaryMomentId: momentId,
+                    caption: caption,
+                    placeName: placeName,
+                    latitude: latitude,
+                    longitude: longitude,
+                    isPlaceNameUserSet: isPlaceNameUserSet
+                )
+            },
+            onEditCaption: { momentId, caption, voiceNotePath in
+                viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+            },
+            onAddPhotos: { section, images in
+                viewModel.addPhotosToMemory(section: section, images: images)
+            },
+            onRemovePhoto: { section, momentId in
+                viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+            },
+            onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                await viewModel.syncMemoryPhotos(
+                    section: section,
+                    selectedAssetIds: assetIds,
+                    selectedOrphanMomentIds: orphanIds
+                )
+            },
+            onReloadMemoryMoments: {
+                guard let anchorId = viewerMoments.first?.id else { return viewerMoments }
+                return viewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
+            }
+        )
+    }
 }
 
 // MARK: - Pulsing Heart (Empty State)
@@ -1679,76 +1903,6 @@ private struct PulsingHeartView: View {
                     scale = 1.18
                 }
             }
-    }
-}
-
-// MARK: - Founding Placeholder Card
-
-private struct FoundingPlaceholderCard: View {
-
-    let title: String
-    var showsPinnedLabel: Bool = false
-    var onTap: () -> Void
-    @State private var pulse = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [BabyTownTheme.accent.opacity(0.12), BabyTownTheme.accent.opacity(0.06)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 150)
-
-                VStack(spacing: 10) {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
-                        .scaleEffect(pulse ? 1.1 : 1.0)
-
-                    Text("Add Photo")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.accent)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
-                    .lineLimit(2)
-
-                if showsPinnedLabel {
-                    HStack(spacing: 4) {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 8))
-                        Text("Pinned")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
-                }
-            }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                .fill(BabyTownTheme.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                .strokeBorder(BabyTownTheme.accent.opacity(0.2), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { onTap() }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                pulse = true
-            }
-        }
     }
 }
 

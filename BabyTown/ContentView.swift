@@ -50,9 +50,6 @@ struct ContentView: View {
                 moments: []
             ))
         }
-        // TEMP (Slice 1): jump straight to the Love Garden for verification.
-        // Remove this line (and the enum case + switch case below) to restore normal flow.
-        _targetScreen = State(initialValue: .loveGarden)
     }
 
     var body: some View {
@@ -260,8 +257,10 @@ struct ContentView: View {
                 }
 
             case .loveGarden:
-                LoveGardenView()
-                    .transition(.opacity)
+                CoupleProfileView(homeViewModel: homeViewModel, onBack: {
+                    withAnimation(.easeInOut(duration: 0.4)) { screen = .home }
+                })
+                .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in

@@ -72,6 +72,21 @@ struct TableOfContentsView: View {
                                         )
                                     }
                                 }
+
+                                ForEach(viewModel.tocPinnedPromptMemories) { memory in
+                                    tocRow(
+                                        title: memory.promptText,
+                                        date: formatDate(memory.date),
+                                        loveNote: pinnedPromptLoveNote(memory),
+                                        thumbnail: memory.photos.first?.thumbnail
+                                    ) {
+                                        promptPhotosViewerConfig = IdentifiablePromptPhotos(
+                                            photos: memory.photos,
+                                            initialIndex: 0,
+                                            promptText: memory.promptText
+                                        )
+                                    }
+                                }
                                 
                                 // "The Beginning" is a special label in the timeline, let's add it if applicable
                                 tocRow(
@@ -100,18 +115,12 @@ struct TableOfContentsView: View {
                                             VStack(spacing: 14) {
                                                 ForEach(seasonGroup.sections) { section in
                                                     tocRow(
-                                                        title: section.placeDisplay,
+                                                        title: viewModel.tocRowTitle(for: section),
                                                         date: formatDate(section.date),
-                                                        loveNote: loveNote(from: section),
+                                                        loveNote: viewModel.tocLoveNote(for: section),
                                                         thumbnail: section.moments.first?.thumbnail
                                                     ) {
-                                                        let photos = viewModel.flattenedPhotos(for: section)
-                                                        if !photos.isEmpty {
-                                                            momentsViewerConfig = IdentifiableMoments(
-                                                                moments: photos,
-                                                                initialIndex: 0
-                                                            )
-                                                        }
+                                                        openSection(section)
                                                     }
                                                 }
                                             }
@@ -180,6 +189,37 @@ struct TableOfContentsView: View {
                         withAnimation {
                             viewModel.deleteMoment(moment)
                         }
+                    },
+                    onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                        viewModel.updateMemory(
+                            section: section,
+                            primaryMomentId: momentId,
+                            caption: caption,
+                            placeName: placeName,
+                            latitude: latitude,
+                            longitude: longitude,
+                            isPlaceNameUserSet: isPlaceNameUserSet
+                        )
+                    },
+                    onEditCaption: { momentId, caption, voiceNotePath in
+                        viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                    },
+                    onAddPhotos: { section, images in
+                        viewModel.addPhotosToMemory(section: section, images: images)
+                    },
+                    onRemovePhoto: { section, momentId in
+                        viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+                    },
+                    onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                        await viewModel.syncMemoryPhotos(
+                            section: section,
+                            selectedAssetIds: assetIds,
+                            selectedOrphanMomentIds: orphanIds
+                        )
+                    },
+                    onReloadMemoryMoments: {
+                        guard let anchorId = config.moments.first?.id else { return config.moments }
+                        return viewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
                     }
                 )
             }
@@ -287,10 +327,26 @@ struct TableOfContentsView: View {
         return caption
     }
 
-    private func loveNote(from section: DaySection) -> String? {
-        section.moments
-            .compactMap { loveNote(from: $0) }
-            .first
+    private func pinnedPromptLoveNote(_ memory: PromptMemory) -> String? {
+        let note = memory.loveNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? nil : note
+    }
+
+    private func openSection(_ section: DaySection) {
+        if let memory = viewModel.promptMemory(for: section), !memory.photos.isEmpty {
+            promptPhotosViewerConfig = IdentifiablePromptPhotos(
+                photos: memory.photos,
+                initialIndex: 0,
+                promptText: memory.promptText
+            )
+            return
+        }
+        let photos = viewModel.flattenedPhotos(for: section)
+        guard !photos.isEmpty else { return }
+        momentsViewerConfig = IdentifiableMoments(
+            moments: photos,
+            initialIndex: 0
+        )
     }
 
     private func formatDate(_ date: Date) -> String {

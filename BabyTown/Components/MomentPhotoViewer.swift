@@ -1,6 +1,4 @@
 import SwiftUI
-import Photos
-import PhotosUI
 
 struct MomentPhotoViewer: View {
     
@@ -9,14 +7,16 @@ struct MomentPhotoViewer: View {
     var onDismiss: () -> Void
     var onUpdateMoments: ([Moment]) -> Void
     var onDeleteMoment: ((Moment) -> Void)? = nil
+    var onEditMemory: ((DaySection, UUID, String, String?, Double?, Double?, Bool) -> Void)? = nil
+    var onEditCaption: ((UUID, String, String?) -> Void)? = nil
+    var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
+    var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
+    var onSyncMemoryPhotos: ((DaySection, Set<String>, Set<UUID>) async -> Void)? = nil
+    var onReloadMemoryMoments: (() -> [Moment])? = nil
     
     @State private var currentIndex: Int
-    @State private var editMode = false
-    @State private var momentsBeforeEdit: [Moment]?
-    @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var updatedMoments: [Moment]
-    @State private var showDeleteConfirmation = false
-    @State private var showFoundingDeleteBlockedAlert = false
+    @State private var showCaptionEditor = false
     @State private var showChrome = true
     @State private var showMapsChooser = false
     @StateObject private var shareCoordinator = MemoryShareCoordinator()
@@ -28,13 +28,25 @@ struct MomentPhotoViewer: View {
         initialIndex: Int,
         onDismiss: @escaping () -> Void,
         onUpdateMoments: @escaping ([Moment]) -> Void,
-        onDeleteMoment: ((Moment) -> Void)? = nil
+        onDeleteMoment: ((Moment) -> Void)? = nil,
+        onEditMemory: ((DaySection, UUID, String, String?, Double?, Double?, Bool) -> Void)? = nil,
+        onEditCaption: ((UUID, String, String?) -> Void)? = nil,
+        onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil,
+        onRemovePhoto: ((DaySection, UUID) -> Void)? = nil,
+        onSyncMemoryPhotos: ((DaySection, Set<String>, Set<UUID>) async -> Void)? = nil,
+        onReloadMemoryMoments: (() -> [Moment])? = nil
     ) {
         self.moments = moments
         self.initialIndex = initialIndex
         self.onDismiss = onDismiss
         self.onUpdateMoments = onUpdateMoments
         self.onDeleteMoment = onDeleteMoment
+        self.onEditMemory = onEditMemory
+        self.onEditCaption = onEditCaption
+        self.onAddPhotos = onAddPhotos
+        self.onRemovePhoto = onRemovePhoto
+        self.onSyncMemoryPhotos = onSyncMemoryPhotos
+        self.onReloadMemoryMoments = onReloadMemoryMoments
         _currentIndex = State(initialValue: initialIndex)
         _updatedMoments = State(initialValue: moments)
     }
@@ -47,10 +59,6 @@ struct MomentPhotoViewer: View {
             return updatedMoments.last ?? moments.first ?? Moment.sampleMoment
         }
         return updatedMoments[currentIndex]
-    }
-    
-    var isFromCamera: Bool {
-        currentMoment.assetIdentifier == nil
     }
     
     private var dateFormatter: DateFormatter {
@@ -139,29 +147,62 @@ struct MomentPhotoViewer: View {
         }
         .statusBarHidden(true)
         .memorySharePresentation(coordinator: shareCoordinator)
-        .onChange(of: selectedPhotos) { _, newItems in
-            Task {
-                await handlePhotoSelection(newItems)
-            }
+        .sheet(isPresented: $showCaptionEditor) {
+            CaptionEditorSheet(
+                section: editingSection,
+                onSave: { momentId, newCaption, placeName, latitude, longitude, isPlaceNameUserSet in
+                    if let onEditMemory {
+                        onEditMemory(
+                            editingSection,
+                            momentId,
+                            newCaption,
+                            placeName,
+                            latitude,
+                            longitude,
+                            isPlaceNameUserSet
+                        )
+                    } else {
+                        onEditCaption?(momentId, newCaption, nil)
+                    }
+                    reloadMemoryMoments()
+                },
+                onAddPhotos: { images in
+                    onAddPhotos?(editingSection, images)
+                    reloadMemoryMoments()
+                },
+                onRemovePhoto: { momentId in
+                    onRemovePhoto?(editingSection, momentId)
+                    reloadMemoryMoments()
+                },
+                onSyncMemoryPhotos: { assetIds, orphanIds in
+                    let section = editingSection
+                    Task {
+                        await onSyncMemoryPhotos?(section, assetIds, orphanIds)
+                        reloadMemoryMoments()
+                    }
+                }
+            )
         }
-        .alert(
-            isFromCamera ? "Remove Photo Permanently?" : "Remove Photo?",
-            isPresented: $showDeleteConfirmation
-        ) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) {
-                deleteCurrentPhoto()
-            }
-        } message: {
-            Text(isFromCamera 
-                ? "This photo was taken with the in-app camera and will be removed permanently from the app."
-                : "Would you like to remove this photo from the app?")
+    }
+
+    private var editingSection: DaySection {
+        let sorted = updatedMoments.sorted { $0.dateTaken < $1.dateTaken }
+        let first = sorted.first ?? moments.first ?? Moment.sampleMoment
+        return DaySection(date: first.dateTaken, placeName: first.placeName, moments: sorted)
+    }
+
+    private func reloadMemoryMoments() {
+        guard let reload = onReloadMemoryMoments else { return }
+        let fresh = reload()
+        guard !fresh.isEmpty else {
+            onDismiss()
+            return
         }
-        .alert("Keep this founding photo", isPresented: $showFoundingDeleteBlockedAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("This memory needs a photo. Use the picker below to replace it instead of removing it.")
+        updatedMoments = fresh
+        if currentIndex >= fresh.count {
+            currentIndex = max(0, fresh.count - 1)
         }
+        onUpdateMoments(fresh)
     }
     
     // MARK: - Photo View
@@ -176,10 +217,6 @@ struct MomentPhotoViewer: View {
     }
 
     private func handlePhotoTap() {
-        if editMode {
-            cancelEditing()
-            return
-        }
         withAnimation(.easeInOut(duration: 0.2)) {
             showChrome.toggle()
         }
@@ -198,7 +235,6 @@ struct MomentPhotoViewer: View {
         }
         .opacity(showChrome ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showChrome)
-        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: editMode)
         .allowsHitTesting(showChrome)
         .background(alignment: .top) {
             if showChrome {
@@ -206,7 +242,7 @@ struct MomentPhotoViewer: View {
             }
         }
         .background(alignment: .bottom) {
-            if showChrome && !editMode {
+            if showChrome {
                 photoViewerBottomGradient
             }
         }
@@ -214,30 +250,22 @@ struct MomentPhotoViewer: View {
 
     @ViewBuilder
     private var viewerChromeBottom: some View {
-        if !editMode {
-            if let foundingPromptText {
-                PromptDisplayCard(prompt: foundingPromptText)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
-            }
-
-            if let foundingMoment = foundingMomentWithPlaceName {
-                foundingPlaceNameDisplay(moment: foundingMoment)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
-            }
-
-            photoMetadataDisplay
+        if let foundingPromptText {
+            PromptDisplayCard(prompt: foundingPromptText)
+                .padding(.horizontal, 20)
                 .padding(.bottom, 8)
         }
 
-        if editMode {
-            PhotoViewerPolaroidEditTray(
-                selectedPhotos: $selectedPhotos,
-                onRemove: { showDeleteConfirmation = true }
-            )
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if updatedMoments.count > 1 {
+        if let foundingMoment = foundingMomentWithPlaceName {
+            foundingPlaceNameDisplay(moment: foundingMoment)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+        }
+
+        photoMetadataDisplay
+            .padding(.bottom, 8)
+
+        if updatedMoments.count > 1 {
             photoPreviewStrip
         }
     }
@@ -246,65 +274,49 @@ struct MomentPhotoViewer: View {
     
     private var topBar: some View {
         HStack {
-            Group {
-                if editMode {
-                    Button(action: cancelEditing) {
-                        Text("Cancel")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.2))
-                            )
-                    }
-                } else {
-                    CircleBackdropCloseButton(action: onDismiss)
-                }
-            }
-            
+            CircleBackdropCloseButton(action: onDismiss)
+
             Spacer()
 
-            if !editMode {
-                Button(action: shareCurrentMoment) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold))
+            Button(action: shareCurrentMoment) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white.opacity(0.2)))
+            }
+            .padding(.trailing, 4)
+
+            if hasNavigationDestination {
+                Button {
+                    showMapsChooser = true
+                } label: {
+                    Image(systemName: "location.north.fill")
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)
+                        .rotationEffect(.degrees(45))
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color.white.opacity(0.2)))
+                        .background(Circle().fill(Color.green))
                 }
                 .padding(.trailing, 4)
-
-                if hasNavigationDestination {
-                    Button {
-                        showMapsChooser = true
-                    } label: {
-                        Image(systemName: "location.north.fill")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
-                            .rotationEffect(.degrees(45))
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.green))
-                    }
-                    .padding(.trailing, 4)
-                    .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
-                        Button("Apple Maps") { openInMaps(useGoogle: false) }
-                        Button("Google Maps") { openInMaps(useGoogle: true) }
-                        Button("Cancel", role: .cancel) {}
-                    }
+                .confirmationDialog("Open this place in", isPresented: $showMapsChooser, titleVisibility: .visible) {
+                    Button("Apple Maps") { openInMaps(useGoogle: false) }
+                    Button("Google Maps") { openInMaps(useGoogle: true) }
+                    Button("Cancel", role: .cancel) {}
                 }
             }
 
-            Button(action: finishEditing) {
-                Text(editMode ? "Done" : "Edit")
+            Button {
+                showCaptionEditor = true
+            } label: {
+                Text("Edit")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(
                         Capsule()
-                            .fill(editMode ? Color.green.opacity(0.3) : Color.white.opacity(0.2))
+                            .fill(Color.white.opacity(0.2))
                     )
             }
         }
@@ -376,29 +388,6 @@ struct MomentPhotoViewer: View {
         }
     }
 
-    private func finishEditing() {
-        if editMode {
-            commitEditingChanges()
-        } else {
-            momentsBeforeEdit = updatedMoments
-            editMode = true
-        }
-    }
-
-    private func commitEditingChanges() {
-        onUpdateMoments(updatedMoments)
-        momentsBeforeEdit = nil
-        editMode = false
-    }
-
-    private func cancelEditing() {
-        if let snapshot = momentsBeforeEdit {
-            updatedMoments = snapshot
-        }
-        momentsBeforeEdit = nil
-        editMode = false
-    }
-    
     // MARK: - Photo Preview Strip
     
     private var photoPreviewStrip: some View {
@@ -453,45 +442,6 @@ struct MomentPhotoViewer: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
     
-    // MARK: - Photo Selection
-    
-    private func handlePhotoSelection(_ items: [PhotosPickerItem]) async {
-        guard let item = items.first else { return }
-        
-        if let data = try? await item.loadTransferable(type: Data.self),
-           let image = UIImage(data: data) {
-            // Replace only the photo; preserve every other field so the moment
-            // keeps its identity (prompt, pin state, location, voice note, etc.).
-            // Dropping these previously turned founding prompt moments into
-            // ordinary, prompt-less timeline entries.
-            let existing = updatedMoments[currentIndex]
-            updatedMoments[currentIndex] = Moment(
-                id: existing.id,
-                dateTaken: existing.dateTaken,
-                assetIdentifier: nil,
-                thumbnail: image,
-                placeName: existing.placeName,
-                caption: existing.caption,
-                voiceNotePath: existing.voiceNotePath,
-                promptText: existing.promptText,
-                isPinned: existing.isPinned,
-                pinnedAt: existing.pinnedAt,
-                isLocked: existing.isLocked,
-                unlockTime: existing.unlockTime,
-                latitude: existing.latitude,
-                longitude: existing.longitude,
-                isAddedFromOnThisDay: existing.isAddedFromOnThisDay,
-                isPlaceNameUserSet: existing.isPlaceNameUserSet,
-                country: existing.country
-            )
-
-            selectedPhotos = []
-            commitEditingChanges()
-        } else {
-            selectedPhotos = []
-        }
-    }
-    
     private var photoViewerMetadataBackground: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(Color.black.opacity(0.68))
@@ -542,38 +492,6 @@ struct MomentPhotoViewer: View {
         .allowsHitTesting(false)
     }
 
-    // MARK: - Delete Photo
-
-    private func requestRemoveCurrentPhoto() {
-        if foundingPromptText != nil, updatedMoments.count == 1 {
-            showFoundingDeleteBlockedAlert = true
-            return
-        }
-        showDeleteConfirmation = true
-    }
-    
-    private func deleteCurrentPhoto() {
-        let momentToDelete = currentMoment
-        
-        // Remove from local array
-        updatedMoments.remove(at: currentIndex)
-        
-        // Adjust current index if needed
-        if updatedMoments.isEmpty {
-            // If no photos left, call delete callback and dismiss
-            onDeleteMoment?(momentToDelete)
-            onDismiss()
-        } else {
-            // Adjust index if we deleted the last photo
-            if currentIndex >= updatedMoments.count {
-                currentIndex = updatedMoments.count - 1
-            }
-            
-            // Update the moments and call delete callback
-            onUpdateMoments(updatedMoments)
-            onDeleteMoment?(momentToDelete)
-        }
-    }
 }
 
 // MARK: - Legible overlay text (light or dark photos)

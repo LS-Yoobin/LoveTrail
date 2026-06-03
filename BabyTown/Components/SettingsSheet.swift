@@ -10,6 +10,7 @@ struct SettingsSheet: View {
     var onResetApp: () -> Void
     var onReplayStory: () -> Void
     var onVisitPet: () -> Void
+    var onOpenCoupleProfile: () -> Void = {}
     
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
@@ -18,32 +19,7 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Button {
-                        onReplayStory()
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Image(systemName: "play.circle")
-                                .font(.system(size: 16))
-                            Text("Replay Our Story")
-                            .font(.system(size: 16))
-                        }
-                    }
-                    
-                    Button(role: .destructive) {
-                        showResetConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 16))
-                            Text("Reset App")
-                                .font(.system(size: 16))
-                        }
-                    }
-                } header: {
-                    Text("App")
-                }
+                BackgroundMusicSettingsSection()
 
                 Section {
                     Button {
@@ -74,6 +50,23 @@ struct SettingsSheet: View {
                             Image(systemName: "pawprint.circle")
                                 .font(.system(size: 16))
                             Text("Visit Pet")
+                                .font(.system(size: 16))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        dismiss()
+                        onOpenCoupleProfile()
+                    } label: {
+                        HStack {
+                            Image(systemName: "leaf.circle")
+                                .font(.system(size: 16))
+                            Text("Our Garden")
                                 .font(.system(size: 16))
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -139,6 +132,33 @@ struct SettingsSheet: View {
                     }
                 } header: {
                     Text("About me")
+                }
+
+                Section {
+                    Button {
+                        onReplayStory()
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Image(systemName: "play.circle")
+                                .font(.system(size: 16))
+                            Text("Replay Our Story")
+                                .font(.system(size: 16))
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        showResetConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 16))
+                            Text("Reset App")
+                                .font(.system(size: 16))
+                        }
+                    }
+                } header: {
+                    Text("App")
                 }
             }
             .navigationTitle("Settings")

@@ -52,7 +52,7 @@ struct PetTrickBookSheet: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(BabyTownTheme.accentDeep)
 
-            Text("Say a trick out loud while the mic is on. Your cat learns over time — higher levels obey more often. Unlock new tricks by mastering the previous one. Bonus coins and Smart XP reward unlocks and level-ups.")
+            Text("Say a trick out loud while the mic is on. Your cat obeys based on training level — it starts low and climbs as you practice. Drop a snack right after a good trick to reinforce it (bonus rep + higher obey rate). Snacks without a successful trick don't train. Unlock new tricks by mastering the previous one.")
                 .font(.system(size: 13))
                 .foregroundStyle(bodyText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -70,7 +70,7 @@ struct PetTrickBookSheet: View {
                 Text("Training modes")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(BabyTownTheme.accentDeep)
-                Text("6 voice tricks · 1 treat teaser (drag the snack)")
+                Text("6 voice tricks · drag snack after a good trick to reinforce")
                     .font(.system(size: 12))
                     .foregroundStyle(mutedText)
             }

@@ -186,6 +186,15 @@ final class PetRoomScene: SKScene {
     /// Called when the user taps the wall picture frame in customize mode (opens photo picker).
     var onTapPictureFrame: (() -> Void)?
 
+    /// When true, renders only the adopted cat on a transparent scene (Couples
+    /// Profile garden). The ambient routine omits bowl/litter activities because
+    /// those props only exist in the pet room.
+    var isGardenBackdrop = false
+    /// When multiple pets roam the garden, spreads each cat's starting X across
+    /// the grass band so they don't stack on top of each other.
+    var gardenSpawnIndex = 0
+    var gardenSpawnCount = 1
+
     /// Fired when the default-mode "walk up to the frame" inspect zoom begins or ends.
     var onPictureFrameInspectChanged: ((Bool) -> Void)?
 
@@ -333,11 +342,21 @@ final class PetRoomScene: SKScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
+        view.allowsTransparency = true
         removeAllChildren()
-        setupRoomCamera()
-        buildRoom()
-        buildCat()
-        playWelcomeSequence()
+        if isGardenBackdrop {
+            buildCat()
+            startAnimation(.idle)
+            let stagger = Double(gardenSpawnIndex) * 0.65 + Double.random(in: 0...0.4)
+            runBehaviorAction(.wait(forDuration: stagger)) { [weak self] in
+                self?.runBehavior()
+            }
+        } else {
+            setupRoomCamera()
+            buildRoom()
+            buildCat()
+            playWelcomeSequence()
+        }
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -1386,7 +1405,16 @@ final class PetRoomScene: SKScene {
             applyCatFrame(frame)
             currentAction = .idle
         }
-        cat.position = clampCatPosition(CGPoint(x: size.width * 0.5, y: randomFloorY()))
+        let spawnX: CGFloat
+        if isGardenBackdrop, gardenSpawnCount > 1 {
+            let margin = maxCatHorizontalHalfWidth
+            let usable = max(1, size.width - margin * 2)
+            let slot = CGFloat(gardenSpawnIndex + 1) / CGFloat(gardenSpawnCount + 1)
+            spawnX = margin + usable * slot
+        } else {
+            spawnX = size.width * 0.5
+        }
+        cat.position = clampCatPosition(CGPoint(x: spawnX, y: randomFloorY()))
         cat.zPosition = catFloorDepthZ(for: cat.position.y)
     }
 
@@ -1456,7 +1484,8 @@ final class PetRoomScene: SKScene {
         // Occasional self-feeding — only when the matching bowl is actually in
         // the room, otherwise the cat would walk to nothing. Skip during room
         // customize so the cat keeps strolling without blocking bowl placement.
-        if !isCustomizeMode {
+        // The garden backdrop has no care props at all.
+        if !isGardenBackdrop, !isCustomizeMode {
             if propNodes[.foodBowl] != nil { weights[.eat] = 8 }
             if propNodes[.waterBowl] != nil { weights[.drink] = 8 }
             if propNodes[.litterBox] != nil { weights[.peekLitter] = 5 }
@@ -1504,7 +1533,9 @@ final class PetRoomScene: SKScene {
     /// elsewhere use `idleFor(state: .sleep, …)` directly. Petting (`petCat`)
     /// cancels this and wakes the cat early.
     private func sleep() {
-        if let bed = nearestPlacedCatBed() {
+        if isGardenBackdrop {
+            idleFor(state: .sleep, duration: Double.random(in: 8...16))
+        } else if let bed = nearestPlacedCatBed() {
             goToBedAndSleep(bedKey: bed.key, bed: bed.node, duration: 30)
         } else {
             idleFor(state: .sleep, duration: 30)
@@ -2275,6 +2306,7 @@ final class PetRoomScene: SKScene {
     // MARK: Interaction
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !isGardenBackdrop else { return }
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
@@ -2759,6 +2791,11 @@ final class PetRoomScene: SKScene {
     /// starts. Cosmetic only — it never refills hunger/thirst, which the care
     /// economy owns and depletes on its own schedule regardless of this.
     private func playWelcomeSequence() {
+        if isGardenBackdrop {
+            startAnimation(.idle)
+            runBehavior()
+            return
+        }
         guard let food = propNodes[.foodBowl], let water = propNodes[.waterBowl] else {
             startAnimation(.idle)
             runBehavior()
@@ -3763,9 +3800,13 @@ final class PetRoomScene: SKScene {
         return 0
     }
 
+    /// Grass band on the Couples Profile garden backdrop (fraction of scene height).
+    private let gardenFloorBand: ClosedRange<CGFloat> = 0.08...0.36
+
     /// Vertical band the cat may walk in — same front reach as play mode
     /// (`laserFloorLowerBound`), with a small back inset so it stays off the seam.
     private var catFloorBand: ClosedRange<CGFloat> {
+        if isGardenBackdrop { return gardenFloorBand }
         let backInset: CGFloat = 0.035
         let lower = max(0.01, min(laserFloorLowerBound, floorBand.upperBound))
         return lower...max(lower, floorBand.upperBound - backInset)

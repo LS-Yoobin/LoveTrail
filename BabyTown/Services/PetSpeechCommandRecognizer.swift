@@ -13,7 +13,8 @@ final class PetSpeechCommandRecognizer: ObservableObject {
     }
 
     @Published private(set) var status: Status = .idle
-    @Published private(set) var lastHeard: String?
+    /// Latest words from the mic for the current utterance (updates on every partial result).
+    @Published private(set) var liveTranscript: String?
     /// Smoothed microphone input level (0…1), driven by the live audio buffer so
     /// the UI can visualize that the mic is actively picking up the user's voice.
     @Published private(set) var audioLevel: CGFloat = 0
@@ -49,7 +50,7 @@ final class PetSpeechCommandRecognizer: ObservableObject {
         }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         status = .idle
-        lastHeard = nil
+        liveTranscript = nil
         audioLevel = 0
         consumedTranscriptPrefix = ""
     }
@@ -192,16 +193,14 @@ final class PetSpeechCommandRecognizer: ObservableObject {
 
     private func markTranscriptConsumed(_ fullTranscript: String) {
         consumedTranscriptPrefix = fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        lastHeard = nil
+        liveTranscript = nil
     }
 
     private func handleTranscript(_ text: String, isFinal: Bool) {
         let slice = freshTranscriptSlice(from: text)
         guard !slice.isEmpty else { return }
 
-        if let heard = PetTrickTrainingState.heardCommandDisplay(from: slice) {
-            lastHeard = heard
-        }
+        liveTranscript = PetTrickTrainingState.displayTranscript(slice)
 
         guard let trick = PetTrickTrainingState.trick(matching: slice) else { return }
 

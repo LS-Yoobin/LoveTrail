@@ -1,7 +1,7 @@
 # Couples Profile Page — Design Spec (v1)
 
 Date: 2026-06-02
-Status: Slice 1 approved for implementation (design only — no implementation yet)
+Status: Slices 1–3 implemented (2026-06-02) — stickers, garden polish, navigation. Real partner profile remains Phase 2 (backend).
 
 ## 1. Vision
 

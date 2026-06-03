@@ -11,6 +11,7 @@ struct PhotoViewerPolaroidEditTray: View {
     private let paper = Color(red: 0.97, green: 0.96, blue: 0.93)
     private let paperEdge = Color(red: 0.88, green: 0.86, blue: 0.82)
     private let ink = Color(red: 0.24, green: 0.22, blue: 0.21)
+    private let actionBlue = Color(red: 0.22, green: 0.48, blue: 0.96)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -88,8 +89,8 @@ struct PhotoViewerPolaroidEditTray: View {
                 icon: "trash",
                 title: "Remove",
                 subtitle: "From album",
-                tint: Color(red: 0.78, green: 0.28, blue: 0.32),
-                background: Color(red: 0.95, green: 0.88, blue: 0.88)
+                tint: actionBlue,
+                background: actionBlue.opacity(0.12)
             )
         }
         .buttonStyle(.plain)

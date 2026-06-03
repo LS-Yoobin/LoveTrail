@@ -22,7 +22,7 @@ struct PetTrickProgressAlertView: View {
     private var subtitle: String {
         switch kind {
         case .levelUp(let level, let xp):
-            let rate = Int(PetTrickTrainingRules.obedienceRate(level: level) * 100)
+            let rate = Int(PetTrickTrainingRules.effectiveObedienceRate(level: level, snackReinforcements: 0) * 100)
             let mastery = level >= PetTrickTrainingRules.maxLevel
             let base = mastery
                 ? "Mastered — always obeys!"

@@ -19,7 +19,7 @@ enum PetTrick: String, Codable, CaseIterable, Identifiable {
         case .up:        return "Up"
         case .spin:      return "Spin"
         case .down:      return "Down"
-        case .sayHi:     return "Say Hi"
+        case .sayHi:     return "Speak"
         }
     }
 
@@ -43,7 +43,7 @@ enum PetTrick: String, Codable, CaseIterable, Identifiable {
         case .up:        return ["up", "stand up", "stand"]
         case .spin:      return ["spin", "turn around", "turn"]
         case .down:      return ["down", "lay down", "lie down"]
-        case .sayHi:     return ["say hi", "say hello", "hello", "hi"]
+        case .sayHi:     return ["speak", "say speak", "say hi", "say hello", "hello", "hi"]
         }
     }
 
@@ -101,10 +101,30 @@ enum PetTrickTrainingRules {
     static let levelSuccessThresholds: [Int] = [0, 5, 12, 20, 30, 42, 56, 72, 90, 110]
 
     /// Probability the cat obeys a voice command at the given training level.
-    /// Level 1 ≈ 40%, level 10 = 100%.
+    /// Level 1 ≈ 28%, level 10 = 100%.
     static func obedienceRate(level: Int) -> Double {
         let clamped = min(maxLevel, max(1, level))
-        return min(1.0, 0.40 + Double(clamped - 1) * (0.60 / Double(maxLevel - 1)))
+        return min(1.0, 0.28 + Double(clamped - 1) * (0.72 / Double(maxLevel - 1)))
+    }
+
+    /// Extra obey chance from treats given right after a successful trick (persisted per trick).
+    static let snackReinforcementObediencePerTreat: Double = 0.03
+    static let maxSnackReinforcementObedienceBonus: Double = 0.18
+    static let maxSnackReinforcementsStored = 6
+
+    /// Window after a successful trick during which a snack counts as reinforcement.
+    static let snackReinforcementWindow: TimeInterval = 50
+
+    /// Bonus rep and Smart XP when a snack reinforces a trick that was just performed.
+    static let snackReinforcementBonusSuccesses = 1
+    static let snackReinforcementSmartXP = 6
+
+    static func effectiveObedienceRate(level: Int, snackReinforcements: Int) -> Double {
+        let bonus = min(
+            maxSnackReinforcementObedienceBonus,
+            Double(snackReinforcements) * snackReinforcementObediencePerTreat
+        )
+        return min(1.0, obedienceRate(level: level) + bonus)
     }
 
     /// Derives the training level from total successful performances.
@@ -132,15 +152,11 @@ enum PetSmartMeterRules {
     /// XP for one successful voice-command rep; harder tricks pay slightly more.
     static func successXP(for trick: PetTrick) -> Int {
         let index = PetTrick.unlockOrder.firstIndex(of: trick) ?? 0
-        return 8 + index   // Paw 8 … Say Hi 13
+        return 8 + index   // Paw 8 … Speak 13
     }
 
     static let levelUpXP = 35
     static let unlockXP = 80
-
-    /// Treat teaser (snack drag) — small bonus XP with a cooldown so it stays supplementary.
-    static let treatTeaserXP = 4
-    static let treatTeaserCooldown: TimeInterval = 45
 
     /// Bonus coins when a new trick unlocks (Paw starts unlocked — no bonus).
     static func unlockBonusCoins(for trick: PetTrick) -> Int {
@@ -233,10 +249,13 @@ struct TrickTrainingRewards: Equatable {
 struct PetTrickProgress: Codable, Equatable {
     var isUnlocked: Bool
     var successes: Int
+    /// Treats given right after a successful performance — raises obey rate for this trick.
+    var snackReinforcements: Int
 
-    init(isUnlocked: Bool = false, successes: Int = 0) {
+    init(isUnlocked: Bool = false, successes: Int = 0, snackReinforcements: Int = 0) {
         self.isUnlocked = isUnlocked
         self.successes = successes
+        self.snackReinforcements = snackReinforcements
     }
 
     var level: Int {
@@ -244,16 +263,36 @@ struct PetTrickProgress: Codable, Equatable {
     }
 
     var obedienceRate: Double {
-        PetTrickTrainingRules.obedienceRate(level: level)
+        PetTrickTrainingRules.effectiveObedienceRate(
+            level: level,
+            snackReinforcements: snackReinforcements
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case isUnlocked, successes, snackReinforcements
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        isUnlocked = try c.decode(Bool.self, forKey: .isUnlocked)
+        successes = try c.decode(Int.self, forKey: .successes)
+        snackReinforcements = try c.decodeIfPresent(Int.self, forKey: .snackReinforcements) ?? 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(isUnlocked, forKey: .isUnlocked)
+        try c.encode(successes, forKey: .successes)
+        try c.encode(snackReinforcements, forKey: .snackReinforcements)
     }
 }
 
 /// All trick training progress for the adopted pet.
 struct PetTrickTrainingState: Codable, Equatable {
     var progress: [String: PetTrickProgress]
-    /// Cumulative Smart Meter XP from tricks and treat teasers.
+    /// Cumulative Smart Meter XP from tricks and snack reinforcement.
     var smartMeterXP: Int
-    var lastTreatTeaserAt: Date?
 
     init() {
         var p: [String: PetTrickProgress] = [:]
@@ -262,14 +301,12 @@ struct PetTrickTrainingState: Codable, Equatable {
         }
         self.progress = p
         self.smartMeterXP = 0
-        self.lastTreatTeaserAt = nil
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         progress = try c.decodeIfPresent([String: PetTrickProgress].self, forKey: .progress) ?? PetTrickTrainingState().progress
         smartMeterXP = try c.decodeIfPresent(Int.self, forKey: .smartMeterXP) ?? 0
-        lastTreatTeaserAt = try c.decodeIfPresent(Date.self, forKey: .lastTreatTeaserAt)
         if progress[PetTrick.paw.rawValue]?.isUnlocked != true {
             progress[PetTrick.paw.rawValue] = PetTrickProgress(isUnlocked: true, successes: progress[PetTrick.paw.rawValue]?.successes ?? 0)
         }
@@ -340,34 +377,37 @@ struct PetTrickTrainingState: Codable, Equatable {
     }
 
     /// Maps recognized speech text to a trick, if any phrase matches.
+    /// Longer phrases win (e.g. "high five" over "hi") and short tokens use word boundaries
+    /// so "hi" does not match inside "high five".
     static func trick(matching transcript: String) -> PetTrick? {
-        let normalized = normalizedTranscript(transcript)
-        guard !normalized.isEmpty else { return nil }
-
-        for trick in PetTrick.allCases {
-            for phrase in trick.voicePhrases {
-                if normalized.contains(phrase) { return trick }
-            }
-        }
-        return nil
+        bestPhraseMatch(in: transcript)?.trick
     }
 
-    /// The matched command phrase to show in the "Heard:" UI — only when a trick word is detected.
-    static func heardCommandDisplay(from transcript: String) -> String? {
+    private static func bestPhraseMatch(in transcript: String) -> (trick: PetTrick, phrase: String)? {
         let normalized = normalizedTranscript(transcript)
         guard !normalized.isEmpty else { return nil }
 
+        var best: (trick: PetTrick, phrase: String)?
         for trick in PetTrick.allCases {
             for phrase in trick.voicePhrases {
-                guard let range = normalized.range(of: phrase) else { continue }
-                let startOffset = normalized.distance(from: normalized.startIndex, to: range.lowerBound)
-                let endOffset = normalized.distance(from: normalized.startIndex, to: range.upperBound)
-                let start = transcript.index(transcript.startIndex, offsetBy: startOffset)
-                let end = transcript.index(transcript.startIndex, offsetBy: endOffset)
-                return displayTranscript(String(transcript[start..<end]))
+                guard phraseRange(phrase, in: normalized) != nil else { continue }
+                if best == nil || phrase.count > best!.phrase.count {
+                    best = (trick, phrase)
+                }
             }
         }
-        return nil
+        return best
+    }
+
+    private static func phraseRange(_ phrase: String, in normalized: String) -> Range<String.Index>? {
+        let escaped = NSRegularExpression.escapedPattern(for: phrase)
+        let pattern: String
+        if phrase.contains(" ") {
+            pattern = "(?:^|\\s)\(escaped)(?:\\s|$)"
+        } else {
+            pattern = "\\b\(escaped)\\b"
+        }
+        return normalized.range(of: pattern, options: .regularExpression)
     }
 
     private static func normalizedTranscript(_ transcript: String) -> String {

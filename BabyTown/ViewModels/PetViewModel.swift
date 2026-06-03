@@ -792,6 +792,9 @@ final class PetViewModel: ObservableObject {
 
     // MARK: - Trick training
 
+    /// After a successful trick, a snack within the window reinforces that command.
+    private var pendingSnackReinforcement: (trick: PetTrick, deadline: Date)?
+
     var trickTraining: PetTrickTrainingState {
         guard let skin = state.adoptedSkin else { return PetTrickTrainingState() }
         return state.trickTraining(for: skin)
@@ -827,9 +830,8 @@ final class PetViewModel: ObservableObject {
         )
     }
 
-    /// Resolves a voice command: locked tricks are rejected; a correctly spoken command
-    /// always counts as a completed rep (obedience only affects non-voice paths, if added later).
-    func attemptTrick(_ trick: PetTrick, voiceRecognized: Bool = false) -> TrickAttemptOutcome {
+    /// Resolves a spoken trick command; obey rate decides whether the cat performs it.
+    func attemptTrick(_ trick: PetTrick) -> TrickAttemptOutcome {
         guard state.adoptedSkin != nil else {
             return .locked(trick: trick)
         }
@@ -839,11 +841,9 @@ final class PetViewModel: ObservableObject {
 
         var progress = trickTraining.progress(for: trick)
         let level = progress.level
-        if !voiceRecognized {
-            let roll = Double.random(in: 0..<1)
-            guard roll <= progress.obedienceRate else {
-                return .ignored(level: level)
-            }
+        let roll = Double.random(in: 0..<1)
+        guard roll <= progress.obedienceRate else {
+            return .ignored(level: level)
         }
 
         let previousLevel = level
@@ -879,6 +879,7 @@ final class PetViewModel: ObservableObject {
         }
 
         bumpHappiness(by: 3)
+        markPendingSnackReinforcement(for: trick)
         return .performed(
             level: newLevel,
             leveledUp: leveledUp,
@@ -887,26 +888,80 @@ final class PetViewModel: ObservableObject {
         )
     }
 
-    /// Treat teaser during trick training — small Smart Meter XP, gated by cooldown.
-    func rewardTreatTeaser() -> TrickTrainingRewards {
-        guard state.adoptedSkin != nil else { return TrickTrainingRewards() }
-        let training = trickTraining
-        let now = Date()
-        if let last = training.lastTreatTeaserAt {
-            let elapsed = now.timeIntervalSince(last)
-            if elapsed < PetSmartMeterRules.treatTeaserCooldown {
-                return TrickTrainingRewards()
-            }
+    func markPendingSnackReinforcement(for trick: PetTrick) {
+        pendingSnackReinforcement = (
+            trick,
+            Date().addingTimeInterval(PetTrickTrainingRules.snackReinforcementWindow)
+        )
+    }
+
+    func clearPendingSnackReinforcement() {
+        pendingSnackReinforcement = nil
+    }
+
+    enum SnackRewardOutcome: Equatable {
+        case reinforced(trick: PetTrick, leveledUp: Bool, rewards: TrickTrainingRewards)
+        case treatOnly
+    }
+
+    /// Snack dropped during trick training — reinforces only if a trick just succeeded.
+    func rewardSnackAfterTrick() -> SnackRewardOutcome {
+        guard state.adoptedSkin != nil else { return .treatOnly }
+
+        guard let pending = pendingSnackReinforcement, Date() <= pending.deadline else {
+            pendingSnackReinforcement = nil
+            bumpHappiness(by: 1)
+            return .treatOnly
+        }
+
+        let trick = pending.trick
+        pendingSnackReinforcement = nil
+
+        guard trickTraining.isUnlocked(trick) else {
+            bumpHappiness(by: 1)
+            return .treatOnly
+        }
+
+        var progress = trickTraining.progress(for: trick)
+        let previousLevel = progress.level
+        let unlockedBefore = Set(PetTrick.allCases.filter { trickTraining.isUnlocked($0) })
+
+        progress.successes += PetTrickTrainingRules.snackReinforcementBonusSuccesses
+        if progress.snackReinforcements < PetTrickTrainingRules.maxSnackReinforcementsStored {
+            progress.snackReinforcements += 1
         }
 
         mutateActiveTrickTraining { training in
-            training.lastTreatTeaserAt = now
+            training.setProgress(progress, for: trick)
+            training.refreshUnlocks()
+            training.addSmartMeterXP(PetTrickTrainingRules.snackReinforcementSmartXP)
         }
-        let xp = PetSmartMeterRules.treatTeaserXP
-        mutateActiveTrickTraining { training in
-            training.addSmartMeterXP(xp)
+
+        let leveledUp = progress.level > previousLevel
+        let newlyUnlocked = PetTrick.allCases.filter {
+            trickTraining.isUnlocked($0) && !unlockedBefore.contains($0)
         }
+        if !newlyUnlocked.isEmpty {
+            var coinBonus = 0
+            var unlockXP = 0
+            for unlocked in newlyUnlocked {
+                unlockXP += PetSmartMeterRules.unlockXP
+                coinBonus += PetSmartMeterRules.unlockBonusCoins(for: unlocked)
+            }
+            mutateActiveTrickTraining { training in
+                training.addSmartMeterXP(unlockXP)
+            }
+            if coinBonus > 0 {
+                state.coins += coinBonus
+                lastAward = (coinBonus, UUID())
+            }
+        }
+
         bumpHappiness(by: 2)
-        return TrickTrainingRewards(smartMeterXP: xp)
+        return .reinforced(
+            trick: trick,
+            leveledUp: leveledUp,
+            rewards: TrickTrainingRewards(smartMeterXP: PetTrickTrainingRules.snackReinforcementSmartXP)
+        )
     }
 }

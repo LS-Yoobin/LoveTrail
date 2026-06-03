@@ -660,10 +660,12 @@ struct PetRoomView: View {
                 Group {
                     switch speechRecognizer.status {
                     case .listening:
-                        if let heard = speechRecognizer.lastHeard, !heard.isEmpty {
-                            Text("Heard: \"\(heard)\"")
+                        if let transcript = speechRecognizer.liveTranscript, !transcript.isEmpty {
+                            Text("\"\(transcript)\"")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(BabyTownTheme.accentDeep)
                         } else {
-                            Text("Listening... Try saying \"Paw\" and more!")
+                            Text("Listening…")
                         }
                     case .requestingPermission:
                         Text("Setting up microphone…")
@@ -1153,6 +1155,7 @@ struct PetRoomView: View {
     }
 
     private func exitTrickMode() {
+        viewModel.clearPendingSnackReinforcement()
         speechRecognizer.stop()
         speechRecognizer.onCommand = nil
         voiceTrickCompletion = nil
@@ -1177,14 +1180,29 @@ struct PetRoomView: View {
         }
     }
 
+    private func handleSnackEatenAfterTrick() {
+        switch viewModel.rewardSnackAfterTrick() {
+        case .reinforced(let trick, let leveledUp, let rewards):
+            let rate = Int(viewModel.trickProgress(for: trick).obedienceRate * 100)
+            showToast("Reinforced \(trick.displayName)! +\(rewards.smartMeterXP) Smart XP · \(rate)% obey")
+            if leveledUp {
+                let xp = PetTrickTrainingRules.snackReinforcementSmartXP
+                presentTrickProgressAlerts([(trick, .levelUp(level: viewModel.trickProgress(for: trick).level, smartMeterXP: xp))])
+            }
+        case .treatOnly:
+            break
+        }
+    }
+
     private func handleTrickCommand(_ trick: PetTrick) {
-        let outcome = viewModel.attemptTrick(trick, voiceRecognized: true)
+        let outcome = viewModel.attemptTrick(trick)
         switch outcome {
         case .locked:
             showToast("\(trick.displayName) isn't unlocked yet — check Tricks")
             scene?.playTrick(trick, succeeded: false)
         case .ignored(let level):
-            showToast("\(petDisplayName) didn't quite get it (Level \(level))")
+            let rate = Int(viewModel.trickProgress(for: trick).obedienceRate * 100)
+            showToast("\(petDisplayName) didn't obey (\(rate)% chance · Lv \(level))")
             scene?.playTrick(trick, succeeded: false)
         case .performed(let level, let leveledUp, let newlyUnlocked, let rewards):
             showVoiceTrickCompleted(trick)
@@ -1346,10 +1364,7 @@ struct PetRoomView: View {
         }
         s.onSnackEaten = {
             DispatchQueue.main.async {
-                let rewards = viewModel.rewardTreatTeaser()
-                if rewards.smartMeterXP > 0 {
-                    showToast("Treat teaser +\(rewards.smartMeterXP) Smart XP")
-                }
+                handleSnackEatenAfterTrick()
             }
         }
         return s

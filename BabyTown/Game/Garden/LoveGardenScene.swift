@@ -2,8 +2,9 @@ import SpriteKit
 import UIKit
 import GardenCore
 
-/// The Love Garden scene. Renders garden elements (grown from the couple's
-/// moments and letters) as procedural blooms — no art assets required. Sibling
+/// The Love Garden scene. Renders garden elements (one flower per day with a
+/// saved moment, one tree per love letter) as procedural blooms — no art assets
+/// required. Sibling
 /// to `PetRoomScene`; the cat room is never touched.
 final class LoveGardenScene: SKScene {
 
@@ -26,8 +27,11 @@ final class LoveGardenScene: SKScene {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func didMove(to view: SKView) {
-        backgroundColor = Self.skyColor(for: season)
+        backgroundColor = .clear
+        addSkyBackdrop()
+        addDistantHills()
         drawGround()
+        addDriftingClouds()
         for (index, element) in elements.enumerated() {
             let node = makeNode(for: element)
             node.position = screenPosition(for: element.position)
@@ -40,6 +44,9 @@ final class LoveGardenScene: SKScene {
             addSway(to: node, seed: element.position.x)
         }
         addAmbientParticles()
+        if season == .blooming {
+            addFallingPetals()
+        }
     }
 
     // MARK: Layout
@@ -49,12 +56,129 @@ final class LoveGardenScene: SKScene {
     }
 
     private func drawGround() {
+        let groundHeight = size.height * 0.45
         let ground = SKShapeNode(rect: CGRect(x: 0, y: 0, width: size.width,
-                                              height: size.height * 0.45))
+                                              height: groundHeight))
         ground.fillColor = Self.groundColor(for: season)
         ground.strokeColor = .clear
         ground.zPosition = -1
         addChild(ground)
+
+        let frontHill = SKShapeNode(
+            ellipseIn: CGRect(x: -size.width * 0.1, y: groundHeight * 0.55,
+                              width: size.width * 1.2, height: groundHeight * 0.9)
+        )
+        frontHill.fillColor = Self.groundColor(for: season).withAlphaComponent(0.55)
+        frontHill.strokeColor = .clear
+        frontHill.zPosition = 0.5
+        addChild(frontHill)
+    }
+
+    // MARK: Backdrop polish (gradient sky, parallax hills, clouds, petals)
+
+    private func addSkyBackdrop() {
+        let texture = Self.skyGradientTexture(size: size, season: season)
+        let sky = SKSpriteNode(texture: texture)
+        sky.size = size
+        sky.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        sky.zPosition = -12
+        addChild(sky)
+    }
+
+    private func addDistantHills() {
+        let back = SKShapeNode(
+            ellipseIn: CGRect(x: -size.width * 0.15, y: size.height * 0.28,
+                              width: size.width * 1.3, height: size.height * 0.22)
+        )
+        back.fillColor = Self.hillColor(for: season, depth: .back)
+        back.strokeColor = .clear
+        back.zPosition = -4
+        addChild(back)
+
+        let mid = SKShapeNode(
+            ellipseIn: CGRect(x: -size.width * 0.05, y: size.height * 0.22,
+                              width: size.width * 1.15, height: size.height * 0.18)
+        )
+        mid.fillColor = Self.hillColor(for: season, depth: .mid)
+        mid.strokeColor = .clear
+        mid.zPosition = -3
+        addChild(mid)
+
+        let drift = SKAction.repeatForever(.sequence([
+            .moveBy(x: 6, y: 0, duration: 14),
+            .moveBy(x: -6, y: 0, duration: 14),
+        ]))
+        mid.run(drift)
+    }
+
+    private func addDriftingClouds() {
+        for i in 0..<3 {
+            let cloud = SKShapeNode(ellipseOf: CGSize(width: 90 + CGFloat(i) * 18, height: 34))
+            cloud.fillColor = SKColor(white: 1, alpha: season == .blooming ? 0.55 : 0.38)
+            cloud.strokeColor = .clear
+            cloud.position = CGPoint(
+                x: size.width * (0.2 + CGFloat(i) * 0.28),
+                y: size.height * (0.72 + CGFloat(i) * 0.04)
+            )
+            cloud.zPosition = -2
+            addChild(cloud)
+            let travel = SKAction.repeatForever(.sequence([
+                .moveBy(x: 24, y: 0, duration: 18 + Double(i) * 4),
+                .moveBy(x: -24, y: 0, duration: 18 + Double(i) * 4),
+            ]))
+            cloud.run(travel)
+        }
+    }
+
+    private func addFallingPetals() {
+        let emitter = SKEmitterNode()
+        emitter.particleTexture = Self.softDot()
+        emitter.position = CGPoint(x: size.width / 2, y: size.height)
+        emitter.particlePositionRange = CGVector(dx: size.width, dy: 0)
+        emitter.particleBirthRate = 3
+        emitter.particleLifetime = 10
+        emitter.particleSpeed = 28
+        emitter.particleSpeedRange = 14
+        emitter.emissionAngle = -.pi / 2
+        emitter.emissionAngleRange = .pi / 4
+        emitter.particleAlpha = 0.7
+        emitter.particleScale = 0.22
+        emitter.particleColor = Self.flowerPalette(season)
+        emitter.particleColorBlendFactor = 1
+        emitter.zPosition = 4500
+        addChild(emitter)
+    }
+
+    private enum HillDepth { case back, mid }
+
+    private static func hillColor(for season: GardenSeason, depth: HillDepth) -> SKColor {
+        switch (season, depth) {
+        case (.blooming, .back): return SKColor(red: 0.58, green: 0.72, blue: 0.52, alpha: 0.85)
+        case (.blooming, .mid):  return SKColor(red: 0.62, green: 0.76, blue: 0.56, alpha: 0.9)
+        case (.resting, .back):  return SKColor(red: 0.70, green: 0.74, blue: 0.72, alpha: 0.85)
+        case (.resting, .mid):   return SKColor(red: 0.74, green: 0.78, blue: 0.76, alpha: 0.9)
+        }
+    }
+
+    static func skyGradientTexture(size: CGSize, season: GardenSeason) -> SKTexture {
+        let top = skyColor(for: season)
+        let bottom = (season == .blooming)
+            ? SKColor(red: 0.88, green: 0.94, blue: 1.0, alpha: 1)
+            : SKColor(red: 0.86, green: 0.88, blue: 0.92, alpha: 1)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { ctx in
+            let colors = [top.cgColor, bottom.cgColor] as CFArray
+            let space = CGColorSpaceCreateDeviceRGB()
+            if let gradient = CGGradient(colorsSpace: space, colors: colors, locations: [0, 1]) {
+                ctx.cgContext.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: size.width / 2, y: size.height),
+                    end: CGPoint(x: size.width / 2, y: 0),
+                    options: []
+                )
+            }
+        }
+        return SKTexture(image: image)
     }
 
     // MARK: Procedural elements

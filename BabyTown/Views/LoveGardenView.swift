@@ -45,10 +45,9 @@ struct LoveGardenView: View {
         guard scene == nil else { return }
         let dpm = DataPersistenceManager.shared
         let loadedMoments = dpm.loadMoments()
-        let letters = dpm.loadUserLetters()
         moments = loadedMoments
 
-        let acts = GardenActMapper.acts(moments: loadedMoments, letters: letters)
+        let acts = GardenActMapper.acts(moments: loadedMoments, letters: dpm.loadUserLetters())
         let elements = GardenComposer().compose(acts: acts)
 
         // Register today's visit; reflect & persist any warm revival.

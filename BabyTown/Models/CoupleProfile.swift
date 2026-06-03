@@ -1,0 +1,29 @@
+import Foundation
+
+/// The local user's couple-profile state. Only the user's own identity and their
+/// special dates are stored; the partner's identity is backend-authored later and
+/// is intentionally absent. Tolerant decode (default-on-missing) mirrors PetState
+/// / GardenState so the format can grow safely. The user's avatar image is stored
+/// as a separate file (see DataPersistenceManager), not embedded here.
+struct CoupleProfile: Codable, Equatable {
+    var displayName: String?
+    var specialDates: [SpecialDate]
+    var stickers: [ProfileSticker]
+
+    init(displayName: String? = nil, specialDates: [SpecialDate] = [], stickers: [ProfileSticker] = []) {
+        self.displayName = displayName
+        self.specialDates = specialDates
+        self.stickers = stickers
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case displayName, specialDates, stickers
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
+        specialDates = try c.decodeIfPresent([SpecialDate].self, forKey: .specialDates) ?? []
+        stickers = try c.decodeIfPresent([ProfileSticker].self, forKey: .stickers) ?? []
+    }
+}

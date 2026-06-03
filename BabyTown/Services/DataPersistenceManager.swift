@@ -46,6 +46,22 @@ final class DataPersistenceManager {
     private var gardenStateFileURL: URL {
         documentsDirectory.appendingPathComponent("garden_state.json")
     }
+
+    private var coupleProfileFileURL: URL {
+        documentsDirectory.appendingPathComponent("couple_profile.json")
+    }
+
+    private var userAvatarURL: URL {
+        pinnedPhotosDirectory.appendingPathComponent("couple_user_avatar.jpg")
+    }
+
+    private func specialDatePhotoURL(id: UUID) -> URL {
+        pinnedPhotosDirectory.appendingPathComponent("special_date_\(id.uuidString).jpg")
+    }
+
+    private func stickerImageURL(id: UUID) -> URL {
+        pinnedPhotosDirectory.appendingPathComponent("profile_sticker_\(id.uuidString).png")
+    }
     
     private let userDefaults = UserDefaults.standard
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
@@ -203,6 +219,72 @@ final class DataPersistenceManager {
         return state
     }
 
+    func saveCoupleProfile(_ profile: CoupleProfile) {
+        guard let data = try? encoder.encode(profile) else { return }
+        try? data.write(to: coupleProfileFileURL)
+    }
+
+    /// Tolerant load — returns an empty profile when nothing is stored.
+    func loadCoupleProfile() -> CoupleProfile {
+        guard fileManager.fileExists(atPath: coupleProfileFileURL.path),
+              let data = try? Data(contentsOf: coupleProfileFileURL),
+              let profile = try? decoder.decode(CoupleProfile.self, from: data) else {
+            return CoupleProfile()
+        }
+        return profile
+    }
+
+    func saveUserAvatar(_ image: UIImage?) {
+        guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
+            try? fileManager.removeItem(at: userAvatarURL)
+            return
+        }
+        try? jpeg.write(to: userAvatarURL)
+    }
+
+    func loadUserAvatar() -> UIImage? {
+        guard fileManager.fileExists(atPath: userAvatarURL.path),
+              let data = try? Data(contentsOf: userAvatarURL) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func saveSpecialDatePhoto(_ image: UIImage?, id: UUID) {
+        let url = specialDatePhotoURL(id: id)
+        guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
+            try? fileManager.removeItem(at: url)
+            return
+        }
+        try? jpeg.write(to: url)
+    }
+
+    func loadSpecialDatePhoto(id: UUID) -> UIImage? {
+        let url = specialDatePhotoURL(id: id)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func deleteSpecialDatePhoto(id: UUID) {
+        try? fileManager.removeItem(at: specialDatePhotoURL(id: id))
+    }
+
+    func saveStickerImage(_ image: UIImage, id: UUID) {
+        let url = stickerImageURL(id: id)
+        guard let png = image.pngData() else { return }
+        try? png.write(to: url)
+    }
+
+    func loadStickerImage(id: UUID) -> UIImage? {
+        let url = stickerImageURL(id: id)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func deleteStickerImage(id: UUID) {
+        try? fileManager.removeItem(at: stickerImageURL(id: id))
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
@@ -285,6 +367,8 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: userLettersFileURL)
         try? fileManager.removeItem(at: petStateFileURL)
         try? fileManager.removeItem(at: gardenStateFileURL)
+        try? fileManager.removeItem(at: coupleProfileFileURL)
+        try? fileManager.removeItem(at: userAvatarURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)

@@ -1068,6 +1068,20 @@ final class HomeViewModel: ObservableObject {
     func flattenedPhotos(for section: DaySection) -> [Moment] {
         return section.moments.sorted { $0.dateTaken < $1.dateTaken }
     }
+
+    /// All photos in the same memory cluster as `momentId` (timeline card or founding slot).
+    func flattenedPhotosForMemory(containingMomentId momentId: UUID) -> [Moment] {
+        if let section = daySections.first(where: { $0.moments.contains(where: { $0.id == momentId }) }) {
+            return flattenedPhotos(for: section)
+        }
+        if let section = foundingDaySections.first(where: { $0.moments.contains(where: { $0.id == momentId }) }) {
+            return flattenedPhotos(for: section)
+        }
+        if let moment = moments.first(where: { $0.id == momentId }) {
+            return [moment]
+        }
+        return []
+    }
     
     /// Check if a moment has already been added to the timeline from On This Day
     func isAddedFromOnThisDay(_ moment: Moment) -> Bool {
