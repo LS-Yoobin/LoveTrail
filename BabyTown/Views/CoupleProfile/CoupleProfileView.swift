@@ -18,6 +18,7 @@ struct CoupleProfileView: View {
     @State private var userAvatar: UIImage?
     @State private var stickerImages: [UUID: UIImage] = [:]
     @State private var isCustomizing = false
+    @State private var selectedStickerID: UUID?
     @State private var showEditProfile = false
     @State private var showVisitPet = false
     @State private var showStickerPicker = false
@@ -41,6 +42,10 @@ struct CoupleProfileView: View {
     @State private var viewerPromptText: String?
 
     private var dpm: DataPersistenceManager { .shared }
+
+    /// Open canvas height below the cards where stickers float (also the edit-mode
+    /// scroll anchor target). Tall enough to arrange several stickers.
+    private let stickerCanvasHeight: CGFloat = 420
 
     private var dateItems: [ImportantDateItem] {
         ImportantDatesComposer().compose(
@@ -148,26 +153,46 @@ struct CoupleProfileView: View {
                     }
                     .padding(.top, 4)
 
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            avatarHeaderSection
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                profileCardsSection
+                                    .id("contentTop")
 
-                            profileCardsSection
+                                Color.clear
+                                    .frame(height: stickerCanvasHeight)
+                                    .id("stickerCanvasTop")
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                            .overlay {
+                                GeometryReader { geo in
+                                    ProfileStickersLayer(
+                                        stickers: profile.stickers,
+                                        images: stickerImages,
+                                        userName: displayName,
+                                        partnerTitle: partnerSlotTitle,
+                                        isCustomizing: isCustomizing,
+                                        selectedID: selectedStickerID,
+                                        onSelect: { selectedStickerID = $0 },
+                                        onDelete: deleteSticker,
+                                        onTapUser: { showEditProfile = true },
+                                        onTapPartner: handlePartnerSlotTap,
+                                        onPositionChanged: updateStickerPosition,
+                                        onScaleChanged: updateStickerScale
+                                    )
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                }
+                            }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                        .overlay {
-                            GeometryReader { geo in
-                                ProfileStickersLayer(
-                                    stickers: profile.stickers,
-                                    images: stickerImages,
-                                    userName: displayName,
-                                    partnerTitle: partnerSlotTitle,
-                                    isCustomizing: isCustomizing,
-                                    onPositionChanged: updateStickerPosition,
-                                    onScaleChanged: updateStickerScale
-                                )
-                                .frame(width: geo.size.width, height: geo.size.height)
+                        .scrollIndicators(.hidden)
+                        .onChange(of: isCustomizing) { _, editing in
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                if editing {
+                                    proxy.scrollTo("stickerCanvasTop", anchor: .top)
+                                } else {
+                                    proxy.scrollTo("contentTop", anchor: .top)
+                                }
                             }
                         }
                     }
@@ -346,23 +371,6 @@ struct CoupleProfileView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: photoViewerContext != nil)
-    }
-
-    private var avatarHeaderSection: some View {
-        CoupleProfileAvatarHeader(
-            userStickerImage: userStickerImage,
-            userStickerScale: userStickerScale,
-            partnerStickerScale: ProfileSticker.defaultScale,
-            userFallbackAvatar: userAvatar,
-            userName: displayName,
-            partnerTitle: partnerSlotTitle,
-            onTapUser: { showEditProfile = true },
-            onTapPartner: handlePartnerSlotTap
-        )
-        .padding(.top, 20)
-        .padding(.bottom, 4)
-        .customizeDottedOutline(isCustomizing, cornerRadius: 20, padding: 10)
-        .allowsHitTesting(!isCustomizing)
     }
 
     @ViewBuilder
@@ -585,11 +593,13 @@ struct CoupleProfileView: View {
 
     private func cancelCustomize() {
         isCustomizing = false
+        selectedStickerID = nil
         load()
     }
 
     private func finishCustomize() {
         isCustomizing = false
+        selectedStickerID = nil
         dpm.saveCoupleProfile(profile)
     }
 
@@ -625,6 +635,15 @@ struct CoupleProfileView: View {
     private func updateStickerScale(id: UUID, scale: CGFloat) {
         guard let idx = profile.stickers.firstIndex(where: { $0.id == id }) else { return }
         profile.stickers[idx].scale = scale
+    }
+
+    private func deleteSticker(_ id: UUID) {
+        guard let idx = profile.stickers.firstIndex(where: { $0.id == id }) else { return }
+        let removed = profile.stickers.remove(at: idx)
+        dpm.deleteStickerImage(id: removed.id)
+        stickerImages[removed.id] = nil
+        if selectedStickerID == id { selectedStickerID = nil }
+        dpm.saveCoupleProfile(profile)
     }
 
     private func photo(for item: ImportantDateItem) -> UIImage? {
