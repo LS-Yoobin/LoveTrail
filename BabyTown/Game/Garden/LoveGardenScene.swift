@@ -189,6 +189,23 @@ final class LoveGardenScene: SKScene {
         addChild(emitter)
     }
 
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        let location = touch.location(in: self)
+        // Walk up from the hit node to find the element container we named.
+        var node: SKNode? = atPoint(location)
+        while let current = node {
+            if let name = current.name, let id = UUID(uuidString: name) {
+                let bump = SKAction.sequence([.scale(to: 1.18, duration: 0.08),
+                                              .scale(to: 1.0, duration: 0.12)])
+                current.run(bump)
+                onTapElement?(id)
+                return
+            }
+            node = current.parent
+        }
+    }
+
     /// A small soft circle texture used for particles, generated in code.
     static func softDot() -> SKTexture {
         let d: CGFloat = 16
