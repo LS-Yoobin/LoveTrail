@@ -99,7 +99,7 @@ struct PetState: Codable {
         case adoptedSkin, adoptedDate, coins, foodServings
         case ownedSkins
         case hunger, thirst, litter, happiness
-        case lastPetAt, lastPlayAt, lastPlantWaterAt, customPetNames
+        case lastPetAt, lastPlayAt, lastPlantWaterAt, customPetNames, lastPetInteractionAt
         case roomLayout
         case roomLayoutsByPet
         case toiletPaperMessByPet
@@ -121,6 +121,9 @@ struct PetState: Codable {
 
     var lastPetAt: Date?
     var lastPlayAt: Date?
+    /// Most recent time the user touched the pet/pet-room (room opened or any
+    /// care action). Drives the 7-day "pet misses you" notification timer.
+    var lastPetInteractionAt: Date?
     /// Last time each plant was watered for coins, keyed by plant item id.
     var lastPlantWaterAt: [String: Date]
 
@@ -148,6 +151,7 @@ struct PetState: Codable {
         self.happiness = StoredNeed(value: 100, asOf: now)
         self.lastPetAt = nil
         self.lastPlayAt = nil
+        self.lastPetInteractionAt = nil
         self.lastPlantWaterAt = [:]
         self.customPetNames = [:]
         self.roomLayoutsByPet = [:]
@@ -168,6 +172,7 @@ struct PetState: Codable {
         try c.encode(happiness, forKey: .happiness)
         try c.encodeIfPresent(lastPetAt, forKey: .lastPetAt)
         try c.encodeIfPresent(lastPlayAt, forKey: .lastPlayAt)
+        try c.encodeIfPresent(lastPetInteractionAt, forKey: .lastPetInteractionAt)
         try c.encode(lastPlantWaterAt, forKey: .lastPlantWaterAt)
         try c.encode(customPetNames, forKey: .customPetNames)
         try c.encode(roomLayoutsByPet, forKey: .roomLayoutsByPet)
@@ -192,6 +197,7 @@ struct PetState: Codable {
         happiness = try c.decodeIfPresent(StoredNeed.self, forKey: .happiness) ?? StoredNeed(value: 100, asOf: now)
         lastPetAt = try c.decodeIfPresent(Date.self, forKey: .lastPetAt)
         lastPlayAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayAt)
+        lastPetInteractionAt = try c.decodeIfPresent(Date.self, forKey: .lastPetInteractionAt)
         lastPlantWaterAt = try c.decodeIfPresent([String: Date].self, forKey: .lastPlantWaterAt) ?? [:]
         customPetNames = try c.decodeIfPresent([String: String].self, forKey: .customPetNames) ?? [:]
         roomLayoutsByPet = try c.decodeIfPresent([String: PetRoomLayoutState].self, forKey: .roomLayoutsByPet) ?? [:]
