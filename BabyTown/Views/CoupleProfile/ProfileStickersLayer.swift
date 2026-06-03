@@ -43,7 +43,9 @@ struct ProfileStickersLayer: View {
                 }
             }
         }
-        .allowsHitTesting(isCustomizing || hasBrowseTaps)
+        // User/partner stickers are tappable in browse mode too; individual
+        // ProfileStickerViews gate their own hit-testing by kind.
+        .allowsHitTesting(true)
     }
 
     private var visibleStickers: [ProfileSticker] {
@@ -64,8 +66,6 @@ struct ProfileStickersLayer: View {
         case .userAvatar, .partnerInvite, .pet: return false
         }
     }
-
-    private var hasBrowseTaps: Bool { true }
 
     private func browseTap(for sticker: ProfileSticker) -> (() -> Void)? {
         switch sticker.kind {

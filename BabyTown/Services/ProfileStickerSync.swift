@@ -51,7 +51,7 @@ enum ProfileStickerSync {
 
         if let idx = stickers.firstIndex(where: { $0.kind == .userAvatar }),
            Self.isLegacyUserAvatarPosition(stickers[idx].position) {
-            stickers[idx].position = Self.canonicalUserAvatarPosition
+            stickers[idx].position = ProfileSticker.defaultUserAvatarPosition
         }
 
         for date in profile.specialDates {

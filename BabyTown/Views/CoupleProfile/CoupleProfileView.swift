@@ -19,6 +19,8 @@ struct CoupleProfileView: View {
     @State private var stickerImages: [UUID: UIImage] = [:]
     @State private var isCustomizing = false
     @State private var selectedStickerID: UUID?
+    /// Sticker image files to delete from disk only when the user taps Save.
+    @State private var pendingImageDeletions: Set<UUID> = []
     @State private var showEditProfile = false
     @State private var showVisitPet = false
     @State private var showStickerPicker = false
@@ -99,6 +101,10 @@ struct CoupleProfileView: View {
 
     private var sortedSpecialDates: [SpecialDate] {
         profile.specialDates.sorted { $0.date < $1.date }
+    }
+
+    private var pinnedSpecialDates: [SpecialDate] {
+        sortedSpecialDates.filter(\.isPinned)
     }
 
     private var gardenMoments: [Moment] {
@@ -257,13 +263,16 @@ struct CoupleProfileView: View {
                 if let homeViewModel {
                     PinnedMemoriesFeedView(
                         viewModel: homeViewModel,
-                        specialDates: sortedSpecialDates,
+                        specialDates: pinnedSpecialDates,
                         userAvatar: userAvatar,
                         userName: displayName,
                         partnerSlotTitle: partnerSlotTitle,
                         onBack: { activeSubpage = nil },
                         onPartnerTap: handlePartnerSlotTap,
-                        onShare: shareMemory
+                        onShare: shareMemory,
+                        onEditSpecialDate: { beginEditSpecial(id: $0.id.uuidString) },
+                        onDeleteSpecialDate: deleteSpecial,
+                        onTogglePinSpecialDate: toggleSpecialDatePin
                     )
                 }
             }
@@ -389,7 +398,7 @@ struct CoupleProfileView: View {
             if let homeViewModel {
                 PinnedMemoriesPreviewCard(
                     pinnedItems: homeViewModel.pinnedItems,
-                    specialDates: sortedSpecialDates,
+                    specialDates: pinnedSpecialDates,
                     showsOfficialPlaceholder: showsOfficialPinnedPlaceholder,
                     showsFirstMetPlaceholder: showsFirstMetPinnedPlaceholder,
                     photoForSpecialDate: { dpm.loadSpecialDatePhoto(id: $0) },
@@ -397,6 +406,9 @@ struct CoupleProfileView: View {
                     onTapOfficialPlaceholder: { showingPinnedViewer = .official },
                     onTapFirstMetPlaceholder: { showingPinnedViewer = .firstMet },
                     onTapSpecialDate: { openSpecialDate($0) },
+                    onEditSpecialDate: { beginEditSpecial(id: $0.id.uuidString) },
+                    onDeleteSpecialDate: deleteSpecial,
+                    onUnpinSpecialDate: toggleSpecialDatePin,
                     onTapPinned: { openPinnedItem($0) },
                     onUnpinPinned: { unpinItem($0) },
                     onSharePinned: shareMemory
@@ -425,7 +437,7 @@ struct CoupleProfileView: View {
             .zIndex(10)
         }
 
-        if showingMomentViewer {
+        if showingMomentViewer, let homeViewModel {
             MomentPhotoViewer(
                 moments: viewerMoments,
                 initialIndex: viewerInitialIndex,
@@ -435,7 +447,6 @@ struct CoupleProfileView: View {
                     }
                 },
                 onUpdateMoments: { updatedMoments in
-                    guard let homeViewModel else { return }
                     var newMoments = homeViewModel.moments
                     for moment in updatedMoments {
                         if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
@@ -445,7 +456,7 @@ struct CoupleProfileView: View {
                     homeViewModel.moments = newMoments
                 },
                 onDeleteMoment: { moment in
-                    withAnimation { homeViewModel?.deleteMoment(moment) }
+                    withAnimation { homeViewModel.deleteMoment(moment) }
                 }
             )
             .transition(.opacity)
@@ -594,12 +605,17 @@ struct CoupleProfileView: View {
     private func cancelCustomize() {
         isCustomizing = false
         selectedStickerID = nil
+        pendingImageDeletions.removeAll()
         load()
     }
 
     private func finishCustomize() {
         isCustomizing = false
         selectedStickerID = nil
+        for id in pendingImageDeletions {
+            dpm.deleteStickerImage(id: id)
+        }
+        pendingImageDeletions.removeAll()
         dpm.saveCoupleProfile(profile)
     }
 
@@ -639,11 +655,10 @@ struct CoupleProfileView: View {
 
     private func deleteSticker(_ id: UUID) {
         guard let idx = profile.stickers.firstIndex(where: { $0.id == id }) else { return }
-        let removed = profile.stickers.remove(at: idx)
-        dpm.deleteStickerImage(id: removed.id)
-        stickerImages[removed.id] = nil
+        profile.stickers.remove(at: idx)
+        stickerImages[id] = nil
+        pendingImageDeletions.insert(id)
         if selectedStickerID == id { selectedStickerID = nil }
-        dpm.saveCoupleProfile(profile)
     }
 
     private func photo(for item: ImportantDateItem) -> UIImage? {
@@ -688,7 +703,9 @@ struct CoupleProfileView: View {
         } else {
             profile.specialDates.append(date)
         }
-        dpm.saveSpecialDatePhoto(image, id: date.id)
+        if let image {
+            dpm.saveSpecialDatePhoto(image, id: date.id)
+        }
         dpm.saveCoupleProfile(profile)
         refreshStickers()
     }
@@ -698,5 +715,12 @@ struct CoupleProfileView: View {
         dpm.deleteSpecialDatePhoto(id: date.id)
         dpm.saveCoupleProfile(profile)
         refreshStickers()
+    }
+
+    private func toggleSpecialDatePin(_ date: SpecialDate) {
+        guard let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) else { return }
+        profile.specialDates[idx].isPinned.toggle()
+        profile.specialDates[idx].pinnedAt = profile.specialDates[idx].isPinned ? Date() : nil
+        dpm.saveCoupleProfile(profile)
     }
 }
