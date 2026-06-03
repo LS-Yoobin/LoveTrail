@@ -631,10 +631,7 @@ struct CoupleProfileView: View {
         let sticker = ProfileSticker(
             kind: .moment,
             sourceKey: momentID.uuidString,
-            position: NormalizedPoint(
-                x: CGFloat.random(in: 0.28...0.72),
-                y: CGFloat.random(in: 0.74...0.86)
-            ),
+            position: nextPhotoStickerPosition(),
             rotation: Double.random(in: -10...10),
             scale: ProfileSticker.newStickerScale,
             usedSubjectLift: processed.usedSubjectLift
@@ -642,6 +639,30 @@ struct CoupleProfileView: View {
         dpm.saveStickerImage(processed.image, id: sticker.id)
         profile.stickers.append(sticker)
         stickerImages[sticker.id] = processed.image
+    }
+
+    /// A spot below the profile photos that clears every sticker already on the
+    /// wall, so each newly added photo frame lands in its own place. Scans a
+    /// staggered grid first, then falls back to a random open-canvas spot.
+    private func nextPhotoStickerPosition() -> NormalizedPoint {
+        let existing = profile.stickers.map(\.position)
+        let minDistance: CGFloat = 0.13
+        let columns: [CGFloat] = [0.25, 0.45, 0.65, 0.35, 0.55]
+        let rows: [CGFloat] = [0.72, 0.80, 0.88, 0.76, 0.84, 0.92]
+
+        for row in rows {
+            for col in columns {
+                let candidate = NormalizedPoint(x: col, y: row)
+                let isClear = existing.allSatisfy { other in
+                    hypot(other.x - candidate.x, other.y - candidate.y) > minDistance
+                }
+                if isClear { return candidate }
+            }
+        }
+        return NormalizedPoint(
+            x: .random(in: 0.20...0.80),
+            y: .random(in: 0.70...0.92)
+        )
     }
 
     private func updateStickerPosition(id: UUID, position: NormalizedPoint) {
