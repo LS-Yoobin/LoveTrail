@@ -28,8 +28,12 @@ struct PetRoomView: View {
     @State private var ownedItemsInitialCategory: PetShopCategory = .catTrees
     @State private var isCustomizing = false
     @State private var isInspectingPictureFrame = false
+    @State private var isPictureFrameInspectAnimating = false
     @State private var showMomentPicker = false
     @State private var momentPickerFrameID: String?
+    @State private var showingPictureFrameMomentViewer = false
+    @State private var pictureFrameViewerMoments: [Moment] = []
+    @State private var pictureFrameViewerInitialIndex = 0
     @State private var customizeSnapshot: [String: NormalizedPoint] = [:]
     @State private var showCustomizeExitPrompt = false
     @State private var showRenameSheet = false
@@ -150,7 +154,9 @@ struct PetRoomView: View {
                 .overlay(alignment: .bottom) {
                     Group {
                         if isInspectingPictureFrame {
-                            pictureFrameInspectBottomBar
+                            if !showMomentPicker, !showingPictureFrameMomentViewer {
+                                pictureFrameInspectBottomBar
+                            }
                         } else if isCustomizing {
                             customizeBottomBar
                         } else if isTrickMode {
@@ -161,6 +167,11 @@ struct PetRoomView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, bottomBarPadding(safeArea: geo.safeAreaInsets.bottom))
+                }
+                .overlay {
+                    if showingPictureFrameMomentViewer {
+                        pictureFrameMomentViewerOverlay
+                    }
                 }
                 .animation(.spring(response: 0.34, dampingFraction: 0.82), value: voiceTrickCompletion?.id)
                 .animation(.spring(response: 0.34, dampingFraction: 0.82), value: trickProgressAlert?.id)
@@ -282,7 +293,7 @@ struct PetRoomView: View {
                         requestExitCustomize()
                     }
                     .font(.system(size: 17))
-                } else {
+                } else if !isInspectingPictureFrame, !showingPictureFrameMomentViewer {
                     Button(action: close) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
@@ -386,6 +397,7 @@ struct PetRoomView: View {
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isPlaying)
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isRefillingFood)
         .animation(.spring(response: 0.35, dampingFraction: 0.86), value: isInspectingPictureFrame)
+        .animation(.easeInOut(duration: 0.25), value: showingPictureFrameMomentViewer)
         .sheet(isPresented: $showMarket) {
             PetMarketSheet(viewModel: viewModel, category: $marketInitialCategory) {
                 openPictureFramePicker(for: viewModel.activePictureFrameID())
@@ -742,23 +754,64 @@ struct PetRoomView: View {
         .buttonStyle(.plain)
     }
 
+    private var pictureFrameMomentViewerOverlay: some View {
+        MomentPhotoViewer(
+            moments: pictureFrameViewerMoments,
+            initialIndex: pictureFrameViewerInitialIndex,
+            onDismiss: {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showingPictureFrameMomentViewer = false
+                }
+            },
+            onUpdateMoments: { updatedMoments in
+                var allMoments = DataPersistenceManager.shared.loadMoments()
+                for moment in updatedMoments {
+                    if let index = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                        allMoments[index] = moment
+                    }
+                }
+                DataPersistenceManager.shared.saveMoments(allMoments)
+                refreshRoomLayout()
+            },
+            onDeleteMoment: { moment in
+                var allMoments = DataPersistenceManager.shared.loadMoments()
+                allMoments.removeAll { $0.id == moment.id }
+                DataPersistenceManager.shared.saveMoments(allMoments)
+                refreshRoomLayout()
+            }
+        )
+        .transition(.opacity)
+        .zIndex(2)
+    }
+
     private var pictureFrameInspectBottomBar: some View {
-        HStack {
-            Spacer(minLength: 0)
+        HStack(spacing: 12) {
             Button {
                 scene?.exitPictureFrameInspect()
             } label: {
                 Text("Exit")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 28)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color(red: 0.18, green: 0.18, blue: 0.21).opacity(0.94), in: Capsule())
+                    .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                openPictureFramePicker(for: viewModel.activePictureFrameID())
+            } label: {
+                Text("Replace")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(BabyTownTheme.buttonGradient)
                     .clipShape(Capsule())
                     .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
             }
             .buttonStyle(.plain)
-            Spacer(minLength: 0)
         }
     }
 
@@ -1210,10 +1263,12 @@ struct PetRoomView: View {
             }
         }
         .overlay {
-            if !isTrickMode, !isInspectingPictureFrame {
+            if !isTrickMode, !isInspectingPictureFrame, !isPictureFrameInspectAnimating {
                 catLevelPillOverlay
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.28), value: isPictureFrameInspectAnimating)
         .onChange(of: skin) { _, newSkin in
             installScene(makeConfiguredScene(skin: newSkin, size: geo.size), geo: geo)
         }
@@ -1223,6 +1278,8 @@ struct PetRoomView: View {
         if isCustomizing { exitCustomizeMode() }
         if isTrickMode { exitTrickMode() }
         isInspectingPictureFrame = false
+        isPictureFrameInspectAnimating = false
+        showingPictureFrameMomentViewer = false
         scene = newScene
         lastKnownLitterDirty = viewModel.isLitterBoxDirty
         refreshRoomLayout()
@@ -1234,6 +1291,16 @@ struct PetRoomView: View {
         s.onTapPictureFrame = {
             openPictureFramePicker(for: viewModel.activePictureFrameID())
         }
+        s.onTapPictureFrameWhileInspecting = {
+            DispatchQueue.main.async {
+                openPictureFrameMomentViewer()
+            }
+        }
+        s.onPictureFrameInspectAnimatingChanged = { animating in
+            DispatchQueue.main.async {
+                isPictureFrameInspectAnimating = animating
+            }
+        }
         s.onPictureFrameInspectChanged = { active in
             DispatchQueue.main.async {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
@@ -1243,6 +1310,8 @@ struct PetRoomView: View {
                     inspect = nil
                     showStatsDetail = false
                     showPetProfile = false
+                } else {
+                    showingPictureFrameMomentViewer = false
                 }
             }
         }
@@ -1314,6 +1383,9 @@ struct PetRoomView: View {
             guard let frameID else { return }
             viewModel.setPictureFrameMoment(momentID, for: frameID)
             refreshRoomLayout()
+            if isInspectingPictureFrame {
+                scene?.refreshPictureFrameInspect()
+            }
         }
     }
 
@@ -1321,6 +1393,35 @@ struct PetRoomView: View {
         guard let frameID else { return }
         momentPickerFrameID = frameID
         showMomentPicker = true
+    }
+
+    private func openPictureFrameMomentViewer() {
+        guard let frameID = viewModel.activePictureFrameID(),
+              let momentID = viewModel.pictureFrameMoment(for: frameID) else {
+            openPictureFramePicker(for: viewModel.activePictureFrameID())
+            return
+        }
+
+        let allMoments = DataPersistenceManager.shared.loadMoments()
+        guard let target = allMoments.first(where: { $0.id == momentID }) else {
+            openPictureFramePicker(for: frameID)
+            return
+        }
+
+        let dayMoments: [Moment]
+        if let section = DaySection.grouped(from: allMoments).first(where: { section in
+            section.moments.contains { $0.id == momentID }
+        }) {
+            dayMoments = section.moments.sorted { $0.dateTaken < $1.dateTaken }
+        } else {
+            dayMoments = [target]
+        }
+
+        pictureFrameViewerMoments = dayMoments
+        pictureFrameViewerInitialIndex = dayMoments.firstIndex(where: { $0.id == momentID }) ?? 0
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingPictureFrameMomentViewer = true
+        }
     }
 
     private func syncNeedThoughtBubble() {

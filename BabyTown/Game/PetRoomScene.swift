@@ -189,6 +189,12 @@ final class PetRoomScene: SKScene {
     /// Fired when the default-mode "walk up to the frame" inspect zoom begins or ends.
     var onPictureFrameInspectChanged: ((Bool) -> Void)?
 
+    /// Fired when the user taps the frame while zoomed in (opens the full moment viewer).
+    var onTapPictureFrameWhileInspecting: (() -> Void)?
+
+    /// Fired when the walk-up / walk-away camera animation starts or finishes.
+    var onPictureFrameInspectAnimatingChanged: ((Bool) -> Void)?
+
     var layoutState = PetRoomLayoutState()
     var pictureFrameImage: UIImage?
     var isCustomizeMode = false
@@ -219,7 +225,7 @@ final class PetRoomScene: SKScene {
     private let pictureFrameZ: CGFloat = -2
     /// Raised while customizing so the frame can be tapped above floor décor.
     private let pictureFrameCustomizeZ: CGFloat = 25
-    private let pictureFrameWallScale: CGFloat = 1.2
+    private let pictureFrameWallScale: CGFloat = 1.6
     private var collarNode: SKNode?
     private var draggableNodes: [String: SKNode] = [:]
     /// Bed prop showing the skin-specific occupied sprite while the cat is hidden.
@@ -1085,6 +1091,21 @@ final class PetRoomScene: SKScene {
             .contains(location)
     }
 
+    private func setPictureFrameInspectAnimating(_ animating: Bool) {
+        guard isPictureFrameInspectAnimating != animating else { return }
+        isPictureFrameInspectAnimating = animating
+        onPictureFrameInspectAnimatingChanged?(animating)
+    }
+
+    private func handlePictureFrameInspectTouch(at location: CGPoint) {
+        guard isInspectingPictureFrame, !isPictureFrameInspectAnimating else { return }
+        if pictureFrameHit(at: location) {
+            onTapPictureFrameWhileInspecting?()
+        } else {
+            exitPictureFrameInspect()
+        }
+    }
+
     private func setupRoomCamera() {
         let cam = SKCameraNode()
         cam.position = defaultCameraPosition()
@@ -1113,7 +1134,7 @@ final class PetRoomScene: SKScene {
               let frameNode = pictureFrameNode,
               let cam = roomCamera else { return }
 
-        isPictureFrameInspectAnimating = true
+        setPictureFrameInspectAnimating(true)
         isInspectingPictureFrame = true
         onPictureFrameInspectChanged?(true)
         stopMovement()
@@ -1132,8 +1153,32 @@ final class PetRoomScene: SKScene {
 
         cam.removeAction(forKey: "pictureFrameInspect")
         let finish = SKAction.run { [weak self] in
-            guard let self else { return }
-            self.isPictureFrameInspectAnimating = false
+            self?.setPictureFrameInspectAnimating(false)
+        }
+        cam.run(.sequence([.group([move, zoom]), finish]), withKey: "pictureFrameInspect")
+    }
+
+    /// Re-frames the camera on the wall picture after the photo inside the frame changes.
+    func refreshPictureFrameInspect() {
+        guard isInspectingPictureFrame,
+              !isCustomizeMode,
+              let frameNode = pictureFrameNode,
+              let cam = roomCamera else { return }
+
+        let frameRect = frameNode.calculateAccumulatedFrame()
+        let targetCenter = CGPoint(x: frameRect.midX, y: frameRect.midY)
+        let targetScale = pictureFrameInspectCameraScale(for: frameRect)
+        let duration = pictureFrameInspectDuration * 0.45
+
+        setPictureFrameInspectAnimating(true)
+        let move = SKAction.move(to: targetCenter, duration: duration)
+        let zoom = SKAction.scale(to: targetScale, duration: duration)
+        move.timingMode = .easeInEaseOut
+        zoom.timingMode = .easeInEaseOut
+
+        cam.removeAction(forKey: "pictureFrameInspect")
+        let finish = SKAction.run { [weak self] in
+            self?.setPictureFrameInspectAnimating(false)
         }
         cam.run(.sequence([.group([move, zoom]), finish]), withKey: "pictureFrameInspect")
     }
@@ -1143,7 +1188,7 @@ final class PetRoomScene: SKScene {
         guard isInspectingPictureFrame || isPictureFrameInspectAnimating,
               let cam = roomCamera else { return }
 
-        isPictureFrameInspectAnimating = true
+        setPictureFrameInspectAnimating(true)
         isInspectingPictureFrame = false
         onPictureFrameInspectChanged?(false)
 
@@ -1156,7 +1201,7 @@ final class PetRoomScene: SKScene {
         cam.removeAction(forKey: "pictureFrameInspect")
         let finish = SKAction.run { [weak self] in
             guard let self else { return }
-            self.isPictureFrameInspectAnimating = false
+            self.setPictureFrameInspectAnimating(false)
             self.isInteracting = false
             self.runBehavior()
         }
@@ -1169,7 +1214,7 @@ final class PetRoomScene: SKScene {
         cam.position = defaultCameraPosition()
         cam.setScale(1)
         let wasActive = isInspectingPictureFrame || isPictureFrameInspectAnimating
-        isPictureFrameInspectAnimating = false
+        setPictureFrameInspectAnimating(false)
         isInspectingPictureFrame = false
         guard wasActive else { return }
         onPictureFrameInspectChanged?(false)
@@ -2233,7 +2278,10 @@ final class PetRoomScene: SKScene {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
-        if isInspectingPictureFrame || isPictureFrameInspectAnimating { return }
+        if isInspectingPictureFrame || isPictureFrameInspectAnimating {
+            handlePictureFrameInspectTouch(at: location)
+            return
+        }
 
         if isCustomizeMode {
             handleCustomizeTouchBegan(at: location)
@@ -3581,7 +3629,7 @@ final class PetRoomScene: SKScene {
     }
 
     /// Scene point for anchoring the level pill above the cat (nil when the cat is hidden).
-    func catHeadAnchorPoint(verticalOffset: CGFloat = 34) -> CGPoint? {
+    func catHeadAnchorPoint(verticalOffset: CGFloat = 22) -> CGPoint? {
         guard cat.alpha > 0.5 else { return nil }
         let catFrame = cat.calculateAccumulatedFrame()
         guard catFrame.width > 1, catFrame.height > 1 else { return nil }

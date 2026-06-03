@@ -856,6 +856,10 @@ enum PetShopCatalog {
         return frameArtImage(named: imageName)
     }
 
+    /// Overscan applied to every frame window so aspect-filled photos hide edge gaps.
+    private static let framePhotoOpeningScale: CGFloat = 1.06
+    private static let framePhotoCenterYNudge: CGFloat = -0.012
+
     /// Size and center for the photo layer behind a frame's transparent window.
     static func pictureFramePhotoPlacement(
         frameSize: CGSize,
@@ -863,11 +867,11 @@ enum PetShopCatalog {
         frameImageName: String? = nil
     ) -> (size: CGSize, position: CGPoint) {
         let layout = framePhotoLayout(for: frameImageName)
-        let openingWidth = frameSize.width * layout.openingWidthFraction
-        let openingHeight = frameSize.height * layout.openingHeightFraction
+        let openingWidth = frameSize.width * layout.openingWidthFraction * framePhotoOpeningScale
+        let openingHeight = frameSize.height * layout.openingHeightFraction * framePhotoOpeningScale
         let openingCenter = CGPoint(
             x: frameSize.width * layout.centerXFraction,
-            y: frameSize.height * layout.centerYFraction
+            y: frameSize.height * (layout.centerYFraction + framePhotoCenterYNudge)
         )
 
         let displayPhoto = photo.normalizedForSpriteKit()
