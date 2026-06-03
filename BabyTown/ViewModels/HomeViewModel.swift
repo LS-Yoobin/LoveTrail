@@ -1178,11 +1178,54 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: - Table of Contents Logic
 
-    var tocGroups: [YearGroup] {
-        let allUnpinned = moments.filter { !$0.isPinned && !Self.isFoundingMoment($0) }
-        let sections = DaySection.grouped(from: allUnpinned)
+    /// One row per timeline place/day (moments) plus one row per prompt memory.
+    var tocSections: [DaySection] {
+        let momentSections = DaySection.grouped(
+            from: moments.filter { !$0.isPinned && !Self.isFoundingMoment($0) }
+        )
+        let promptSections = promptMemories
+            .filter { !$0.isPinned }
+            .map { $0.asEditingDaySection() }
+        return (momentSections + promptSections)
+            .sorted { $0.timelineSortDate > $1.timelineSortDate }
+    }
 
-        let groupedByYear = Dictionary(grouping: sections) { section in
+    var tocPinnedPromptMemories: [PromptMemory] {
+        promptMemories
+            .filter(\.isPinned)
+            .sorted { ($0.pinnedAt ?? .distantPast) > ($1.pinnedAt ?? .distantPast) }
+    }
+
+    func promptMemory(for section: DaySection) -> PromptMemory? {
+        let photoIds = Set(section.moments.map(\.id))
+        guard !photoIds.isEmpty else { return nil }
+        return promptMemories.first { memory in
+            memory.photos.contains { photoIds.contains($0.id) }
+        }
+    }
+
+    func tocRowTitle(for section: DaySection) -> String {
+        if let memory = promptMemory(for: section) {
+            let place = memory.placeName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !place.isEmpty { return place }
+            return memory.promptText
+        }
+        return section.placeDisplay
+    }
+
+    func tocLoveNote(for section: DaySection) -> String? {
+        if let memory = promptMemory(for: section) {
+            let note = memory.loveNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            return note.isEmpty ? nil : note
+        }
+        let caption = section.moments
+            .compactMap { $0.caption?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        return caption
+    }
+
+    var tocGroups: [YearGroup] {
+        let groupedByYear = Dictionary(grouping: tocSections) { section in
             Calendar.current.component(.year, from: section.date)
         }
 
@@ -1227,11 +1270,7 @@ final class HomeViewModel: ObservableObject {
 
     /// Matches the memory rows shown in the table of contents (milestones + year/season sections).
     var tocMemoryCount: Int {
-        let sectionCount = tocGroups
-            .flatMap(\.seasons)
-            .flatMap(\.sections)
-            .count
-        return tocMilestones.count + sectionCount
+        tocMilestones.count + tocPinnedPromptMemories.count + tocSections.count
     }
 }
 
