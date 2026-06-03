@@ -27,6 +27,7 @@ struct PetRoomView: View {
     @State private var showOwnedItems = false
     @State private var ownedItemsInitialCategory: PetShopCategory = .catTrees
     @State private var isCustomizing = false
+    @State private var isInspectingPictureFrame = false
     @State private var showMomentPicker = false
     @State private var momentPickerFrameID: String?
     @State private var customizeSnapshot: [String: NormalizedPoint] = [:]
@@ -107,19 +108,6 @@ struct PetRoomView: View {
             // and bottom controls use `.overlay`, which draws above the scene.
             sceneView(geo: geo)
                 .ignoresSafeArea()
-                .overlay(alignment: .bottom) {
-                    Group {
-                        if isCustomizing {
-                            customizeBottomBar
-                        } else if isTrickMode {
-                            trickModeBottomBar
-                        } else {
-                            playModeBottomBar
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, bottomBarPadding(safeArea: geo.safeAreaInsets.bottom))
-                }
                 .overlay(alignment: .center) {
                     if let burst = coinBurst {
                         Text("+\(burst.amount) 🪙")
@@ -158,6 +146,21 @@ struct PetRoomView: View {
                     } else if showWateringCan {
                         wateringCanOverlay
                     }
+                }
+                .overlay(alignment: .bottom) {
+                    Group {
+                        if isInspectingPictureFrame {
+                            pictureFrameInspectBottomBar
+                        } else if isCustomizing {
+                            customizeBottomBar
+                        } else if isTrickMode {
+                            trickModeBottomBar
+                        } else {
+                            playModeBottomBar
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, bottomBarPadding(safeArea: geo.safeAreaInsets.bottom))
                 }
                 .animation(.spring(response: 0.34, dampingFraction: 0.82), value: voiceTrickCompletion?.id)
                 .animation(.spring(response: 0.34, dampingFraction: 0.82), value: trickProgressAlert?.id)
@@ -294,7 +297,7 @@ struct PetRoomView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     marketToolbarButton
                 }
-            } else {
+            } else if !isInspectingPictureFrame {
                 ToolbarItem(placement: .principal) {
                     Button {
                         inspect = nil
@@ -352,15 +355,19 @@ struct PetRoomView: View {
                 }
                     .transition(.move(edge: .top).combined(with: .opacity))
             } else if isRefillingFood {
-                refillModeBanner
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                VStack(spacing: 8) {
+                    refillModeBanner
+                    refillFoodHotbar
+                        .padding(.horizontal, 16)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             } else if isCleaningLitterBox {
                 litterModeBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
             } else if isWateringPlant {
                 wateringModeBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
-            } else {
+            } else if !isInspectingPictureFrame && !isRefillingFood {
                 TimelineView(.periodic(from: .now, by: 5)) { _ in
                     PetHUDView(coins: viewModel.coins,
                                level: viewModel.smartMeterLevel,
@@ -379,6 +386,8 @@ struct PetRoomView: View {
             }
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isPlaying)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isRefillingFood)
+        .animation(.spring(response: 0.35, dampingFraction: 0.86), value: isInspectingPictureFrame)
         .sheet(isPresented: $showMarket) {
             PetMarketSheet(viewModel: viewModel, category: $marketInitialCategory) {
                 openPictureFramePicker(for: viewModel.activePictureFrameID())
@@ -420,6 +429,12 @@ struct PetRoomView: View {
         }
         .onChange(of: viewModel.roomLayout) { _, _ in
             refreshRoomLayout()
+        }
+        .onChange(of: showMarket) { _, _ in
+            syncSceneSheetPause()
+        }
+        .onChange(of: showOwnedItems) { _, _ in
+            syncSceneSheetPause()
         }
         .onChange(of: viewModel.selectedPlayToyID) { _, selectedToyID in
             guard isPlaying else { return }
@@ -508,22 +523,40 @@ struct PetRoomView: View {
             HStack(spacing: 8) {
                 Image(systemName: "fork.knife")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.accentDeep)
-                Text("Refill Food")
+                    .foregroundStyle(.white)
+                Text("Refill the food bowl")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(.white)
                 Spacer()
             }
-            refillProgressBar
+            refillModeProgressBar
             Text("Select food below, then drag/tap to place it in the bowl")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal, 16)
+    }
+
+    private var refillModeProgressBar: some View {
+        let fraction = min(1, refillProgress / refillDurationRequired)
+        return VStack(spacing: 4) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.25))
+                    Capsule()
+                        .fill(BabyTownTheme.buttonGradient)
+                        .frame(width: geo.size.width * fraction)
+                }
+            }
+            .frame(height: 9)
+            Text("\(Int(refillProgress.rounded(.down))) / \(Int(refillDurationRequired))s")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+        }
     }
 
     private var litterModeBanner: some View {
@@ -686,12 +719,28 @@ struct PetRoomView: View {
         .buttonStyle(.plain)
     }
 
+    private var pictureFrameInspectBottomBar: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                scene?.exitPictureFrameInspect()
+            } label: {
+                Text("Exit")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(BabyTownTheme.buttonGradient)
+                    .clipShape(Capsule())
+                    .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 0)
+        }
+    }
+
     private var playModeBottomBar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if isRefillingFood {
-                refillFoodHotbar
-            }
-
             HStack(spacing: 12) {
                 if isRefillingFood {
                     Spacer(minLength: 0)
@@ -774,7 +823,7 @@ struct PetRoomView: View {
 
     private var doneRefillButton: some View {
         Button(action: cancelFoodRefillMiniGame) {
-            Label("Done Refilling", systemImage: "xmark.circle.fill")
+            Label("Cancel", systemImage: "xmark.circle.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 22)
@@ -1145,6 +1194,7 @@ struct PetRoomView: View {
     private func installScene(_ newScene: PetRoomScene, geo: GeometryProxy) {
         if isCustomizing { exitCustomizeMode() }
         if isTrickMode { exitTrickMode() }
+        isInspectingPictureFrame = false
         scene = newScene
         lastKnownLitterDirty = viewModel.isLitterBoxDirty
         refreshRoomLayout()
@@ -1155,6 +1205,18 @@ struct PetRoomView: View {
         s.onTapProp = { prop in handleProp(prop) }
         s.onTapPictureFrame = {
             openPictureFramePicker(for: viewModel.activePictureFrameID())
+        }
+        s.onPictureFrameInspectChanged = { active in
+            DispatchQueue.main.async {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                    isInspectingPictureFrame = active
+                }
+                if active {
+                    inspect = nil
+                    showStatsDetail = false
+                    showPetProfile = false
+                }
+            }
         }
         s.onLayoutPositionsChanged = { positions in
             viewModel.updatePropPositions(positions)
@@ -1204,6 +1266,13 @@ struct PetRoomView: View {
         syncLitterBoxState()
         syncNeedThoughtBubble()
         scene?.setToiletPaperMessVisible(viewModel.hasActiveToiletPaperMess())
+        scene?.recoverFromStalledBehavior()
+    }
+
+    /// Keeps SpriteKit paused while market / owned-items sheets cover the room,
+    /// then heals walk-animation desync when they close.
+    private func syncSceneSheetPause() {
+        scene?.setSheetCoverActive(showMarket || showOwnedItems)
     }
 
     private var pictureFramePickerSheet: some View {
@@ -1491,20 +1560,6 @@ struct PetRoomView: View {
                     .contentShape(Rectangle())
                     .gesture(refillFoodDragGesture(in: overlayGeo))
 
-                VStack(spacing: 8) {
-                    Text("Refill the food bowl")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("Tap or drag the food to the bowl and hold for 5 seconds")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.92))
-                    refillProgressBar
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .position(x: overlayGeo.size.width / 2, y: 84)
-
                 refillFoodSprite
                     .position(refillFoodCenter)
                     .opacity(refillFoodOpacity)
@@ -1536,31 +1591,7 @@ struct PetRoomView: View {
             }
         }
         .frame(width: 140, height: 110)
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.65), lineWidth: 1.2)
-        )
-        .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
-    }
-
-    private var refillProgressBar: some View {
-        let fraction = min(1, refillProgress / refillDurationRequired)
-        return VStack(spacing: 4) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.25))
-                    Capsule().fill(BabyTownTheme.buttonGradient)
-                        .frame(width: geo.size.width * fraction)
-                }
-            }
-            .frame(height: 9)
-            Text("\(Int(refillProgress.rounded(.down))) / \(Int(refillDurationRequired))s")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-        }
-        .frame(width: 220)
+        .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
     }
 
     private func refillFoodDragGesture(in geo: GeometryProxy) -> some Gesture {

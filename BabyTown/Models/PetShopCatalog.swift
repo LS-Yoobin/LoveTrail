@@ -24,6 +24,19 @@ enum PetShopCategory: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Market and "Your room items" category pills (collar & couch hidden for now).
+    static let pickerCategories: [PetShopCategory] = [
+        .catTrees,
+        .catBeds,
+        .catFood,
+        .catToys,
+        .bowls,
+        .litterBoxes,
+        .plants,
+        .pictureFrames,
+        .wallColors,
+    ]
+
     var title: String {
         switch self {
         case .catTrees: return "Cat Tree"

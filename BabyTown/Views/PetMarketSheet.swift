@@ -27,10 +27,7 @@ struct PetMarketSheet: View {
 
     private let previewBoxHeight: CGFloat = 128
     private var orderedCategories: [PetShopCategory] {
-        var categories = PetShopCategory.allCases.filter { $0 != .catFood }
-        let insertIndex = min(2, categories.count)
-        categories.insert(.catFood, at: insertIndex)
-        return categories
+        PetShopCategory.pickerCategories
     }
 
     private let marketBackground = LinearGradient(
@@ -228,7 +225,7 @@ struct PetMarketSheet: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.black.opacity(0.88))
 
-                Text("Spend coins on trees, beds, bowls, cat food, collars, and room décor.")
+                Text("Spend coins on trees, beds, bowls, cat food, toys, and room décor.")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)

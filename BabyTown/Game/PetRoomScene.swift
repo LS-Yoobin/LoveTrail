@@ -183,8 +183,11 @@ final class PetRoomScene: SKScene {
     /// Called when the user taps a prop (or the cat). Set by `PetRoomView`.
     var onTapProp: ((RoomProp) -> Void)?
 
-    /// Called when the user taps the wall picture frame.
+    /// Called when the user taps the wall picture frame in customize mode (opens photo picker).
     var onTapPictureFrame: (() -> Void)?
+
+    /// Fired when the default-mode "walk up to the frame" inspect zoom begins or ends.
+    var onPictureFrameInspectChanged: ((Bool) -> Void)?
 
     var layoutState = PetRoomLayoutState()
     var pictureFrameImage: UIImage?
@@ -207,6 +210,11 @@ final class PetRoomScene: SKScene {
 
     private var wallWashNode: SKSpriteNode?
     private var pictureFrameNode: SKNode?
+    private var roomCamera: SKCameraNode?
+    private(set) var isInspectingPictureFrame = false
+    private var isPictureFrameInspectAnimating = false
+    private let pictureFrameInspectZoomFraction: CGFloat = 0.78
+    private let pictureFrameInspectDuration: TimeInterval = 1.05
     /// Fixed draw order behind floor props during normal play.
     private let pictureFrameZ: CGFloat = -2
     /// Raised while customizing so the frame can be tapped above floor décor.
@@ -319,9 +327,16 @@ final class PetRoomScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         removeAllChildren()
+        setupRoomCamera()
         buildRoom()
         buildCat()
         playWelcomeSequence()
+    }
+
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        guard let cam = roomCamera, !isInspectingPictureFrame, !isPictureFrameInspectAnimating else { return }
+        cam.position = defaultCameraPosition()
     }
 
     // MARK: Room
@@ -1064,6 +1079,98 @@ final class PetRoomScene: SKScene {
             .contains(location)
     }
 
+    private func setupRoomCamera() {
+        let cam = SKCameraNode()
+        cam.position = defaultCameraPosition()
+        addChild(cam)
+        camera = cam
+        roomCamera = cam
+    }
+
+    private func defaultCameraPosition() -> CGPoint {
+        CGPoint(x: size.width / 2, y: size.height / 2)
+    }
+
+    /// Camera scale for inspect mode. SpriteKit scales below 1 zoom in; above 1 zoom out.
+    private func pictureFrameInspectCameraScale(for frameRect: CGRect) -> CGFloat {
+        let scaleForWidth = max(frameRect.width, 1) / (size.width * pictureFrameInspectZoomFraction)
+        let scaleForHeight = max(frameRect.height, 1) / (size.height * pictureFrameInspectZoomFraction)
+        // Pick the larger scale so the full frame fits, then clamp to a sensible zoom range.
+        return min(max(max(scaleForWidth, scaleForHeight), 0.12), 1.0)
+    }
+
+    /// Pans and zooms the room camera toward the wall frame, like walking up for a closer look.
+    func enterPictureFrameInspect() {
+        guard !isCustomizeMode,
+              !isInspectingPictureFrame,
+              !isPictureFrameInspectAnimating,
+              let frameNode = pictureFrameNode,
+              let cam = roomCamera else { return }
+
+        isPictureFrameInspectAnimating = true
+        isInspectingPictureFrame = true
+        onPictureFrameInspectChanged?(true)
+        stopMovement()
+        cat.removeAction(forKey: "behavior")
+        startAnimation(.idle)
+        isInteracting = true
+
+        let frameRect = frameNode.calculateAccumulatedFrame()
+        let targetCenter = CGPoint(x: frameRect.midX, y: frameRect.midY)
+        let targetScale = pictureFrameInspectCameraScale(for: frameRect)
+
+        let move = SKAction.move(to: targetCenter, duration: pictureFrameInspectDuration)
+        let zoom = SKAction.scale(to: targetScale, duration: pictureFrameInspectDuration)
+        move.timingMode = .easeInEaseOut
+        zoom.timingMode = .easeInEaseOut
+
+        cam.removeAction(forKey: "pictureFrameInspect")
+        let finish = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.isPictureFrameInspectAnimating = false
+        }
+        cam.run(.sequence([.group([move, zoom]), finish]), withKey: "pictureFrameInspect")
+    }
+
+    /// Returns the camera to the default room view.
+    func exitPictureFrameInspect() {
+        guard isInspectingPictureFrame || isPictureFrameInspectAnimating,
+              let cam = roomCamera else { return }
+
+        isPictureFrameInspectAnimating = true
+        isInspectingPictureFrame = false
+        onPictureFrameInspectChanged?(false)
+
+        let home = defaultCameraPosition()
+        let move = SKAction.move(to: home, duration: pictureFrameInspectDuration * 0.82)
+        let zoom = SKAction.scale(to: 1, duration: pictureFrameInspectDuration * 0.82)
+        move.timingMode = .easeInEaseOut
+        zoom.timingMode = .easeInEaseOut
+
+        cam.removeAction(forKey: "pictureFrameInspect")
+        let finish = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.isPictureFrameInspectAnimating = false
+            self.isInteracting = false
+            self.runBehavior()
+        }
+        cam.run(.sequence([.group([move, zoom]), finish]), withKey: "pictureFrameInspect")
+    }
+
+    private func resetPictureFrameInspectImmediately() {
+        guard let cam = roomCamera else { return }
+        cam.removeAction(forKey: "pictureFrameInspect")
+        cam.position = defaultCameraPosition()
+        cam.setScale(1)
+        let wasActive = isInspectingPictureFrame || isPictureFrameInspectAnimating
+        isPictureFrameInspectAnimating = false
+        isInspectingPictureFrame = false
+        guard wasActive else { return }
+        onPictureFrameInspectChanged?(false)
+        isInteracting = false
+        runBehavior()
+    }
+
     private func normalizedPoint(from scenePoint: CGPoint) -> NormalizedPoint {
         NormalizedPoint(
             x: min(max(scenePoint.x / max(size.width, 1), 0.06), 0.94),
@@ -1401,11 +1508,20 @@ final class PetRoomScene: SKScene {
     }
 
     private func clearOccupiedBedState(showCat: Bool) {
+        let surfacingFromComposite = showCat && occupiedBedKey != nil
         if let key = occupiedBedKey {
             setCatBedVisualState(key: key, occupied: false)
         }
         occupiedBedKey = nil
-        if showCat { cat.alpha = 1 }
+        if showCat {
+            cat.alpha = 1
+            // Room rebuilds can surface the cat while a sleep sequence is still
+            // running — drop any stale walk loop left from the approach.
+            if surfacingFromComposite {
+                catVisual.removeAction(forKey: "anim")
+                startAnimation(.sleep)
+            }
+        }
     }
 
     /// Wakes the cat from a composite bed (occupied art hides the live sprite).
@@ -1454,6 +1570,7 @@ final class PetRoomScene: SKScene {
             self.occupiedBedKey = bedKey
             if self.catBedOccupiedImageName(for: bedKey) != nil {
                 self.cat.alpha = 0
+                self.catVisual.removeAction(forKey: "anim")
                 self.setCatBedVisualState(key: bedKey, occupied: true)
             } else {
                 self.face(towards: propFloorAnchor(for: bed).x)
@@ -1567,6 +1684,85 @@ final class PetRoomScene: SKScene {
             walkOut,
             finish
         ]), withKey: "behavior")
+    }
+
+    private func isCatBedKey(_ key: String) -> Bool {
+        Self.catBedItemIDs.contains(key)
+    }
+
+    private func isTappableFurnitureKey(_ key: String) -> Bool {
+        isCatBedKey(key) || key == PetRoomPropKey.catTree
+    }
+
+    /// Tap target for the cat bed and cat tree (draggable décor, not in `propNodes`).
+    private func furnitureTapHit(at location: CGPoint) -> (key: String, node: SKNode)? {
+        var topHit: (key: String, node: SKNode, z: CGFloat)?
+        for (key, node) in draggableNodes {
+            guard isTappableFurnitureKey(key) else { continue }
+            if isCatBedKey(key) {
+                guard layoutState.owns(key), !layoutState.isStashed(key) else { continue }
+            }
+            let hitFrame = node.calculateAccumulatedFrame().insetBy(dx: -16, dy: -16)
+            guard hitFrame.contains(location) else { continue }
+            if topHit == nil || node.zPosition > topHit!.z {
+                topHit = (key, node, node.zPosition)
+            }
+        }
+        if let topHit { return (topHit.key, topHit.node) }
+        return nil
+    }
+
+    private func furnitureApproachPoint(for node: SKNode, key: String) -> CGPoint {
+        if isCatBedKey(key) {
+            return catBedApproachPoint(for: node)
+        }
+        let anchor = propFloorAnchor(for: node)
+        let frame = node.calculateAccumulatedFrame()
+        let margin = maxCatHorizontalHalfWidth
+        let targetX = min(max(frame.midX, margin), size.width - margin)
+        let targetY = min(max(anchor.y, size.height * catFloorBand.lowerBound),
+                          size.height * catFloorBand.upperBound)
+        return clampCatPosition(CGPoint(x: targetX, y: targetY))
+    }
+
+    /// User tapped the cat bed or cat tree — stroll over, sit briefly, then resume ambient life.
+    private func walkToFurnitureAndSit(key: String, node: SKNode) {
+        guard !isCustomizeMode, !isPlaying, !isTrickMode, !isCarryingCat else { return }
+
+        stopMovement()
+        wakeFromOccupiedBedIfNeeded()
+        isInteracting = true
+
+        let target = furnitureApproachPoint(for: node, key: key)
+        face(towards: target.x)
+        startAnimation(.walk)
+
+        let distance = hypot(target.x - cat.position.x, target.y - cat.position.y)
+        let move = SKAction.move(
+            to: target,
+            duration: max(0.35, TimeInterval(distance / walkSpeed))
+        )
+        move.timingMode = .easeInEaseOut
+
+        let sitDuration = Double.random(in: 2.5...4.5)
+        let faceTarget = node.calculateAccumulatedFrame().midX
+
+        let arrive = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
+            self.face(towards: faceTarget)
+            self.startAnimation(.sit)
+            self.isHoldingPose = true
+        }
+        let finish = SKAction.run { [weak self] in
+            guard let self else { return }
+            self.isHoldingPose = false
+            self.isInteracting = false
+            self.startAnimation(.idle)
+            self.runBehavior()
+        }
+
+        cat.run(.sequence([move, arrive, .wait(forDuration: sitDuration), finish]), withKey: "behavior")
     }
 
     private func idleFor(state: CatAction, duration: TimeInterval) {
@@ -2026,6 +2222,8 @@ final class PetRoomScene: SKScene {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
+        if isInspectingPictureFrame || isPictureFrameInspectAnimating { return }
+
         if isCustomizeMode {
             handleCustomizeTouchBegan(at: location)
             return
@@ -2043,7 +2241,7 @@ final class PetRoomScene: SKScene {
         }
 
         if pictureFrameHit(at: location) {
-            onTapPictureFrame?()
+            enterPictureFrameInspect()
             return
         }
 
@@ -2059,6 +2257,11 @@ final class PetRoomScene: SKScene {
         }
         if let topPropHit {
             handleTap(topPropHit.prop)
+            return
+        }
+
+        if let furniture = furnitureTapHit(at: location) {
+            walkToFurnitureAndSit(key: furniture.key, node: furniture.node)
             return
         }
 
@@ -2350,6 +2553,9 @@ final class PetRoomScene: SKScene {
     }
 
     func setCustomizeMode(_ enabled: Bool) {
+        if enabled {
+            resetPictureFrameInspectImmediately()
+        }
         isCustomizeMode = enabled
         if enabled {
             if isCarryingCat { dropCarriedCat() }
@@ -2382,6 +2588,58 @@ final class PetRoomScene: SKScene {
         } else if prop == .cat {
             // Self-contained fallback when not wired to a view (e.g. previews).
             playReaction(.happy)
+        }
+    }
+
+    // MARK: Scene visibility (SwiftUI sheets)
+
+    /// Pauses the scene while a modal sheet covers the room; on dismiss, heals
+    /// animation/state desync when the walk loop outlives its behavior action.
+    func setSheetCoverActive(_ active: Bool) {
+        isPaused = active
+        if !active {
+            recoverFromStalledBehavior()
+        }
+    }
+
+    /// Restarts ambient life when locomotion visuals and the behavior driver drift apart
+    /// (e.g. after SKView pause or a cancelled `behavior` action).
+    func recoverFromStalledBehavior() {
+        guard !isPlaying,
+              !isTrickMode,
+              !isCarryingCat,
+              !isCustomizeMode,
+              !isInspectingPictureFrame,
+              !isPictureFrameInspectAnimating else { return }
+
+        let behaviorRunning = cat.action(forKey: "behavior") != nil
+        if behaviorRunning { return }
+
+        if currentAction == .walk || currentAction == .pounce {
+            isHoldingPose = false
+            isInteracting = false
+            startAnimation(.idle)
+            runBehavior()
+            return
+        }
+
+        if isHoldingPose && !isHoldingBowlInteraction {
+            isHoldingPose = false
+            isInteracting = false
+            startAnimation(.idle)
+            runBehavior()
+            return
+        }
+
+        if isInteracting {
+            isInteracting = false
+            startAnimation(.idle)
+            runBehavior()
+            return
+        }
+
+        if !isHoldingPose {
+            runBehavior()
         }
     }
 

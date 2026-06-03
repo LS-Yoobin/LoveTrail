@@ -27,6 +27,9 @@ final class PetViewModel: ObservableObject {
     /// Hidden adoption easter egg: bypasses the level gate for adopting a second pet.
     @Published private(set) var secondPetAdoptionBypassActive = false
 
+    /// Room the user left via "Choose a different pet"; restored when they back out of selection.
+    private var petRoomSkinBeforeSelection: CatSkin?
+
     /// Exact state snapshot captured right before the unlock-all override is applied.
     /// A second long-press restores this snapshot and clears the override.
     private var marketUnlockAllSnapshot: PetState?
@@ -55,6 +58,7 @@ final class PetViewModel: ObservableObject {
     var hasAnyOwnedPet: Bool { !state.ownedSkins.isEmpty }
 
     func adopt(_ skin: CatSkin) {
+        petRoomSkinBeforeSelection = nil
         state.adoptedSkin = skin
         if state.adoptedDate == nil {
             state.adoptedDate = Date()
@@ -128,11 +132,22 @@ final class PetViewModel: ObservableObject {
     /// Returns to the selection screen so the user can visit another adopted cat.
     /// Per-pet room layouts, names, and care progress are preserved.
     func releasePet() {
+        petRoomSkinBeforeSelection = state.adoptedSkin
         state.adoptedSkin = nil
+    }
+
+    var canCancelPetSelection: Bool { petRoomSkinBeforeSelection != nil }
+
+    /// Back from cat selection after leaving a room — returns to that pet's room.
+    func cancelPetSelection() {
+        guard let skin = petRoomSkinBeforeSelection else { return }
+        petRoomSkinBeforeSelection = nil
+        visit(skin)
     }
 
     func visit(_ skin: CatSkin) {
         guard state.ownedSkins.contains(skin) else { return }
+        petRoomSkinBeforeSelection = nil
         state.adoptedSkin = skin
     }
 
@@ -484,7 +499,7 @@ final class PetViewModel: ObservableObject {
 
     /// Categories that have at least one owned inventory item.
     var ownedItemCategories: [PetShopCategory] {
-        PetShopCategory.allCases.filter { !ownedInventoryItems(in: $0).isEmpty }
+        PetShopCategory.pickerCategories.filter { !ownedInventoryItems(in: $0).isEmpty }
     }
 
     var hasOwnedShopItems: Bool {

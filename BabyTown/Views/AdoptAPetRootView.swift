@@ -20,7 +20,7 @@ struct AdoptAPetRootView: View {
             } else {
                 CatSelectionView(
                     viewModel: viewModel,
-                    onDismiss: onDismiss
+                    onDismiss: dismissCatSelection
                 ) { skin in
                     withAnimation(.easeInOut(duration: 0.3)) {
                         viewModel.visit(skin)
@@ -30,6 +30,16 @@ struct AdoptAPetRootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.adoptedSkin)
+    }
+
+    private func dismissCatSelection() {
+        if viewModel.canCancelPetSelection {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                viewModel.cancelPetSelection()
+            }
+        } else {
+            onDismiss()
+        }
     }
 }
 
