@@ -160,6 +160,24 @@ struct SettingsSheet: View {
                 } header: {
                     Text("App")
                 }
+
+#if DEBUG
+                Section("Debug · Partner notifications") {
+                    Button("Test: partner joined") {
+                        NotificationManager.shared.handlePartnerEvent(.joined(partnerName: "Alex"))
+                    }
+                    Button("Test: love letter received") {
+                        NotificationManager.shared.handlePartnerEvent(
+                            .loveLetterReceived(title: "Thinking of you", sentAt: Date()))
+                    }
+                    Button("Test: partner added a moment") {
+                        NotificationManager.shared.handlePartnerEvent(.partnerAddedMoment)
+                    }
+                    Button("Test: partner added a date") {
+                        NotificationManager.shared.handlePartnerEvent(.partnerAddedSpecialDate)
+                    }
+                }
+#endif
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
