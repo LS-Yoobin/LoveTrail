@@ -73,6 +73,7 @@ final class DataPersistenceManager {
     private let appJoinedDateKey = "appJoinedDate"
     private let foundingOfficialDateKey = "foundingOfficialPhotoDate"
     private let foundingFirstMetDateKey = "foundingFirstMetPhotoDate"
+    private let celebratedMomentMilestonesKey = "celebratedMomentMilestones"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -88,7 +89,16 @@ final class DataPersistenceManager {
         guard let data = try? encoder.encode(moments) else { return }
         try? data.write(to: momentsFileURL)
     }
-    
+
+    func loadCelebratedMomentMilestones() -> Set<Int> {
+        let arr = userDefaults.array(forKey: celebratedMomentMilestonesKey) as? [Int] ?? []
+        return Set(arr)
+    }
+
+    func saveCelebratedMomentMilestones(_ set: Set<Int>) {
+        userDefaults.set(Array(set), forKey: celebratedMomentMilestonesKey)
+    }
+
     func loadMoments() -> [Moment] {
         guard fileManager.fileExists(atPath: momentsFileURL.path),
               let data = try? Data(contentsOf: momentsFileURL),

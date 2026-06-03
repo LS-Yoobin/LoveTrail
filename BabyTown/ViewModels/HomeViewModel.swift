@@ -3,6 +3,7 @@ import Combine
 import SwiftUI
 import UIKit
 import Photos
+import GardenCore
 
 enum Season: String, CaseIterable, Comparable {
     case spring = "Spring" // Mar–May
@@ -113,6 +114,7 @@ final class HomeViewModel: ObservableObject {
         didSet {
             DataPersistenceManager.shared.saveMoments(moments)
             refreshOnThisDay()
+            handleMomentCountChange()
         }
     }
 
@@ -138,6 +140,7 @@ final class HomeViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let locationResolver = LocationNameResolver()
     private var isBackfillingCountries = false
+    private var lastKnownMomentCount = DataPersistenceManager.shared.loadMoments().count
 
     private static let foundingPrompts: Set<String> = [
         "When we first met",
@@ -1285,6 +1288,25 @@ final class HomeViewModel: ObservableObject {
     /// Matches the memory rows shown in the table of contents (milestones + year/season sections).
     var tocMemoryCount: Int {
         tocMilestones.count + tocPinnedPromptMemories.count + tocSections.count
+    }
+
+    // MARK: - Moment Milestone Banners
+
+    private func handleMomentCountChange() {
+        let newCount = moments.count
+        defer {
+            lastKnownMomentCount = newCount
+            NotificationManager.shared.refresh()
+        }
+        guard newCount > lastKnownMomentCount else { return }
+        let dp = DataPersistenceManager.shared
+        var celebrated = dp.loadCelebratedMomentMilestones()
+        let crossed = NotificationPlanner().crossedMilestones(
+            oldCount: lastKnownMomentCount, newCount: newCount, alreadyCelebrated: celebrated)
+        guard let top = crossed.max() else { return }
+        celebrated.formUnion(crossed)         // record all crossed; fire only the top
+        dp.saveCelebratedMomentMilestones(celebrated)
+        NotificationManager.shared.fireMilestone(top)
     }
 }
 
