@@ -121,4 +121,14 @@ public struct NotificationPlanner {
                 trigger: .calendarAnnual(month: comps.month ?? 1, day: comps.day ?? 1, hour: 9, minute: 0))
         }
     }
+
+    public static let momentMilestones = [10, 50, 100, 250, 500, 1000]
+
+    /// Milestones strictly above `oldCount`, at or below `newCount`, not yet
+    /// celebrated. Caller fires the max (one banner per batch) and records all
+    /// returned values as celebrated so the skipped lower ones never re-fire.
+    public func crossedMilestones(oldCount: Int, newCount: Int, alreadyCelebrated: Set<Int>) -> [Int] {
+        guard newCount > oldCount else { return [] }
+        return Self.momentMilestones.filter { $0 > oldCount && $0 <= newCount && !alreadyCelebrated.contains($0) }
+    }
 }

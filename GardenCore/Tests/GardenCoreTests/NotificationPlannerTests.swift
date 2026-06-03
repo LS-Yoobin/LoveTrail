@@ -92,3 +92,27 @@ final class NotificationPlannerTests: XCTestCase {
         XCTAssertEqual(sd.title, "Anniversary 💞")
     }
 }
+
+final class MomentMilestoneTests: XCTestCase {
+    private let planner = NotificationPlanner()
+
+    func testThresholdsAreTheAgreedSet() {
+        XCTAssertEqual(NotificationPlanner.momentMilestones, [10, 50, 100, 250, 500, 1000])
+    }
+
+    func testCrossingOneThreshold() {
+        XCTAssertEqual(planner.crossedMilestones(oldCount: 9, newCount: 10, alreadyCelebrated: []), [10])
+    }
+
+    func testNoCrossingReturnsEmpty() {
+        XCTAssertEqual(planner.crossedMilestones(oldCount: 11, newCount: 12, alreadyCelebrated: []), [])
+    }
+
+    func testBulkCrossingReturnsAllCrossed() {
+        XCTAssertEqual(planner.crossedMilestones(oldCount: 5, newCount: 300, alreadyCelebrated: []), [10, 50, 100, 250])
+    }
+
+    func testAlreadyCelebratedExcluded() {
+        XCTAssertEqual(planner.crossedMilestones(oldCount: 5, newCount: 60, alreadyCelebrated: [10]), [50])
+    }
+}
