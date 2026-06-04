@@ -7,12 +7,14 @@ enum GardenSnapshotRenderer {
 
     private static let renderSize = CGSize(width: 150, height: 150)
 
-    static func render(moments: [Moment], letters: [UserLetter], season: GardenSeason) -> UIImage? {
+    /// SpriteKit must run on the main actor and needs at least one display pass after
+    /// `presentScene` before `texture(from:)` returns pixels (cold launch often fails otherwise).
+    @MainActor
+    static func render(moments: [Moment], letters: [UserLetter], season: GardenSeason) async -> UIImage? {
         let acts = GardenActMapper.acts(moments: moments, letters: letters)
         let elements = GardenComposer().compose(acts: acts)
         let view = SKView(frame: CGRect(origin: .zero, size: renderSize))
         view.allowsTransparency = true
-        view.isPaused = true
 
         let scene = LoveGardenScene(
             size: renderSize,
@@ -20,9 +22,33 @@ enum GardenSnapshotRenderer {
             season: season,
             isStaticSnapshot: true
         )
+        scene.isPaused = true
         view.presentScene(scene)
 
+        await waitForRenderPass()
+        if let image = snapshot(from: view, scene: scene) {
+            return image
+        }
+
+        await waitForRenderPass()
+        return snapshot(from: view, scene: scene)
+    }
+
+    @MainActor
+    private static func snapshot(from view: SKView, scene: LoveGardenScene) -> UIImage? {
         guard let texture = view.texture(from: scene) else { return nil }
         return UIImage(cgImage: texture.cgImage())
+    }
+
+    /// Yields until after the next main-runloop turn so the SKView can draw once.
+    @MainActor
+    private static func waitForRenderPass() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                DispatchQueue.main.async {
+                    continuation.resume()
+                }
+            }
+        }
     }
 }

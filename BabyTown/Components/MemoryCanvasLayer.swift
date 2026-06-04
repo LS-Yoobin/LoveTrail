@@ -9,10 +9,14 @@ struct MemoryCanvasLayer: View {
     let composingNotePosition: NormalizedPoint?
     let metadataBottomY: CGFloat
     let isComposingNote: Bool
+    let isComposingNoteSelected: Bool
     let isEditingStickers: Bool
     let selectedStickerID: UUID?
     @Binding var noteDraft: String
     var isNoteFocused: FocusState<Bool>.Binding
+    let onSelectComposingNote: () -> Void
+    let onDeselectComposingNote: () -> Void
+    let onDeleteComposingNote: () -> Void
     let onNotePositionChanged: (MemoryNoteAuthor, NormalizedPoint) -> Void
     let onStickerPositionChanged: (UUID, NormalizedPoint) -> Void
     let onStickerScaleChanged: (UUID, CGFloat) -> Void
@@ -61,7 +65,12 @@ struct MemoryCanvasLayer: View {
                 if isEditingStickers || isArrangingOnCanvas {
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { onSelectSticker(nil) }
+                        .onTapGesture {
+                            onSelectSticker(nil)
+                            if isArrangingOnCanvas {
+                                onDeselectComposingNote()
+                            }
+                        }
                 }
 
                 ForEach(notes.filter(\.hasContent)) { note in
@@ -79,10 +88,8 @@ struct MemoryCanvasLayer: View {
                             position: note.position.map(clampNote),
                             stickers: [],
                             canvasSize: geo.size,
-                            isCustomizing: false,
+                            isCustomizing: isEditingStickers,
                             fallbackPosition: noteFallback,
-                            isDraggable: false,
-                            showsArrangementChrome: false,
                             dragBounds: noteBounds,
                             onSelect: nil,
                             onDelete: nil,
@@ -145,6 +152,10 @@ struct MemoryCanvasLayer: View {
             existingNotes: notes,
             author: author,
             isFocused: isNoteFocused,
+            isSelected: isComposingNoteSelected,
+            onSelect: onSelectComposingNote,
+            onDeselect: onDeselectComposingNote,
+            onDelete: onDeleteComposingNote,
             onPositionChanged: { onNotePositionChanged(author, clampNote($0)) },
             onDragEnded: onCanvasDragEnded,
             onDragActiveChanged: onCanvasDragActiveChanged
@@ -161,6 +172,10 @@ private struct MemoryPageNoteComposer: View {
     let existingNotes: [MemoryPageNote]
     let author: MemoryNoteAuthor
     var isFocused: FocusState<Bool>.Binding
+    var isSelected: Bool = false
+    var onSelect: (() -> Void)? = nil
+    var onDeselect: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
     let onPositionChanged: (NormalizedPoint) -> Void
     var onDragEnded: (() -> Void)? = nil
     var onDragActiveChanged: ((Bool) -> Void)? = nil
@@ -242,18 +257,43 @@ private struct MemoryPageNoteComposer: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(
                         Color.white,
-                        style: StrokeStyle(lineWidth: 2, dash: [6, 4])
+                        style: StrokeStyle(
+                            lineWidth: isSelected ? 3 : 2,
+                            dash: isSelected ? [] : [6, 4]
+                        )
                     )
                     .padding(4)
                     .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .top) {
+            if isSelected, let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(Color.red, in: Circle())
+                        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                }
+                .buttonStyle(.plain)
+                .offset(y: -44)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
         .position(center)
         .gesture(isFocused.wrappedValue ? nil : dragGesture)
-        .onTapGesture {
-            if !isFocused.wrappedValue {
-                isFocused.wrappedValue = true
-            }
+        .modifier(ComposingNoteTapWhenUnfocused(isEnabled: !isFocused.wrappedValue, action: handleComposingNoteTap))
+    }
+
+    private func handleComposingNoteTap() {
+        if isSelected {
+            onDeselect?()
+            isFocused.wrappedValue = true
+        } else if let onSelect {
+            onSelect()
+        } else {
+            isFocused.wrappedValue = true
         }
     }
 
@@ -283,5 +323,19 @@ private struct MemoryPageNoteComposer: View {
                 onDragActiveChanged?(false)
                 onDragEnded?()
             }
+    }
+}
+
+/// Applies a tap handler only while the note keyboard is dismissed so taps reach the text view and system keyboard.
+private struct ComposingNoteTapWhenUnfocused: ViewModifier {
+    let isEnabled: Bool
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.onTapGesture(perform: action)
+        } else {
+            content
+        }
     }
 }

@@ -30,6 +30,7 @@ struct MomentPhotoViewer: View {
     @State private var stickerImages: [UUID: UIImage] = [:]
     @State private var isImmersivePhotoMode = false
     @State private var isComposingNote = false
+    @State private var isComposingNoteSelected = false
     @State private var isEditingStickers = false
     @State private var selectedStickerID: UUID?
     @State private var noteDraft = ""
@@ -252,10 +253,14 @@ struct MomentPhotoViewer: View {
                                 composingNotePosition: composingNotePosition,
                                 metadataBottomY: metadataBottomY,
                                 isComposingNote: isComposingNote,
+                                isComposingNoteSelected: isComposingNoteSelected,
                                 isEditingStickers: isEditingStickers,
                                 selectedStickerID: selectedStickerID,
                                 noteDraft: $noteDraft,
                                 isNoteFocused: $isNoteFocused,
+                                onSelectComposingNote: selectComposingNote,
+                                onDeselectComposingNote: { isComposingNoteSelected = false },
+                                onDeleteComposingNote: deleteComposingNote,
                                 onNotePositionChanged: { author, pos in
                                     let clamped = MemoryPageLayout.clampNotePosition(
                                         pos,
@@ -278,23 +283,14 @@ struct MomentPhotoViewer: View {
                                 onCanvasDragActiveChanged: { isCanvasDragActive = $0 }
                             )
                             .frame(width: geo.size.width, height: geo.size.height)
-                            .mask(alignment: .top) {
-                                if metadataBottomY > 0 {
-                                    Rectangle()
-                                        .frame(height: max(geo.size.height - metadataBottomY, 0))
-                                        .offset(y: metadataBottomY)
-                                } else {
-                                    Rectangle()
-                                }
-                            }
-                            .zIndex(1)
+                            .zIndex(3)
                         }
                     }
                 }
                 .onPreferenceChange(MemoryPageMetadataBottomKey.self) { metadataBottomY = $0 }
                 .onPreferenceChange(MemoryPageContentHeightKey.self) { pageContentHeight = $0 }
                 .scrollDisabled(isCanvasDragActive && (isComposingNote || isEditingStickers))
-                .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(isComposingNote && isNoteFocused ? .never : .interactively)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     browseTopBar
                         .padding(.horizontal, 20)
@@ -377,6 +373,22 @@ struct MomentPhotoViewer: View {
     private func dismissNoteKeyboardIfNeeded() {
         guard isComposingNote, isNoteFocused else { return }
         isNoteFocused = false
+    }
+
+    private func selectComposingNote() {
+        isNoteFocused = false
+        isComposingNoteSelected = true
+    }
+
+    private func deleteComposingNote() {
+        canvas.upsertNote(author: .localUser, text: nil, position: nil)
+        persistCanvas()
+        noteDraft = ""
+        composingNotePosition = nil
+        isComposingNote = false
+        isNoteFocused = false
+        isComposingNoteSelected = false
+        selectedStickerID = nil
     }
 
     private func scrollToNoteForComposing(using scrollProxy: ScrollViewProxy, animated: Bool) {
@@ -832,6 +844,7 @@ struct MomentPhotoViewer: View {
         } ?? ""
         composingNotePosition = canvas.localUserNote?.position
         selectedStickerID = nil
+        isComposingNoteSelected = false
         isComposingNote = true
         scrollToNoteForComposing(using: scrollProxy, animated: true)
 
@@ -858,6 +871,7 @@ struct MomentPhotoViewer: View {
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
+        isComposingNoteSelected = false
         selectedStickerID = nil
     }
 
@@ -877,6 +891,7 @@ struct MomentPhotoViewer: View {
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
+        isComposingNoteSelected = false
         selectedStickerID = nil
     }
 

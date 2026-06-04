@@ -144,9 +144,12 @@ enum MemoryCanvasLayout {
 
 /// Scroll layout for the full moment scrapbook page.
 enum MemoryPageLayout {
-    /// Open canvas below metadata (love note, date, etc.) for photo stickers.
+    /// Full scroll height is draggable; new items default below metadata.
     static let stickerSandboxHeight: CGFloat = 960
     static let noteBelowMetadataPadding: CGFloat = 20
+    static let canvasEdgePadding: CGFloat = 12
+    static let normalizedMinYFallback: CGFloat = 0.06
+    static let normalizedMaxYFallback: CGFloat = 0.96
     /// `scrollTo` anchor Y: keeps the note band above the footer with room for the keyboard.
     static let noteComposeScrollAnchorUnitY: CGFloat = 0.44
 
@@ -212,24 +215,43 @@ enum MemoryPageLayout {
         return NormalizedPoint(x: normalizedX, y: normalizedY)
     }
 
-    /// Keeps the note center below metadata text (prompt, place, date, love note).
+    static func pageCanvasVerticalLimits(
+        contentHeight: CGFloat,
+        elementHalfHeight: CGFloat
+    ) -> (minY: CGFloat, maxY: CGFloat) {
+        guard contentHeight > 0 else {
+            return (normalizedMinYFallback, normalizedMaxYFallback)
+        }
+        let padding = canvasEdgePadding
+        let minY = min(
+            max((elementHalfHeight + padding) / contentHeight, normalizedMinYFallback),
+            normalizedMaxYFallback - 0.02
+        )
+        let maxY = min(
+            max(1 - (elementHalfHeight + padding) / contentHeight, minY + 0.02),
+            normalizedMaxYFallback
+        )
+        return (minY, maxY)
+    }
+
+    /// Draggable anywhere on the scroll page; keeps the note center inside vertical padding.
     static func noteDragBounds(
         metadataBottomY: CGFloat,
         contentHeight: CGFloat,
         canvasWidth: CGFloat
     ) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
-        let maxY: CGFloat = 0.96
+        _ = metadataBottomY
         let minX: CGFloat = 0.04
         let maxX: CGFloat = 0.96
         guard contentHeight > 0, canvasWidth > 0 else {
-            return (minX, maxX, 0.42, maxY)
+            return (minX, maxX, 0.42, normalizedMaxYFallback)
         }
         let noteH = noteHeight(canvasWidth: canvasWidth)
-        let minCenterY = metadataBottomY > 0
-            ? metadataBottomY + noteBelowMetadataPadding + noteH / 2
-            : contentHeight * 0.42
-        let minY = min(max(minCenterY / contentHeight, 0.08), maxY - 0.02)
-        return (minX, maxX, minY, maxY)
+        let vertical = pageCanvasVerticalLimits(
+            contentHeight: contentHeight,
+            elementHalfHeight: noteH / 2
+        )
+        return (minX, maxX, vertical.minY, vertical.maxY)
     }
 
     static func clampNotePosition(
@@ -253,13 +275,13 @@ enum MemoryPageLayout {
         metadataBottomY: CGFloat,
         contentHeight: CGFloat
     ) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
-        let sandboxMinY: CGFloat
-        if metadataBottomY > 0, contentHeight > 0 {
-            sandboxMinY = min(max((metadataBottomY + 8) / contentHeight, 0.08), 0.90)
-        } else {
-            sandboxMinY = 0.42
-        }
-        return (minX: 0.04, maxX: 0.96, minY: sandboxMinY, maxY: 0.96)
+        _ = metadataBottomY
+        let stickerHalf = ProfileSticker.renderedSize(scale: ProfileSticker.memoryPageNewStickerScale) / 2
+        let vertical = pageCanvasVerticalLimits(
+            contentHeight: contentHeight,
+            elementHalfHeight: stickerHalf
+        )
+        return (minX: 0.04, maxX: 0.96, minY: vertical.minY, maxY: vertical.maxY)
     }
 
     static func defaultStickerPosition(
@@ -268,9 +290,15 @@ enum MemoryPageLayout {
         index: Int = 0
     ) -> NormalizedPoint {
         let bounds = stickerDragBounds(metadataBottomY: metadataBottomY, contentHeight: contentHeight)
-        let midY = (bounds.minY + bounds.maxY) / 2
+        let placementMidY: CGFloat
+        if metadataBottomY > 0, contentHeight > 0 {
+            let sandboxMinY = min(max((metadataBottomY + 8) / contentHeight, bounds.minY), 0.90)
+            placementMidY = (sandboxMinY + bounds.maxY) / 2
+        } else {
+            placementMidY = (bounds.minY + bounds.maxY) / 2
+        }
         let xs: [CGFloat] = [0.28, 0.62, 0.45, 0.72]
-        let ys: [CGFloat] = [midY - 0.06, midY, midY + 0.06, midY + 0.10]
+        let ys: [CGFloat] = [placementMidY - 0.06, placementMidY, placementMidY + 0.06, placementMidY + 0.10]
         let i = index % xs.count
         return NormalizedPoint(x: xs[i], y: min(ys[i], bounds.maxY - 0.04))
     }

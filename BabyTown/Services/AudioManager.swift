@@ -1,7 +1,7 @@
 import AVFoundation
 import UIKit
 
-class AudioManager {
+class AudioManager: NSObject {
     static let shared = AudioManager()
     private var audioPlayer: AVAudioPlayer?
     private var homeAudioPlayer: AVAudioPlayer?
@@ -10,7 +10,12 @@ class AudioManager {
     private var carSfxPlayer: AVAudioPlayer?
     private var preferenceObserver: NSObjectProtocol?
 
-    private init() {
+    private var shuffleQueue: [UUID] = []
+    private var shuffleQueueIndex = 0
+    private var currentPlayingTrackID: UUID?
+
+    private override init() {
+        super.init()
         preferenceObserver = NotificationCenter.default.addObserver(
             forName: .backgroundMusicPreferenceChanged,
             object: nil,
@@ -61,20 +66,18 @@ class AudioManager {
     }
 
     func playHomeMusic() {
-        if isHomeMusicPlaying { return }
-
         stopMusic()
-
-        if let importedURL = BackgroundMusicImporter.importedAudioURL {
-            playImportedHomeMusic(url: importedURL)
+        _ = CouplePlaylistStore.tracks
+        if CouplePlaylistStore.hasTracks {
+            playCurrentPlaylistTrack()
             return
         }
-
         playBundledHomeMusic()
     }
 
     func reloadHomeMusic() {
         stopHomeMusic()
+        resetShuffleQueue()
         playHomeMusic()
     }
 
@@ -83,21 +86,48 @@ class AudioManager {
         return false
     }
 
-    private func playImportedHomeMusic(url: URL) {
+    private func playCurrentPlaylistTrack() {
+        guard let track = resolvedNowPlayingTrack() else {
+            playBundledHomeMusic()
+            return
+        }
+        let url = CouplePlaylistStore.audioURL(for: track)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            playBundledHomeMusic()
+            return
+        }
+
+        if currentPlayingTrackID == track.id, isHomeMusicPlaying {
+            updatePlaybackState(isPlaying: true, track: track)
+            return
+        }
+
+        stopBundledHomeMusic()
+        currentPlayingTrackID = track.id
+
         do {
             activatePlaybackSession()
-            homeAudioPlayer = try AVAudioPlayer(contentsOf: url)
-            homeAudioPlayer?.numberOfLoops = -1
-            homeAudioPlayer?.volume = 0.3
-            homeAudioPlayer?.prepareToPlay()
-            homeAudioPlayer?.play()
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            player.numberOfLoops = CouplePlaylistStore.repeatEnabled ? -1 : 0
+            player.volume = 0.3
+            player.prepareToPlay()
+            player.play()
+            homeAudioPlayer = player
+            updatePlaybackState(isPlaying: true, track: track)
         } catch {
             print("Error playing imported home music: \(error.localizedDescription)")
+            currentPlayingTrackID = nil
             playBundledHomeMusic()
         }
     }
 
+    private func resolvedNowPlayingTrack() -> CouplePlaylistTrack? {
+        CouplePlaylistStore.nowPlayingTrack
+    }
+
     private func playBundledHomeMusic() {
+        currentPlayingTrackID = nil
 
         let musicFiles = [
             "The Weeknd - The Abyss (Audio)",
@@ -116,23 +146,29 @@ class AudioManager {
 
         guard let musicUrl = url else {
             print("Home music file not found. Tried: \(musicFiles)")
+            updatePlaybackState(isPlaying: false, track: nil)
             return
         }
 
         do {
             activatePlaybackSession()
-            homeAudioPlayer = try AVAudioPlayer(contentsOf: musicUrl)
-            homeAudioPlayer?.numberOfLoops = -1
-            homeAudioPlayer?.volume = 0.3
-            homeAudioPlayer?.prepareToPlay()
-            homeAudioPlayer?.play()
+            let player = try AVAudioPlayer(contentsOf: musicUrl)
+            player.numberOfLoops = -1
+            player.volume = 0.3
+            player.prepareToPlay()
+            player.play()
+            homeAudioPlayer = player
+            updatePlaybackState(isPlaying: true, track: nil)
         } catch {
             print("Error playing home music: \(error.localizedDescription)")
+            updatePlaybackState(isPlaying: false, track: nil)
         }
     }
 
     func stopHomeMusic() {
         stopBundledHomeMusic()
+        currentPlayingTrackID = nil
+        updatePlaybackState(isPlaying: false, track: CouplePlaylistStore.nowPlayingTrack)
     }
 
     private func stopBundledHomeMusic() {
@@ -140,6 +176,87 @@ class AudioManager {
             player.stop()
         }
         homeAudioPlayer = nil
+    }
+
+    private func advanceToNextTrack() {
+        guard CouplePlaylistStore.hasTracks else {
+            playBundledHomeMusic()
+            return
+        }
+
+        if CouplePlaylistStore.repeatEnabled {
+            playCurrentPlaylistTrack()
+            return
+        }
+
+        guard let nextID = nextTrackID() else {
+            playBundledHomeMusic()
+            return
+        }
+
+        CouplePlaylistStore.setNowPlaying(id: nextID)
+        resetShuffleQueueIfNeeded()
+        playCurrentPlaylistTrack()
+    }
+
+    private func nextTrackID() -> UUID? {
+        let ordered = CouplePlaylistStore.tracks
+        guard !ordered.isEmpty else { return nil }
+
+        if CouplePlaylistStore.shuffleEnabled {
+            if shuffleQueue.isEmpty {
+                rebuildShuffleQueue(avoidingFirst: nil)
+            }
+            let current = currentPlayingTrackID ?? CouplePlaylistStore.nowPlayingID
+            if let current, let idx = shuffleQueue.firstIndex(of: current) {
+                let nextIdx = idx + 1
+                if nextIdx < shuffleQueue.count {
+                    return shuffleQueue[nextIdx]
+                }
+                rebuildShuffleQueue(avoidingFirst: current)
+                return shuffleQueue.first
+            }
+            return shuffleQueue.first ?? ordered.first?.id
+        }
+
+        guard let current = currentPlayingTrackID ?? CouplePlaylistStore.nowPlayingID,
+              let currentIndex = ordered.firstIndex(where: { $0.id == current }) else {
+            return ordered.first?.id
+        }
+        let nextIndex = (currentIndex + 1) % ordered.count
+        return ordered[nextIndex].id
+    }
+
+    private func rebuildShuffleQueue(avoidingFirst avoidID: UUID?) {
+        var ids = CouplePlaylistStore.tracks.map(\.id)
+        guard !ids.isEmpty else {
+            shuffleQueue = []
+            return
+        }
+        ids.shuffle()
+        if let avoidID, ids.count > 1, ids[0] == avoidID, let swapIndex = ids.indices.dropFirst().first {
+            ids.swapAt(0, swapIndex)
+        }
+        shuffleQueue = ids
+        shuffleQueueIndex = 0
+    }
+
+    private func resetShuffleQueue() {
+        shuffleQueue = []
+        shuffleQueueIndex = 0
+    }
+
+    private func resetShuffleQueueIfNeeded() {
+        if CouplePlaylistStore.shuffleEnabled, shuffleQueue.isEmpty {
+            rebuildShuffleQueue(avoidingFirst: nil)
+        }
+    }
+
+    private func updatePlaybackState(isPlaying: Bool, track: CouplePlaylistTrack?) {
+        Task { @MainActor in
+            CoupleMusicPlaybackState.shared.setPlaying(isPlaying)
+            CoupleMusicPlaybackState.shared.refreshFromStore()
+        }
     }
 
     private func activatePlaybackSession() {
@@ -258,5 +375,13 @@ class AudioManager {
         } catch {
             print("Error playing yipee: \(error.localizedDescription)")
         }
+    }
+}
+
+extension AudioManager: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        guard player === homeAudioPlayer, flag else { return }
+        guard !CouplePlaylistStore.repeatEnabled else { return }
+        advanceToNextTrack()
     }
 }

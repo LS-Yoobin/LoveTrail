@@ -1,0 +1,59 @@
+import SwiftUI
+
+/// Vinyl record player on the garden scroll canvas; draggable in Edit Garden mode.
+struct ProfileGardenRecordPlayerView: View {
+    let position: NormalizedPoint?
+    let canvasSize: CGSize
+    let isCustomizing: Bool
+    let isPlaying: Bool
+    let onPositionChanged: (NormalizedPoint) -> Void
+    var onTap: (() -> Void)?
+
+    @State private var dragOrigin: NormalizedPoint?
+
+    private var resolvedPosition: NormalizedPoint {
+        position ?? ProfileGardenLayout.defaultRecordPlayerPosition(canvasSize: canvasSize)
+    }
+
+    private var center: CGPoint {
+        CGPoint(
+            x: resolvedPosition.x * canvasSize.width,
+            y: resolvedPosition.y * canvasSize.height
+        )
+    }
+
+    var body: some View {
+        VinylRecordPlayerView(isPlaying: isPlaying, scale: 1, onTap: isCustomizing ? nil : onTap)
+            .customizeDottedOutline(isCustomizing, cornerRadius: 14, padding: 4)
+            .position(center)
+            .gesture(isCustomizing ? dragGesture : nil)
+            .zIndex(20)
+    }
+
+    private var dragLimits: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
+        (minX: 0.06, maxX: 0.94, minY: 0.06, maxY: 0.94)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                if dragOrigin == nil {
+                    dragOrigin = resolvedPosition
+                }
+                let origin = dragOrigin ?? resolvedPosition
+                let limits = dragLimits
+                let nx = min(
+                    max(origin.x + value.translation.width / canvasSize.width, limits.minX),
+                    limits.maxX
+                )
+                let ny = min(
+                    max(origin.y + value.translation.height / canvasSize.height, limits.minY),
+                    limits.maxY
+                )
+                onPositionChanged(NormalizedPoint(x: nx, y: ny))
+            }
+            .onEnded { _ in
+                dragOrigin = nil
+            }
+    }
+}

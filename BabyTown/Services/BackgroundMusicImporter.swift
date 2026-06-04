@@ -9,6 +9,7 @@ enum BackgroundMusicImporter {
         case unreadableVideo
         case noAudioTrack
         case exportFailed
+        case playlistFull
 
         var errorDescription: String? {
             switch self {
@@ -18,37 +19,37 @@ enum BackgroundMusicImporter {
                 return "That recording has no audio. Make sure music was playing while you recorded."
             case .exportFailed:
                 return "Couldn't extract audio from that recording. Try a shorter clip."
+            case .playlistFull:
+                return CouplePlaylistStore.PlaylistError.playlistFull.errorDescription
             }
         }
     }
 
-    private static let hasImportedKey = "backgroundMusicHasImportedSong"
     private static let directoryName = "background_music"
-    private static let fileName = "imported_song.m4a"
-
     private static var fileManager: FileManager { .default }
 
-    private static var storageDirectory: URL {
+    private static var tempExportDirectory: URL {
         fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    static var storageURL: URL {
-        storageDirectory.appendingPathComponent(fileName)
-    }
-
     static var hasImportedSong: Bool {
-        guard fileManager.fileExists(atPath: storageURL.path) else { return false }
-        return UserDefaults.standard.bool(forKey: hasImportedKey)
+        CouplePlaylistStore.hasImportedSong
     }
 
     static var importedAudioURL: URL? {
-        guard hasImportedSong else { return nil }
-        return storageURL
+        CouplePlaylistStore.importedAudioURL
     }
 
-    static func importFromVideo(at videoURL: URL) async throws {
-        ensureStorageDirectory()
+    /// Extracts audio from a screen recording and appends it to the couple playlist.
+    @discardableResult
+    static func importFromVideo(at videoURL: URL) async throws -> CouplePlaylistTrack {
+        guard CouplePlaylistStore.canAddTrack else {
+            throw ImportError.playlistFull
+        }
+
+        ensureTempDirectory()
+        let tempURL = tempExportDirectory.appendingPathComponent("import_temp_\(UUID().uuidString).m4a")
 
         let asset = AVURLAsset(url: videoURL)
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
@@ -60,11 +61,11 @@ enum BackgroundMusicImporter {
             throw ImportError.exportFailed
         }
 
-        if fileManager.fileExists(atPath: storageURL.path) {
-            try? fileManager.removeItem(at: storageURL)
+        if fileManager.fileExists(atPath: tempURL.path) {
+            try? fileManager.removeItem(at: tempURL)
         }
 
-        exporter.outputURL = storageURL
+        exporter.outputURL = tempURL
         exporter.outputFileType = .m4a
 
         await withCheckedContinuation { continuation in
@@ -74,26 +75,31 @@ enum BackgroundMusicImporter {
         }
 
         guard exporter.status == .completed else {
-            try? fileManager.removeItem(at: storageURL)
+            try? fileManager.removeItem(at: tempURL)
             throw ImportError.exportFailed
         }
 
-        UserDefaults.standard.set(true, forKey: hasImportedKey)
-        UserDefaults.standard.removeObject(forKey: "customBackgroundMusicLink")
-        NotificationCenter.default.post(name: .backgroundMusicPreferenceChanged, object: nil)
+        defer {
+            try? fileManager.removeItem(at: tempURL)
+            cleanupTemporaryFile(at: videoURL)
+        }
 
-        cleanupTemporaryFile(at: videoURL)
+        do {
+            let track = try CouplePlaylistStore.addTrack(fromExportedAudioAt: tempURL)
+            UserDefaults.standard.removeObject(forKey: "customBackgroundMusicLink")
+            return track
+        } catch CouplePlaylistStore.PlaylistError.playlistFull {
+            throw ImportError.playlistFull
+        }
     }
 
     static func clearImportedSong() {
-        try? fileManager.removeItem(at: storageURL)
-        UserDefaults.standard.set(false, forKey: hasImportedKey)
-        NotificationCenter.default.post(name: .backgroundMusicPreferenceChanged, object: nil)
+        CouplePlaylistStore.clearAll()
     }
 
-    private static func ensureStorageDirectory() {
-        if !fileManager.fileExists(atPath: storageDirectory.path) {
-            try? fileManager.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
+    private static func ensureTempDirectory() {
+        if !fileManager.fileExists(atPath: tempExportDirectory.path) {
+            try? fileManager.createDirectory(at: tempExportDirectory, withIntermediateDirectories: true)
         }
     }
 

@@ -3,13 +3,20 @@ import SwiftUI
 
 struct BackgroundMusicSettingsSection: View {
 
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var statusMessage: String?
-    @State private var isImporting = false
+    @StateObject private var importCoordinator = BackgroundMusicImportCoordinator()
+
+    private var trackSummary: String {
+        let count = CouplePlaylistStore.tracks.count
+        if count == 0 { return "Default song" }
+        if count == 1, let name = CouplePlaylistStore.nowPlayingTrack?.displayName {
+            return name
+        }
+        return "\(count) songs in playlist"
+    }
 
     var body: some View {
         Section {
-            PhotosPicker(selection: $pickerItem, matching: .videos) {
+            PhotosPicker(selection: $importCoordinator.pickerItem, matching: .videos) {
                 HStack {
                     Image(systemName: "waveform.badge.plus")
                         .font(.system(size: 16))
@@ -17,9 +24,9 @@ struct BackgroundMusicSettingsSection: View {
                         .font(.system(size: 16, weight: .semibold))
                 }
             }
-            .disabled(isImporting)
+            .disabled(importCoordinator.isImporting || !CouplePlaylistStore.canAddTrack)
 
-            if isImporting {
+            if importCoordinator.isImporting {
                 HStack(spacing: 10) {
                     ProgressView()
                         .scaleEffect(0.85)
@@ -32,17 +39,17 @@ struct BackgroundMusicSettingsSection: View {
             HStack {
                 Text("Current")
                 Spacer()
-                Text(BackgroundMusicImporter.hasImportedSong ? "Your imported song" : "Default song")
+                Text(trackSummary)
                     .foregroundStyle(.secondary)
             }
 
-            if BackgroundMusicImporter.hasImportedSong {
+            if CouplePlaylistStore.hasTracks {
                 Button("Use default song") {
                     useDefaultSong()
                 }
             }
 
-            if let statusMessage {
+            if let statusMessage = importCoordinator.statusMessage {
                 Text(statusMessage)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
@@ -50,38 +57,30 @@ struct BackgroundMusicSettingsSection: View {
         } header: {
             Text("Background Music")
         } footer: {
-            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. Baby Town saves only the audio on your device and loops it on the home screen.")
+            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. You can manage up to 10 songs in Secret Garden → Our Song.")
         }
-        .onChange(of: pickerItem) { _, newItem in
+        .onChange(of: importCoordinator.pickerItem) { _, newItem in
             guard let newItem else { return }
-            Task { await importPickedVideo(newItem) }
+            Task { await importCoordinator.importPickedVideo(newItem) }
         }
-    }
-
-    @MainActor
-    private func importPickedVideo(_ item: PhotosPickerItem) async {
-        isImporting = true
-        statusMessage = nil
-        defer {
-            isImporting = false
-            pickerItem = nil
-        }
-
-        do {
-            guard let picked = try await item.loadTransferable(type: PickedBackgroundMusicVideo.self) else {
-                statusMessage = BackgroundMusicImporter.ImportError.unreadableVideo.errorDescription
-                return
-            }
-            try await BackgroundMusicImporter.importFromVideo(at: picked.url)
-            statusMessage = "Imported — your song will loop on the home screen."
-        } catch {
-            statusMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        .sheet(item: $importCoordinator.trackAwaitingName) { track in
+            CoupleSongNameSheet(
+                title: "Name your song",
+                subtitle: "Give this track a name for your couple playlist.",
+                initialName: track.displayName,
+                confirmTitle: "Save & play",
+                onCancel: { importCoordinator.dismissNamingPrompt() },
+                onConfirm: { name in
+                    importCoordinator.finishNamingTrack(id: track.id, displayName: name)
+                }
+            )
         }
     }
 
     private func useDefaultSong() {
-        statusMessage = nil
-        BackgroundMusicImporter.clearImportedSong()
-        statusMessage = "Using the default Baby Town song."
+        importCoordinator.clearStatus()
+        CouplePlaylistStore.clearAll()
+        AudioManager.shared.reloadHomeMusic()
+        importCoordinator.statusMessage = "Using the default Baby Town song."
     }
 }

@@ -4,15 +4,15 @@ import Foundation
 enum BackgroundMusicPreferences {
 
     static var hasCustomSong: Bool {
-        BackgroundMusicImporter.hasImportedSong
+        CouplePlaylistStore.hasTracks
     }
 
     static var importedAudioURL: URL? {
-        BackgroundMusicImporter.importedAudioURL
+        CouplePlaylistStore.importedAudioURL
     }
 
     static func clearCustomSong() {
-        BackgroundMusicImporter.clearImportedSong()
+        CouplePlaylistStore.clearAll()
     }
 }
 

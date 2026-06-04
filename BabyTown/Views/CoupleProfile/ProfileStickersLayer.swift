@@ -7,6 +7,8 @@ struct ProfileStickersLayer: View {
     let images: [UUID: UIImage]
     let profileNote: String?
     let profileNotePosition: NormalizedPoint?
+    let recordPlayerPosition: NormalizedPoint?
+    let isRecordPlayerPlaying: Bool
     let userName: String
     let partnerTitle: String
     let isCustomizing: Bool
@@ -19,8 +21,10 @@ struct ProfileStickersLayer: View {
     let onTapUser: () -> Void
     let onTapPartner: () -> Void
     var onTapNote: (() -> Void)?
+    var onTapRecordPlayer: (() -> Void)?
     var onTapPhotoSticker: ((ProfileSticker) -> Void)?
     let onNotePositionChanged: (NormalizedPoint) -> Void
+    let onRecordPlayerPositionChanged: (NormalizedPoint) -> Void
     let onPositionChanged: (UUID, NormalizedPoint) -> Void
     let onScaleChanged: (UUID, CGFloat) -> Void
     let onRotationChanged: (UUID, Double) -> Void
@@ -59,6 +63,16 @@ struct ProfileStickersLayer: View {
                 ForEach(photoStickers) { sticker in
                     stickerView(sticker, canvasSize: geo.size)
                 }
+
+                ProfileGardenRecordPlayerView(
+                    position: recordPlayerPosition,
+                    canvasSize: geo.size,
+                    isCustomizing: isCustomizing,
+                    isPlaying: isRecordPlayerPlaying,
+                    onPositionChanged: onRecordPlayerPositionChanged,
+                    onTap: isCustomizing ? nil : onTapRecordPlayer
+                )
+                .zIndex(20)
             }
         }
         // User/partner stickers are tappable in browse mode too; individual

@@ -26,6 +26,9 @@ struct CoupleProfileView: View {
     @State private var showVisitPet = false
     @State private var showStickerPicker = false
     @State private var showProfileNoteEditor = false
+    @State private var showOurSongSheet = false
+
+    @ObservedObject private var musicPlaybackState = CoupleMusicPlaybackState.shared
 
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
     @State private var activeSubpage: CoupleProfileSubpage?
@@ -183,6 +186,8 @@ struct CoupleProfileView: View {
                                 images: stickerImages,
                                 profileNote: profile.profileNote,
                                 profileNotePosition: profile.profileNotePosition,
+                                recordPlayerPosition: profile.recordPlayerPosition,
+                                isRecordPlayerPlaying: musicPlaybackState.isPlaying,
                                 userName: displayName,
                                 partnerTitle: partnerSlotTitle,
                                 isCustomizing: isCustomizing,
@@ -201,8 +206,10 @@ struct CoupleProfileView: View {
                                 onTapUser: { showEditProfile = true },
                                 onTapPartner: handlePartnerSlotTap,
                                 onTapNote: { showProfileNoteEditor = true },
+                                onTapRecordPlayer: { showOurSongSheet = true },
                                 onTapPhotoSticker: handlePhotoStickerTap,
                                 onNotePositionChanged: updateProfileNotePosition,
+                                onRecordPlayerPositionChanged: updateRecordPlayerPosition,
                                 onPositionChanged: updateStickerPosition,
                                 onScaleChanged: updateStickerScale,
                                 onRotationChanged: updateStickerRotation
@@ -240,7 +247,13 @@ struct CoupleProfileView: View {
             pinnedMemoryOverlays
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear(perform: load)
+        .onAppear {
+            load()
+            AudioManager.shared.playHomeMusic()
+        }
+        .sheet(isPresented: $showOurSongSheet) {
+            OurSongSheet()
+        }
         .sheet(isPresented: $showEditProfile) {
             ProfileEditorSheet(initialName: displayName, initialImage: userAvatar) { image, name in
                 dpm.saveUserAvatar(image)
@@ -738,6 +751,10 @@ struct CoupleProfileView: View {
 
     private func updateProfileNotePosition(_ position: NormalizedPoint) {
         profile.profileNotePosition = position
+    }
+
+    private func updateRecordPlayerPosition(_ position: NormalizedPoint) {
+        profile.recordPlayerPosition = position
     }
 
     private func deleteProfileNote() {

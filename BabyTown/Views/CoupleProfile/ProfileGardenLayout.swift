@@ -14,6 +14,27 @@ enum ProfileGardenLayout {
     /// Typical height of Our History + Important Dates + Pinned Memories preview.
     static let estimatedCardsHeight: CGFloat = 700
 
+    /// Default vinyl player center — lower-right of the card stack, above the
+    /// user / invite-partner avatar band (`profileSlotNormalizedY`).
+    static func defaultRecordPlayerPosition(canvasSize: CGSize) -> NormalizedPoint {
+        let totalH = max(
+            canvasSize.height,
+            contentTopPadding
+                + estimatedCardsHeight
+                + avatarBandTopGap
+                + avatarBandHeight
+                + stickerCanvasHeight
+        )
+        let avatarBandTopY = contentTopPadding + estimatedCardsHeight + avatarBandTopGap
+        let recordHalfHeight: CGFloat = 44
+        let gapAboveAvatars: CGFloat = 32
+        let centerY = avatarBandTopY - gapAboveAvatars - recordHalfHeight
+        return NormalizedPoint(
+            x: 0.86,
+            y: min(profileSlotNormalizedY - 0.06, max(0.10, centerY / totalH))
+        )
+    }
+
     /// Normalized Y for default user/partner sticker centers (0…1 over full scroll content).
     static var profileSlotNormalizedY: CGFloat {
         let total = contentTopPadding

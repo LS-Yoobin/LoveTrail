@@ -567,15 +567,13 @@ struct HomeView: View {
         coupleSpaceBloomCount = GardenComposer().compose(acts: acts).count
 
         let season = dpm.loadGardenState().season(now: Date())
-        Task.detached(priority: .utility) {
-            let thumbnail = GardenSnapshotRenderer.render(
+        Task { @MainActor in
+            let thumbnail = await GardenSnapshotRenderer.render(
                 moments: moments,
                 letters: letters,
                 season: season
             )
-            await MainActor.run {
-                coupleSpaceGardenThumbnail = thumbnail
-            }
+            coupleSpaceGardenThumbnail = thumbnail
         }
     }
 
