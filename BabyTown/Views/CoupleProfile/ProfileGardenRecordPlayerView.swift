@@ -3,16 +3,31 @@ import SwiftUI
 /// Vinyl record player on the garden scroll canvas; draggable in Edit Garden mode.
 struct ProfileGardenRecordPlayerView: View {
     let position: NormalizedPoint?
+    let scale: CGFloat?
     let canvasSize: CGSize
     let isCustomizing: Bool
     let isPlaying: Bool
     let onPositionChanged: (NormalizedPoint) -> Void
+    let onScaleChanged: (CGFloat) -> Void
     var onTap: (() -> Void)?
 
     @State private var dragOrigin: NormalizedPoint?
+    @State private var pinchBaseScale: CGFloat = VinylRecordPlayerView.gardenMinScale
+    @State private var pinchPreviewScale: CGFloat?
+
+    /// Lower = finer pinch control (matches `ProfileStickerView`).
+    private static let pinchSensitivity: CGFloat = 0.22
 
     private var resolvedPosition: NormalizedPoint {
         position ?? ProfileGardenLayout.defaultRecordPlayerPosition(canvasSize: canvasSize)
+    }
+
+    private var resolvedScale: CGFloat {
+        max(scale ?? VinylRecordPlayerView.gardenMinScale, VinylRecordPlayerView.gardenMinScale)
+    }
+
+    private var effectiveScale: CGFloat {
+        pinchPreviewScale ?? resolvedScale
     }
 
     private var center: CGPoint {
@@ -23,11 +38,20 @@ struct ProfileGardenRecordPlayerView: View {
     }
 
     var body: some View {
-        VinylRecordPlayerView(isPlaying: isPlaying, scale: 1, onTap: isCustomizing ? nil : onTap)
+        VinylRecordPlayerView(isPlaying: isPlaying, scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
             .customizeDottedOutline(isCustomizing, cornerRadius: 14, padding: 4)
             .position(center)
-            .gesture(isCustomizing ? dragGesture : nil)
+            .gesture(isCustomizing ? customizeGestures : nil)
+            .onAppear { pinchBaseScale = resolvedScale }
+            .onChange(of: scale) { _, newScale in
+                pinchBaseScale = max(newScale ?? VinylRecordPlayerView.gardenMinScale, VinylRecordPlayerView.gardenMinScale)
+                pinchPreviewScale = nil
+            }
             .zIndex(20)
+    }
+
+    private var scaleLimits: (min: CGFloat, max: CGFloat) {
+        (VinylRecordPlayerView.gardenMinScale, VinylRecordPlayerView.gardenMaxScale)
     }
 
     private var dragLimits: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
@@ -55,5 +79,27 @@ struct ProfileGardenRecordPlayerView: View {
             .onEnded { _ in
                 dragOrigin = nil
             }
+    }
+
+    private var pinchGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { amount in
+                let damped = 1 + (amount - 1) * Self.pinchSensitivity
+                let proposed = pinchBaseScale * damped
+                let limits = scaleLimits
+                pinchPreviewScale = min(max(proposed, limits.min), limits.max)
+            }
+            .onEnded { amount in
+                let damped = 1 + (amount - 1) * Self.pinchSensitivity
+                let limits = scaleLimits
+                let final = min(max(pinchBaseScale * damped, limits.min), limits.max)
+                pinchBaseScale = final
+                pinchPreviewScale = nil
+                onScaleChanged(final)
+            }
+    }
+
+    private var customizeGestures: some Gesture {
+        SimultaneousGesture(dragGesture, pinchGesture)
     }
 }

@@ -8,6 +8,7 @@ struct ProfileStickersLayer: View {
     let profileNote: String?
     let profileNotePosition: NormalizedPoint?
     let recordPlayerPosition: NormalizedPoint?
+    let recordPlayerScale: CGFloat?
     let isRecordPlayerPlaying: Bool
     let userName: String
     let partnerTitle: String
@@ -25,6 +26,7 @@ struct ProfileStickersLayer: View {
     var onTapPhotoSticker: ((ProfileSticker) -> Void)?
     let onNotePositionChanged: (NormalizedPoint) -> Void
     let onRecordPlayerPositionChanged: (NormalizedPoint) -> Void
+    let onRecordPlayerScaleChanged: (CGFloat) -> Void
     let onPositionChanged: (UUID, NormalizedPoint) -> Void
     let onScaleChanged: (UUID, CGFloat) -> Void
     let onRotationChanged: (UUID, Double) -> Void
@@ -66,10 +68,12 @@ struct ProfileStickersLayer: View {
 
                 ProfileGardenRecordPlayerView(
                     position: recordPlayerPosition,
+                    scale: recordPlayerScale,
                     canvasSize: geo.size,
                     isCustomizing: isCustomizing,
                     isPlaying: isRecordPlayerPlaying,
                     onPositionChanged: onRecordPlayerPositionChanged,
+                    onScaleChanged: onRecordPlayerScaleChanged,
                     onTap: isCustomizing ? nil : onTapRecordPlayer
                 )
                 .zIndex(20)

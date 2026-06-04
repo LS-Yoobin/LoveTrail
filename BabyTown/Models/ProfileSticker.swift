@@ -26,6 +26,8 @@ struct ProfileSticker: Codable, Identifiable, Equatable {
 
     /// User + partner profile stickers on the secret garden canvas.
     static let profileAvatarScale: CGFloat = 1.6
+    /// Default scale for user avatar when a profile photo is set (25% larger than placeholder).
+    static let profileAvatarScaleWithPhoto: CGFloat = profileAvatarScale * 1.25
     static let profileAvatarMinScale: CGFloat = 1.0
     static let profileAvatarMaxScale: CGFloat = 5.5
 

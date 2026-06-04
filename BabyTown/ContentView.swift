@@ -79,43 +79,77 @@ struct ContentView: View {
                 .transition(.opacity)
 
             case .storyOnboarding:
-                StoryOnboardingFlow {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .nickname
+                StoryOnboardingFlow(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
+                    },
+                    onFinishedStory: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .nickname
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .nickname:
-                NicknameView { nickname in
-                    DataPersistenceManager.shared.saveUserNickname(nickname)
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .colorTheme
+                NicknameView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .welcome
+                        }
+                    },
+                    onContinue: { nickname in
+                        DataPersistenceManager.shared.saveUserNickname(nickname)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .colorTheme
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .colorTheme:
-                ColorThemeView { theme in
-                    ThemeManager.shared.setTheme(theme)
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .birthday
+                ColorThemeView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .nickname
+                        }
+                    },
+                    onContinue: { theme in
+                        ThemeManager.shared.setTheme(theme)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .birthday
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .birthday:
-                UserBirthdayView { birthday in
-                    let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
-                    DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .firstMemories
+                UserBirthdayView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .colorTheme
+                        }
+                    },
+                    onContinue: { birthday in
+                        let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
+                        DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .firstMemories
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .firstMemories:
-                FirstMemoriesView { firstMet, official, firstMetDate, officialDate in
+                FirstMemoriesView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .birthday
+                        }
+                    },
+                    onFinished: { firstMet, official, firstMetDate, officialDate in
                     firstMetPhoto = firstMet
                     officialPhoto = official
                     homeViewModel.pinnedFirstMet = firstMet
@@ -198,27 +232,42 @@ struct ContentView: View {
 
                     homeViewModel.addMoments(onboardingMoments)
                     
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .howItWorks
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .howItWorks
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .howItWorks:
-                HowItWorksView {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .photoAccess
+                HowItWorksView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .firstMemories
+                        }
+                    },
+                    onEnterHome: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .photoAccess
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .photoAccess:
-                PhotoAccessView {
-                    DataPersistenceManager.shared.setOnboardingCompleted(true)
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .home
+                PhotoAccessView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .howItWorks
+                        }
+                    },
+                    onContinue: {
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
                     }
-                }
+                )
                 .transition(.opacity)
 
             case .home:

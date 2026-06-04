@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StoryOnboardingFlow: View {
+    let onBack: () -> Void
     let onFinishedStory: () -> Void
     
     @State private var currentSceneIndex = 0
@@ -82,7 +83,32 @@ struct StoryOnboardingFlow: View {
                     .padding(.bottom, 30)
             }
         }
+        .onboardingBackButton(action: handleBack)
         .interactiveDismissDisabled()
+    }
+
+    private func handleBack() {
+        if currentSceneIndex > 0 {
+            let leaving = currentSceneIndex
+            if leaving == 0 {
+                AudioManager.shared.stopMusic()
+            } else if leaving == 1 {
+                AudioManager.shared.stopRingtone()
+            } else if leaving == 2 {
+                AudioManager.shared.stopFootsteps()
+            }
+
+            let previous = currentSceneIndex - 1
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                currentSceneIndex = previous
+                interactionComplete = completedScenes.contains(previous)
+            }
+        } else {
+            AudioManager.shared.stopMusic()
+            AudioManager.shared.stopRingtone()
+            AudioManager.shared.stopFootsteps()
+            onBack()
+        }
     }
     
     private func handleCTAAction() {
@@ -182,9 +208,9 @@ struct SceneContentView: View {
 }
 
 #Preview {
-    StoryOnboardingFlow {
+    StoryOnboardingFlow(onBack: {}, onFinishedStory: {
         print("Story finished!")
-    }
+    })
 }
 
 #Preview("Scene 1 Only") {

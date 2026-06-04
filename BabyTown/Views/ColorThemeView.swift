@@ -3,6 +3,7 @@ import UIKit
 
 struct ColorThemeView: View {
 
+    var onBack: () -> Void
     var onContinue: (ColorTheme) -> Void
 
     @State private var selected: ColorTheme = .pink
@@ -40,6 +41,7 @@ struct ColorThemeView: View {
             .scrollIndicators(.hidden)
             .opacity(contentOpacity)
         }
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.easeOut(duration: 0.6).delay(0.15)) {
                 contentOpacity = 1.0
@@ -53,12 +55,12 @@ struct ColorThemeView: View {
         VStack(spacing: 14) {
             Text("Choose your palette")
                 .font(.system(size: 26, weight: .light, design: .serif))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.black)
                 .multilineTextAlignment(.center)
 
             Text("Sets the mood for memories, buttons, and every little detail. You can switch anytime in Settings.")
                 .font(.system(size: 15))
-                .foregroundStyle(Color(.secondaryLabel))
+                .foregroundStyle(.black)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -71,7 +73,7 @@ struct ColorThemeView: View {
             Text("PREVIEW")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.2)
-                .foregroundStyle(Color(.tertiaryLabel))
+                .foregroundStyle(.black)
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -323,5 +325,5 @@ struct ColorThemeView: View {
 }
 
 #Preview {
-    ColorThemeView { print("theme: \($0)") }
+    ColorThemeView(onBack: {}, onContinue: { print("theme: \($0)") })
 }

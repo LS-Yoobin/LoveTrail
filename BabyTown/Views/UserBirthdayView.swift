@@ -2,6 +2,7 @@ import SwiftUI
 
 struct UserBirthdayView: View {
 
+    var onBack: () -> Void
     var onContinue: (Date) -> Void
 
     @State private var birthday: Date
@@ -14,7 +15,8 @@ struct UserBirthdayView: View {
         return start...end
     }
 
-    init(onContinue: @escaping (Date) -> Void) {
+    init(onBack: @escaping () -> Void, onContinue: @escaping (Date) -> Void) {
+        self.onBack = onBack
         self.onContinue = onContinue
         let defaultDate = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
         _birthday = State(initialValue: defaultDate)
@@ -65,6 +67,7 @@ struct UserBirthdayView: View {
             }
             .opacity(contentOpacity)
         }
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.easeOut(duration: 0.6).delay(0.15)) {
                 contentOpacity = 1.0
@@ -74,7 +77,7 @@ struct UserBirthdayView: View {
 
     private var continueButton: some View {
         Button {
-            onContinue(Calendar.current.startOfDay(for: birthday))
+            onContinue(SpecialDate.normalizedTimelineDay(birthday))
         } label: {
             Text("Continue")
                 .font(.system(size: 17, weight: .medium))
@@ -93,7 +96,7 @@ struct UserBirthdayView: View {
 }
 
 #Preview {
-    UserBirthdayView { date in
+    UserBirthdayView(onBack: {}, onContinue: { date in
         print("birthday: \(date)")
-    }
+    })
 }

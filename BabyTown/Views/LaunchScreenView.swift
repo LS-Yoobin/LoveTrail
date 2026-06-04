@@ -50,7 +50,7 @@ struct LaunchScreenView: View {
 
 // MARK: - SpriteKit cats
 
-private struct LaunchRunningCatsView: View {
+struct LaunchRunningCatsView: View {
     let scene: LaunchCatScene
 
     var body: some View {

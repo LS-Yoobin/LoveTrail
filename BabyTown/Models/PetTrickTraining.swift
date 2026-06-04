@@ -38,7 +38,7 @@ enum PetTrick: String, Codable, CaseIterable, Identifiable {
     /// Phrases the speech recognizer listens for (lowercased).
     var voicePhrases: [String] {
         switch self {
-        case .paw:       return ["paw", "paul", "give paw", "shake"]
+        case .paw:       return ["paw", "paul", "poor", "give paw", "shake"]
         case .highFive:  return [
             "high five", "high-five", "highfive", "high 5", "high5",
             "gh five", "gh 5", "gh5", "hive five", "hai five",
@@ -380,6 +380,7 @@ struct PetTrickTrainingState: Codable, Equatable {
             (#"\bhigh\s*[-]?\s*5\b"#, "High Five"),
             (#"\bhighfive\b"#, "High Five"),
             (#"\bpaul\b"#, "Paw"),
+            (#"\bpoor\b"#, "Paw"),
         ]
         for (pattern, replacement) in corrections {
             text = text.replacingOccurrences(

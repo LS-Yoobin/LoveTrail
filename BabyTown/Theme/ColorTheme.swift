@@ -63,4 +63,21 @@ enum ColorTheme: String, CaseIterable, Codable {
             endPoint: .trailing
         )
     }
+
+    /// Pet-room wall swatch shown when no custom wall color is saved.
+    var defaultWallColorID: String {
+        switch self {
+        case .pink: "wall_blush"
+        case .blue: "wall_sky"
+        }
+    }
+
+    /// Loads the persisted theme (same key as `DataPersistenceManager`).
+    static var persisted: ColorTheme {
+        guard let raw = UserDefaults.standard.string(forKey: "colorTheme"),
+              let theme = ColorTheme(rawValue: raw) else {
+            return .pink
+        }
+        return theme
+    }
 }

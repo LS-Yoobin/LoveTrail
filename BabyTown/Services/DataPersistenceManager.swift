@@ -278,12 +278,27 @@ final class DataPersistenceManager {
         saveCoupleProfile(profile)
     }
 
+    /// Saves the partner's birthday into Important Dates (stable id for timeline ordering).
+    func savePartnerBirthday(_ date: Date, partnerName: String) {
+        var profile = loadCoupleProfile()
+        let birthday = SpecialDate.localPartnerBirthday(
+            title: SpecialDate.partnerBirthdayTitle(for: partnerName),
+            date: date
+        )
+        profile.specialDates.removeAll { $0.id == SpecialDate.localPartnerBirthdayID }
+        profile.specialDates.append(birthday)
+        saveCoupleProfile(profile)
+    }
+
     /// Tolerant load — returns an empty profile when nothing is stored.
     func loadCoupleProfile() -> CoupleProfile {
         guard fileManager.fileExists(atPath: coupleProfileFileURL.path),
               let data = try? Data(contentsOf: coupleProfileFileURL),
-              let profile = try? decoder.decode(CoupleProfile.self, from: data) else {
+              var profile = try? decoder.decode(CoupleProfile.self, from: data) else {
             return CoupleProfile()
+        }
+        if SpecialDate.migrateBirthdayEntries(in: &profile) {
+            saveCoupleProfile(profile)
         }
         return profile
     }

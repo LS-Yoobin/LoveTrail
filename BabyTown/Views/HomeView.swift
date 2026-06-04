@@ -600,16 +600,25 @@ struct HomeView: View {
         showHomeSpecialDateEditor = true
     }
 
+    private func normalizedSpecialDateForSave(_ date: SpecialDate) -> SpecialDate {
+        guard date.isBirthday else { return date }
+        var copy = date
+        copy.isPinned = false
+        copy.pinnedAt = nil
+        return copy
+    }
+
     private func saveHomeSpecialDate(_ date: SpecialDate, image: UIImage?) {
         let dpm = DataPersistenceManager.shared
         var profile = dpm.loadCoupleProfile()
-        if let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) {
-            profile.specialDates[idx] = date
+        let toSave = normalizedSpecialDateForSave(date)
+        if let idx = profile.specialDates.firstIndex(where: { $0.id == toSave.id }) {
+            profile.specialDates[idx] = toSave
         } else {
-            profile.specialDates.append(date)
+            profile.specialDates.append(toSave)
         }
         if let image {
-            dpm.saveSpecialDatePhoto(image, id: date.id)
+            dpm.saveSpecialDatePhoto(image, id: toSave.id)
         }
         ProfileStickerSync.sync(profile: &profile, dpm: dpm)
         dpm.saveCoupleProfile(profile)
@@ -619,10 +628,11 @@ struct HomeView: View {
     private func updateHomeSpecialDate(_ date: SpecialDate) {
         let dpm = DataPersistenceManager.shared
         var profile = dpm.loadCoupleProfile()
-        if let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) {
-            profile.specialDates[idx] = date
+        let toSave = normalizedSpecialDateForSave(date)
+        if let idx = profile.specialDates.firstIndex(where: { $0.id == toSave.id }) {
+            profile.specialDates[idx] = toSave
         } else {
-            profile.specialDates.append(date)
+            profile.specialDates.append(toSave)
         }
         ProfileStickerSync.sync(profile: &profile, dpm: dpm)
         dpm.saveCoupleProfile(profile)
@@ -630,6 +640,7 @@ struct HomeView: View {
     }
 
     private func toggleHomeSpecialDatePin(_ special: SpecialDate) {
+        guard !special.isBirthday else { return }
         var updated = special
         updated.isPinned.toggle()
         updated.pinnedAt = updated.isPinned ? Date() : nil
@@ -1116,7 +1127,7 @@ struct HomeView: View {
     }
 
     private var pinnedHomeSpecialDates: [SpecialDate] {
-        homeSpecialDates.filter(\.isPinned)
+        homeSpecialDates.filter { $0.isPinned && !$0.isBirthday }
     }
 
     private enum PinnedMemoryRowItem: Identifiable {
@@ -1290,12 +1301,13 @@ struct HomeView: View {
 
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: viewModel.daySections.count + viewModel.promptMemories.count + homeSpecialDates.count + (viewModel.processingMemoryForTimeline != nil ? 1 : 0) + viewModel.foundingTimelineSlots.count
+                    sectionCount: memoryTimelineItems.count + birthdayTimelineItems.count + viewModel.foundingTimelineSlots.count
                 )
 
-                let rows = timelineRows
+                let memoryRows = memoryTimelineRows
+                let birthdayRows = birthdayTimelineRows
                 LazyVStack(spacing: 24) {
-                    ForEach(rows) { row in
+                    ForEach(memoryRows) { row in
                         let index = row.displayIndex
                         if let year = row.yearHeader {
                             yearHeaderView(year)
@@ -1477,7 +1489,7 @@ struct HomeView: View {
                         }
                     }
 
-                    // "The Beginning..." after the last regular item
+                    // "The Beginning..." after regular memories (newest-first above)
                     HStack(spacing: 8) {
                         HeartbeatIconView()
 
@@ -1569,6 +1581,39 @@ struct HomeView: View {
                             .padding(.top, 16)
                         }
                     }
+
+                    // Birthdays — oldest anchor at the absolute bottom (below founding)
+                    ForEach(birthdayRows) { row in
+                        let index = row.displayIndex
+                        if let year = row.yearHeader {
+                            yearHeaderView(year)
+                        }
+
+                        if case .specialDate(let special) = row.item {
+                            SpecialDateMemoryCard(
+                                title: special.title,
+                                date: special.date,
+                                image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id),
+                                style: .timeline,
+                                isPinned: false,
+                                isLeftAligned: index.isMultiple(of: 2),
+                                index: index,
+                                onTap: { openHomeSpecialDate(special) },
+                                onShare: { shareHomeSpecialDate(special) },
+                                onEdit: { beginEditHomeSpecialDate(special) },
+                                onDelete: { deleteHomeSpecialDate(special) },
+                                onTogglePin: nil
+                            )
+                            .padding(
+                                .leading,
+                                index.isMultiple(of: 2) ? 20 : 46
+                            )
+                            .padding(
+                                .trailing,
+                                index.isMultiple(of: 2) ? 46 : 20
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1657,8 +1702,25 @@ struct HomeView: View {
             case .processingMemory(let memory):
                 return memory.date
             case .specialDate(let special):
-                return special.date
+                return special.timelineSortDate
             }
+        }
+
+        /// Year divider label — always the real event year (e.g. 1999 birth year).
+        var yearHeaderDate: Date {
+            switch self {
+            case .specialDate(let special):
+                return special.date
+            default:
+                return date
+            }
+        }
+
+        var isBirthday: Bool {
+            if case .specialDate(let special) = self {
+                return special.isBirthday
+            }
+            return false
         }
 
         var stableId: String {
@@ -1677,34 +1739,43 @@ struct HomeView: View {
         var stableSortKey: String { stableId }
     }
     
-    private var combinedTimelineItems: [TimelineItem] {
+    /// Unpinned special dates only — pinned ones live in the pinned strip.
+    private var timelineSpecialDates: [SpecialDate] {
+        homeSpecialDates.filter { !$0.isPinned }
+    }
+
+    /// Photos and non-birthday special dates — newest first.
+    private var memoryTimelineItems: [TimelineItem] {
         var items: [TimelineItem] = []
         
         items += viewModel.daySections.map { .daySection($0) }
         items += viewModel.promptMemories.map { .promptMemory($0) }
-        items += homeSpecialDates.map { .specialDate($0) }
+        items += timelineSpecialDates.filter { !$0.isBirthday }.map { .specialDate($0) }
         if let processingMemory = viewModel.processingMemoryForTimeline {
             items.append(.processingMemory(processingMemory))
         }
         
-        // Sort with processing memories at the top until 9:00 PM
-        return items.sorted { item1, item2 in
-            let isProcessing1 = isProcessingMemory(item1)
-            let isProcessing2 = isProcessingMemory(item2)
-            
-            // If one is processing and the other isn't, processing comes first
-            if isProcessing1 && !isProcessing2 {
-                return true
-            } else if !isProcessing1 && isProcessing2 {
-                return false
-            }
-            
-            // Otherwise sort by date (newest first), with stable tiebreaker
-            if item1.date != item2.date {
-                return item1.date > item2.date
-            }
-            return item1.stableSortKey < item2.stableSortKey
+        return HomeTimelineOrdering.sorted(items) { item in
+            HomeTimelineOrdering.SortableItem(
+                date: item.date,
+                stableKey: item.stableSortKey,
+                isProcessing: isProcessingMemory(item),
+                isBirthday: false
+            )
         }
+    }
+
+    /// Birthdays are rendered in a fixed block above founding moments, never mixed into the main feed.
+    private var birthdayTimelineItems: [TimelineItem] {
+        timelineSpecialDates
+            .filter(\.isBirthday)
+            .sorted { lhs, rhs in
+                if lhs.timelineSortDate != rhs.timelineSortDate {
+                    return lhs.timelineSortDate > rhs.timelineSortDate
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            .map { .specialDate($0) }
     }
     
     private func isProcessingMemory(_ item: TimelineItem) -> Bool {
@@ -1721,28 +1792,37 @@ struct HomeView: View {
         let displayIndex: Int
     }
 
-    /// Builds the sorted timeline once and precomputes year-header boundaries in a single
-    /// pass. Replaces the old per-item `yearHeaderForItem`, which re-sorted the whole list
-    /// for every row (O(N²) per render).
-    private var timelineRows: [TimelineRow] {
-        let items = combinedTimelineItems
+    /// Builds timeline rows and precomputes year-header boundaries in a single pass.
+    private func buildTimelineRows(from items: [TimelineItem], startingDisplayIndex: Int = 0) -> [TimelineRow] {
         let calendar = Calendar.current
         var rows: [TimelineRow] = []
         rows.reserveCapacity(items.count)
 
         var previousYear: Int? = nil
-        for (displayIndex, item) in items.enumerated() {
-            let year = calendar.component(.year, from: item.date)
+        for (offset, item) in items.enumerated() {
+            let year = calendar.component(.year, from: item.yearHeaderDate)
             let header: String? = (year != previousYear) ? String(year) : nil
             previousYear = year
             rows.append(TimelineRow(
                 id: item.stableId,
                 item: item,
                 yearHeader: header,
-                displayIndex: displayIndex
+                displayIndex: startingDisplayIndex + offset
             ))
         }
         return rows
+    }
+
+    private var memoryTimelineRows: [TimelineRow] {
+        buildTimelineRows(from: memoryTimelineItems)
+    }
+
+    private var birthdayTimelineRows: [TimelineRow] {
+        let foundingCount = viewModel.foundingTimelineSlots.count
+        return buildTimelineRows(
+            from: birthdayTimelineItems,
+            startingDisplayIndex: memoryTimelineRows.count + foundingCount
+        )
     }
 
     private func yearHeaderView(_ year: String) -> some View {

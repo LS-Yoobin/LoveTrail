@@ -6,6 +6,11 @@ struct VinylRecordPlayerView: View {
     var scale: CGFloat = 1
     var onTap: (() -> Void)? = nil
 
+    /// Secret Garden canvas: current default size is the minimum; pinch can enlarge only.
+    static let gardenMinScale: CGFloat = 1
+    static let gardenMaxScale: CGFloat = 2.5
+    static let gardenBaseSide: CGFloat = 88
+
     private static let frameNames = [
         "prop_record_player_0",
         "prop_record_player_1",

@@ -8,22 +8,41 @@ final class LaunchCatScene: SKScene {
         let texture: SKTexture
     }
 
+    private enum RunnerBehavior {
+        case stopAndSit
+        case walkAcross
+    }
+
     private struct RunnerConfig {
         let skin: CatSkin
+        let displayHeight: CGFloat
         let destinationXFraction: CGFloat
         let destinationYFraction: CGFloat
         let startDelay: TimeInterval
+        let behavior: RunnerBehavior
     }
 
-    private let catDisplayHeight: CGFloat = 92
     private let walkSpeed: CGFloat = 140
 
     private var hasStarted = false
-    private var frameDisplaySizes: [String: CGSize] = [:]
 
     private static let runners: [RunnerConfig] = [
-        RunnerConfig(skin: .calico, destinationXFraction: 0.36, destinationYFraction: 0.48, startDelay: 0),
-        RunnerConfig(skin: .cowCat, destinationXFraction: 0.64, destinationYFraction: 0.44, startDelay: 0.22)
+        RunnerConfig(
+            skin: .calico,
+            displayHeight: 92,
+            destinationXFraction: 0.5,
+            destinationYFraction: 0.48,
+            startDelay: 0,
+            behavior: .stopAndSit
+        ),
+        RunnerConfig(
+            skin: .cowCat,
+            displayHeight: 108,
+            destinationXFraction: 0.64,
+            destinationYFraction: 0.44,
+            startDelay: 0.22,
+            behavior: .walkAcross
+        )
     ]
 
     override func didMove(to view: SKView) {
@@ -48,9 +67,14 @@ final class LaunchCatScene: SKScene {
         }
     }
 
+    func restartParade() {
+        removeAllChildren()
+        hasStarted = false
+        startParadeIfNeeded()
+    }
+
     private func spawnRunner(_ config: RunnerConfig) {
         let atlas = SKTextureAtlas(named: config.skin.atlasName)
-        cacheFrameSizes(from: atlas)
 
         let root = SKNode()
         let visual = SKSpriteNode()
@@ -59,38 +83,62 @@ final class LaunchCatScene: SKScene {
         root.addChild(visual)
         addChild(root)
 
-        let destination = CGPoint(
-            x: size.width * config.destinationXFraction,
-            y: size.height * config.destinationYFraction
-        )
-        let start = CGPoint(x: -catDisplayHeight, y: destination.y)
+        let y = size.height * config.destinationYFraction
+        let start = CGPoint(x: -config.displayHeight, y: y)
         root.position = start
-        face(visual, towards: destination.x, from: start.x)
 
         let walkFrames = frames(from: atlas, prefixes: ["walk_"])
-        let idleFrames = frames(from: atlas, prefixes: ["stand_", "idle_"])
 
-        let begin = SKAction.sequence([
-            .wait(forDuration: config.startDelay),
-            .run { [weak self, weak root, weak visual] in
-                guard let self, let root, let visual else { return }
-                self.playWalkAnimation(on: visual, frames: walkFrames)
-                self.runToPosition(
-                    root: root,
-                    visual: visual,
-                    destination: destination,
-                    idleFrames: idleFrames
-                )
-            }
-        ])
-        root.run(begin)
+        switch config.behavior {
+        case .stopAndSit:
+            let destination = CGPoint(
+                x: size.width * config.destinationXFraction,
+                y: y
+            )
+            face(visual, towards: destination.x, from: start.x)
+            let sitFrames = frames(from: atlas, prefixes: ["sit_"])
+
+            let begin = SKAction.sequence([
+                .wait(forDuration: config.startDelay),
+                .run { [weak self, weak root, weak visual] in
+                    guard let self, let root, let visual else { return }
+                    self.playWalkAnimation(on: visual, frames: walkFrames, displayHeight: config.displayHeight)
+                    self.runToPositionAndSit(
+                        root: root,
+                        visual: visual,
+                        destination: destination,
+                        sitFrames: sitFrames,
+                        displayHeight: config.displayHeight
+                    )
+                }
+            ])
+            root.run(begin)
+
+        case .walkAcross:
+            let exit = CGPoint(x: size.width + config.displayHeight, y: y)
+            face(visual, towards: exit.x, from: start.x)
+
+            let begin = SKAction.sequence([
+                .wait(forDuration: config.startDelay),
+                .run { [weak self, weak root, weak visual] in
+                    guard let self, let root, let visual else { return }
+                    self.playWalkAnimation(on: visual, frames: walkFrames, displayHeight: config.displayHeight)
+                    self.walkAcrossScreen(
+                        root: root,
+                        destination: exit
+                    )
+                }
+            ])
+            root.run(begin)
+        }
     }
 
-    private func runToPosition(
+    private func runToPositionAndSit(
         root: SKNode,
         visual: SKSpriteNode,
         destination: CGPoint,
-        idleFrames: [CatFrame]
+        sitFrames: [CatFrame],
+        displayHeight: CGFloat
     ) {
         let distance = hypot(destination.x - root.position.x, destination.y - root.position.y)
         let duration = max(0.55, TimeInterval(distance / walkSpeed))
@@ -101,15 +149,24 @@ final class LaunchCatScene: SKScene {
         let settle = SKAction.run { [weak self, weak visual] in
             guard let self, let visual else { return }
             visual.removeAction(forKey: "walk")
-            self.startIdleAnimation(on: visual, frames: idleFrames)
+            self.startSitAnimation(on: visual, frames: sitFrames, displayHeight: displayHeight)
         }
 
         root.run(.sequence([move, settle]), withKey: "approach")
     }
 
-    private func playWalkAnimation(on visual: SKSpriteNode, frames: [CatFrame]) {
+    private func walkAcrossScreen(root: SKNode, destination: CGPoint) {
+        let distance = hypot(destination.x - root.position.x, destination.y - root.position.y)
+        let duration = max(0.55, TimeInterval(distance / walkSpeed))
+
+        let move = SKAction.move(to: destination, duration: duration)
+        move.timingMode = .linear
+        root.run(move, withKey: "cross")
+    }
+
+    private func playWalkAnimation(on visual: SKSpriteNode, frames: [CatFrame], displayHeight: CGFloat) {
         guard let firstFrame = frames.first else { return }
-        apply(firstFrame, to: visual)
+        apply(firstFrame, to: visual, displayHeight: displayHeight)
         guard frames.count > 1 else { return }
 
         visual.run(
@@ -123,17 +180,17 @@ final class LaunchCatScene: SKScene {
         )
     }
 
-    private func startIdleAnimation(on visual: SKSpriteNode, frames: [CatFrame]) {
+    private func startSitAnimation(on visual: SKSpriteNode, frames: [CatFrame], displayHeight: CGFloat) {
         guard let first = frames.first else { return }
-        apply(first, to: visual)
+        apply(first, to: visual, displayHeight: displayHeight)
 
         guard frames.count >= 3 else { return }
 
-        let wait = { SKAction.wait(forDuration: 2.4) }
+        let wait = { SKAction.wait(forDuration: 2.0) }
         let show: (CatFrame) -> SKAction = { [weak self, weak visual] frame in
             .run {
                 guard let self, let visual else { return }
-                self.apply(frame, to: visual)
+                self.apply(frame, to: visual, displayHeight: displayHeight)
             }
         }
 
@@ -142,25 +199,17 @@ final class LaunchCatScene: SKScene {
                 wait(), show(frames[1]),
                 wait(), show(frames[2])
             ])),
-            withKey: "idle"
+            withKey: "sit"
         )
     }
 
-    private func apply(_ frame: CatFrame, to visual: SKSpriteNode) {
+    private func apply(_ frame: CatFrame, to visual: SKSpriteNode, displayHeight: CGFloat) {
         visual.texture = frame.texture
-        visual.size = frameDisplaySizes[frame.name]
-            ?? Self.displaySize(for: frame.texture, targetHeight: catDisplayHeight)
+        visual.size = Self.displaySize(for: frame.texture, targetHeight: displayHeight)
     }
 
     private func face(_ visual: SKSpriteNode, towards x: CGFloat, from currentX: CGFloat) {
         visual.xScale = x >= currentX ? 1 : -1
-    }
-
-    private func cacheFrameSizes(from atlas: SKTextureAtlas) {
-        for name in atlas.textureNames {
-            let texture = atlas.textureNamed(name)
-            frameDisplaySizes[name] = Self.displaySize(for: texture, targetHeight: catDisplayHeight)
-        }
     }
 
     private func frames(from atlas: SKTextureAtlas, prefixes: [String]) -> [CatFrame] {

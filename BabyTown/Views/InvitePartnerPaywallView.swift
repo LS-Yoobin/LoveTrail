@@ -158,16 +158,11 @@ struct InvitePartnerPaywallView: View {
 
     private var hero: some View {
         VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: heroGradient,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            Image("BabyTownFullIcon")
+                .resizable()
+                .scaledToFit()
                 .frame(width: 70, height: 70)
-                .overlay(Text("💞").font(.system(size: 34)))
+                .clipShape(RoundedRectangle(cornerRadius: 15.75, style: .continuous))
                 .shadow(color: accent.opacity(0.38), radius: 12, y: 6)
                 .padding(.bottom, 16)
 
@@ -191,13 +186,19 @@ struct InvitePartnerPaywallView: View {
             + Text("both").fontWeight(.bold)
             + Text(" of you 💕"))
             .font(.system(size: 12))
-            .foregroundStyle(accent.opacity(0.95))
+            .foregroundStyle(.white)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 9)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(accent.opacity(0.07))
+                    .fill(
+                        LinearGradient(
+                            colors: heroGradient,
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
             )
     }
 

@@ -9,7 +9,7 @@ struct CustomizeProfileBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Customize")
                     .font(.subheadline.weight(.semibold))
-                Text("Drag your stickers anywhere · pinch to resize")
+                Text("Drag stickers and the record player · pinch to resize")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -187,6 +187,7 @@ struct CoupleProfileView: View {
                                 profileNote: profile.profileNote,
                                 profileNotePosition: profile.profileNotePosition,
                                 recordPlayerPosition: profile.recordPlayerPosition,
+                                recordPlayerScale: profile.recordPlayerScale,
                                 isRecordPlayerPlaying: musicPlaybackState.isPlaying,
                                 userName: displayName,
                                 partnerTitle: partnerSlotTitle,
@@ -210,6 +211,7 @@ struct CoupleProfileView: View {
                                 onTapPhotoSticker: handlePhotoStickerTap,
                                 onNotePositionChanged: updateProfileNotePosition,
                                 onRecordPlayerPositionChanged: updateRecordPlayerPosition,
+                                onRecordPlayerScaleChanged: updateRecordPlayerScale,
                                 onPositionChanged: updateStickerPosition,
                                 onScaleChanged: updateStickerScale,
                                 onRotationChanged: updateStickerRotation
@@ -755,6 +757,10 @@ struct CoupleProfileView: View {
 
     private func updateRecordPlayerPosition(_ position: NormalizedPoint) {
         profile.recordPlayerPosition = position
+    }
+
+    private func updateRecordPlayerScale(_ scale: CGFloat) {
+        profile.recordPlayerScale = max(scale, VinylRecordPlayerView.gardenMinScale)
     }
 
     private func deleteProfileNote() {

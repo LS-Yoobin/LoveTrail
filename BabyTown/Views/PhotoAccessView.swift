@@ -3,6 +3,7 @@ import Photos
 
 struct PhotoAccessView: View {
 
+    var onBack: () -> Void
     var onContinue: () -> Void
 
     @State private var contentOpacity: Double = 0
@@ -34,6 +35,7 @@ struct PhotoAccessView: View {
             }
             .opacity(contentOpacity)
         }
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.72).delay(0.1)) {
                 iconScale = 1.0
@@ -108,7 +110,7 @@ struct PhotoAccessView: View {
             AccessLevelCard(
                 icon: "clock.arrow.circlepath",
                 title: "Moments from your past",
-                description: "Save photos from your camera roll anytime.\nWe organize them into moments you can add."
+                description: "Save photos from your camera roll anytime."
             )
             AccessLevelCard(
                 icon: "camera.fill",
@@ -226,7 +228,7 @@ private struct AccessLevelCard: View {
 }
 
 #Preview {
-    PhotoAccessView {
+    PhotoAccessView(onBack: {}, onContinue: {
         print("Continuing to home")
-    }
+    })
 }

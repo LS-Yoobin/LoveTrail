@@ -635,6 +635,20 @@ enum PetShopCatalog {
             isPictureFrame: false
         ),
         PetShopItem(
+            id: "wall_sky",
+            name: "Sky Blue",
+            detail: "Calm sky-tinted walls.",
+            category: .wallColors,
+            cost: 18,
+            imageName: nil,
+            systemImage: "paintpalette.fill",
+            placeholderCaption: "",
+            defaultSize: .zero,
+            isFloorItem: false,
+            isWallColor: true,
+            isPictureFrame: false
+        ),
+        PetShopItem(
             id: "wall_sage",
             name: "Soft Sage",
             detail: "Calm green wall wash.",
@@ -1005,17 +1019,28 @@ enum PetShopCatalog {
         return ("", .zero)
     }
 
+    /// Active wall swatch when `wallColorID` is nil — follows the app color theme.
+    static func defaultWallColorID() -> String {
+        ColorTheme.persisted.defaultWallColorID
+    }
+
+    static func resolvedWallColorID(for id: String?) -> String {
+        id ?? defaultWallColorID()
+    }
+
     static func wallColor(for id: String?) -> Color {
         Color(uiColor: wallUIColor(for: id))
     }
 
     static func wallUIColor(for id: String?) -> UIColor {
-        switch id {
+        switch resolvedWallColorID(for: id) {
         case "wall_sage":
             return UIColor(red: 0.82, green: 0.90, blue: 0.84, alpha: 1)
         case "wall_lavender":
             return UIColor(red: 0.88, green: 0.84, blue: 0.94, alpha: 1)
-        case "wall_blush", nil:
+        case "wall_sky":
+            return UIColor(red: 0.90, green: 0.94, blue: 1.0, alpha: 1)
+        case "wall_blush":
             return UIColor(red: 1.0, green: 0.93, blue: 0.95, alpha: 1)
         default:
             return UIColor(red: 1.0, green: 0.93, blue: 0.95, alpha: 1)

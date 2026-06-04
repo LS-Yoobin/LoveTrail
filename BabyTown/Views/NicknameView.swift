@@ -2,11 +2,11 @@ import SwiftUI
 
 struct NicknameView: View {
 
+    var onBack: () -> Void
     var onContinue: (String) -> Void
 
     @State private var nickname = ""
     @State private var contentOpacity: Double = 0
-    @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isFieldFocused: Bool
 
     private var trimmedNickname: String {
@@ -15,17 +15,6 @@ struct NicknameView: View {
 
     private var canContinue: Bool {
         !trimmedNickname.isEmpty
-    }
-
-    /// Lifts the footer above the keyboard while keeping a small gap.
-    private var keyboardFooterLift: CGFloat {
-        guard keyboardHeight > 0 else { return 0 }
-        let safeBottom = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .safeAreaInsets.bottom ?? 0
-        return max(0, keyboardHeight - safeBottom + 16)
     }
 
     var body: some View {
@@ -74,27 +63,10 @@ struct NicknameView: View {
                     continueButton
                     OnboardingLegalLinks()
                 }
-                .padding(.bottom, keyboardFooterLift)
             }
             .opacity(contentOpacity)
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-            guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
-                return
-            }
-            let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?
-                .doubleValue ?? 0.25
-            withAnimation(.easeOut(duration: duration)) {
-                keyboardHeight = frame.height
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
-            let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?
-                .doubleValue ?? 0.25
-            withAnimation(.easeOut(duration: duration)) {
-                keyboardHeight = 0
-            }
-        }
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.easeOut(duration: 0.6).delay(0.15)) {
                 contentOpacity = 1.0
@@ -154,7 +126,7 @@ struct NicknameView: View {
 }
 
 #Preview {
-    NicknameView { nickname in
+    NicknameView(onBack: {}, onContinue: { nickname in
         print("Nickname: \(nickname)")
-    }
+    })
 }

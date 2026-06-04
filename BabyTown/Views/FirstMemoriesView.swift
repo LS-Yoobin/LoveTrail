@@ -5,6 +5,7 @@ struct FirstMemoriesView: View {
 
     @StateObject private var viewModel = FirstMemoriesViewModel()
 
+    var onBack: () -> Void
     var onFinished: (_ firstMet: UIImage?, _ official: UIImage, _ firstMetDate: Date?, _ officialDate: Date?) -> Void
 
     var body: some View {
@@ -28,6 +29,7 @@ struct FirstMemoriesView: View {
         .onChange(of: viewModel.officialItem) { _, _ in
             Task { await viewModel.handleOfficialSelection() }
         }
+        .onboardingBackButton(action: onBack)
     }
 
     // MARK: - Background
@@ -141,7 +143,7 @@ struct FirstMemoriesView: View {
 }
 
 #Preview {
-    FirstMemoriesView { firstMet, official, firstMetDate, officialDate in
+    FirstMemoriesView(onBack: {}, onFinished: { firstMet, official, firstMetDate, officialDate in
         print("Done — firstMet: \(firstMet != nil), official: \(official)")
-    }
+    })
 }

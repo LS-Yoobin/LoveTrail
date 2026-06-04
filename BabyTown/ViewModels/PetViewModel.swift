@@ -426,9 +426,9 @@ final class PetViewModel: ObservableObject {
         // The food and water bowls stay locked in the same fixed positions across
         // *all* pets so feeding/drinking animations don't drift per-room. The
         // litter box is movable, so each pet keeps its own litter position.
-        let arabellaLayout = state.roomLayout(for: .cowCat)
+        let bowlReferenceLayout = state.roomLayout(for: .calico)
         for key in [PetRoomPropKey.foodBowl, PetRoomPropKey.waterBowl] {
-            if let fixed = arabellaLayout.propPositions[key] {
+            if let fixed = bowlReferenceLayout.propPositions[key] {
                 layout.propPositions[key] = fixed
             } else if let canonical = PetRoomLayoutState.builtInDefaultPosition(for: key) {
                 layout.propPositions[key] = canonical
@@ -462,7 +462,7 @@ final class PetViewModel: ObservableObject {
             return equipped == itemID
         }
         if item.isWallColor {
-            let activeID = layout.wallColorID ?? "wall_blush"
+            let activeID = PetShopCatalog.resolvedWallColorID(for: layout.wallColorID)
             return itemID == activeID
         }
         if item.isPictureFrame {

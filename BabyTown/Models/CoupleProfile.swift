@@ -15,6 +15,8 @@ struct CoupleProfile: Codable, Equatable {
     var profileNotePosition: NormalizedPoint?
     /// Normalized center of the vinyl record player on the scroll canvas (0…1).
     var recordPlayerPosition: NormalizedPoint?
+    /// Garden canvas scale for the vinyl player; `nil` or `1` is the default (minimum) size.
+    var recordPlayerScale: CGFloat?
 
     init(
         displayName: String? = nil,
@@ -22,7 +24,8 @@ struct CoupleProfile: Codable, Equatable {
         stickers: [ProfileSticker] = [],
         profileNote: String? = nil,
         profileNotePosition: NormalizedPoint? = nil,
-        recordPlayerPosition: NormalizedPoint? = nil
+        recordPlayerPosition: NormalizedPoint? = nil,
+        recordPlayerScale: CGFloat? = nil
     ) {
         self.displayName = displayName
         self.specialDates = specialDates
@@ -30,10 +33,12 @@ struct CoupleProfile: Codable, Equatable {
         self.profileNote = profileNote
         self.profileNotePosition = profileNotePosition
         self.recordPlayerPosition = recordPlayerPosition
+        self.recordPlayerScale = recordPlayerScale
     }
 
     enum CodingKeys: String, CodingKey {
-        case displayName, specialDates, stickers, profileNote, profileNotePosition, recordPlayerPosition
+        case displayName, specialDates, stickers, profileNote, profileNotePosition
+        case recordPlayerPosition, recordPlayerScale
     }
 
     init(from decoder: Decoder) throws {
@@ -44,5 +49,6 @@ struct CoupleProfile: Codable, Equatable {
         profileNote = try c.decodeIfPresent(String.self, forKey: .profileNote)
         profileNotePosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .profileNotePosition)
         recordPlayerPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .recordPlayerPosition)
+        recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)
     }
 }

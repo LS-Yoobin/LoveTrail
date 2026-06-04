@@ -51,7 +51,7 @@ struct ProfileEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .padding(.top, 8)
+                .padding(.top, 20)
                 .padding(.bottom, 20)
 
             ScrollView(showsIndicators: false) {
@@ -158,7 +158,7 @@ struct ProfileEditorSheet: View {
                 .foregroundStyle(BabyTownTheme.accentDeep)
 
             if image != nil {
-                Button(role: .destructive) {
+                Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         image = nil
                         pickerItem = nil
@@ -166,6 +166,7 @@ struct ProfileEditorSheet: View {
                 } label: {
                     Text("Remove photo")
                         .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.black)
                 }
                 .buttonStyle(.plain)
             }

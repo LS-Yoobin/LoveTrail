@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HowItWorksView: View {
 
+    var onBack: () -> Void
     var onEnterHome: () -> Void
 
     @State private var contentOpacity: Double = 0
@@ -33,6 +34,7 @@ struct HowItWorksView: View {
             }
             .opacity(contentOpacity)
         }
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.easeOut(duration: 0.7).delay(0.15)) {
                 contentOpacity = 1.0
@@ -131,7 +133,7 @@ struct HowItWorksView: View {
 }
 
 #Preview {
-    HowItWorksView {
+    HowItWorksView(onBack: {}, onEnterHome: {
         print("Enter Baby Town")
-    }
+    })
 }

@@ -1,8 +1,10 @@
 import SwiftUI
 import Photos
+import SpriteKit
 
 struct ScanView: View {
     @StateObject private var viewModel = ScanViewModel()
+    @State private var catScene = LaunchCatScene()
     @Environment(\.dismiss) private var dismiss
 
     private let monthSymbols = Calendar.current.shortMonthSymbols
@@ -42,6 +44,11 @@ struct ScanView: View {
                 await viewModel.checkPhotoPermission()
                 if viewModel.authorizationStatus == .authorized {
                     await viewModel.scanPhotosForYear(viewModel.selectedYear)
+                }
+            }
+            .onChange(of: viewModel.isScanning) { _, isScanning in
+                if isScanning {
+                    catScene.restartParade()
                 }
             }
         }
@@ -127,15 +134,11 @@ struct ScanView: View {
     private var scanningView: some View {
         VStack(spacing: 16) {
             Spacer()
-            
-            // Cat image with animation (matching launch screen style)
-            Image("First Page Cat")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 200, height: 200)
+
+            LaunchRunningCatsView(scene: catScene)
+                .frame(height: 240)
                 .padding(.bottom, 20)
-            
-            // Pulsing dots loading animation
+
             PulsingDotsLoader()
             
             Text("Scanning photos...")

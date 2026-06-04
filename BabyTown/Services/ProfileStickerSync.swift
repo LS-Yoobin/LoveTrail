@@ -25,7 +25,7 @@ enum ProfileStickerSync {
             stickers[idx].position = ProfileSticker.defaultPartnerPosition
         }
 
-        migrateLegacyProfileStickerScales(stickers: &stickers)
+        migrateLegacyProfileStickerScales(stickers: &stickers, dpm: dpm)
 
         // Special dates no longer auto-spawn garden stickers — they live only in
         // Important Dates. Remove any that earlier versions created so a deleted
@@ -69,12 +69,13 @@ enum ProfileStickerSync {
     ) {
         let key = "userAvatar"
         if bySource[key] == nil {
+            let hasPhoto = dpm.loadUserAvatar() != nil
             var sticker = ProfileSticker(
                 kind: .userAvatar,
                 sourceKey: key,
                 position: ProfileSticker.defaultUserAvatarPosition,
                 rotation: 0,
-                scale: ProfileSticker.profileAvatarScale
+                scale: userAvatarDefaultScale(hasPhoto: hasPhoto)
             )
             if let image = dpm.loadUserAvatar() {
                 let processed = SubjectLiftService.stickerImage(from: image)
@@ -91,9 +92,15 @@ enum ProfileStickerSync {
             let processed = SubjectLiftService.stickerImage(from: image)
             dpm.saveStickerImage(processed.image, id: sticker.id)
             sticker.usedSubjectLift = processed.usedSubjectLift
+            if sticker.scale == ProfileSticker.profileAvatarScale {
+                sticker.scale = ProfileSticker.profileAvatarScaleWithPhoto
+            }
         } else {
             dpm.deleteStickerImage(id: sticker.id)
             sticker.usedSubjectLift = false
+            if sticker.scale == ProfileSticker.profileAvatarScaleWithPhoto {
+                sticker.scale = ProfileSticker.profileAvatarScale
+            }
         }
         if let idx = stickers.firstIndex(where: { $0.id == sticker.id }) {
             stickers[idx] = sticker
@@ -116,7 +123,7 @@ enum ProfileStickerSync {
             sourceKey: key,
             position: ProfileSticker.defaultUserAvatarPosition,
             rotation: 0,
-            scale: ProfileSticker.profileAvatarScale
+            scale: ProfileSticker.profileAvatarScaleWithPhoto
         )
         let processed = SubjectLiftService.stickerImage(from: image)
         dpm.saveStickerImage(processed.image, id: sticker.id)
@@ -154,10 +161,23 @@ enum ProfileStickerSync {
     }
 
     /// Bumps profile avatars that still use the old 1.0 default; clamps below minimum.
-    private static func migrateLegacyProfileStickerScales(stickers: inout [ProfileSticker]) {
+    private static func migrateLegacyProfileStickerScales(
+        stickers: inout [ProfileSticker],
+        dpm: DataPersistenceManager
+    ) {
+        let hasUserAvatarPhoto = dpm.loadUserAvatar() != nil
         for idx in stickers.indices {
             switch stickers[idx].kind {
-            case .userAvatar, .partnerInvite:
+            case .userAvatar:
+                if stickers[idx].scale < ProfileSticker.profileAvatarMinScale {
+                    stickers[idx].scale = ProfileSticker.profileAvatarMinScale
+                } else if stickers[idx].scale <= 1.0 {
+                    stickers[idx].scale = userAvatarDefaultScale(hasPhoto: hasUserAvatarPhoto)
+                } else if hasUserAvatarPhoto,
+                          stickers[idx].scale == ProfileSticker.profileAvatarScale {
+                    stickers[idx].scale = ProfileSticker.profileAvatarScaleWithPhoto
+                }
+            case .partnerInvite:
                 if stickers[idx].scale < ProfileSticker.profileAvatarMinScale {
                     stickers[idx].scale = ProfileSticker.profileAvatarMinScale
                 } else if stickers[idx].scale <= 1.0 {
@@ -191,5 +211,9 @@ enum ProfileStickerSync {
 
     private static func isLegacyUserAvatarPosition(_ point: NormalizedPoint) -> Bool {
         abs(point.x - 0.28) < 0.02 && abs(point.y - 0.24) < 0.02
+    }
+
+    private static func userAvatarDefaultScale(hasPhoto: Bool) -> CGFloat {
+        hasPhoto ? ProfileSticker.profileAvatarScaleWithPhoto : ProfileSticker.profileAvatarScale
     }
 }
