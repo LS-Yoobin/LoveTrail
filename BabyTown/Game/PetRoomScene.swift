@@ -483,14 +483,14 @@ final class PetRoomScene: SKScene {
             addChild(bg)
         } else {
             let bg = SKSpriteNode(texture: gradientTexture(size: size,
-                                                           top: SKColor(red: 1.0, green: 0.93, blue: 0.95, alpha: 1),
-                                                           bottom: SKColor(red: 0.99, green: 0.86, blue: 0.83, alpha: 1)),
+                                                           top: BabyTownTheme.roomWallTopSK,
+                                                           bottom: BabyTownTheme.roomWallBottomSK),
                                   size: size)
             bg.position = CGPoint(x: size.width / 2, y: size.height / 2)
             bg.zPosition = -10
             addChild(bg)
 
-            let floor = SKSpriteNode(color: SKColor(red: 0.97, green: 0.80, blue: 0.74, alpha: 1),
+            let floor = SKSpriteNode(color: BabyTownTheme.roomFloorSK,
                                      size: CGSize(width: size.width, height: size.height * floorBand.upperBound))
             floor.anchorPoint = CGPoint(x: 0.5, y: 0)
             floor.position = CGPoint(x: size.width / 2, y: 0)
@@ -970,7 +970,7 @@ final class PetRoomScene: SKScene {
         }
 
         let rect = SKShapeNode(rectOf: placeholderSize, cornerRadius: 12)
-        rect.fillColor = SKColor(red: 0.90, green: 0.62, blue: 0.66, alpha: 0.55)
+        rect.fillColor = BabyTownTheme.accentSK.withAlphaComponent(0.55)
         rect.strokeColor = SKColor(red: 0.88, green: 0.22, blue: 0.38, alpha: 0.6)
         rect.lineWidth = 2
         rect.position = CGPoint(x: point.x, y: point.y + placeholderSize.height / 2)
@@ -3619,7 +3619,7 @@ final class PetRoomScene: SKScene {
         for i in 0..<count {
             let heart = SKLabelNode(text: "♥")
             heart.fontSize = CGFloat.random(in: 18...28)
-            heart.fontColor = SKColor(red: 0.92, green: 0.30, blue: 0.45, alpha: 1)
+            heart.fontColor = BabyTownTheme.accentDeepSK
             heart.position = CGPoint(x: cat.position.x + CGFloat.random(in: -20...20),
                                      y: cat.position.y + 120)
             heart.zPosition = 50
