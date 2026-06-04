@@ -296,7 +296,7 @@ final class LoveGardenScene: SKScene {
     }
     static func flowerPalette(_ season: GardenSeason) -> SKColor {
         switch season {
-        case .blooming: return SKColor(red: 0.93, green: 0.45, blue: 0.62, alpha: 1)
+        case .blooming: return BabyTownTheme.accentSK
         case .resting:  return SKColor(red: 0.74, green: 0.66, blue: 0.78, alpha: 1)
         }
     }
