@@ -16,13 +16,13 @@ struct EditGardenFooterBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .tint(.white)
     }
 
     private func actionButton(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(
@@ -30,6 +30,8 @@ struct EditGardenFooterBar: View {
                         .fill(Self.buttonFill)
                 )
         }
+        .foregroundStyle(Color.white)
+        .tint(.white)
         .buttonStyle(.plain)
     }
 }

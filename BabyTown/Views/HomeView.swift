@@ -552,7 +552,16 @@ struct HomeView: View {
                 showCoupleProfile = false
             }
         })
-        .background(Color(red: 0.78, green: 0.90, blue: 0.98).ignoresSafeArea())
+        .background {
+            Group {
+                if nightModeManager.isNightMode {
+                    HomeBackgroundView(isNightMode: true)
+                } else {
+                    Color(red: 0.78, green: 0.90, blue: 0.98)
+                }
+            }
+            .ignoresSafeArea()
+        }
     }
 
     /// Refreshes Us-card metadata off the hot path (scroll / body). Uses in-memory
@@ -563,8 +572,7 @@ struct HomeView: View {
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
         let letters = dpm.loadUserLetters()
-        let acts = GardenActMapper.acts(moments: moments, letters: letters)
-        coupleSpaceBloomCount = GardenComposer().compose(acts: acts).count
+        coupleSpaceBloomCount = GardenActMapper.composeElements(moments: moments, letters: letters).count
 
         let season = dpm.loadGardenState().season(now: Date())
         Task { @MainActor in

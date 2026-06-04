@@ -16,17 +16,21 @@ final class LoveGardenScene: SKScene {
     private let season: GardenSeason
     /// When true, blooms and backdrop are drawn at rest with no motion (thumbnails).
     private let isStaticSnapshot: Bool
+    /// When true, sky and clouds are omitted so a SwiftUI night backdrop shows through.
+    private let isNightMode: Bool
     private var elementNodes: [UUID: SKNode] = [:]
 
     init(
         size: CGSize,
         elements: [GardenElement],
         season: GardenSeason,
-        isStaticSnapshot: Bool = false
+        isStaticSnapshot: Bool = false,
+        isNightMode: Bool = false
     ) {
         self.elements = elements
         self.season = season
         self.isStaticSnapshot = isStaticSnapshot
+        self.isNightMode = isNightMode
         super.init(size: size)
         scaleMode = .resizeFill
         anchorPoint = CGPoint(x: 0, y: 0)
@@ -36,13 +40,17 @@ final class LoveGardenScene: SKScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
-        addSkyBackdrop()
+        if !isNightMode {
+            addSkyBackdrop()
+        }
         addDistantHills()
         drawGround()
-        if !isStaticSnapshot {
-            addDriftingClouds()
-        } else {
-            addStaticClouds()
+        if !isNightMode {
+            if !isStaticSnapshot {
+                addDriftingClouds()
+            } else {
+                addStaticClouds()
+            }
         }
         for (index, element) in elements.enumerated() {
             let node = makeNode(for: element)
@@ -52,12 +60,14 @@ final class LoveGardenScene: SKScene {
             addChild(node)
             elementNodes[element.sourceID] = node
 
-            let depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
+            var depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
+            if element.isLegend { depthScale *= 1.35 }
             if isStaticSnapshot {
                 node.setScale(depthScale)
             } else {
                 animateGrowth(node, targetScale: depthScale, delay: Double(index) * 0.03)
                 addSway(to: node, seed: element.position.x)
+                if element.isLegend { addLegendShimmer(to: node) }
             }
         }
         if !isStaticSnapshot {
@@ -230,39 +240,185 @@ final class LoveGardenScene: SKScene {
 
     private func makeNode(for element: GardenElement) -> SKNode {
         switch element.kind {
-        case .flower:      return makeFlower(petalColor: Self.flowerPalette(season))
-        case .placeFlower: return makeFlower(petalColor: Self.placePalette(season))
-        case .tree:        return makeTree()
+        case .flower, .placeFlower:
+            return makeFlower(
+                chapter: element.chapter,
+                shape: element.shape,
+                season: season,
+                cycle: element.cycle,
+                isLegend: element.isLegend
+            )
+        case .tree:
+            return makeTree()
         }
     }
 
-    private func makeFlower(petalColor: SKColor) -> SKNode {
+    private func makeFlower(
+        chapter: BloomChapter,
+        shape: BloomShape,
+        season: GardenSeason,
+        cycle: Int,
+        isLegend: Bool
+    ) -> SKNode {
         let container = SKNode()
-
-        let stem = SKShapeNode(rect: CGRect(x: -2, y: 0, width: 4, height: 46))
+        let stemHeight: CGFloat = isLegend ? 52 : 46
+        let stem = SKShapeNode(rect: CGRect(x: -2, y: 0, width: 4, height: stemHeight))
         stem.fillColor = SKColor(red: 0.36, green: 0.55, blue: 0.32, alpha: 1)
         stem.strokeColor = .clear
         container.addChild(stem)
 
+        let petalColor = Self.petalColor(chapter: chapter, season: season, cycle: cycle)
         let head = SKNode()
-        head.position = CGPoint(x: 0, y: 50)
-        for i in 0..<6 {
-            let petal = SKShapeNode(ellipseOf: CGSize(width: 12, height: 22))
-            petal.fillColor = petalColor
+        head.position = CGPoint(x: 0, y: stemHeight + 4)
+        addPetals(to: head, shape: shape, color: petalColor, isLegend: isLegend)
+        addFlowerCenter(to: head, chapter: chapter, shape: shape)
+        container.addChild(head)
+        return container
+    }
+
+    private func addPetals(to head: SKNode, shape: BloomShape, color: SKColor, isLegend: Bool) {
+        switch shape {
+        case .classic6:
+            addRadialPetals(to: head, count: 6, size: CGSize(width: 12, height: 22), color: color, offsetY: 12)
+        case .place5:
+            addRadialPetals(to: head, count: 5, size: CGSize(width: 11, height: 20), color: color, offsetY: 11)
+        case .daisy12:
+            addRadialPetals(to: head, count: 12, size: CGSize(width: 7, height: 14), color: color, offsetY: 10)
+        case .tulip3:
+            for i in 0..<3 {
+                let petal = SKShapeNode(ellipseOf: CGSize(width: 18, height: 28))
+                petal.fillColor = color
+                petal.strokeColor = .clear
+                let holder = SKNode()
+                holder.zRotation = CGFloat(i) * (2 * .pi / 3) - .pi / 2
+                petal.position = CGPoint(x: 0, y: 14)
+                holder.addChild(petal)
+                head.addChild(holder)
+            }
+        case .lotus8:
+            for ring in 0..<2 {
+                let count = 4
+                let radius: CGFloat = ring == 0 ? 10 : 16
+                let petalSize = CGSize(width: ring == 0 ? 10 : 12, height: ring == 0 ? 16 : 18)
+                for i in 0..<count {
+                    let petal = SKShapeNode(ellipseOf: petalSize)
+                    petal.fillColor = color
+                    petal.strokeColor = color.withAlphaComponent(0.35)
+                    petal.lineWidth = 0.5
+                    let holder = SKNode()
+                    let angle = CGFloat(i) * (.pi / 2) + (ring == 1 ? .pi / 4 : 0)
+                    holder.zRotation = angle
+                    petal.position = CGPoint(x: 0, y: radius)
+                    holder.addChild(petal)
+                    head.addChild(holder)
+                }
+            }
+        }
+        if isLegend {
+            let glow = SKShapeNode(circleOfRadius: 22)
+            glow.fillColor = color.withAlphaComponent(0.12)
+            glow.strokeColor = .clear
+            glow.zPosition = -1
+            head.addChild(glow)
+        }
+    }
+
+    private func addRadialPetals(
+        to head: SKNode,
+        count: Int,
+        size: CGSize,
+        color: SKColor,
+        offsetY: CGFloat
+    ) {
+        guard count > 0 else { return }
+        for i in 0..<count {
+            let petal = SKShapeNode(ellipseOf: size)
+            petal.fillColor = color
             petal.strokeColor = .clear
-            petal.zRotation = CGFloat(i) * (.pi / 3)
-            petal.position = CGPoint(x: 0, y: 12)
             let holder = SKNode()
-            holder.zRotation = CGFloat(i) * (.pi / 3)
+            holder.zRotation = CGFloat(i) * (2 * .pi / CGFloat(count))
+            petal.position = CGPoint(x: 0, y: offsetY)
             holder.addChild(petal)
             head.addChild(holder)
         }
-        let center = SKShapeNode(circleOfRadius: 7)
-        center.fillColor = SKColor(red: 0.98, green: 0.85, blue: 0.45, alpha: 1)
-        center.strokeColor = .clear
-        head.addChild(center)
-        container.addChild(head)
-        return container
+    }
+
+    private func addFlowerCenter(to head: SKNode, chapter: BloomChapter, shape: BloomShape) {
+        switch shape {
+        case .place5:
+            let pin = SKShapeNode(circleOfRadius: 5)
+            pin.fillColor = SKColor(red: 0.35, green: 0.42, blue: 0.62, alpha: 1)
+            pin.strokeColor = .white
+            pin.lineWidth = 1
+            head.addChild(pin)
+        default:
+            let radius: CGFloat = (chapter == .black) ? 6 : 7
+            let center = SKShapeNode(circleOfRadius: radius)
+            if chapter == .black {
+                center.fillColor = SKColor(red: 0.78, green: 0.80, blue: 0.85, alpha: 1)
+            } else {
+                center.fillColor = SKColor(red: 0.98, green: 0.85, blue: 0.45, alpha: 1)
+            }
+            center.strokeColor = .clear
+            head.addChild(center)
+        }
+    }
+
+    static func petalColor(chapter: BloomChapter, season: GardenSeason, cycle: Int) -> SKColor {
+        let base: SKColor
+        switch chapter {
+        case .white:
+            base = SKColor(red: 0.98, green: 0.96, blue: 0.94, alpha: 1)
+        case .yellow:
+            base = SKColor(red: 1.0, green: 0.90, blue: 0.42, alpha: 1)
+        case .red:
+            base = SKColor(red: 0.95, green: 0.42, blue: 0.48, alpha: 1)
+        case .blue:
+            base = SKColor(red: 0.45, green: 0.62, blue: 0.95, alpha: 1)
+        case .purple:
+            base = SKColor(red: 0.72, green: 0.52, blue: 0.88, alpha: 1)
+        case .black:
+            base = SKColor(red: 0.10, green: 0.08, blue: 0.13, alpha: 1)
+        }
+        var color = enrich(base, cycle: cycle)
+        if season == .resting {
+            color = soften(color, factor: 0.15)
+        }
+        return color
+    }
+
+    private static func enrich(_ color: SKColor, cycle: Int) -> SKColor {
+        guard cycle > 0 else { return color }
+        let white = SKColor.white
+        return blend(color, white, factor: min(0.12 * CGFloat(cycle), 0.22))
+    }
+
+    private static func soften(_ color: SKColor, factor: CGFloat) -> SKColor {
+        let calm = SKColor(red: 0.78, green: 0.76, blue: 0.82, alpha: 1)
+        return blend(color, calm, factor: factor)
+    }
+
+    private static func blend(_ a: SKColor, _ b: SKColor, factor: CGFloat) -> SKColor {
+        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
+        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        let t = min(max(factor, 0), 1)
+        return SKColor(
+            red: ar + (br - ar) * t,
+            green: ag + (bg - ag) * t,
+            blue: ab + (bb - ab) * t,
+            alpha: aa + (ba - aa) * t
+        )
+    }
+
+    private func addLegendShimmer(to node: SKNode) {
+        let pulse = SKAction.repeatForever(.sequence([
+            .fadeAlpha(to: 0.92, duration: 1.4),
+            .fadeAlpha(to: 1.0, duration: 1.4),
+        ]))
+        pulse.timingMode = .easeInEaseOut
+        node.run(pulse)
     }
 
     private func makeTree() -> SKNode {
@@ -295,16 +451,7 @@ final class LoveGardenScene: SKScene {
         }
     }
     static func flowerPalette(_ season: GardenSeason) -> SKColor {
-        switch season {
-        case .blooming: return BabyTownTheme.accentSK
-        case .resting:  return SKColor(red: 0.74, green: 0.66, blue: 0.78, alpha: 1)
-        }
-    }
-    static func placePalette(_ season: GardenSeason) -> SKColor {
-        switch season {
-        case .blooming: return SKColor(red: 0.55, green: 0.62, blue: 0.95, alpha: 1)
-        case .resting:  return SKColor(red: 0.62, green: 0.66, blue: 0.80, alpha: 1)
-        }
+        petalColor(chapter: .yellow, season: season, cycle: 0)
     }
 
     // MARK: Living layer — growth, sway, particles

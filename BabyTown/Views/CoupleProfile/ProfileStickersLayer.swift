@@ -31,9 +31,6 @@ struct ProfileStickersLayer: View {
     let onScaleChanged: (UUID, CGFloat) -> Void
     let onRotationChanged: (UUID, Double) -> Void
 
-    @State private var overlayPinchPreviewByStickerID: [UUID: CGFloat] = [:]
-    @State private var overlayRecordPlayerPinchPreview: CGFloat?
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -77,22 +74,9 @@ struct ProfileStickersLayer: View {
                     isPlaying: isRecordPlayerPlaying,
                     onPositionChanged: onRecordPlayerPositionChanged,
                     onScaleChanged: onRecordPlayerScaleChanged,
-                    onTap: isCustomizing ? nil : onTapRecordPlayer,
-                    overlayPinchPreviewScale: overlayRecordPlayerPinchPreview
+                    onTap: isCustomizing ? nil : onTapRecordPlayer
                 )
                 .zIndex(20)
-
-                if isCustomizing {
-                    ForgivingPinchGestureOverlay(
-                        isEnabled: true,
-                        targets: pinchTargets(canvasSize: geo.size),
-                        selectedStickerID: selectedID,
-                        onPreviewScale: handleOverlayPinchPreview,
-                        onCommitScale: handleOverlayPinchCommit
-                    )
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .allowsHitTesting(true)
-                }
             }
         }
         // User/partner stickers are tappable in browse mode too; individual
@@ -106,67 +90,6 @@ struct ProfileStickersLayer: View {
 
     private var photoStickers: [ProfileSticker] {
         stickers.filter { $0.kind == .moment || $0.kind == .specialDate }
-    }
-
-    private func pinchTargets(canvasSize: CGSize) -> [ForgivingPinchTarget] {
-        var targets: [ForgivingPinchTarget] = stickers.map { sticker in
-            let limits = ProfileSticker.scaleLimits(for: sticker.kind)
-            let preview = overlayPinchPreviewByStickerID[sticker.id]
-            return ForgivingPinchTarget(
-                kind: .sticker(sticker.id),
-                frame: ForgivingPinchGeometry.stickerFrame(
-                    sticker: sticker,
-                    canvasSize: canvasSize,
-                    previewScale: preview,
-                    includesLabel: label(for: sticker) != nil
-                ),
-                baseScale: preview ?? sticker.scale,
-                minScale: limits.min,
-                maxScale: limits.max
-            )
-        }
-        let recordScale = overlayRecordPlayerPinchPreview
-            ?? max(recordPlayerScale ?? VinylRecordPlayerView.gardenMinScale, VinylRecordPlayerView.gardenMinScale)
-        let recordPosition = recordPlayerPosition
-            ?? ProfileGardenLayout.defaultRecordPlayerPosition(canvasSize: canvasSize)
-        targets.append(
-            ForgivingPinchTarget(
-                kind: .recordPlayer,
-                frame: ForgivingPinchGeometry.recordPlayerFrame(
-                    position: recordPosition,
-                    scale: recordScale,
-                    canvasSize: canvasSize
-                ),
-                baseScale: recordScale,
-                minScale: VinylRecordPlayerView.gardenMinScale,
-                maxScale: VinylRecordPlayerView.gardenMaxScale
-            )
-        )
-        return targets
-    }
-
-    private func handleOverlayPinchPreview(kind: ForgivingPinchTarget.Kind, scale: CGFloat?) {
-        switch kind {
-        case .sticker(let id):
-            if let scale {
-                overlayPinchPreviewByStickerID[id] = scale
-            } else {
-                overlayPinchPreviewByStickerID.removeValue(forKey: id)
-            }
-        case .recordPlayer:
-            overlayRecordPlayerPinchPreview = scale
-        }
-    }
-
-    private func handleOverlayPinchCommit(kind: ForgivingPinchTarget.Kind, scale: CGFloat) {
-        switch kind {
-        case .sticker(let id):
-            overlayPinchPreviewByStickerID.removeValue(forKey: id)
-            onScaleChanged(id, scale)
-        case .recordPlayer:
-            overlayRecordPlayerPinchPreview = nil
-            onRecordPlayerScaleChanged(scale)
-        }
     }
 
     @ViewBuilder
@@ -185,8 +108,7 @@ struct ProfileStickersLayer: View {
             onScaleChanged: { onScaleChanged(sticker.id, $0) },
             onRotationChanged: sticker.kind == .moment
                 ? { onRotationChanged(sticker.id, $0) }
-                : nil,
-            overlayPinchPreviewScale: overlayPinchPreviewByStickerID[sticker.id]
+                : nil
         )
     }
 

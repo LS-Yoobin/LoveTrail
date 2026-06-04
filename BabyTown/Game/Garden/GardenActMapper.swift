@@ -22,6 +22,27 @@ enum GardenActMapper {
         acts(moments: moments, letters: letters).map(\.id)
     }
 
+    /// Full garden elements including chapter colors and milestone legend blooms.
+    static func composeElements(moments: [Moment], letters: [UserLetter]) -> [GardenElement] {
+        let eligible = bloomEligibleMoments(moments)
+        let acts = acts(moments: moments, letters: letters)
+        return GardenComposer().compose(
+            acts: acts,
+            momentOrdinalByActID: momentOrdinalByActID(eligible: eligible),
+            totalMomentCount: moments.count
+        )
+    }
+
+    /// 1-based index by `dateTaken` among unlocked moments (matches milestone count).
+    static func momentOrdinalByActID(eligible: [Moment]) -> [UUID: Int] {
+        let sorted = eligible.sorted { $0.dateTaken < $1.dateTaken }
+        var map: [UUID: Int] = [:]
+        for (index, moment) in sorted.enumerated() {
+            map[moment.id] = index + 1
+        }
+        return map
+    }
+
     private static func bloomEligibleMoments(_ moments: [Moment]) -> [Moment] {
         moments.filter { !$0.isLocked }
     }

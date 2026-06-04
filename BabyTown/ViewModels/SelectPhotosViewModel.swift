@@ -243,7 +243,10 @@ final class SelectPhotosViewModel: ObservableObject {
         return promptPhotos
     }
     
-    func createMomentsFromPickerResults(_ results: [PHPickerResult]) async -> [Moment] {
+    func createMomentsFromPickerResults(
+        _ results: [PHPickerResult],
+        prepareThumbnailsForPictureFrame: Bool = false
+    ) async -> [Moment] {
         guard !results.isEmpty else { return [] }
         isSaving = true
         defer { isSaving = false }
@@ -266,13 +269,41 @@ final class SelectPhotosViewModel: ObservableObject {
 
         var moments = await MomentFactory().createMoments(from: assets)
         for image in fallbackImages {
+            let thumbnail = prepareThumbnailsForPictureFrame
+                ? image.preparedForPictureFrame(assetIdentifier: nil)
+                : image
             moments.append(Moment(
                 id: UUID(),
                 dateTaken: Date(),
-                thumbnail: image
+                thumbnail: thumbnail
             ))
         }
+        if prepareThumbnailsForPictureFrame {
+            moments = moments.map { momentWithPictureFramePreparedThumbnail($0) }
+        }
         return moments
+    }
+
+    private func momentWithPictureFramePreparedThumbnail(_ moment: Moment) -> Moment {
+        Moment(
+            id: moment.id,
+            dateTaken: moment.dateTaken,
+            assetIdentifier: moment.assetIdentifier,
+            thumbnail: moment.thumbnail.preparedForPictureFrame(assetIdentifier: moment.assetIdentifier),
+            placeName: moment.placeName,
+            caption: moment.caption,
+            voiceNotePath: moment.voiceNotePath,
+            promptText: moment.promptText,
+            isPinned: moment.isPinned,
+            pinnedAt: moment.pinnedAt,
+            isLocked: moment.isLocked,
+            unlockTime: moment.unlockTime,
+            latitude: moment.latitude,
+            longitude: moment.longitude,
+            isAddedFromOnThisDay: moment.isAddedFromOnThisDay,
+            isPlaceNameUserSet: moment.isPlaceNameUserSet,
+            country: moment.country
+        )
     }
 
     func createPromptPhotosFromPickerResults(_ results: [PHPickerResult]) async -> [PromptPhoto] {

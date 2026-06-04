@@ -878,7 +878,8 @@ enum PetShopCatalog {
     static func pictureFramePhotoPlacement(
         frameSize: CGSize,
         photo: UIImage,
-        frameImageName: String? = nil
+        frameImageName: String? = nil,
+        assetIdentifier: String? = nil
     ) -> (size: CGSize, position: CGPoint) {
         let layout = framePhotoLayout(for: frameImageName)
         let openingWidth = frameSize.width * layout.openingWidthFraction * framePhotoOpeningScale
@@ -888,7 +889,7 @@ enum PetShopCatalog {
             y: frameSize.height * (layout.centerYFraction + framePhotoCenterYNudge)
         )
 
-        let displayPhoto = photo.normalizedForSpriteKit()
+        let displayPhoto = photo.preparedForPictureFrame(assetIdentifier: assetIdentifier)
         let filledSize = displayPhoto.sizeAspectFilling(CGSize(width: openingWidth, height: openingHeight))
         return (filledSize, openingCenter)
     }

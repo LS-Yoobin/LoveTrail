@@ -80,12 +80,16 @@ struct PetMomentGalleryPickerSheet: View {
                 let previewFrameSize = CGSize(width: previewFrameWidth, height: previewFrameHeight)
 
                 if let photo = highlightedPhoto?.thumbnail {
+                    let assetIdentifier = highlightedPhotoID.flatMap {
+                        PetGalleryPhotoLoader.assetIdentifierForDisplay(momentID: $0)
+                    }
                     let placement = PetShopCatalog.pictureFramePhotoPlacement(
                         frameSize: previewFrameSize,
                         photo: photo,
-                        frameImageName: frameImageName
+                        frameImageName: frameImageName,
+                        assetIdentifier: assetIdentifier
                     )
-                    Image(uiImage: photo.normalizedForSpriteKit())
+                    Image(uiImage: photo.preparedForPictureFrame(assetIdentifier: assetIdentifier))
                         .resizable()
                         .scaledToFill()
                         .frame(width: placement.size.width, height: placement.size.height)
@@ -234,7 +238,10 @@ struct PetMomentGalleryPickerSheet: View {
         isImportingPhotos = true
         defer { isImportingPhotos = false }
 
-        let newMoments = await SelectPhotosViewModel().createMomentsFromPickerResults(results)
+        let newMoments = await SelectPhotosViewModel().createMomentsFromPickerResults(
+            results,
+            prepareThumbnailsForPictureFrame: true
+        )
         guard !newMoments.isEmpty else { return }
 
         mergeMomentsIntoBabyTown(newMoments)

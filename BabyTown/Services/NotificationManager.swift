@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import GardenCore
 import Combine
 import UIKit
 import GardenCore
@@ -222,8 +223,9 @@ class NotificationManager: NSObject, ObservableObject {
     /// Fires an immediate local banner for a freshly-crossed moment milestone.
     func fireMilestone(_ count: Int) {
         let content = UNMutableNotificationContent()
-        content.title = "Milestone unlocked! 🎉"
-        content.body = "You've saved \(count) moments together. Here's to many more 💞"
+        let bloomName = BloomChapterResolver.milestoneBloomName(count: count)
+        content.title = "\(bloomName) unlocked! 🎉"
+        content.body = "You've saved \(count) moments together—a new bloom opened in your garden 💞"
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         UNUserNotificationCenter.current().add(

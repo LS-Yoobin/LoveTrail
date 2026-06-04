@@ -11,8 +11,7 @@ enum GardenSnapshotRenderer {
     /// `presentScene` before `texture(from:)` returns pixels (cold launch often fails otherwise).
     @MainActor
     static func render(moments: [Moment], letters: [UserLetter], season: GardenSeason) async -> UIImage? {
-        let acts = GardenActMapper.acts(moments: moments, letters: letters)
-        let elements = GardenComposer().compose(acts: acts)
+        let elements = GardenActMapper.composeElements(moments: moments, letters: letters)
         let view = SKView(frame: CGRect(origin: .zero, size: renderSize))
         view.allowsTransparency = true
 

@@ -575,7 +575,7 @@ final class PetRoomScene: SKScene {
         )
 
         if let pictureFrameImage {
-            let displayPhoto = pictureFrameImage.normalizedForSpriteKit()
+            let displayPhoto = pictureFrameImage
             let placement = PetShopCatalog.pictureFramePhotoPlacement(
                 frameSize: frameSize,
                 photo: displayPhoto,

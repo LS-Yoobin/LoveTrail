@@ -6,8 +6,9 @@ struct VinylRecordPlayerView: View {
     var scale: CGFloat = 1
     var onTap: (() -> Void)? = nil
 
-    /// Secret Garden canvas: current default size is the minimum; pinch can enlarge only.
+    /// Secret Garden canvas scale range; `gardenDefaultScale` is used when none is saved.
     static let gardenMinScale: CGFloat = 1
+    static let gardenDefaultScale: CGFloat = 1.4
     static let gardenMaxScale: CGFloat = 2.5
     static let gardenBaseSide: CGFloat = 88
 
@@ -23,7 +24,7 @@ struct VinylRecordPlayerView: View {
     @State private var frameIndex = 0
     @State private var animationTask: Task<Void, Never>?
 
-    private var size: CGFloat { 88 * scale }
+    private var size: CGFloat { Self.gardenBaseSide * scale }
     private var hasSpriteFrames: Bool {
         Self.frameNames.contains { UIImage(named: $0) != nil }
     }

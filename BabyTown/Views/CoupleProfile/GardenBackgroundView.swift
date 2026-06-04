@@ -14,22 +14,28 @@ struct GardenBackgroundView: View {
     var showsLivePet: Bool = true
     /// Skins for every owned pet; one roaming cat is shown per skin.
     var petSkins: [CatSkin] = []
+    /// Matches home night mode (9 PM–6 AM LA); sky is transparent so `HomeBackgroundView` shows through.
+    var isNightMode: Bool = false
 
     @State private var gardenScene: LoveGardenScene?
     @State private var petScenes: [CatSkin: PetRoomScene] = [:]
     @State private var builtPetSkins: [CatSkin] = []
-    @State private var builtBloomSignature: [UUID] = []
+    @State private var builtGardenToken: GardenRebuildToken?
+    @State private var builtIsNightMode = false
 
-    private var bloomSignature: [UUID] {
-        GardenActMapper.bloomActIDs(moments: moments, letters: letters)
-            .sorted { $0.uuidString < $1.uuidString }
+    private var gardenRebuildToken: GardenRebuildToken {
+        GardenRebuildToken(
+            momentCount: moments.count,
+            actIDs: GardenActMapper.bloomActIDs(moments: moments, letters: letters)
+                .sorted { $0.uuidString < $1.uuidString }
+        )
     }
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 // Opaque sky fill — the SpriteKit scene clears to transparent.
-                Color(red: 0.78, green: 0.90, blue: 0.98)
+                (isNightMode ? Color.clear : Color(red: 0.78, green: 0.90, blue: 0.98))
                     .ignoresSafeArea()
 
                 if let gardenScene {
@@ -52,22 +58,29 @@ struct GardenBackgroundView: View {
             .onChange(of: petSkins) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: letters) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: showsLivePet) { _, _ in updateScenes(size: geo.size) }
-            .onChange(of: bloomSignature) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: isNightMode) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: gardenRebuildToken) { _, _ in updateScenes(size: geo.size) }
         }
     }
 
     private func updateScenes(size: CGSize) {
         guard size.width > 1, size.height > 1 else { return }
 
-        let signature = bloomSignature
+        let token = gardenRebuildToken
         let gardenNeedsBuild = gardenScene == nil
-            || builtBloomSignature != signature
+            || builtGardenToken != token
+            || builtIsNightMode != isNightMode
         if gardenNeedsBuild {
-            let acts = GardenActMapper.acts(moments: moments, letters: letters)
-            let elements = GardenComposer().compose(acts: acts)
+            let elements = GardenActMapper.composeElements(moments: moments, letters: letters)
             let season = DataPersistenceManager.shared.loadGardenState().season(now: Date())
-            gardenScene = LoveGardenScene(size: size, elements: elements, season: season)
-            builtBloomSignature = signature
+            gardenScene = LoveGardenScene(
+                size: size,
+                elements: elements,
+                season: season,
+                isNightMode: isNightMode
+            )
+            builtGardenToken = token
+            builtIsNightMode = isNightMode
         } else if let gardenScene, gardenScene.size != size {
             gardenScene.size = size
         }
@@ -105,4 +118,10 @@ struct GardenBackgroundView: View {
             }
         }
     }
+}
+
+/// Rebuild when act IDs or total moment count changes (legend shrines use count).
+private struct GardenRebuildToken: Equatable {
+    let momentCount: Int
+    let actIDs: [UUID]
 }

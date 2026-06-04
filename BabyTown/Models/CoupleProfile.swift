@@ -15,7 +15,7 @@ struct CoupleProfile: Codable, Equatable {
     var profileNotePosition: NormalizedPoint?
     /// Normalized center of the vinyl record player on the scroll canvas (0…1).
     var recordPlayerPosition: NormalizedPoint?
-    /// Garden canvas scale for the vinyl player; `nil` or `1` is the default (minimum) size.
+    /// Garden canvas scale for the vinyl player; `nil` uses `VinylRecordPlayerView.gardenDefaultScale`.
     var recordPlayerScale: CGFloat?
 
     init(

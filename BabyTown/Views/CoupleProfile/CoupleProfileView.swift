@@ -29,6 +29,7 @@ struct CoupleProfileView: View {
     @State private var showOurSongSheet = false
 
     @ObservedObject private var musicPlaybackState = CoupleMusicPlaybackState.shared
+    @StateObject private var nightModeManager = NightModeManager()
 
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
     @State private var activeSubpage: CoupleProfileSubpage?
@@ -150,14 +151,22 @@ struct CoupleProfileView: View {
 
     private var profileGardenBody: some View {
         ZStack(alignment: .top) {
-            Color(red: 0.78, green: 0.90, blue: 0.98)
-                .ignoresSafeArea()
+            Group {
+                if nightModeManager.isNightMode {
+                    HomeBackgroundView(isNightMode: true)
+                } else {
+                    Color(red: 0.78, green: 0.90, blue: 0.98)
+                }
+            }
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.8), value: nightModeManager.isNightMode)
 
             GardenBackgroundView(
                 moments: gardenMoments,
                 letters: gardenLetters,
                 showsLivePet: true,
-                petSkins: gardenPetSkins
+                petSkins: gardenPetSkins,
+                isNightMode: nightModeManager.isNightMode
             )
             .ignoresSafeArea()
 

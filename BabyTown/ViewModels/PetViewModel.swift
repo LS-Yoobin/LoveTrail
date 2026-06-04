@@ -580,7 +580,7 @@ final class PetViewModel: ObservableObject {
         let resolvedFrameID = frameID ?? activePictureFrameID()
         guard let resolvedFrameID,
               let momentID = roomLayout.pictureFrameMoment(for: resolvedFrameID) else { return nil }
-        return PetGalleryPhotoLoader.image(for: momentID)
+        return PetGalleryPhotoLoader.pictureFrameImage(for: momentID)
     }
 
     func updatePropPositions(_ positions: [String: NormalizedPoint]) {

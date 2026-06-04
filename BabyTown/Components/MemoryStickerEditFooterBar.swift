@@ -10,7 +10,6 @@ struct MemoryStickerEditFooterBar: View {
         Button(action: onAddMore) {
             Text("Add More")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(
@@ -18,6 +17,8 @@ struct MemoryStickerEditFooterBar: View {
                         .fill(Self.buttonFill)
                 )
         }
+        .foregroundStyle(Color.white)
+        .tint(.white)
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

@@ -26,8 +26,6 @@ struct MemoryCanvasLayer: View {
     var onCanvasDragEnded: (() -> Void)? = nil
     var onCanvasDragActiveChanged: ((Bool) -> Void)? = nil
 
-    @State private var overlayPinchPreviewByStickerID: [UUID: CGFloat] = [:]
-
     var body: some View {
         GeometryReader { geo in
             let isArrangingOnCanvas = isComposingNote && !isNoteFocused.wrappedValue
@@ -131,46 +129,8 @@ struct MemoryCanvasLayer: View {
                         onScaleChanged: { onStickerScaleChanged(sticker.id, $0) },
                         onDragEnded: onCanvasDragEnded,
                         onDragActiveChanged: onCanvasDragActiveChanged,
-                        onRotationChanged: { onStickerRotationChanged(sticker.id, $0) },
-                        overlayPinchPreviewScale: overlayPinchPreviewByStickerID[sticker.id]
+                        onRotationChanged: { onStickerRotationChanged(sticker.id, $0) }
                     )
-                }
-
-                if stickerCustomize {
-                    ForgivingPinchGestureOverlay(
-                        isEnabled: true,
-                        targets: stickers.map { sticker in
-                            let limits = ProfileSticker.scaleLimits(for: sticker.kind)
-                            let preview = overlayPinchPreviewByStickerID[sticker.id]
-                            return ForgivingPinchTarget(
-                                kind: .sticker(sticker.id),
-                                frame: ForgivingPinchGeometry.stickerFrame(
-                                    sticker: sticker,
-                                    canvasSize: geo.size,
-                                    previewScale: preview,
-                                    includesLabel: false
-                                ),
-                                baseScale: preview ?? sticker.scale,
-                                minScale: limits.min,
-                                maxScale: limits.max
-                            )
-                        },
-                        selectedStickerID: selectedStickerID,
-                        onPreviewScale: { kind, scale in
-                            guard case .sticker(let id) = kind else { return }
-                            if let scale {
-                                overlayPinchPreviewByStickerID[id] = scale
-                            } else {
-                                overlayPinchPreviewByStickerID.removeValue(forKey: id)
-                            }
-                        },
-                        onCommitScale: { kind, scale in
-                            guard case .sticker(let id) = kind else { return }
-                            overlayPinchPreviewByStickerID.removeValue(forKey: id)
-                            onStickerScaleChanged(id, scale)
-                        }
-                    )
-                    .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
         }

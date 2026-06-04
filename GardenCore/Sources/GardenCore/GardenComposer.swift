@@ -6,13 +6,51 @@ import Foundation
 public struct GardenComposer {
     public init() {}
 
-    public func compose(acts: [GardenActInput]) -> [GardenElement] {
-        acts.map { act in
-            GardenElement(
-                sourceID: act.id,
-                kind: Self.elementKind(for: act.kind),
-                date: act.date,
-                position: Self.position(for: act.id)
+    public func compose(
+        acts: [GardenActInput],
+        momentOrdinalByActID: [UUID: Int] = [:],
+        totalMomentCount: Int = 0
+    ) -> [GardenElement] {
+        var elements = acts.map { act in
+            element(for: act, momentOrdinalByActID: momentOrdinalByActID)
+        }
+        elements.append(contentsOf: Self.legendElements(totalMomentCount: totalMomentCount))
+        return elements
+    }
+
+    private func element(
+        for act: GardenActInput,
+        momentOrdinalByActID: [UUID: Int]
+    ) -> GardenElement {
+        let kind = Self.elementKind(for: act.kind)
+        let ordinal = momentOrdinalByActID[act.id] ?? 1
+        let chapter = BloomChapterResolver.chapter(forMomentOrdinal: ordinal)
+        let cycle = BloomChapterResolver.cycle(forMomentOrdinal: ordinal)
+        let shape = BloomChapterResolver.shape(for: act.kind, isLegend: false, milestone: nil)
+        return GardenElement(
+            sourceID: act.id,
+            kind: kind,
+            date: act.date,
+            position: Self.position(for: act.id),
+            chapter: kind == .tree ? .white : chapter,
+            shape: kind == .placeFlower ? .place5 : shape,
+            isLegend: false,
+            cycle: cycle
+        )
+    }
+
+    static func legendElements(totalMomentCount: Int) -> [GardenElement] {
+        BloomChapterResolver.legendMilestones.compactMap { milestone in
+            guard totalMomentCount >= milestone else { return nil }
+            return GardenElement(
+                sourceID: BloomChapterResolver.legendID(milestone: milestone),
+                kind: .flower,
+                date: .distantPast,
+                position: BloomChapterResolver.legendPosition(milestone: milestone),
+                chapter: BloomChapterResolver.legendChapter(milestone: milestone),
+                shape: BloomChapterResolver.shape(for: .moment, isLegend: true, milestone: milestone),
+                isLegend: true,
+                cycle: 0
             )
         }
     }
