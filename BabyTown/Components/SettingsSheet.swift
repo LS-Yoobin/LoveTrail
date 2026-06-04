@@ -7,6 +7,7 @@ struct SettingsSheet: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationManager = NotificationManager.shared
     @ObservedObject private var store = StoreManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     var onResetApp: () -> Void
     var onReplayStory: () -> Void
     var onVisitPet: () -> Void
@@ -39,6 +40,19 @@ struct SettingsSheet: View {
                     .foregroundStyle(.primary)
                 } header: {
                     Text("Subscription")
+                }
+
+                Section {
+                    Picker("Color", selection: Binding(
+                        get: { themeManager.theme },
+                        set: { themeManager.setTheme($0) }
+                    )) {
+                        Text("Pink").tag(ColorTheme.pink)
+                        Text("Blue").tag(ColorTheme.blue)
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Color Theme")
                 }
 
                 Section {
