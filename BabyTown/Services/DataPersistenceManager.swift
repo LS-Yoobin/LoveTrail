@@ -80,6 +80,7 @@ final class DataPersistenceManager {
     private let celebratedMomentMilestonesKey = "celebratedMomentMilestones"
     private let petNeedsNotifiedWhileLowKey = "petNeedsNotifiedWhileLow"
     private let petMissesYouNotifiedForInteractionAtKey = "petMissesYouNotifiedForInteractionAt"
+    private let colorThemeKey = "colorTheme"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -411,6 +412,21 @@ final class DataPersistenceManager {
         var ids = readInAppNotificationIDs()
         ids.insert(id)
         userDefaults.set(Array(ids), forKey: readInAppNotificationIDsKey)
+    }
+
+    // MARK: - Color Theme
+
+    func saveColorTheme(_ theme: ColorTheme) {
+        userDefaults.set(theme.rawValue, forKey: colorThemeKey)
+    }
+
+    /// Returns the persisted theme, defaulting to `.pink` when unset or invalid.
+    func loadColorTheme() -> ColorTheme {
+        guard let raw = userDefaults.string(forKey: colorThemeKey),
+              let theme = ColorTheme(rawValue: raw) else {
+            return .pink
+        }
+        return theme
     }
 
     func clearAllData() {
