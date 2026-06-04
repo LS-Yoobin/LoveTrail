@@ -966,7 +966,7 @@ struct PetRoomView: View {
                 }
 
                 playToyChip(
-                    title: "+ Buy",
+                    title: "Buy",
                     iconSystemName: "plus.circle.fill",
                     imageName: nil,
                     selected: false

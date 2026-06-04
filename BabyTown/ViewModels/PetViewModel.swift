@@ -407,9 +407,7 @@ final class PetViewModel: ObservableObject {
     }
 
     private func unlockAllShopItemsForAllPets() {
-        let unlockableIDs = PetShopCatalog.all
-            .filter { !$0.isStarter && !$0.isCatFood }
-            .map(\.id)
+        let unlockableIDs = PetShopCatalog.marketUnlockableItemIDs
 
         for skin in CatSkin.allCases {
             state.updateRoomLayout(for: skin) { layout in

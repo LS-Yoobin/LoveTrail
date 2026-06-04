@@ -774,6 +774,8 @@ final class PetRoomScene: SKScene {
             }
         )
         for item in PetShopCatalog.all where item.isFloorItem {
+            // Couch lives in a hidden market tab — never auto-place until it ships.
+            guard item.category != .furniture else { continue }
             guard activeFloorIDs.contains(item.id) else { continue }
             let key = item.id
             let defaultPoint: NormalizedPoint
@@ -1807,7 +1809,7 @@ final class PetRoomScene: SKScene {
             if isCatBedKey(key) {
                 guard layoutState.owns(key), !layoutState.isStashed(key) else { continue }
             }
-            let hitFrame = node.calculateAccumulatedFrame().insetBy(dx: -16, dy: -16)
+            let hitFrame = propDragHitFrame(for: key, node: node)
             guard hitFrame.contains(location) else { continue }
             if topHit == nil || node.zPosition > topHit!.z {
                 topHit = (key, node, node.zPosition)
@@ -1885,6 +1887,11 @@ final class PetRoomScene: SKScene {
     /// Cancels locomotion so sit / sleep / groom poses stay in place.
     private func stopMovement() {
         isHoldingPose = false
+        // `goToBowl` only clears this in its `finish` action; cancelling the
+        // behavior (customize, sheet pause, tap-to-interrupt) must reset it or
+        // `updateCatFloorDepthLayering` stops updating and the cat stays at
+        // `catAtBowlZ` in front of every floor prop.
+        isHoldingBowlInteraction = false
         cat.removeAction(forKey: "behavior")
         cat.removeAction(forKey: "pounceMove")
         cat.zPosition = catFloorDepthZ(for: cat.position.y)
@@ -2227,20 +2234,32 @@ final class PetRoomScene: SKScene {
         let frame = node.calculateAccumulatedFrame()
         switch prop {
         case .litterBox:
-            let width = frame.width * 0.56
-            let height = frame.height * 0.48
-            return CGRect(
-                x: frame.midX - width / 2,
-                y: frame.midY - height / 2,
-                width: width,
-                height: height
-            )
+            return bottomAnchoredHitRect(in: frame, widthFraction: 0.56, heightFraction: 0.44)
         case .smallPlant:
             return centeredHitRect(in: frame, widthFraction: 0.36, heightFraction: 0.32)
         case .bigPlant:
             return centeredHitRect(in: frame, widthFraction: 0.40, heightFraction: 0.36)
         default:
             return frame.insetBy(dx: -16, dy: -16)
+        }
+    }
+
+    /// Customize drag / furniture tap target — hugs visible art, not transparent padding.
+    private func propDragHitFrame(for key: String, node: SKNode) -> CGRect {
+        let frame = node.calculateAccumulatedFrame()
+        switch key {
+        case PetRoomPropKey.litterBox:
+            return bottomAnchoredHitRect(in: frame, widthFraction: 0.56, heightFraction: 0.44)
+        case PetRoomPropKey.catTree:
+            return bottomAnchoredHitRect(in: frame, widthFraction: 0.50, heightFraction: 0.66)
+        default:
+            if isCatBedKey(key) {
+                return bottomAnchoredHitRect(in: frame, widthFraction: 0.80, heightFraction: 0.70)
+            }
+            if isPictureFrame(key) {
+                return frame.insetBy(dx: -8, dy: -8)
+            }
+            return frame.insetBy(dx: 4, dy: 4)
         }
     }
 
@@ -2253,6 +2272,17 @@ final class PetRoomScene: SKScene {
             width: width,
             height: height
         )
+    }
+
+    /// Hit rect anchored to the prop's feet (sprites use bottom-center anchor).
+    private func bottomAnchoredHitRect(
+        in frame: CGRect,
+        widthFraction: CGFloat,
+        heightFraction: CGFloat
+    ) -> CGRect {
+        let width = frame.width * min(max(widthFraction, 0.1), 1)
+        let height = frame.height * min(max(heightFraction, 0.1), 1)
+        return CGRect(x: frame.midX - width / 2, y: frame.minY, width: width, height: height)
     }
 
     private func beginCatPickUpCandidate(at location: CGPoint) {
@@ -2512,11 +2542,11 @@ final class PetRoomScene: SKScene {
         }
     }
 
-    /// Topmost draggable prop whose padded frame contains `location`.
+    /// Topmost draggable prop whose visible-art hit rect contains `location`.
     private func propKey(at location: CGPoint) -> String? {
         var best: (key: String, z: CGFloat)?
-        for (key, node) in draggableNodes
-        where node.calculateAccumulatedFrame().insetBy(dx: -12, dy: -12).contains(location) {
+        for (key, node) in draggableNodes {
+            guard propDragHitFrame(for: key, node: node).contains(location) else { continue }
             if best == nil || node.zPosition > best!.z { best = (key, node.zPosition) }
         }
         return best?.key
@@ -2709,6 +2739,7 @@ final class PetRoomScene: SKScene {
             // Drop any interaction lock (e.g. a mid-greeting eat/drink) so the
             // ambient loop resumes cleanly when customize mode exits.
             isInteracting = false
+            isHoldingBowlInteraction = false
             runBehavior()
             pictureFrameNode?.zPosition = pictureFrameCustomizeZ
         } else {
@@ -2776,6 +2807,14 @@ final class PetRoomScene: SKScene {
 
         if isInteracting {
             isInteracting = false
+            startAnimation(.idle)
+            runBehavior()
+            return
+        }
+
+        if isHoldingBowlInteraction
+            || currentAction == .eat || currentAction == .drink || currentAction == .snack {
+            isHoldingBowlInteraction = false
             startAnimation(.idle)
             runBehavior()
             return
@@ -3511,6 +3550,7 @@ final class PetRoomScene: SKScene {
             evaluateCatPickUp(at: catPickUpLastLocation)
         }
         updateCatFloorDepthLayering()
+        updateFloorPropLayering()
         refreshCareBowlDepthLayering()
         if let toy = playToyNode {
             applyPlayToyFloorDepth(for: toy)
@@ -3595,9 +3635,8 @@ final class PetRoomScene: SKScene {
             cat.zPosition = catCarryZPosition
             return
         }
-        // While explicit interactions drive z-order (eat/drink/snack/confused at bowl), keep that.
-        if isHoldingBowlInteraction
-            || currentAction == .eat || currentAction == .drink || currentAction == .snack {
+        // While holding an eat/drink pose at a bowl, keep the forced front z from `goToBowl`.
+        if isHoldingBowlInteraction {
             return
         }
         if currentAction == .sleep {

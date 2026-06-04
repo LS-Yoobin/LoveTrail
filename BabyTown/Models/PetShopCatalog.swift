@@ -988,6 +988,17 @@ enum PetShopCatalog {
         return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
     }
 
+    /// IDs granted by the market coin long-press easter egg (visible picker tabs only).
+    static var marketUnlockableItemIDs: [String] {
+        all
+            .filter {
+                PetShopCategory.pickerCategories.contains($0.category)
+                    && !$0.isStarter
+                    && !$0.isCatFood
+            }
+            .map(\.id)
+    }
+
     static func items(in category: PetShopCategory) -> [PetShopItem] {
         all
             .filter { $0.category == category }
