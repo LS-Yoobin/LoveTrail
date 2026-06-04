@@ -1,27 +1,34 @@
 import SwiftUI
+import SpriteKit
 
 enum BabyTownTheme {
+
+    // MARK: - Theme
+
+    static var theme: ColorTheme { ThemeManager.shared.theme }
+    private static var isBlue: Bool { theme == .blue }
 
     // MARK: - Backgrounds
 
     static let background = Color.white
-    static let blush = Color.pink.opacity(0.15)
-    static let backgroundGradient = LinearGradient(
-        colors: [background, background],
-        startPoint: .top,
-        endPoint: .bottom
-    )
+    static var blush: Color { isBlue ? Color.blue.opacity(0.15) : Color.pink.opacity(0.15) }
+    static var backgroundGradient: LinearGradient {
+        isBlue
+            ? LinearGradient(colors: [background, Color(red: 0.88, green: 0.94, blue: 0.99)],
+                             startPoint: .top, endPoint: .bottom)
+            : LinearGradient(colors: [background, background], startPoint: .top, endPoint: .bottom)
+    }
 
     // MARK: - Accents
 
-    static let accent = Color.pink
-    static let accentDeep = Color(red: 0.88, green: 0.22, blue: 0.38)
-    static let accentGradient = LinearGradient(
-        colors: [accent, accentDeep],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-    static let accentSoft = Color.pink.opacity(0.08)
+    static var accent: Color { isBlue ? Color(red: 0.22, green: 0.48, blue: 0.96) : Color.pink }
+    static var accentDeep: Color {
+        isBlue ? Color(red: 0.14, green: 0.34, blue: 0.78) : Color(red: 0.88, green: 0.22, blue: 0.38)
+    }
+    static var accentGradient: LinearGradient {
+        LinearGradient(colors: [accent, accentDeep], startPoint: .leading, endPoint: .trailing)
+    }
+    static var accentSoft: Color { accent.opacity(0.08) }
 
     // MARK: - Text
 
@@ -37,35 +44,52 @@ enum BabyTownTheme {
 
     // MARK: - Cards
 
-    static let cardBackground = Color(red: 0.96, green: 0.82, blue: 0.86)
+    static var cardBackground: Color {
+        isBlue ? Color(red: 0.80, green: 0.88, blue: 0.96) : Color(red: 0.96, green: 0.82, blue: 0.86)
+    }
     static let cardShadow = Color.black.opacity(0.05)
     static let cardRadius: CGFloat = 18
 
     // MARK: - Buttons
 
-    static let buttonGradient = LinearGradient(
-        colors: [accent, accent.opacity(0.82)],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-    static let buttonShadow = Color.pink.opacity(0.3)
+    static var buttonGradient: LinearGradient {
+        LinearGradient(colors: [accent, accent.opacity(0.82)], startPoint: .leading, endPoint: .trailing)
+    }
+    static var buttonShadow: Color { accent.opacity(0.3) }
 
     /// Solid blue for Save confirmation pills (edit garden, editors, etc.).
     static let savePillFill = Color(red: 0.22, green: 0.48, blue: 0.96)
     static let savePillShadow = savePillFill.opacity(0.35)
 
-    /// Pink → red icon tint used on onboarding access cards and the home camera control.
-    static let accentIconGradient = LinearGradient(
-        colors: [accent, accentDeep],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    /// Pink → red (or blue → deep blue) icon tint used on onboarding access cards and the home camera control.
+    static var accentIconGradient: LinearGradient {
+        LinearGradient(colors: [accent, accentDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    static var accentIconBackdropGradient: LinearGradient {
+        LinearGradient(colors: [accent.opacity(0.15), accentDeep.opacity(0.08)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
-    static let accentIconBackdropGradient = LinearGradient(
-        colors: [accent.opacity(0.15), accentDeep.opacity(0.08)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // MARK: - Bridged colors (SpriteKit / UIKit)
+
+    static var accentUIColor: UIColor { UIColor(accent) }
+    static var accentDeepUIColor: UIColor { UIColor(accentDeep) }
+
+    /// Pet-room ambient surfaces. Pink: warm peach. Blue: cool light blue.
+    static var roomWallTop: Color {
+        isBlue ? Color(red: 0.93, green: 0.96, blue: 1.0) : Color(red: 1.0, green: 0.93, blue: 0.95)
+    }
+    static var roomWallBottom: Color {
+        isBlue ? Color(red: 0.83, green: 0.90, blue: 0.98) : Color(red: 0.99, green: 0.86, blue: 0.83)
+    }
+    static var roomFloor: Color {
+        isBlue ? Color(red: 0.74, green: 0.84, blue: 0.95) : Color(red: 0.97, green: 0.80, blue: 0.74)
+    }
+    static var roomWallTopSK: SKColor { SKColor(roomWallTop) }
+    static var roomWallBottomSK: SKColor { SKColor(roomWallBottom) }
+    static var roomFloorSK: SKColor { SKColor(roomFloor) }
+    static var accentSK: SKColor { SKColor(accent) }
+    static var accentDeepSK: SKColor { SKColor(accentDeep) }
 }
 
 enum PlaceNameFormatting {
