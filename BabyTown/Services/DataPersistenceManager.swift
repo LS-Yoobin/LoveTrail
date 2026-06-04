@@ -449,6 +449,7 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: appJoinedDateKey)
         userDefaults.removeObject(forKey: foundingOfficialDateKey)
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
+        userDefaults.removeObject(forKey: colorThemeKey)
         BackgroundMusicImporter.clearImportedSong()
     }
 }
