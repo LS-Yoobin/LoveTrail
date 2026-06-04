@@ -50,6 +50,15 @@ enum BabyTownTheme {
     static let cardShadow = Color.black.opacity(0.05)
     static let cardRadius: CGFloat = 18
 
+    /// Muted accent fill (e.g. sticker-edit "Add More" button). Pink: soft salmon. Blue: muted blue.
+    static var accentMuted: Color {
+        isBlue ? Color(red: 0.52, green: 0.68, blue: 0.90) : Color(red: 0.93, green: 0.55, blue: 0.52)
+    }
+    /// Very light blush background tint. Pink: warm blush. Blue: cool light blue.
+    static var blushSoft: Color {
+        isBlue ? Color(red: 0.92, green: 0.95, blue: 1.0) : Color(red: 1.0, green: 0.92, blue: 0.94)
+    }
+
     // MARK: - Buttons
 
     static var buttonGradient: LinearGradient {

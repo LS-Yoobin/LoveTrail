@@ -24,7 +24,7 @@ struct ValentineCardDetailView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 1.0, green: 0.92, blue: 0.94)
+            BabyTownTheme.blushSoft
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
