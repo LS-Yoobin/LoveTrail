@@ -37,6 +37,7 @@ struct HomeView: View {
     @State private var editingHomeSpecialDateImage: UIImage?
     @State private var showPartnerPaywall = false
     @ObservedObject private var store = StoreManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var memorySearchText = ""
     @State private var cachedMemorySearchRows: [MemorySearchRow] = []
     @FocusState private var isMemorySearchFocused: Bool

@@ -22,8 +22,6 @@ struct ContentView: View {
     @State private var shouldScrollToNewMemory = false
     @StateObject private var homeViewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
-    @ObservedObject private var themeManager = ThemeManager.shared
-
     init() {
         let hasCompletedOnboarding = DataPersistenceManager.shared.hasCompletedOnboarding()
         
@@ -56,7 +54,6 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Group {
             switch screen {
             case .launch:
                 LaunchScreenView()
@@ -284,8 +281,6 @@ struct ContentView: View {
                 })
                 .transition(.opacity)
             }
-            }
-            .id(themeManager.theme)
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
             if screen == .home || screen == .selectPhotos {
