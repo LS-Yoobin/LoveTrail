@@ -28,16 +28,22 @@ struct PetRoomLayoutState: Codable, Equatable {
     /// Most-recently-used play toys, newest first (`PetShopItem.id`).
     var playToyUsageOrder: [String]
 
-    private static let currentBuiltInLayoutVersion = 7
+    private static let currentBuiltInLayoutVersion = 8
 
     /// Canonical normalized anchors for built-in care props (pre pixel-offset nudge).
     static let canonicalBuiltInPropPositions: [String: NormalizedPoint] = [
-        PetRoomPropKey.catTree: NormalizedPoint(x: 0.84, y: 0.30),
+        // Middle-left, above the bowls (Artemis reference layout).
+        PetRoomPropKey.catTree: NormalizedPoint(x: 0.22, y: 0.30),
         // Bottom-left bowls sit closer together, just above the Train pill.
         PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.15, y: 0.125),
         PetRoomPropKey.waterBowl: NormalizedPoint(x: 0.31, y: 0.125),
-        // Bottom-right above Play, clear of the CTA (Arabella layout).
+        // Bottom-right above Play, clear of the CTA.
         PetRoomPropKey.litterBox: NormalizedPoint(x: 0.81, y: 0.17)
+    ]
+
+    /// Prior shipped cat-tree anchors — used to refresh only untouched defaults on migrate.
+    private static let legacyCatTreeDefaultPositions: [NormalizedPoint] = [
+        NormalizedPoint(x: 0.84, y: 0.30)
     ]
 
     /// Prior shipped litter anchors — used to refresh only untouched defaults on migrate.
@@ -142,7 +148,21 @@ struct PetRoomLayoutState: Codable, Equatable {
         if builtInLayoutVersion < 7 {
             migrateToBuiltInLayoutV7()
         }
+        if builtInLayoutVersion < 8 {
+            migrateToBuiltInLayoutV8()
+        }
         builtInLayoutVersion = Self.currentBuiltInLayoutVersion
+    }
+
+    /// v8: move the cat tree to the middle-left (reference room layout).
+    private mutating func migrateToBuiltInLayoutV8() {
+        if let current = propPositions[PetRoomPropKey.catTree] {
+            if Self.isLegacyCatTreeDefaultPosition(current) {
+                applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+            }
+        } else {
+            applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+        }
     }
 
     /// Writes the shipped default anchors for food, water, litter, and cat tree.
@@ -196,6 +216,12 @@ struct PetRoomLayoutState: Codable, Equatable {
             if let point = Self.canonicalBuiltInPropPositions[key] {
                 propPositions[key] = point
             }
+        }
+    }
+
+    static func isLegacyCatTreeDefaultPosition(_ point: NormalizedPoint) -> Bool {
+        legacyCatTreeDefaultPositions.contains {
+            abs($0.x - point.x) < 0.02 && abs($0.y - point.y) < 0.02
         }
     }
 
