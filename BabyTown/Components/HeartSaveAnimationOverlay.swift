@@ -44,7 +44,7 @@ struct HeartSaveAnimationOverlay: View {
                     x: CGFloat.random(in: -screenWidth/2...screenWidth/2),
                     y: screenHeight / 2,
                     size: CGFloat.random(in: 20...40),
-                    color: Bool.random() ? Color.pink : BabyTownTheme.accent,
+                    color: Bool.random() ? BabyTownTheme.accentDeep : BabyTownTheme.accent,
                     opacity: 1.0
                 )
                 

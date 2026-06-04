@@ -94,10 +94,11 @@ struct ProfileStickersLayer: View {
         )
     }
 
+    /// Photo stickers can be removed in edit mode; profile avatars stay on the garden.
     private func isDeletable(_ sticker: ProfileSticker) -> Bool {
         switch sticker.kind {
-        case .moment, .specialDate, .userAvatar, .partnerInvite: return true
-        case .pet: return false
+        case .moment, .specialDate: return true
+        case .userAvatar, .partnerInvite, .pet: return false
         }
     }
 

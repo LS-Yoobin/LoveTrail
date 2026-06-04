@@ -14,9 +14,9 @@ struct InvitePartnerFlowView: View {
     @State private var showMessageComposer = false
     @FocusState private var phoneFocused: Bool
 
-    private let accent = Color(red: 0.88, green: 0.22, blue: 0.38)
+    private var accent: Color { BabyTownTheme.accentDeep }
     private var heroGradient: [Color] {
-        [Color(red: 1.0, green: 0.48, blue: 0.63), accent]
+        [BabyTownTheme.accent, BabyTownTheme.accentDeep]
     }
 
     private var canSendText: Bool {

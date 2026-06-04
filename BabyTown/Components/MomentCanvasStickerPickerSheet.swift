@@ -104,7 +104,7 @@ struct MomentCanvasStickerPickerSheet: View {
             .overlay {
                 if isHighlighted {
                     RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                        .strokeBorder(BabyTownTheme.accentDeep, lineWidth: 3)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 4))

@@ -15,7 +15,9 @@ struct ProfileNoteEditorSheet: View {
     init(initialText: String, onSave: @escaping (String) -> Void) {
         self.initialText = initialText
         self.onSave = onSave
-        _draftText = State(initialValue: initialText)
+        let noteWidth: CGFloat = 280
+        let clamped = ProfileGardenNoteLayout.clampedNoteText(initialText, noteWidth: noteWidth)
+        _draftText = State(initialValue: clamped)
     }
 
     private var trimmedDraft: String {
@@ -96,18 +98,11 @@ struct ProfileNoteEditorSheet: View {
                         .allowsHitTesting(false)
                 }
 
-                TextEditor(text: $draftText)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(Color(red: 0.38, green: 0.30, blue: 0.24))
-                    .multilineTextAlignment(.center)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
-                    .focused($isNoteFocused)
-                    .onChange(of: draftText) { _, newValue in
-                        if newValue.count > Self.maxLength {
-                            draftText = String(newValue.prefix(Self.maxLength))
-                        }
-                    }
+                FixedLineNoteTextEditor(
+                    text: $draftText,
+                    noteWidth: noteWidth,
+                    isFocused: $isNoteFocused
+                )
             }
             .padding(.horizontal, noteWidth * ProfileGardenNoteLayout.textHorizontalInsetFraction)
             .padding(.top, noteHeight * ProfileGardenNoteLayout.textTopInsetFraction)

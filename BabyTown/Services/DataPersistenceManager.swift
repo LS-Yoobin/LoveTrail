@@ -262,6 +262,22 @@ final class DataPersistenceManager {
         NotificationManager.shared.refresh()
     }
 
+    /// Saves the onboarding birthday into Important Dates and sets the profile display name.
+    func saveOnboardingUserBirthday(_ date: Date, nickname: String) {
+        var profile = loadCoupleProfile()
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            profile.displayName = trimmed
+        }
+        let birthday = SpecialDate.localUserBirthday(
+            title: SpecialDate.birthdayTitle(for: trimmed),
+            date: date
+        )
+        profile.specialDates.removeAll { $0.id == SpecialDate.localUserBirthdayID }
+        profile.specialDates.append(birthday)
+        saveCoupleProfile(profile)
+    }
+
     /// Tolerant load — returns an empty profile when nothing is stored.
     func loadCoupleProfile() -> CoupleProfile {
         guard fileManager.fileExists(atPath: coupleProfileFileURL.path),

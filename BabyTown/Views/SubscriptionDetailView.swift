@@ -11,7 +11,7 @@ struct SubscriptionDetailView: View {
     @State private var showPaywall = false
     @State private var showInvite = false
 
-    private let accent = Color(red: 0.88, green: 0.22, blue: 0.38)
+    private var accent: Color { BabyTownTheme.accentDeep }
 
     var body: some View {
         List {

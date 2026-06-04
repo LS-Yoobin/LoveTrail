@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen {
-        case launch, welcome, storyOnboarding, nickname, colorTheme, firstMemories, howItWorks, photoAccess, home, selectPhotos
+        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday, firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
     }
 
@@ -99,6 +99,16 @@ struct ContentView: View {
             case .colorTheme:
                 ColorThemeView { theme in
                     ThemeManager.shared.setTheme(theme)
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .birthday
+                    }
+                }
+                .transition(.opacity)
+
+            case .birthday:
+                UserBirthdayView { birthday in
+                    let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
+                    DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
                     withAnimation(.easeInOut(duration: 0.4)) {
                         screen = .firstMemories
                     }

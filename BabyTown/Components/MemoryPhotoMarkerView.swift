@@ -9,7 +9,7 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
     private static let circleDiameter: CGFloat = 46
     private static let imageDiameter: CGFloat = 40
     private static let ringWidth: CGFloat = 2
-    private static let fillColor = UIColor(red: 1.0, green: 0.4, blue: 0.5, alpha: 1.0)
+    private static var fillColor: UIColor { BabyTownTheme.accentUIColor }
     private static let pillMaxWidth: CGFloat = 148
     private static let pillHorizontalPadding: CGFloat = 10
     private static let pillVerticalPadding: CGFloat = 5

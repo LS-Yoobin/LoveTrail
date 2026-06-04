@@ -26,10 +26,12 @@ struct ProfileStickerView: View {
     @State private var rotationBase: Double = 0
     @State private var rotationPreview: Double?
 
-    private static let minScale: CGFloat = 0.5
-    private static let maxScale: CGFloat = 4.0
     /// Lower = finer pinch control (0.25 ≈ quarter of native sensitivity).
     private static let pinchSensitivity: CGFloat = 0.22
+
+    private var scaleLimits: (min: CGFloat, max: CGFloat) {
+        ProfileSticker.scaleLimits(for: sticker.kind)
+    }
 
     private var effectiveScale: CGFloat {
         pinchPreviewScale ?? sticker.scale
@@ -191,11 +193,13 @@ struct ProfileStickerView: View {
             .onChanged { amount in
                 let damped = 1 + (amount - 1) * Self.pinchSensitivity
                 let proposed = pinchBaseScale * damped
-                pinchPreviewScale = min(max(proposed, Self.minScale), Self.maxScale)
+                let limits = scaleLimits
+                pinchPreviewScale = min(max(proposed, limits.min), limits.max)
             }
             .onEnded { amount in
                 let damped = 1 + (amount - 1) * Self.pinchSensitivity
-                let final = min(max(pinchBaseScale * damped, Self.minScale), Self.maxScale)
+                let limits = scaleLimits
+                let final = min(max(pinchBaseScale * damped, limits.min), limits.max)
                 pinchBaseScale = final
                 pinchPreviewScale = nil
                 onScaleChanged(final)

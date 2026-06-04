@@ -125,7 +125,7 @@ struct JinkyPromptSheetView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 0.95, green: 0.5, blue: 0.55))
+                    .fill(BabyTownTheme.accentMuted)
                     .shadow(color: BabyTownTheme.accent.opacity(0.2), radius: 6, y: 2)
             )
         }

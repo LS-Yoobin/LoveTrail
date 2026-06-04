@@ -21,14 +21,34 @@ struct ProfileSticker: Codable, Identifiable, Equatable {
     var scale: CGFloat
     var usedSubjectLift: Bool
 
-    /// Default rendered size multiplier for new stickers on the profile canvas.
-    static let defaultScale: CGFloat = 1
-    /// Freshly created photo stickers spawn ~20% larger than the base size.
-    static let newStickerScale: CGFloat = 1.2
-    /// Full moment page stickers spawn 50% larger than the garden default.
-    static let memoryPageNewStickerScale: CGFloat = newStickerScale * 1.5
     /// Base cutout size — matches the profile header slots in browse mode.
     static let cutoutBaseSize: CGFloat = 84
+
+    /// User + partner profile stickers on the secret garden canvas.
+    static let profileAvatarScale: CGFloat = 1.6
+    static let profileAvatarMinScale: CGFloat = 1.0
+    static let profileAvatarMaxScale: CGFloat = 5.5
+
+    /// Photo cutouts (moment / special date) on the garden and memory pages.
+    static let photoStickerDefaultScale: CGFloat = 1.5
+    static let photoStickerMinScale: CGFloat = 0.8
+    static let photoStickerMaxScale: CGFloat = 5.5
+
+    /// Default rendered size multiplier for profile avatar stickers.
+    static let defaultScale: CGFloat = profileAvatarScale
+    /// Freshly created garden photo stickers.
+    static let newStickerScale: CGFloat = photoStickerDefaultScale
+    /// Full moment page stickers spawn larger than the garden default.
+    static let memoryPageNewStickerScale: CGFloat = photoStickerDefaultScale * 1.5
+
+    static func scaleLimits(for kind: Kind) -> (min: CGFloat, max: CGFloat) {
+        switch kind {
+        case .userAvatar, .partnerInvite:
+            return (profileAvatarMinScale, profileAvatarMaxScale)
+        case .moment, .specialDate, .pet:
+            return (photoStickerMinScale, photoStickerMaxScale)
+        }
+    }
 
     /// Default normalized position for partner-invite sticker — garden band below
     /// the three profile cards (`ProfileGardenLayout.profileSlotNormalizedY`).

@@ -25,6 +25,8 @@ enum ProfileStickerSync {
             stickers[idx].position = ProfileSticker.defaultPartnerPosition
         }
 
+        migrateLegacyProfileStickerScales(stickers: &stickers)
+
         // Special dates no longer auto-spawn garden stickers — they live only in
         // Important Dates. Remove any that earlier versions created so a deleted
         // one can't resurrect on the next load.
@@ -98,7 +100,7 @@ enum ProfileStickerSync {
             sourceKey: key,
             position: ProfileSticker.defaultUserAvatarPosition,
             rotation: 0,
-            scale: ProfileSticker.defaultScale
+            scale: ProfileSticker.profileAvatarScale
         )
         let processed = SubjectLiftService.stickerImage(from: image)
         dpm.saveStickerImage(processed.image, id: sticker.id)
@@ -120,6 +122,24 @@ enum ProfileStickerSync {
         }
         let keepID = existing.first!.id
         stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
+    }
+
+    /// Bumps profile avatars that still use the old 1.0 default; clamps below minimum.
+    private static func migrateLegacyProfileStickerScales(stickers: inout [ProfileSticker]) {
+        for idx in stickers.indices {
+            switch stickers[idx].kind {
+            case .userAvatar, .partnerInvite:
+                if stickers[idx].scale < ProfileSticker.profileAvatarMinScale {
+                    stickers[idx].scale = ProfileSticker.profileAvatarMinScale
+                } else if stickers[idx].scale <= 1.0 {
+                    stickers[idx].scale = ProfileSticker.profileAvatarScale
+                }
+            case .moment, .specialDate, .pet:
+                if stickers[idx].scale < ProfileSticker.photoStickerMinScale {
+                    stickers[idx].scale = ProfileSticker.photoStickerMinScale
+                }
+            }
+        }
     }
 
     private static func shouldMigrateToDefaultProfilePosition(

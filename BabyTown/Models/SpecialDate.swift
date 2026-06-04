@@ -37,3 +37,18 @@ struct SpecialDate: Codable, Identifiable, Equatable {
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
     }
 }
+
+extension SpecialDate {
+    /// Stable id for the local user's birthday row created during onboarding.
+    static let localUserBirthdayID = UUID(uuidString: "7E4A9B12-3C5D-4F8A-9E01-2B6D8C4A1F30")!
+
+    static func localUserBirthday(title: String, date: Date) -> SpecialDate {
+        SpecialDate(id: localUserBirthdayID, title: title, date: date)
+    }
+
+    static func birthdayTitle(for nickname: String) -> String {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "My Birthday" }
+        return "\(trimmed)'s Birthday"
+    }
+}

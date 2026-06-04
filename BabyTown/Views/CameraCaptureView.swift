@@ -42,7 +42,7 @@ struct CameraCaptureView: View {
                 RoundedRectangle(cornerRadius: 24)
                     .fill(
                         LinearGradient(
-                            colors: [Color(red: 0.95, green: 0.26, blue: 0.35), Color(red: 0.88, green: 0.22, blue: 0.32)],
+                            colors: [BabyTownTheme.accentDeep, BabyTownTheme.accentDeep],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -120,7 +120,7 @@ struct CameraCaptureView: View {
             } label: {
                 Text("Take Photo")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.88, green: 0.22, blue: 0.32))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(

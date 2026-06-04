@@ -103,7 +103,7 @@ struct PetMomentGalleryPickerSheet: View {
                     .fill(Color(red: 0.45, green: 0.28, blue: 0.18))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                            .strokeBorder(BabyTownTheme.accentDeep, lineWidth: 3)
                     )
                     .frame(width: 120, height: 140)
                     .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
@@ -159,7 +159,7 @@ struct PetMomentGalleryPickerSheet: View {
             .overlay {
                 if isHighlighted {
                     RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Color(red: 0.88, green: 0.22, blue: 0.38), lineWidth: 3)
+                        .strokeBorder(BabyTownTheme.accentDeep, lineWidth: 3)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 4))

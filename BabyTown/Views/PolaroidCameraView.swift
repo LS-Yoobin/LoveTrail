@@ -217,11 +217,11 @@ struct PolaroidCameraView: View {
                 .foregroundStyle(isActive ? (activeIconColor ?? .white) : .white)
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial)
-                .background(showsPinkActiveChrome ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.22) : Color.clear)
+                .background(showsPinkActiveChrome ? BabyTownTheme.accentDeep.opacity(0.22) : Color.clear)
                 .clipShape(Circle())
                 .overlay(
                     Circle().stroke(
-                        showsPinkActiveChrome ? Color(red: 0.95, green: 0.26, blue: 0.35).opacity(0.5) : Color.clear,
+                        showsPinkActiveChrome ? BabyTownTheme.accentDeep.opacity(0.5) : Color.clear,
                         lineWidth: 1
                     )
                 )
@@ -418,7 +418,7 @@ struct PolaroidCameraView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(Color(red: 0.95, green: 0.26, blue: 0.35))
+                    .background(BabyTownTheme.accentDeep)
                     .clipShape(Capsule())
                     .shadow(color: latestImage != nil ? .black.opacity(0.35) : .clear, radius: 2, y: 1)
             }

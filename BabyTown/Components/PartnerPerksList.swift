@@ -4,7 +4,7 @@ import SwiftUI
 /// Settings ▸ Subscription screen so the benefit copy lives in one place.
 struct PartnerPerksList: View {
 
-    var accent: Color = Color(red: 0.88, green: 0.22, blue: 0.38)
+    var accent: Color = BabyTownTheme.accentDeep
 
     private let perks: [(emoji: String, title: String, description: String)] = [
         ("☁️", "Private cloud backup", "Every memory safe forever — never lose a moment"),

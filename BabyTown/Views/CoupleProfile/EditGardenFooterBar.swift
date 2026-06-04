@@ -7,7 +7,7 @@ struct EditGardenFooterBar: View {
     let onAddNote: () -> Void
     let onCreateStickers: () -> Void
 
-    private static let buttonFill = Color(red: 0.93, green: 0.55, blue: 0.52)
+    private static var buttonFill: Color { BabyTownTheme.accentMuted }
 
     var body: some View {
         HStack(spacing: 12) {

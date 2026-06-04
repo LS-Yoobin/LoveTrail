@@ -71,8 +71,8 @@ struct OnThisDayCard: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.8, green: 0.4, blue: 0.6),
-                                Color(red: 0.6, green: 0.3, blue: 0.5)
+                                BabyTownTheme.accent,
+                                BabyTownTheme.accentDeep
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
