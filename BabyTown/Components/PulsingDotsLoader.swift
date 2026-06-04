@@ -5,7 +5,7 @@ struct PulsingDotsLoader: View {
     
     @State private var isAnimating = false
     
-    var dotColor: Color = .pink.opacity(0.7)
+    var dotColor: Color = BabyTownTheme.accent.opacity(0.7)
     var dotSize: CGFloat = 12
     var spacing: CGFloat = 12
     

@@ -29,7 +29,7 @@ struct FloatingHeartsView: View {
                 Image(systemName: "heart.fill")
                     .font(.system(size: heart.size))
                     .foregroundStyle(
-                        Color.pink.opacity(heart.opacity)
+                        BabyTownTheme.accent.opacity(heart.opacity)
                     )
                     .position(
                         x: geo.size.width * heart.x,

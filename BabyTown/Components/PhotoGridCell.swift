@@ -80,7 +80,7 @@ struct PhotoGridCell: View {
             .font(.system(size: 30, weight: isSelected ? .regular : .semibold))
             .foregroundStyle(
                 isSelected
-                    ? Color(red: 0.95, green: 0.25, blue: 0.3)
+                    ? BabyTownTheme.accentDeep
                     : .white
             )
             .shadow(color: .black.opacity(memoryEditStyle && !isSelected ? 0.5 : 0.35), radius: 3, y: 1)

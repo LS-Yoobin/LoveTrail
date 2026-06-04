@@ -29,8 +29,8 @@ struct Scene5HeartTrailView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.pink.opacity(0.1 + Double(fillProgress) * 0.3),
-                                Color.red.opacity(0.05 + Double(fillProgress) * 0.2)
+                                BabyTownTheme.accent.opacity(0.1 + Double(fillProgress) * 0.3),
+                                BabyTownTheme.accentDeep.opacity(0.05 + Double(fillProgress) * 0.2)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing

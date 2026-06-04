@@ -69,8 +69,8 @@ struct ProcessingMemoryCard: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.95, green: 0.3, blue: 0.35),
-                            Color(red: 0.88, green: 0.22, blue: 0.32)
+                            BabyTownTheme.accentDeep,
+                            BabyTownTheme.accentDeep
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

@@ -81,7 +81,7 @@ struct BowlInspectCard: View {
                 fullnessLabel: "",
                 primaryButton: "",
                 secondaryButton: nil,
-                tint: .pink
+                tint: BabyTownTheme.accent
             )
         case .toiletPaperMess:
             return Config(
@@ -91,7 +91,7 @@ struct BowlInspectCard: View {
                 fullnessLabel: "",
                 primaryButton: "",
                 secondaryButton: nil,
-                tint: .pink
+                tint: BabyTownTheme.accent
             )
         }
     }

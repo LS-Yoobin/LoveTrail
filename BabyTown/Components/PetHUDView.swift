@@ -208,7 +208,7 @@ private struct PetMeter: View {
 
 #Preview {
     ZStack {
-        Color.pink.opacity(0.2)
+        BabyTownTheme.accent.opacity(0.2)
         VStack {
             PetHUDView(coins: 128, hunger: 70, thirst: 35, litter: 90, happiness: 55)
             Spacer()

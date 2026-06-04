@@ -42,18 +42,18 @@ struct MemorySelectionCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             } else {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.pink.opacity(0.06))
+                    .fill(BabyTownTheme.accent.opacity(0.06))
                     .frame(width: 64, height: 64)
                     .overlay(
                         Image(systemName: "heart")
                             .font(.system(size: 22, weight: .light))
-                            .foregroundStyle(.pink.opacity(0.3))
+                            .foregroundStyle(BabyTownTheme.accent.opacity(0.3))
                     )
             }
 
             Image(systemName: "heart.fill")
                 .font(.system(size: 26))
-                .foregroundStyle(.pink)
+                .foregroundStyle(BabyTownTheme.accent)
                 .scaleEffect(heartPopScale)
                 .opacity(heartPopOpacity)
         }
@@ -69,12 +69,12 @@ struct MemorySelectionCard: View {
                 if isOptional {
                     Text("Optional")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.pink.opacity(0.6))
+                        .foregroundStyle(BabyTownTheme.accent.opacity(0.6))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(Color.pink.opacity(0.08))
+                                .fill(BabyTownTheme.accent.opacity(0.08))
                         )
                 }
             }
@@ -88,7 +88,7 @@ struct MemorySelectionCard: View {
     private var trailingIcon: some View {
         Image(systemName: image == nil ? "plus.circle.fill" : "checkmark.circle.fill")
             .font(.system(size: 24))
-            .foregroundStyle(image == nil ? .pink.opacity(0.4) : .green.opacity(0.7))
+            .foregroundStyle(image == nil ? BabyTownTheme.accent.opacity(0.4) : .green.opacity(0.7))
             .animation(.easeInOut(duration: 0.25), value: image == nil)
     }
 

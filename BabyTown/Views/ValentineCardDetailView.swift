@@ -7,7 +7,7 @@ struct ValentineCardDetailView: View {
     @State private var showLetter = false
     @State private var heartBeat = false
 
-    private let accentColor = Color.pink
+    private let accentColor = BabyTownTheme.accent
 
     private let message = """
     Happy Valentine's Day \u{2764}\u{FE0F}

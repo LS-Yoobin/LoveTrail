@@ -10,11 +10,11 @@ struct BenefitRow: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundStyle(.pink)
+                .foregroundStyle(BabyTownTheme.accent)
                 .frame(width: 40, height: 40)
                 .background(
                     Circle()
-                        .fill(Color.pink.opacity(0.08))
+                        .fill(BabyTownTheme.accent.opacity(0.08))
                 )
 
             Text(title)

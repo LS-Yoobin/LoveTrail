@@ -26,7 +26,7 @@ struct HeroPhotoPreview: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .background(
             RoundedRectangle(cornerRadius: 24)
-                .fill(Color.pink.opacity(0.04))
+                .fill(BabyTownTheme.accent.opacity(0.04))
         )
         .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         .padding(.horizontal, 20)
@@ -37,7 +37,7 @@ struct HeroPhotoPreview: View {
         VStack(spacing: 14) {
             Image(systemName: "heart")
                 .font(.system(size: 48, weight: .thin))
-                .foregroundStyle(.pink.opacity(0.25))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.25))
             Text("Select a memory")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(Color(.tertiaryLabel))

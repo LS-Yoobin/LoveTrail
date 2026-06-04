@@ -519,7 +519,7 @@ struct SelectPhotosView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.95, green: 0.3, blue: 0.35))
+                .fill(BabyTownTheme.accentDeep)
                 .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
         )
         .padding(.horizontal, 16)

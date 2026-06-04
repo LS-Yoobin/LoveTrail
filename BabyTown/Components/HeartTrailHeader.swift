@@ -29,12 +29,12 @@ struct HeartTrailHeader: View {
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.pink, .red.opacity(0.7)],
+                        colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.7)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: .pink.opacity(0.25), radius: 10, y: 4)
+                .shadow(color: BabyTownTheme.accent.opacity(0.25), radius: 10, y: 4)
                 .offset(y: 50)
                 .scaleEffect(animate ? 1.0 : 0.9)
                 .animation(
@@ -47,7 +47,7 @@ struct HeartTrailHeader: View {
             ForEach(hearts) { heart in
                 Image(systemName: "heart.fill")
                     .font(.system(size: heart.size))
-                    .foregroundStyle(.pink.opacity(0.35))
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.35))
                     .offset(
                         x: heart.xOffset + (animate ? heart.drift : 0),
                         y: animate ? -60 : 40

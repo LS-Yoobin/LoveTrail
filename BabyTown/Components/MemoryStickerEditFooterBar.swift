@@ -4,7 +4,7 @@ import SwiftUI
 struct MemoryStickerEditFooterBar: View {
     let onAddMore: () -> Void
 
-    private static let buttonFill = Color(red: 0.93, green: 0.55, blue: 0.52)
+    private static let buttonFill = BabyTownTheme.accentDeep
 
     var body: some View {
         Button(action: onAddMore) {

@@ -4,7 +4,7 @@ import UIKit
 /// Map pin used on the memories map — pink fill, white ring, white glyph / count.
 final class MemoryMapMarkerAnnotationView: MKMarkerAnnotationView {
 
-    private static let fillColor = UIColor(red: 1.0, green: 0.4, blue: 0.5, alpha: 1.0)
+    private static let fillColor = BabyTownTheme.accentUIColor
     private static let ringWidth: CGFloat = 2.5
     private static let pillMaxWidth: CGFloat = 160
     private static let pillHorizontalPadding: CGFloat = 10
