@@ -40,8 +40,8 @@ public struct ImportantDateItem: Equatable, Sendable, Identifiable {
 }
 
 /// Merges the two foundational dates (when present) with the user's special
-/// dates. Non-birthdays stay in chronological order; birthdays are ordered
-/// latest-to-oldest (same rule as the home timeline birthday block).
+/// dates. Non-birthdays are newest-first; birthdays sit at the bottom, ordered
+/// latest-to-oldest among themselves (same rule as the home timeline).
 public struct ImportantDatesComposer {
     public init() {}
 
@@ -69,24 +69,14 @@ public struct ImportantDatesComposer {
         return Self.sortedForDisplay(items)
     }
 
-    /// Ascending timeline order, with birthday rows among themselves latest-first.
+    /// Newest-first for regular rows; birthdays anchored at the bottom, latest-first.
     static func sortedForDisplay(_ items: [ImportantDateItem]) -> [ImportantDateItem] {
-        var sorted = items.sorted {
-            if $0.date != $1.date { return $0.date < $1.date }
-            return $0.id < $1.id
+        func compareNewestFirst(_ lhs: ImportantDateItem, _ rhs: ImportantDateItem) -> Bool {
+            if lhs.date != rhs.date { return lhs.date > rhs.date }
+            return lhs.id < rhs.id
         }
-        let birthdayIndices = sorted.indices.filter { sorted[$0].isBirthday }
-        guard birthdayIndices.count > 1 else { return sorted }
-
-        let orderedBirthdays = birthdayIndices
-            .map { sorted[$0] }
-            .sorted {
-                if $0.date != $1.date { return $0.date > $1.date }
-                return $0.id < $1.id
-            }
-        for (index, item) in zip(birthdayIndices, orderedBirthdays) {
-            sorted[index] = item
-        }
-        return sorted
+        let regular = items.filter { !$0.isBirthday }.sorted(by: compareNewestFirst)
+        let birthdays = items.filter(\.isBirthday).sorted(by: compareNewestFirst)
+        return regular + birthdays
     }
 }

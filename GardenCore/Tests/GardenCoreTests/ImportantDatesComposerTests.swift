@@ -7,7 +7,7 @@ final class ImportantDatesComposerTests: XCTestCase {
                        year: y, month: m, day: d).date!
     }
 
-    func testFoundationalAndSpecialAreMergedAndSortedAscending() {
+    func testFoundationalAndSpecialAreMergedAndSortedNewestFirst() {
         let special = [
             SpecialDateInput(id: UUID(), title: "Anniversary", date: date(2025, 6, 1)),
             SpecialDateInput(id: UUID(), title: "Trip", date: date(2024, 1, 1)),
@@ -18,7 +18,7 @@ final class ImportantDatesComposerTests: XCTestCase {
             special: special
         )
         XCTAssertEqual(items.map(\.title),
-                       ["Trip", "When we first met", "When we became official", "Anniversary"])
+                       ["Anniversary", "When we became official", "When we first met", "Trip"])
     }
 
     func testMissingFoundationalDatesAreOmitted() {
@@ -49,7 +49,7 @@ final class ImportantDatesComposerTests: XCTestCase {
         XCTAssertEqual(items[0].kind, .special)
     }
 
-    func testBirthdaysAreOrderedLatestToOldestAmongChronologicalList() {
+    func testBirthdaysAreAnchoredAtBottomOrderedLatestToOldest() {
         let items = ImportantDatesComposer().compose(
             firstMet: date(2020, 1, 1),
             official: nil,
@@ -60,10 +60,10 @@ final class ImportantDatesComposerTests: XCTestCase {
             ]
         )
         XCTAssertEqual(items.map(\.title), [
+            "Anniversary",
+            "When we first met",
             "My Birthday",
             "Partner's Birthday",
-            "When we first met",
-            "Anniversary",
         ])
     }
 }
