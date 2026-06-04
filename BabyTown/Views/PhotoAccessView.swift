@@ -48,7 +48,7 @@ struct PhotoAccessView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, Color.pink.opacity(0.06)],
+            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -62,7 +62,7 @@ struct PhotoAccessView: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.pink.opacity(0.15), Color.red.opacity(0.08)],
+                        colors: [BabyTownTheme.accent.opacity(0.15), BabyTownTheme.accentDeep.opacity(0.08)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -73,7 +73,7 @@ struct PhotoAccessView: View {
                 .font(.system(size: 46))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.pink, .red.opacity(0.8)],
+                        colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.8)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -143,12 +143,12 @@ struct PhotoAccessView: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [.pink, .red.opacity(0.75)],
+                            colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.8)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
-                    .shadow(color: .pink.opacity(0.35), radius: 14, y: 6)
+                    .shadow(color: BabyTownTheme.accent.opacity(0.35), radius: 14, y: 6)
             )
         }
         .disabled(isRequesting)
@@ -193,7 +193,7 @@ private struct AccessLevelCard: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
                         LinearGradient(
-                            colors: [.pink.opacity(0.15), .red.opacity(0.08)],
+                            colors: [BabyTownTheme.accent.opacity(0.15), BabyTownTheme.accentDeep.opacity(0.08)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -220,7 +220,7 @@ private struct AccessLevelCard: View {
                             .background(
                                 Capsule()
                                     .fill(LinearGradient(
-                                        colors: [.pink, .red.opacity(0.8)],
+                                        colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.8)],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     ))

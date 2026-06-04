@@ -77,7 +77,7 @@ struct NicknameView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, Color.pink.opacity(0.06)],
+            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -95,11 +95,7 @@ struct NicknameView: View {
                     Capsule()
                         .fill(
                             canContinue
-                                ? LinearGradient(
-                                    colors: [.pink, .pink.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                ? BabyTownTheme.buttonGradient
                                 : LinearGradient(
                                     colors: [
                                         Color(.systemGray4),
@@ -110,7 +106,7 @@ struct NicknameView: View {
                                 )
                         )
                         .shadow(
-                            color: canContinue ? .pink.opacity(0.3) : .clear,
+                            color: canContinue ? BabyTownTheme.accent.opacity(0.3) : .clear,
                             radius: 12, y: 6
                         )
                 )

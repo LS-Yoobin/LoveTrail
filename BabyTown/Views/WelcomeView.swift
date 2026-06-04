@@ -15,7 +15,7 @@ struct WelcomeView: View {
             LinearGradient(
                 colors: [
                     Color.white,
-                    Color.pink.opacity(0.06)
+                    BabyTownTheme.accent.opacity(0.06)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -46,7 +46,7 @@ struct WelcomeView: View {
                     .scaleEffect(heartScale)
                     .opacity(heartOpacity)
                     .shadow(
-                        color: .pink.opacity(0.3),
+                        color: BabyTownTheme.accent.opacity(0.3),
                         radius: 20, y: 8
                     )
 
@@ -74,15 +74,15 @@ struct WelcomeView: View {
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color.pink,
-                                                Color.pink.opacity(0.8)
+                                                BabyTownTheme.accent,
+                                                BabyTownTheme.accent.opacity(0.8)
                                             ],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )
                                     )
                                     .shadow(
-                                        color: .pink.opacity(0.3),
+                                        color: BabyTownTheme.accent.opacity(0.3),
                                         radius: 12, y: 6
                                     )
                             )

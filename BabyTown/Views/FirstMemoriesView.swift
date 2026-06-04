@@ -34,7 +34,7 @@ struct FirstMemoriesView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, Color.pink.opacity(0.06)],
+            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -115,11 +115,7 @@ struct FirstMemoriesView: View {
                     Capsule()
                         .fill(
                             viewModel.canFinish
-                                ? LinearGradient(
-                                    colors: [.pink, .pink.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                  )
+                                ? BabyTownTheme.buttonGradient
                                 : LinearGradient(
                                     colors: [
                                         Color(.systemGray4),
@@ -131,7 +127,7 @@ struct FirstMemoriesView: View {
                         )
                         .shadow(
                             color: viewModel.canFinish
-                                ? .pink.opacity(0.3)
+                                ? BabyTownTheme.accent.opacity(0.3)
                                 : .clear,
                             radius: 12, y: 6
                         )

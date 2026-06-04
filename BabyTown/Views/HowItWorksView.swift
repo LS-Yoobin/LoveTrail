@@ -47,7 +47,7 @@ struct HowItWorksView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, Color.pink.opacity(0.05)],
+            colors: [.white, BabyTownTheme.accent.opacity(0.05)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -64,7 +64,7 @@ struct HowItWorksView: View {
 
             Text("Baby Town does the rest.")
                 .font(.system(size: 25, weight: .light, design: .serif))
-                .foregroundStyle(.pink)
+                .foregroundStyle(BabyTownTheme.accent)
 
             Text("Select your favorite moments and we'll\norganize them by day and place for you.")
                 .font(.system(size: 14))
@@ -116,12 +116,12 @@ struct HowItWorksView: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [.pink, .red.opacity(0.75)],
+                                colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.85)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .shadow(color: .pink.opacity(0.35), radius: 14, y: 6)
+                        .shadow(color: BabyTownTheme.accent.opacity(0.35), radius: 14, y: 6)
                 )
         }
         .padding(.horizontal, 40)
