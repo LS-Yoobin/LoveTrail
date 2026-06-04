@@ -971,14 +971,14 @@ final class PetRoomScene: SKScene {
 
         let rect = SKShapeNode(rectOf: placeholderSize, cornerRadius: 12)
         rect.fillColor = BabyTownTheme.accentSK.withAlphaComponent(0.55)
-        rect.strokeColor = SKColor(red: 0.88, green: 0.22, blue: 0.38, alpha: 0.6)
+        rect.strokeColor = BabyTownTheme.accentDeepSK.withAlphaComponent(0.6)
         rect.lineWidth = 2
         rect.position = CGPoint(x: point.x, y: point.y + placeholderSize.height / 2)
         rect.zPosition = roomProp == nil ? 0 : propDepthZ(for: point.y)
         let label = SKLabelNode(text: caption)
         label.fontName = "HelveticaNeue-Medium"
         label.fontSize = 14
-        label.fontColor = SKColor(red: 0.55, green: 0.15, blue: 0.27, alpha: 1)
+        label.fontColor = BabyTownTheme.accentDeepSK
         label.verticalAlignmentMode = .center
         rect.addChild(label)
         if isCustomizeMode, draggableInCustomize { highlightDraggable(rect) }
@@ -2666,7 +2666,7 @@ final class PetRoomScene: SKScene {
         let dashed = CGPath(roundedRect: outlineRect, cornerWidth: 10, cornerHeight: 10, transform: nil)
             .copy(dashingWithPhase: 0, lengths: [7, 5])
         let outline = SKShapeNode(path: dashed)
-        outline.strokeColor = SKColor(red: 0.88, green: 0.22, blue: 0.38, alpha: 0.95)
+        outline.strokeColor = BabyTownTheme.accentDeepSK.withAlphaComponent(0.95)
         outline.lineWidth = 2.5
         outline.fillColor = .clear
         overlay.addChild(outline)
