@@ -108,8 +108,8 @@ struct CaptionEditorSheet: View {
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 7)
                                 .background(
-                                    Capsule()
-                                        .fill(LinearGradient(colors: [.blue], startPoint: .leading, endPoint: .trailing))
+                                Capsule()
+                                    .fill(BabyTownTheme.savePillFill)
                                 )
                         }
                         .buttonStyle(.plain)

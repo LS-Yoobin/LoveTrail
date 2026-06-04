@@ -14,11 +14,19 @@ final class LoveGardenScene: SKScene {
 
     private let elements: [GardenElement]
     private let season: GardenSeason
+    /// When true, blooms and backdrop are drawn at rest with no motion (thumbnails).
+    private let isStaticSnapshot: Bool
     private var elementNodes: [UUID: SKNode] = [:]
 
-    init(size: CGSize, elements: [GardenElement], season: GardenSeason) {
+    init(
+        size: CGSize,
+        elements: [GardenElement],
+        season: GardenSeason,
+        isStaticSnapshot: Bool = false
+    ) {
         self.elements = elements
         self.season = season
+        self.isStaticSnapshot = isStaticSnapshot
         super.init(size: size)
         scaleMode = .resizeFill
         anchorPoint = CGPoint(x: 0, y: 0)
@@ -31,7 +39,11 @@ final class LoveGardenScene: SKScene {
         addSkyBackdrop()
         addDistantHills()
         drawGround()
-        addDriftingClouds()
+        if !isStaticSnapshot {
+            addDriftingClouds()
+        } else {
+            addStaticClouds()
+        }
         for (index, element) in elements.enumerated() {
             let node = makeNode(for: element)
             node.position = screenPosition(for: element.position)
@@ -41,12 +53,18 @@ final class LoveGardenScene: SKScene {
             elementNodes[element.sourceID] = node
 
             let depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
-            animateGrowth(node, targetScale: depthScale, delay: Double(index) * 0.03)
-            addSway(to: node, seed: element.position.x)
+            if isStaticSnapshot {
+                node.setScale(depthScale)
+            } else {
+                animateGrowth(node, targetScale: depthScale, delay: Double(index) * 0.03)
+                addSway(to: node, seed: element.position.x)
+            }
         }
-        addAmbientParticles()
-        if season == .blooming {
-            addFallingPetals()
+        if !isStaticSnapshot {
+            addAmbientParticles()
+            if season == .blooming {
+                addFallingPetals()
+            }
         }
     }
 
@@ -116,11 +134,26 @@ final class LoveGardenScene: SKScene {
         mid.zPosition = -3
         addChild(mid)
 
+        guard !isStaticSnapshot else { return }
         let drift = SKAction.repeatForever(.sequence([
             .moveBy(x: 6, y: 0, duration: 14),
             .moveBy(x: -6, y: 0, duration: 14),
         ]))
         mid.run(drift)
+    }
+
+    private func addStaticClouds() {
+        for i in 0..<3 {
+            let cloud = SKShapeNode(ellipseOf: CGSize(width: 90 + CGFloat(i) * 18, height: 34))
+            cloud.fillColor = SKColor(white: 1, alpha: season == .blooming ? 0.55 : 0.38)
+            cloud.strokeColor = .clear
+            cloud.position = CGPoint(
+                x: size.width * (0.2 + CGFloat(i) * 0.28),
+                y: size.height * (0.72 + CGFloat(i) * 0.04)
+            )
+            cloud.zPosition = -2
+            addChild(cloud)
+        }
     }
 
     private func addDriftingClouds() {

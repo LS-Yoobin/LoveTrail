@@ -9,10 +9,14 @@ struct ProfileStickerView: View {
     let isCustomizing: Bool
     var onTap: (() -> Void)?
     let isSelected: Bool
+    var showsArrangementChrome: Bool? = nil
+    var dragBounds: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? = nil
     var onSelect: (() -> Void)?
     var onDelete: (() -> Void)?
     let onPositionChanged: (NormalizedPoint) -> Void
     let onScaleChanged: (CGFloat) -> Void
+    var onDragEnded: (() -> Void)? = nil
+    var onDragActiveChanged: ((Bool) -> Void)? = nil
     /// Set for garden moment stickers only; profile avatars omit this.
     var onRotationChanged: ((Double) -> Void)?
 
@@ -39,6 +43,8 @@ struct ProfileStickerView: View {
         onRotationChanged != nil
     }
 
+    private var showChrome: Bool { showsArrangementChrome ?? isCustomizing }
+
     var body: some View {
         let side = ProfileSticker.renderedSize(scale: effectiveScale)
         let center = CGPoint(
@@ -62,7 +68,7 @@ struct ProfileStickerView: View {
         .contentShape(Rectangle())
         .rotationEffect(.degrees(effectiveRotation))
         .overlay(alignment: .top) {
-            if isCustomizing, isSelected, let onDelete {
+            if showChrome, isSelected, let onDelete {
                 Button(action: onDelete) {
                     Image(systemName: "trash.fill")
                         .font(.subheadline.weight(.semibold))
@@ -119,7 +125,7 @@ struct ProfileStickerView: View {
         .frame(width: side, height: side)
         .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
         .overlay {
-            if isCustomizing {
+            if showChrome {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .strokeBorder(
                         Color.white,
@@ -156,16 +162,28 @@ struct ProfileStickerView: View {
         .overlay(Circle().stroke(.white, lineWidth: 3))
     }
 
+    private var dragLimits: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
+        dragBounds ?? (minX: 0.06, maxX: 0.94, minY: 0.10, maxY: 0.92)
+    }
+
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
+                if dragOrigin == nil {
+                    dragOrigin = sticker.position
+                    onDragActiveChanged?(true)
+                }
                 let origin = dragOrigin ?? sticker.position
-                if dragOrigin == nil { dragOrigin = sticker.position }
-                let nx = min(max(origin.x + value.translation.width / canvasSize.width, 0.06), 0.94)
-                let ny = min(max(origin.y + value.translation.height / canvasSize.height, 0.10), 0.92)
+                let limits = dragLimits
+                let nx = min(max(origin.x + value.translation.width / canvasSize.width, limits.minX), limits.maxX)
+                let ny = min(max(origin.y + value.translation.height / canvasSize.height, limits.minY), limits.maxY)
                 onPositionChanged(NormalizedPoint(x: nx, y: ny))
             }
-            .onEnded { _ in dragOrigin = nil }
+            .onEnded { _ in
+                dragOrigin = nil
+                onDragActiveChanged?(false)
+                onDragEnded?()
+            }
     }
 
     private var pinchGesture: some Gesture {

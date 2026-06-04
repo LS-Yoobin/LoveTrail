@@ -1,58 +1,42 @@
+import PhotosUI
 import SwiftUI
 
 struct BackgroundMusicSettingsSection: View {
 
-    @State private var linkDraft = ""
+    @State private var pickerItem: PhotosPickerItem?
     @State private var statusMessage: String?
-    @State private var isSaving = false
-
-    private var savedLink: BackgroundMusicLink? {
-        BackgroundMusicPreferences.parsedLink
-    }
+    @State private var isImporting = false
 
     var body: some View {
         Section {
-            TextField(
-                "Paste Spotify, Apple Music, or YouTube link",
-                text: $linkDraft,
-                axis: .vertical
-            )
-            .lineLimit(2...4)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(.URL)
-
-            if let savedLink {
+            PhotosPicker(selection: $pickerItem, matching: .videos) {
                 HStack {
-                    Text("Current")
-                    Spacer()
-                    Text(savedLink.kind.displayName)
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                HStack {
-                    Text("Current")
-                    Spacer()
-                    Text("Default song")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Button {
-                saveLink()
-            } label: {
-                HStack {
-                    if isSaving {
-                        ProgressView()
-                            .scaleEffect(0.85)
-                    }
-                    Text("Save background song")
+                    Image(systemName: "waveform.badge.plus")
+                        .font(.system(size: 16))
+                    Text("Import song from screen recording")
                         .font(.system(size: 16, weight: .semibold))
                 }
             }
-            .disabled(isSaving || linkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(isImporting)
 
-            if savedLink != nil {
+            if isImporting {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .scaleEffect(0.85)
+                    Text("Extracting audio…")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack {
+                Text("Current")
+                Spacer()
+                Text(BackgroundMusicImporter.hasImportedSong ? "Your imported song" : "Default song")
+                    .foregroundStyle(.secondary)
+            }
+
+            if BackgroundMusicImporter.hasImportedSong {
                 Button("Use default song") {
                     useDefaultSong()
                 }
@@ -66,34 +50,38 @@ struct BackgroundMusicSettingsSection: View {
         } header: {
             Text("Background Music")
         } footer: {
-            Text("YouTube and direct audio links play automatically. Spotify uses Spotify's in-app player — playback starts after you save, but iOS may still block autoplay until you've interacted with the app once.")
+            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. Baby Town saves only the audio on your device and loops it on the home screen.")
         }
-        .onAppear {
-            linkDraft = BackgroundMusicPreferences.customLinkURL?.absoluteString ?? ""
+        .onChange(of: pickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task { await importPickedVideo(newItem) }
         }
     }
 
-    private func saveLink() {
-        let trimmed = linkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard BackgroundMusicLinkParser.isValidMusicURL(trimmed) else {
-            statusMessage = "Paste a valid Spotify, Apple Music, or YouTube link."
-            return
-        }
-
-        isSaving = true
+    @MainActor
+    private func importPickedVideo(_ item: PhotosPickerItem) async {
+        isImporting = true
         statusMessage = nil
-        BackgroundMusicPreferences.customLinkURL = URL(string: trimmed)
-
-        if let kind = BackgroundMusicPreferences.parsedLink?.kind.displayName {
-            statusMessage = "Saved — starting \(kind) playback."
+        defer {
+            isImporting = false
+            pickerItem = nil
         }
-        isSaving = false
+
+        do {
+            guard let picked = try await item.loadTransferable(type: PickedBackgroundMusicVideo.self) else {
+                statusMessage = BackgroundMusicImporter.ImportError.unreadableVideo.errorDescription
+                return
+            }
+            try await BackgroundMusicImporter.importFromVideo(at: picked.url)
+            statusMessage = "Imported — your song will loop on the home screen."
+        } catch {
+            statusMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 
     private func useDefaultSong() {
-        linkDraft = ""
         statusMessage = nil
-        BackgroundMusicPreferences.clearCustomLink()
+        BackgroundMusicImporter.clearImportedSong()
         statusMessage = "Using the default Baby Town song."
     }
 }

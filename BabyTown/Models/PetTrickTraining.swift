@@ -41,7 +41,7 @@ enum PetTrick: String, Codable, CaseIterable, Identifiable {
         case .paw:       return ["paw", "paul", "give paw", "shake"]
         case .highFive:  return [
             "high five", "high-five", "highfive", "high 5", "high5",
-            "gh five", "hive five", "hai five",
+            "gh five", "gh 5", "gh5", "hive five", "hai five",
         ]
         case .up:        return ["up", "stand up", "stand"]
         case .spin:      return ["spin", "turn around", "turn"]
@@ -374,9 +374,11 @@ struct PetTrickTrainingState: Codable, Equatable {
     static func displayTranscript(_ transcript: String) -> String {
         var text = transcript
         let corrections: [(pattern: String, replacement: String)] = [
-            (#"\b(?:gh|hive|hai)\s+five\b"#, "High five"),
-            (#"\bhigh\s*[-]?\s*5\b"#, "High five"),
-            (#"\bhighfive\b"#, "High five"),
+            (#"\b(?:gh|hive|hai)\s+five\b"#, "High Five"),
+            (#"\bgh5\b"#, "High Five"),
+            (#"\bgh\s+5\b"#, "High Five"),
+            (#"\bhigh\s*[-]?\s*5\b"#, "High Five"),
+            (#"\bhighfive\b"#, "High Five"),
             (#"\bpaul\b"#, "Paw"),
         ]
         for (pattern, replacement) in corrections {
@@ -392,8 +394,12 @@ struct PetTrickTrainingState: Codable, Equatable {
     /// Maps recognized speech text to a trick, if any phrase matches.
     /// Longer phrases win (e.g. "high five" over "hi") and short tokens use word boundaries
     /// so "hi" does not match inside "high five".
-    static func trick(matching transcript: String) -> PetTrick? {
-        bestPhraseMatch(in: transcript)?.trick
+    /// Pass `isFinal: false` while streaming partial ASR — bare `"hi"` waits for finalize
+    /// so an in-progress "high five" doesn't accidentally trigger Speak.
+    static func trick(matching transcript: String, isFinal: Bool = true) -> PetTrick? {
+        guard let match = bestPhraseMatch(in: transcript) else { return nil }
+        if !isFinal && match.phrase == "hi" { return nil }
+        return match.trick
     }
 
     private static func bestPhraseMatch(in transcript: String) -> (trick: PetTrick, phrase: String)? {
@@ -429,6 +435,8 @@ struct PetTrickTrainingState: Codable, Equatable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let mishearToCanonical: [(pattern: String, replacement: String)] = [
             (#"\b(?:gh|hive|hai)\s+five\b"#, "high five"),
+            (#"\bgh5\b"#, "high five"),
+            (#"\bgh\s+5\b"#, "high five"),
             (#"\bhigh\s*5\b"#, "high five"),
             (#"\bhighfive\b"#, "high five"),
             (#"\bhigh5\b"#, "high five"),

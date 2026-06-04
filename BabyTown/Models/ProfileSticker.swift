@@ -25,14 +25,16 @@ struct ProfileSticker: Codable, Identifiable, Equatable {
     static let defaultScale: CGFloat = 1
     /// Freshly created photo stickers spawn ~20% larger than the base size.
     static let newStickerScale: CGFloat = 1.2
+    /// Full moment page stickers spawn 50% larger than the garden default.
+    static let memoryPageNewStickerScale: CGFloat = newStickerScale * 1.5
     /// Base cutout size — matches the profile header slots in browse mode.
     static let cutoutBaseSize: CGFloat = 84
 
-    /// Default normalized position for a freshly synced partner-invite sticker
-    /// (garden band directly below the profile cards).
-    static let defaultPartnerPosition = NormalizedPoint(x: 0.68, y: 0.46)
-    /// Default normalized position for a freshly synced user-avatar sticker.
-    static let defaultUserAvatarPosition = NormalizedPoint(x: 0.32, y: 0.46)
+    /// Default normalized position for partner-invite sticker — garden band below
+    /// the three profile cards (`ProfileGardenLayout.profileSlotNormalizedY`).
+    static let defaultPartnerPosition = NormalizedPoint(x: 0.68, y: ProfileGardenLayout.profileSlotNormalizedY)
+    /// Default normalized position for user-avatar sticker.
+    static let defaultUserAvatarPosition = NormalizedPoint(x: 0.32, y: ProfileGardenLayout.profileSlotNormalizedY)
 
     /// Side length on screen for a sticker at the given scale.
     static func renderedSize(scale: CGFloat) -> CGFloat {

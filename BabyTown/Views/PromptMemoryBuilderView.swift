@@ -305,8 +305,8 @@ struct PromptMemoryBuilderView: View {
                 .padding(.vertical, 16)
                 .background(
                     Capsule()
-                        .fill(canSave ? BabyTownTheme.accentGradient : LinearGradient(colors: [Color(.systemGray4)], startPoint: .leading, endPoint: .trailing))
-                        .shadow(color: canSave ? BabyTownTheme.buttonShadow : .clear, radius: 12, y: 6)
+                        .fill(canSave ? BabyTownTheme.savePillFill : Color(.systemGray4))
+                        .shadow(color: canSave ? BabyTownTheme.savePillShadow : .clear, radius: 12, y: 6)
                 )
         }
         .disabled(!canSave)

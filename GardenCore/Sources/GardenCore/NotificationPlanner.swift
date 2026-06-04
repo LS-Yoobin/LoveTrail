@@ -27,14 +27,22 @@ public struct NotificationSnapshot: Equatable {
     public var hunger: PetNeedSnapshot?
     public var thirst: PetNeedSnapshot?
     public var specialDates: [PlannerSpecialDate]
+    /// True once a pet-needs banner has fired for the current below-gate episode.
+    public var petNeedsNotifiedWhileLow: Bool
+    /// `lastPetInteractionAt` value a "pet misses you" overdue banner already covered.
+    public var petMissesYouNotifiedForInteractionAt: Date?
     public init(isPetAdopted: Bool, petName: String?, userNickname: String?,
                 lastPetInteractionAt: Date?, litterIsDirty: Bool,
                 hunger: PetNeedSnapshot?, thirst: PetNeedSnapshot?,
-                specialDates: [PlannerSpecialDate]) {
+                specialDates: [PlannerSpecialDate],
+                petNeedsNotifiedWhileLow: Bool = false,
+                petMissesYouNotifiedForInteractionAt: Date? = nil) {
         self.isPetAdopted = isPetAdopted; self.petName = petName
         self.userNickname = userNickname; self.lastPetInteractionAt = lastPetInteractionAt
         self.litterIsDirty = litterIsDirty; self.hunger = hunger; self.thirst = thirst
         self.specialDates = specialDates
+        self.petNeedsNotifiedWhileLow = petNeedsNotifiedWhileLow
+        self.petMissesYouNotifiedForInteractionAt = petMissesYouNotifiedForInteractionAt
     }
 }
 
@@ -57,7 +65,7 @@ public struct NotificationPlanner {
     public func plan(snapshot s: NotificationSnapshot, now: Date, calendar: Calendar) -> [PlannedNotification] {
         var out: [PlannedNotification] = []
         if s.isPetAdopted {
-            out.append(petMissesYou(s, now: now, calendar: calendar))
+            if let miss = petMissesYou(s, now: now, calendar: calendar) { out.append(miss) }
             if s.litterIsDirty { out.append(litterNoon(s)) }
             if let needs = petNeeds(s, now: now, calendar: calendar) { out.append(needs) }
         }
@@ -65,9 +73,14 @@ public struct NotificationPlanner {
         return out
     }
 
-    private func petMissesYou(_ s: NotificationSnapshot, now: Date, calendar: Calendar) -> PlannedNotification {
+    private func petMissesYou(_ s: NotificationSnapshot, now: Date, calendar: Calendar) -> PlannedNotification? {
         let name = s.petName ?? "Someone"
-        let candidate = (s.lastPetInteractionAt ?? now).addingTimeInterval(7 * 86_400)
+        let interactionAt = s.lastPetInteractionAt ?? now
+        let candidate = interactionAt.addingTimeInterval(7 * 86_400)
+        if candidate <= now,
+           s.petMissesYouNotifiedForInteractionAt == interactionAt {
+            return nil
+        }
         let target = max(candidate, now)
         let fire = NotificationQuietHours.clamp(target, calendar: calendar)
         let body: String
@@ -96,6 +109,7 @@ public struct NotificationPlanner {
         let h = hoursToGate(s.hunger)
         let t = hoursToGate(s.thirst)
         guard let soonest = [h, t].compactMap({ $0 }).min() else { return nil }
+        if soonest <= 0, s.petNeedsNotifiedWhileLow { return nil }
         let fire = NotificationQuietHours.clamp(now.addingTimeInterval(soonest * 3600), calendar: calendar)
         let name = s.petName ?? "Your pet"
         let title: String

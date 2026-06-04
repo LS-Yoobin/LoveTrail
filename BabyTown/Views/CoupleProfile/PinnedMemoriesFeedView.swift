@@ -29,11 +29,9 @@ struct PinnedMemoriesFeedView: View {
     @State private var showingMomentViewer = false
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
-    @State private var showingPromptPhotoViewer = false
-    @State private var viewerPromptPhotos: [PromptPhoto] = []
-    @State private var viewerPromptPhotoIndex = 0
-    @State private var viewerPromptText: String?
-    @State private var specialDatePhotoContext: ImportantDatePhotoViewerContext?
+    @State private var viewerMemoryPagePromptText: String?
+    @State private var viewerImportantDate: MemoryPageImportantDateInfo?
+    @State private var viewerPromptMemoryId: UUID?
 
     private var feedRows: [PinnedFeedRow] {
         var rows: [PinnedFeedRow] = specialDates.filter(\.isPinned).map { .special($0) }
@@ -92,6 +90,7 @@ struct PinnedMemoriesFeedView: View {
                     onDismiss: {
                         withAnimation(.easeOut(duration: 0.25)) {
                             showingMomentViewer = false
+                            clearMemoryPageViewerContext()
                         }
                     },
                     onUpdateMoments: { updatedMoments in
@@ -105,51 +104,86 @@ struct PinnedMemoriesFeedView: View {
                     },
                     onDeleteMoment: { moment in
                         withAnimation { viewModel.deleteMoment(moment) }
+                    },
+                    memoryPagePromptText: viewerMemoryPagePromptText,
+                    memoryPageImportantDate: viewerImportantDate,
+                    promptMemoryId: viewerPromptMemoryId,
+                    onEditPromptMemory: { memoryId, _, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                        viewModel.updatePromptMemory(
+                            memoryId: memoryId,
+                            primaryPhotoId: viewerMoments.first?.id ?? UUID(),
+                            loveNote: caption,
+                            placeName: placeName,
+                            latitude: latitude,
+                            longitude: longitude,
+                            isPlaceNameUserSet: isPlaceNameUserSet
+                        )
+                    },
+                    onAddPromptPhotos: { memoryId, images in
+                        viewModel.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+                    },
+                    onRemovePromptPhoto: { memoryId, photoId in
+                        viewModel.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+                    },
+                    onSyncPromptMemoryPhotos: { memoryId, assetIds, orphanIds in
+                        await viewModel.syncPromptMemoryPhotos(
+                            memoryId: memoryId,
+                            selectedAssetIds: assetIds,
+                            selectedOrphanMomentIds: orphanIds
+                        )
+                    },
+                    onReloadPromptMoments: {
+                        guard let memoryId = viewerPromptMemoryId,
+                              let memory = viewModel.promptMemories.first(where: { $0.id == memoryId }) else {
+                            return viewerMoments
+                        }
+                        return memory.sortedViewerMoments
                     }
                 )
                 .transition(.opacity)
                 .zIndex(11)
             }
-
-            if showingPromptPhotoViewer {
-                PromptPhotoViewer(
-                    photos: viewerPromptPhotos,
-                    initialIndex: viewerPromptPhotoIndex,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showingPromptPhotoViewer = false
-                        }
-                    },
-                    onUpdatePhotos: { updatedPhotos in
-                        viewModel.updatePromptMemoryPhotos(viewerPromptPhotos, with: updatedPhotos)
-                    },
-                    onDeletePhoto: { photo in
-                        withAnimation {
-                            viewModel.deletePromptPhoto(photo, from: viewerPromptPhotos)
-                        }
-                    },
-                    promptText: viewerPromptText
-                )
-                .transition(.opacity)
-                .zIndex(12)
-            }
-
-            if let context = specialDatePhotoContext {
-                ImportantDatePhotoViewer(
-                    title: context.title,
-                    date: context.date,
-                    image: context.image,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            specialDatePhotoContext = nil
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(13)
-            }
         }
-        .animation(.easeInOut(duration: 0.25), value: specialDatePhotoContext != nil)
+    }
+
+    private func clearMemoryPageViewerContext() {
+        viewerMemoryPagePromptText = nil
+        viewerImportantDate = nil
+        viewerPromptMemoryId = nil
+    }
+
+    private func openPromptMemoryPage(memory: PromptMemory, photo: PromptPhoto) {
+        let moments = memory.sortedViewerMoments
+        guard !moments.isEmpty else { return }
+        clearMemoryPageViewerContext()
+        viewerMoments = moments
+        viewerInitialIndex = moments.firstIndex(where: { $0.id == photo.id }) ?? 0
+        viewerMemoryPagePromptText = memory.promptText
+        viewerPromptMemoryId = memory.id
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
+    }
+
+    private func openImportantDateMemoryPage(
+        title: String,
+        date: Date,
+        image: UIImage,
+        itemId: String
+    ) {
+        clearMemoryPageViewerContext()
+        viewerMoments = [
+            MemoryPageMomentFactory.moment(
+                image: image,
+                importantDate: MemoryPageImportantDateInfo(title: title, date: date),
+                itemId: itemId
+            )
+        ]
+        viewerInitialIndex = 0
+        viewerImportantDate = MemoryPageImportantDateInfo(title: title, date: date)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
     }
 
     @ViewBuilder
@@ -189,6 +223,7 @@ struct PinnedMemoriesFeedView: View {
                 DayClusterCard(
                     section: section,
                     onOpenPhoto: { moment, all in
+                        clearMemoryPageViewerContext()
                         viewerMoments = all
                         viewerInitialIndex = all.firstIndex(where: { $0.id == moment.id }) ?? 0
                         withAnimation(.easeInOut(duration: 0.25)) {
@@ -243,15 +278,8 @@ struct PinnedMemoriesFeedView: View {
                 PromptMemoryCard(
                     memory: memory,
                     onTap: {},
-                    onOpenPhoto: { photo, allPhotos in
-                        if let photoIndex = allPhotos.firstIndex(where: { $0.id == photo.id }) {
-                            viewerPromptPhotos = allPhotos
-                            viewerPromptPhotoIndex = photoIndex
-                            viewerPromptText = memory.promptText
-                            withAnimation(.easeIn(duration: 0.25)) {
-                                showingPromptPhotoViewer = true
-                            }
-                        }
+                    onOpenPhoto: { photo, _ in
+                        openPromptMemoryPage(memory: memory, photo: photo)
                     },
                     onRemove: { memory in
                         withAnimation { viewModel.removePromptMemory(memory) }
@@ -298,12 +326,11 @@ struct PinnedMemoriesFeedView: View {
 
     private func openSpecialDate(_ special: SpecialDate) {
         guard let image = DataPersistenceManager.shared.loadSpecialDatePhoto(id: special.id) else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            specialDatePhotoContext = ImportantDatePhotoViewerContext(
-                title: special.title,
-                date: special.date,
-                image: image
-            )
-        }
+        openImportantDateMemoryPage(
+            title: special.title,
+            date: special.date,
+            image: image,
+            itemId: special.id.uuidString
+        )
     }
 }

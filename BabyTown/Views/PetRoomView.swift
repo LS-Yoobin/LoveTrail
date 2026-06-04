@@ -1508,9 +1508,9 @@ struct PetRoomView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 14)
-                .background(BabyTownTheme.buttonGradient)
+                .background(BabyTownTheme.savePillFill)
                 .clipShape(Capsule())
-                .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
+                .shadow(color: BabyTownTheme.savePillShadow, radius: 10, y: 4)
         }
     }
 
@@ -1615,7 +1615,6 @@ struct PetRoomView: View {
         if showingToiletPaperModal || isCleaningLitterBox || isRefillingFood || isWateringPlant { return }
         switch prop {
         case .cat:
-            if isTrickMode { return }
             present(viewModel.pet())
             scene?.playReaction(.happy)
         case .foodBowl, .waterBowl, .litterBox, .smallPlant, .bigPlant:

@@ -21,8 +21,6 @@ struct SpecialDateEditorPresentation: Identifiable {
 /// edited `SpecialDate` and the chosen image (nil = no change requested by the
 /// caller's convention: see CoupleProfileView). `onDelete` is nil when adding.
 struct SpecialDateEditorSheet: View {
-    private static let editorBlue = Color(red: 0.22, green: 0.48, blue: 0.96)
-
     let editing: SpecialDate?
     let initialImage: UIImage?
     let onSave: (SpecialDate, UIImage?) -> Void
@@ -71,12 +69,11 @@ struct SpecialDateEditorSheet: View {
                 }
                 if let editing, let onDelete {
                     Section {
-                        Button {
+                        Button(role: .destructive) {
                             onDelete(editing)
                             dismiss()
                         } label: {
                             Label("Delete date", systemImage: "trash")
-                                .foregroundStyle(Self.editorBlue)
                         }
                     }
                 }
@@ -108,7 +105,7 @@ struct SpecialDateEditorSheet: View {
                                 Capsule()
                                     .fill(
                                         canSave
-                                            ? AnyShapeStyle(Color(red: 0.22, green: 0.48, blue: 0.96))
+                                            ? AnyShapeStyle(BabyTownTheme.savePillFill)
                                             : AnyShapeStyle(Color.gray.opacity(0.35))
                                     )
                             )

@@ -82,6 +82,24 @@ final class NotificationPlannerTests: XCTestCase {
         XCTAssertEqual(needs.body, "Mochi is hungry and thirsty")
     }
 
+    func testPetNeedsAlreadyLowSkippedWhenAcknowledged() {
+        var s = base()
+        s.hunger = PetNeedSnapshot(level: 40, decayPerHour: 10, gate: 50)
+        s.thirst = PetNeedSnapshot(level: 30, decayPerHour: 10, gate: 50)
+        s.petNeedsNotifiedWhileLow = true
+        let plan = planner.plan(snapshot: s, now: date(2026, 6, 3, 12), calendar: calendar())
+        XCTAssertNil(plan.first { $0.id == "pet_needs" })
+    }
+
+    func testPetMissesYouOverdueSkippedWhenAcknowledged() {
+        var s = base()
+        let interaction = date(2026, 5, 20, 12)
+        s.lastPetInteractionAt = interaction
+        s.petMissesYouNotifiedForInteractionAt = interaction
+        let plan = planner.plan(snapshot: s, now: date(2026, 6, 3, 12), calendar: calendar())
+        XCTAssertNil(plan.first { $0.id == "pet_misses_you" })
+    }
+
     func testSpecialDatesProduceAnnualTriggers() {
         var s = base()
         s.specialDates = [PlannerSpecialDate(id: "abc", title: "Anniversary", date: date(2025, 9, 14, 0))]

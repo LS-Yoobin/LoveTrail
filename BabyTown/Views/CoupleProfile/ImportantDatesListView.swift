@@ -93,7 +93,9 @@ struct ImportantDatesListView: View {
     let onSaveSpecial: (SpecialDate, UIImage?) -> Void
     let onDeleteSpecial: (SpecialDate) -> Void
 
-    @State private var photoViewerContext: ImportantDatePhotoViewerContext?
+    @State private var showingMomentViewer = false
+    @State private var viewerMoments: [Moment] = []
+    @State private var viewerImportantDate: MemoryPageImportantDateInfo?
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
 
     private static let dateFormat: Date.FormatStyle =
@@ -147,22 +149,23 @@ struct ImportantDatesListView: View {
                 }
             }
 
-            if let context = photoViewerContext {
-                ImportantDatePhotoViewer(
-                    title: context.title,
-                    date: context.date,
-                    image: context.image,
+            if showingMomentViewer {
+                MomentPhotoViewer(
+                    moments: viewerMoments,
+                    initialIndex: 0,
                     onDismiss: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            photoViewerContext = nil
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingMomentViewer = false
+                            viewerImportantDate = nil
                         }
-                    }
+                    },
+                    onUpdateMoments: { _ in },
+                    memoryPageImportantDate: viewerImportantDate
                 )
                 .transition(.opacity)
                 .zIndex(10)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: photoViewerContext != nil)
         .sheet(item: $dateEditorPresentation) { presentation in
             SpecialDateEditorSheet(
                 editing: presentation.editing,
@@ -182,7 +185,8 @@ struct ImportantDatesListView: View {
     private func beginEditSpecial(id: String) {
         guard let uid = UUID(uuidString: id),
               let match = specialDates.first(where: { $0.id == uid }) else { return }
-        photoViewerContext = nil
+        showingMomentViewer = false
+        viewerImportantDate = nil
         dateEditorPresentation = .edit(
             match,
             image: DataPersistenceManager.shared.loadSpecialDatePhoto(id: uid)
@@ -244,12 +248,16 @@ struct ImportantDatesListView: View {
 
     private func presentPhoto(for item: ImportantDateItem) {
         guard let image = photoForItem(item) else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            photoViewerContext = ImportantDatePhotoViewerContext(
-                title: item.title,
-                date: item.date,
-                image: image
+        viewerMoments = [
+            MemoryPageMomentFactory.moment(
+                image: image,
+                importantDate: MemoryPageImportantDateInfo(item: item),
+                itemId: item.id
             )
+        ]
+        viewerImportantDate = MemoryPageImportantDateInfo(item: item)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
         }
     }
 

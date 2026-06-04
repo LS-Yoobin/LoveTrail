@@ -51,6 +51,10 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("couple_profile.json")
     }
 
+    private var memoryCanvasesFileURL: URL {
+        documentsDirectory.appendingPathComponent("memory_canvases.json")
+    }
+
     private var userAvatarURL: URL {
         pinnedPhotosDirectory.appendingPathComponent("couple_user_avatar.jpg")
     }
@@ -74,6 +78,8 @@ final class DataPersistenceManager {
     private let foundingOfficialDateKey = "foundingOfficialPhotoDate"
     private let foundingFirstMetDateKey = "foundingFirstMetPhotoDate"
     private let celebratedMomentMilestonesKey = "celebratedMomentMilestones"
+    private let petNeedsNotifiedWhileLowKey = "petNeedsNotifiedWhileLow"
+    private let petMissesYouNotifiedForInteractionAtKey = "petMissesYouNotifiedForInteractionAt"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -97,6 +103,26 @@ final class DataPersistenceManager {
 
     func saveCelebratedMomentMilestones(_ set: Set<Int>) {
         userDefaults.set(Array(set), forKey: celebratedMomentMilestonesKey)
+    }
+
+    func isPetNeedsNotifiedWhileLow() -> Bool {
+        userDefaults.bool(forKey: petNeedsNotifiedWhileLowKey)
+    }
+
+    func setPetNeedsNotifiedWhileLow(_ notified: Bool) {
+        userDefaults.set(notified, forKey: petNeedsNotifiedWhileLowKey)
+    }
+
+    func petMissesYouNotifiedForInteractionAt() -> Date? {
+        userDefaults.object(forKey: petMissesYouNotifiedForInteractionAtKey) as? Date
+    }
+
+    func setPetMissesYouNotifiedForInteractionAt(_ date: Date?) {
+        if let date {
+            userDefaults.set(date, forKey: petMissesYouNotifiedForInteractionAtKey)
+        } else {
+            userDefaults.removeObject(forKey: petMissesYouNotifiedForInteractionAtKey)
+        }
     }
 
     func loadMoments() -> [Moment] {
@@ -296,6 +322,23 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: stickerImageURL(id: id))
     }
 
+    func loadMemoryCanvases() -> [String: MemoryCanvas] {
+        guard fileManager.fileExists(atPath: memoryCanvasesFileURL.path),
+              let data = try? Data(contentsOf: memoryCanvasesFileURL),
+              let canvases = try? decoder.decode([MemoryCanvas].self, from: data) else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: canvases.map { ($0.memoryKey, $0) })
+    }
+
+    func saveMemoryCanvas(_ canvas: MemoryCanvas) {
+        var all = loadMemoryCanvases()
+        all[canvas.memoryKey] = canvas
+        let list = Array(all.values)
+        guard let data = try? encoder.encode(list) else { return }
+        try? data.write(to: memoryCanvasesFileURL)
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
@@ -379,6 +422,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: petStateFileURL)
         try? fileManager.removeItem(at: gardenStateFileURL)
         try? fileManager.removeItem(at: coupleProfileFileURL)
+        try? fileManager.removeItem(at: memoryCanvasesFileURL)
         try? fileManager.removeItem(at: userAvatarURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
@@ -389,5 +433,6 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: appJoinedDateKey)
         userDefaults.removeObject(forKey: foundingOfficialDateKey)
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
+        BackgroundMusicImporter.clearImportedSong()
     }
 }

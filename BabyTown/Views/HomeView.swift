@@ -30,11 +30,11 @@ struct HomeView: View {
     /// was reloading JSON from disk and tanking Home scroll performance.
     @State private var coupleSpaceBloomCount = 0
     @State private var coupleSpaceAvatar: UIImage?
+    @State private var coupleSpaceGardenThumbnail: UIImage?
     @State private var homeSpecialDates: [SpecialDate] = []
     @State private var showHomeSpecialDateEditor = false
     @State private var editingHomeSpecialDate: SpecialDate?
     @State private var editingHomeSpecialDateImage: UIImage?
-    @State private var importantDatePhotoViewer: ImportantDatePhotoViewerContext?
     @State private var showPartnerPaywall = false
     @ObservedObject private var store = StoreManager.shared
     @State private var memorySearchText = ""
@@ -47,10 +47,9 @@ struct HomeView: View {
     @State private var showingMomentViewer = false
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
-    @State private var showingPromptPhotoViewer = false
-    @State private var viewerPromptPhotos: [PromptPhoto] = []
-    @State private var viewerPromptPhotoIndex = 0
-    @State private var viewerPromptText: String? = nil
+    @State private var viewerMemoryPagePromptText: String?
+    @State private var viewerImportantDate: MemoryPageImportantDateInfo?
+    @State private var viewerPromptMemoryId: UUID?
     @State private var showPromptSheet = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
@@ -175,9 +174,11 @@ struct HomeView: View {
                                 } else {
                                     CoupleSpaceCard(
                                         avatar: coupleSpaceAvatar,
+                                        gardenThumbnail: coupleSpaceGardenThumbnail,
                                         bloomCount: coupleSpaceBloomCount,
                                         isReadyToInvite: store.isPartnerUnlocked,
                                         onTap: {
+                                            dismissMemorySearchKeyboard()
                                             withAnimation(.easeInOut(duration: 0.3)) {
                                                 showCoupleProfile = true
                                             }
@@ -398,43 +399,6 @@ struct HomeView: View {
                     .zIndex(11)
                 }
                 
-                if showingPromptPhotoViewer {
-                    PromptPhotoViewer(
-                        photos: viewerPromptPhotos,
-                        initialIndex: viewerPromptPhotoIndex,
-                        onDismiss: {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                showingPromptPhotoViewer = false
-                            }
-                        },
-                        onUpdatePhotos: { updatedPhotos in
-                            viewModel.updatePromptMemoryPhotos(viewerPromptPhotos, with: updatedPhotos)
-                        },
-                        onDeletePhoto: { photo in
-                            withAnimation {
-                                viewModel.deletePromptPhoto(photo, from: viewerPromptPhotos)
-                            }
-                        },
-                        promptText: viewerPromptText
-                    )
-                    .transition(.opacity)
-                    .zIndex(12)
-                }
-
-                if let context = importantDatePhotoViewer {
-                    ImportantDatePhotoViewer(
-                        title: context.title,
-                        date: context.date,
-                        image: context.image,
-                        onDismiss: {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                importantDatePhotoViewer = nil
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                    .zIndex(13)
-                }
                 
                 if showOnThisDayViewer {
                     OnThisDayPhotoViewer(
@@ -468,13 +432,6 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
 
-                if showVisitPet {
-                    visitPetOverlay
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .zIndex(25)
-                        .transition(.opacity)
-                }
-
                 if showCoupleProfile {
                     coupleProfileOverlay
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -483,10 +440,8 @@ struct HomeView: View {
                 }
             } // Close ZStack
             .animation(.easeInOut(duration: 0.3), value: showMapView)
-            .animation(.easeInOut(duration: 0.3), value: showVisitPet)
             .animation(.easeInOut(duration: 0.3), value: showCoupleProfile)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
-            .animation(.easeInOut(duration: 0.25), value: importantDatePhotoViewer != nil)
             .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
             .sheet(isPresented: $showPromptSheet) {
                 JinkyPromptSheetView { prompt in
@@ -547,6 +502,9 @@ struct HomeView: View {
                     viewModel.addMoments(moments)
                 }
             }
+            .fullScreenCover(isPresented: $showVisitPet) {
+                visitPetOverlay
+            }
             .sheet(isPresented: $showToC) {
                 TableOfContentsView(viewModel: viewModel)
                     .presentationDetents([.medium, .large])
@@ -581,11 +539,7 @@ struct HomeView: View {
     @ViewBuilder
     private var visitPetOverlay: some View {
         NavigationStack {
-            AdoptAPetRootView {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showVisitPet = false
-                }
-            }
+            AdoptAPetRootView(onDismiss: { showVisitPet = false })
         }
         .background(BabyTownTheme.background.ignoresSafeArea())
     }
@@ -606,23 +560,33 @@ struct HomeView: View {
         let dpm = DataPersistenceManager.shared
         coupleSpaceAvatar = dpm.loadUserAvatar()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
-        let acts = GardenActMapper.acts(
-            moments: viewModel.moments,
-            letters: dpm.loadUserLetters()
-        )
+        let moments = viewModel.moments
+        let letters = dpm.loadUserLetters()
+        let acts = GardenActMapper.acts(moments: moments, letters: letters)
         coupleSpaceBloomCount = GardenComposer().compose(acts: acts).count
+
+        let season = dpm.loadGardenState().season(now: Date())
+        Task.detached(priority: .utility) {
+            let thumbnail = GardenSnapshotRenderer.render(
+                moments: moments,
+                letters: letters,
+                season: season
+            )
+            await MainActor.run {
+                coupleSpaceGardenThumbnail = thumbnail
+            }
+        }
     }
 
     private func openHomeSpecialDate(_ special: SpecialDate) {
         let dpm = DataPersistenceManager.shared
         if let image = dpm.loadSpecialDatePhoto(id: special.id) {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                importantDatePhotoViewer = ImportantDatePhotoViewerContext(
-                    title: special.title,
-                    date: special.date,
-                    image: image
-                )
-            }
+            openImportantDateMemoryPage(
+                title: special.title,
+                date: special.date,
+                image: image,
+                itemId: special.id.uuidString
+            )
         } else {
             withAnimation(.easeInOut(duration: 0.3)) {
                 showCoupleProfile = true
@@ -692,6 +656,7 @@ struct HomeView: View {
             MapView(
                 viewModel: viewModel,
                 onOpenMemory: { section in
+                    clearMemoryPageViewerContext()
                     let photos = viewModel.flattenedPhotos(for: section)
                     viewerMoments = photos
                     viewerInitialIndex = 0
@@ -795,10 +760,15 @@ struct HomeView: View {
         }
     }
 
+    private func dismissMemorySearchKeyboard() {
+        guard isMemorySearchFocused else { return }
+        isMemorySearchFocused = false
+    }
+
     private func dismissSearchKeyboardIfScrolling(from previousOffset: CGFloat, to offset: CGFloat) {
         guard isMemorySearchFocused else { return }
         guard abs(offset - previousOffset) > 2 else { return }
-        isMemorySearchFocused = false
+        dismissMemorySearchKeyboard()
     }
 
     // MARK: - Memory Search
@@ -991,6 +961,7 @@ struct HomeView: View {
                         DayClusterCard(
                             section: section,
                             onOpenPhoto: { moment, allMoments in
+                                clearMemoryPageViewerContext()
                                 viewerMoments = allMoments
                                 if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
                                     viewerInitialIndex = idx
@@ -1052,15 +1023,8 @@ struct HomeView: View {
                         PromptMemoryCard(
                             memory: memory,
                             onTap: {},
-                            onOpenPhoto: { photo, allPhotos in
-                                if let photoIndex = allPhotos.firstIndex(where: { $0.id == photo.id }) {
-                                    viewerPromptPhotos = allPhotos
-                                    viewerPromptPhotoIndex = photoIndex
-                                    viewerPromptText = memory.promptText
-                                    withAnimation(.easeIn(duration: 0.25)) {
-                                        showingPromptPhotoViewer = true
-                                    }
-                                }
+                            onOpenPhoto: { photo, _ in
+                                openPromptMemoryPage(memory: memory, photo: photo)
                             },
                             onRemove: { memory in
                                 withAnimation { viewModel.removePromptMemory(memory) }
@@ -1241,18 +1205,15 @@ struct HomeView: View {
                                 onTap: {
                                     switch item {
                                     case .moment(_, let all):
+                                        clearMemoryPageViewerContext()
                                         viewerMoments = all
                                         viewerInitialIndex = 0
                                         withAnimation(.easeInOut(duration: 0.25)) {
                                             showingMomentViewer = true
                                         }
                                     case .prompt(let p):
-                                        viewerPromptPhotos = p.photos
-                                        viewerPromptPhotoIndex = 0
-                                        viewerPromptText = p.promptText
-                                        withAnimation(.easeInOut(duration: 0.25)) {
-                                            showingPromptPhotoViewer = true
-                                        }
+                                        guard let photo = p.photos.first else { return }
+                                        openPromptMemoryPage(memory: p, photo: photo)
                                     }
                                 },
                                 onUnpin: {
@@ -1347,6 +1308,7 @@ struct HomeView: View {
                                 DayClusterCard(
                                     section: section,
                                     onOpenPhoto: { moment, allMoments in
+                                        clearMemoryPageViewerContext()
                                         viewerMoments = allMoments
                                         if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
                                             viewerInitialIndex = idx
@@ -1415,15 +1377,8 @@ struct HomeView: View {
                                 onTap: {
                                     // TODO: Open prompt memory detail view
                                 },
-                                onOpenPhoto: { photo, allPhotos in
-                                    if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
-                                        viewerPromptPhotos = allPhotos
-                                        viewerPromptPhotoIndex = index
-                                        viewerPromptText = memory.promptText
-                                        withAnimation(.easeIn(duration: 0.25)) {
-                                            showingPromptPhotoViewer = true
-                                        }
-                                    }
+                                onOpenPhoto: { photo, _ in
+                                    openPromptMemoryPage(memory: memory, photo: photo)
                                 },
                                 onRemove: { memory in
                                     withAnimation {
@@ -1545,6 +1500,7 @@ struct HomeView: View {
                             DayClusterCard(
                                 section: section,
                                 onOpenPhoto: { moment, allMoments in
+                                    clearMemoryPageViewerContext()
                                     viewerMoments = allMoments
                                     if let i = allMoments.firstIndex(where: { $0.id == moment.id }) {
                                         viewerInitialIndex = i
@@ -1889,6 +1845,46 @@ struct HomeView: View {
         .ignoresSafeArea()
     }
 
+    private func clearMemoryPageViewerContext() {
+        viewerMemoryPagePromptText = nil
+        viewerImportantDate = nil
+        viewerPromptMemoryId = nil
+    }
+
+    private func openPromptMemoryPage(memory: PromptMemory, photo: PromptPhoto) {
+        let moments = memory.sortedViewerMoments
+        guard !moments.isEmpty else { return }
+        clearMemoryPageViewerContext()
+        viewerMoments = moments
+        viewerInitialIndex = moments.firstIndex(where: { $0.id == photo.id }) ?? 0
+        viewerMemoryPagePromptText = memory.promptText
+        viewerPromptMemoryId = memory.id
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
+    }
+
+    private func openImportantDateMemoryPage(
+        title: String,
+        date: Date,
+        image: UIImage,
+        itemId: String
+    ) {
+        clearMemoryPageViewerContext()
+        viewerMoments = [
+            MemoryPageMomentFactory.moment(
+                image: image,
+                importantDate: MemoryPageImportantDateInfo(title: title, date: date),
+                itemId: itemId
+            )
+        ]
+        viewerInitialIndex = 0
+        viewerImportantDate = MemoryPageImportantDateInfo(title: title, date: date)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
+    }
+
     private var momentPhotoViewerOverlay: some View {
         MomentPhotoViewer(
             moments: viewerMoments,
@@ -1896,6 +1892,7 @@ struct HomeView: View {
             onDismiss: {
                 withAnimation(.easeOut(duration: 0.25)) {
                     showingMomentViewer = false
+                    clearMemoryPageViewerContext()
                 }
             },
             onUpdateMoments: { updatedMoments in
@@ -1942,6 +1939,40 @@ struct HomeView: View {
             onReloadMemoryMoments: {
                 guard let anchorId = viewerMoments.first?.id else { return viewerMoments }
                 return viewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
+            },
+            memoryPagePromptText: viewerMemoryPagePromptText,
+            memoryPageImportantDate: viewerImportantDate,
+            promptMemoryId: viewerPromptMemoryId,
+            onEditPromptMemory: { memoryId, _, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                viewModel.updatePromptMemory(
+                    memoryId: memoryId,
+                    primaryPhotoId: viewerMoments.first?.id ?? UUID(),
+                    loveNote: caption,
+                    placeName: placeName,
+                    latitude: latitude,
+                    longitude: longitude,
+                    isPlaceNameUserSet: isPlaceNameUserSet
+                )
+            },
+            onAddPromptPhotos: { memoryId, images in
+                viewModel.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+            },
+            onRemovePromptPhoto: { memoryId, photoId in
+                viewModel.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+            },
+            onSyncPromptMemoryPhotos: { memoryId, assetIds, orphanIds in
+                await viewModel.syncPromptMemoryPhotos(
+                    memoryId: memoryId,
+                    selectedAssetIds: assetIds,
+                    selectedOrphanMomentIds: orphanIds
+                )
+            },
+            onReloadPromptMoments: {
+                guard let memoryId = viewerPromptMemoryId,
+                      let memory = viewModel.promptMemories.first(where: { $0.id == memoryId }) else {
+                    return viewerMoments
+                }
+                return memory.sortedViewerMoments
             }
         )
     }

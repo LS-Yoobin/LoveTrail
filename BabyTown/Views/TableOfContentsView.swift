@@ -5,21 +5,15 @@ struct TableOfContentsView: View {
     @Environment(\.dismiss) var dismiss
 
     // Internal viewer configurations for item-based presentation (safer)
-    struct IdentifiableMoments: Identifiable {
+    struct IdentifiableMemoryPage: Identifiable {
         let id = UUID()
         let moments: [Moment]
         let initialIndex: Int
-    }
-    
-    struct IdentifiablePromptPhotos: Identifiable {
-        let id = UUID()
-        let photos: [PromptPhoto]
-        let initialIndex: Int
         let promptText: String?
+        let promptMemoryId: UUID?
     }
-    
-    @State private var momentsViewerConfig: IdentifiableMoments?
-    @State private var promptPhotosViewerConfig: IdentifiablePromptPhotos?
+
+    @State private var memoryPageConfig: IdentifiableMemoryPage?
 
     private let backgroundColor = Color(red: 253/255, green: 246/255, blue: 236/255) // #FDF6EC
     private let serifFont = "Georgia" // Fallback to system serif if needed
@@ -66,9 +60,11 @@ struct TableOfContentsView: View {
                                         loveNote: loveNote(from: milestone),
                                         thumbnail: milestone.thumbnail
                                     ) {
-                                        momentsViewerConfig = IdentifiableMoments(
+                                        memoryPageConfig = IdentifiableMemoryPage(
                                             moments: [milestone],
-                                            initialIndex: 0
+                                            initialIndex: 0,
+                                            promptText: nil,
+                                            promptMemoryId: nil
                                         )
                                     }
                                 }
@@ -80,10 +76,11 @@ struct TableOfContentsView: View {
                                         loveNote: pinnedPromptLoveNote(memory),
                                         thumbnail: memory.photos.first?.thumbnail
                                     ) {
-                                        promptPhotosViewerConfig = IdentifiablePromptPhotos(
-                                            photos: memory.photos,
+                                        memoryPageConfig = IdentifiableMemoryPage(
+                                            moments: memory.sortedViewerMoments,
                                             initialIndex: 0,
-                                            promptText: memory.promptText
+                                            promptText: memory.promptText,
+                                            promptMemoryId: memory.id
                                         )
                                     }
                                 }
@@ -169,12 +166,12 @@ struct TableOfContentsView: View {
                 .sharedBackgroundVisibility(.hidden)
             }
             .presentationBackground(backgroundColor)
-            .fullScreenCover(item: $momentsViewerConfig) { config in
+            .fullScreenCover(item: $memoryPageConfig) { config in
                 MomentPhotoViewer(
                     moments: config.moments,
                     initialIndex: config.initialIndex,
                     onDismiss: {
-                        momentsViewerConfig = nil
+                        memoryPageConfig = nil
                     },
                     onUpdateMoments: { updatedMoments in
                         var newMoments = viewModel.moments
@@ -220,25 +217,40 @@ struct TableOfContentsView: View {
                     onReloadMemoryMoments: {
                         guard let anchorId = config.moments.first?.id else { return config.moments }
                         return viewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
-                    }
-                )
-            }
-            .fullScreenCover(item: $promptPhotosViewerConfig) { config in
-                PromptPhotoViewer(
-                    photos: config.photos,
-                    initialIndex: config.initialIndex,
-                    onDismiss: {
-                        promptPhotosViewerConfig = nil
                     },
-                    onUpdatePhotos: { updatedPhotos in
-                        viewModel.updatePromptMemoryPhotos(config.photos, with: updatedPhotos)
+                    memoryPagePromptText: config.promptText,
+                    promptMemoryId: config.promptMemoryId,
+                    onEditPromptMemory: { memoryId, _, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                        viewModel.updatePromptMemory(
+                            memoryId: memoryId,
+                            primaryPhotoId: config.moments.first?.id ?? UUID(),
+                            loveNote: caption,
+                            placeName: placeName,
+                            latitude: latitude,
+                            longitude: longitude,
+                            isPlaceNameUserSet: isPlaceNameUserSet
+                        )
                     },
-                    onDeletePhoto: { photo in
-                        withAnimation {
-                            viewModel.deletePromptPhoto(photo, from: config.photos)
+                    onAddPromptPhotos: { memoryId, images in
+                        viewModel.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+                    },
+                    onRemovePromptPhoto: { memoryId, photoId in
+                        viewModel.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+                    },
+                    onSyncPromptMemoryPhotos: { memoryId, assetIds, orphanIds in
+                        await viewModel.syncPromptMemoryPhotos(
+                            memoryId: memoryId,
+                            selectedAssetIds: assetIds,
+                            selectedOrphanMomentIds: orphanIds
+                        )
+                    },
+                    onReloadPromptMoments: {
+                        guard let memoryId = config.promptMemoryId,
+                              let memory = viewModel.promptMemories.first(where: { $0.id == memoryId }) else {
+                            return config.moments
                         }
-                    },
-                    promptText: config.promptText
+                        return memory.sortedViewerMoments
+                    }
                 )
             }
         }
@@ -334,18 +346,21 @@ struct TableOfContentsView: View {
 
     private func openSection(_ section: DaySection) {
         if let memory = viewModel.promptMemory(for: section), !memory.photos.isEmpty {
-            promptPhotosViewerConfig = IdentifiablePromptPhotos(
-                photos: memory.photos,
+            memoryPageConfig = IdentifiableMemoryPage(
+                moments: memory.sortedViewerMoments,
                 initialIndex: 0,
-                promptText: memory.promptText
+                promptText: memory.promptText,
+                promptMemoryId: memory.id
             )
             return
         }
         let photos = viewModel.flattenedPhotos(for: section)
         guard !photos.isEmpty else { return }
-        momentsViewerConfig = IdentifiableMoments(
+        memoryPageConfig = IdentifiableMemoryPage(
             moments: photos,
-            initialIndex: 0
+            initialIndex: 0,
+            promptText: nil,
+            promptMemoryId: nil
         )
     }
 

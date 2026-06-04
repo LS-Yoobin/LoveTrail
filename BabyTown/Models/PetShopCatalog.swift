@@ -743,7 +743,7 @@ enum PetShopCatalog {
             imageName: "prop_frame_leaves",
             systemImage: "photo.artframe",
             placeholderCaption: "Frame",
-            defaultSize: CGSize(width: 75, height: 100),
+            defaultSize: CGSize(width: 83, height: 100),
             isFloorItem: false,
             isWallColor: false,
             isPictureFrame: true
@@ -860,28 +860,6 @@ enum PetShopCatalog {
     private static let framePhotoOpeningScale: CGFloat = 1.06
     private static let framePhotoCenterYNudge: CGFloat = -0.012
 
-    private struct FramePhotoOpeningOverscan {
-        var width: CGFloat
-        var height: CGFloat
-
-        static func uniform(_ scale: CGFloat) -> FramePhotoOpeningOverscan {
-            FramePhotoOpeningOverscan(width: scale, height: scale)
-        }
-    }
-
-    /// Arch-topped frames can overscan width while keeping height tighter so photos fill
-    /// the window without peeking past the vine shoulders.
-    private static let framePhotoOpeningOverscanOverrides: [String: FramePhotoOpeningOverscan] = [
-        "prop_frame_leaves": FramePhotoOpeningOverscan(width: 1.07, height: 0.97),
-    ]
-
-    private static func framePhotoOpeningOverscan(for imageName: String?) -> FramePhotoOpeningOverscan {
-        if let imageName, let overscan = framePhotoOpeningOverscanOverrides[imageName] {
-            return overscan
-        }
-        return .uniform(framePhotoOpeningScale)
-    }
-
     /// Size and center for the photo layer behind a frame's transparent window.
     static func pictureFramePhotoPlacement(
         frameSize: CGSize,
@@ -889,9 +867,8 @@ enum PetShopCatalog {
         frameImageName: String? = nil
     ) -> (size: CGSize, position: CGPoint) {
         let layout = framePhotoLayout(for: frameImageName)
-        let overscan = framePhotoOpeningOverscan(for: frameImageName)
-        let openingWidth = frameSize.width * layout.openingWidthFraction * overscan.width
-        let openingHeight = frameSize.height * layout.openingHeightFraction * overscan.height
+        let openingWidth = frameSize.width * layout.openingWidthFraction * framePhotoOpeningScale
+        let openingHeight = frameSize.height * layout.openingHeightFraction * framePhotoOpeningScale
         let openingCenter = CGPoint(
             x: frameSize.width * layout.centerXFraction,
             y: frameSize.height * (layout.centerYFraction + framePhotoCenterYNudge)
@@ -916,7 +893,7 @@ enum PetShopCatalog {
         "prop_frame_hearts": FramePhotoLayout(openingWidthFraction: 0.549, openingHeightFraction: 0.562, centerXFraction: -0.003, centerYFraction: -0.034),
         "prop_frame_ribbon": FramePhotoLayout(openingWidthFraction: 0.510, openingHeightFraction: 0.562, centerXFraction: -0.009, centerYFraction: -0.034),
         "prop_frame_moon": FramePhotoLayout(openingWidthFraction: 0.504, openingHeightFraction: 0.580, centerXFraction: 0.004, centerYFraction: -0.002),
-        "prop_frame_leaves": FramePhotoLayout(openingWidthFraction: 0.656, openingHeightFraction: 0.648, centerXFraction: 0.000, centerYFraction: -0.028),
+        "prop_frame_leaves": FramePhotoLayout(openingWidthFraction: 0.568, openingHeightFraction: 0.595, centerXFraction: 0.010, centerYFraction: -0.009),
         "prop_frame_bear": FramePhotoLayout(openingWidthFraction: 0.503, openingHeightFraction: 0.578, centerXFraction: 0.010, centerYFraction: -0.010),
         "prop_frame_ornate": FramePhotoLayout(openingWidthFraction: 0.566, openingHeightFraction: 0.586, centerXFraction: -0.006, centerYFraction: -0.005),
     ]

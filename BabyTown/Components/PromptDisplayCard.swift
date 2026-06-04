@@ -7,10 +7,12 @@ struct PromptDisplayCard: View {
     var variant: Variant = .photoOverlay
 
     enum Variant {
-        /// Dark photo viewer (PromptPhotoViewer, MomentPhotoViewer).
+        /// Dark photo viewer (PromptPhotoViewer, MomentPhotoViewer immersive).
         case photoOverlay
         /// Light form header above Place name (CaptionEditorSheet location mode).
         case formHeader
+        /// Light scrapbook moment page.
+        case momentPage
     }
 
     var body: some View {
@@ -35,7 +37,7 @@ struct PromptDisplayCard: View {
     private var textColor: Color {
         switch variant {
         case .photoOverlay: .white
-        case .formHeader: BabyTownTheme.textPrimary
+        case .formHeader, .momentPage: BabyTownTheme.textPrimary
         }
     }
 
@@ -53,6 +55,10 @@ struct PromptDisplayCard: View {
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(BabyTownTheme.accent.opacity(0.18), lineWidth: 1)
                 )
+        case .momentPage:
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white.opacity(0.92))
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         }
     }
 }

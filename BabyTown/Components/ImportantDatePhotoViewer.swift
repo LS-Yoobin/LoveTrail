@@ -13,77 +13,158 @@ struct ImportantDatePhotoViewer: View {
     let image: UIImage
     var onDismiss: () -> Void
 
-    @State private var dragOffset: CGSize = .zero
+    @State private var showChrome = true
+    @StateObject private var shareCoordinator = MemoryShareCoordinator()
 
-    private static let dateFormat: Date.FormatStyle =
-        .dateTime.month(.wide).day().year()
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        return formatter
+    }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
-                photo
-                Spacer()
-                bottomInfo
-            }
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: handlePhotoTap)
+
+            viewerChromeOverlay
         }
         .statusBarHidden(true)
+        .memorySharePresentation(coordinator: shareCoordinator)
+    }
+
+    private func handlePhotoTap() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showChrome.toggle()
+        }
+    }
+
+    private var viewerChromeOverlay: some View {
+        VStack(spacing: 0) {
+            topBar
+                .allowsHitTesting(showChrome)
+
+            Spacer()
+                .allowsHitTesting(false)
+
+            viewerChromeBottom
+                .allowsHitTesting(showChrome)
+        }
+        .opacity(showChrome ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showChrome)
+        .allowsHitTesting(showChrome)
+        .background(alignment: .top) {
+            if showChrome {
+                PhotoViewerTopScrim()
+            }
+        }
+        .background(alignment: .bottom) {
+            if showChrome {
+                photoViewerBottomGradient
+            }
+        }
     }
 
     private var topBar: some View {
         HStack {
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(.black.opacity(0.3)))
-            }
+            CircleBackdropCloseButton(action: onDismiss)
+
             Spacer()
+
+            Button(action: sharePhoto) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white.opacity(0.2)))
+            }
+        }
+        .padding(.top, 12)
+        .padding(.horizontal, 20)
+    }
+
+    private var viewerChromeBottom: some View {
+        VStack(spacing: 0) {
+            PromptDisplayCard(prompt: title)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+
+            photoMetadataDisplay
+                .padding(.bottom, 8)
+        }
+    }
+
+    private var photoMetadataDisplay: some View {
+        HStack {
+            Text(dateFormatter.string(from: date))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .photoViewerLegibleText()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(photoViewerMetadataBackground)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
     }
 
-    private var photo: some View {
-        Image(uiImage: image)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(y: dragOffset.height)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        if value.translation.height > 0 {
-                            dragOffset = value.translation
-                        }
-                    }
-                    .onEnded { value in
-                        if value.translation.height > 150 {
-                            onDismiss()
-                        } else {
-                            withAnimation(.spring(response: 0.3)) {
-                                dragOffset = .zero
-                            }
-                        }
-                    }
+    private var photoViewerMetadataBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.black.opacity(0.68))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
             )
+            .shadow(color: .black.opacity(0.45), radius: 10, y: 4)
     }
 
-    private var bottomInfo: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(date, format: Self.dateFormat)
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 40)
+    private var photoViewerBottomGradient: some View {
+        LinearGradient(
+            colors: [
+                Color.black.opacity(0),
+                Color.black.opacity(0.35),
+                Color.black.opacity(0.72)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .allowsHitTesting(false)
+    }
+
+    private func sharePhoto() {
+        let payload = MemorySharePayload(
+            date: date,
+            placeName: nil,
+            isPlaceNameUserSet: false,
+            promptText: title,
+            loveNote: nil,
+            photoSources: [
+                MemorySharePhotoSource(
+                    id: UUID(),
+                    thumbnail: image,
+                    assetIdentifier: nil,
+                    isLocked: false
+                )
+            ]
+        )
+        shareCoordinator.share(payload)
+    }
+}
+
+private extension View {
+    func photoViewerLegibleText() -> some View {
+        self
+            .shadow(color: .black.opacity(0.95), radius: 0, x: 0, y: 0.5)
+            .shadow(color: .black.opacity(0.85), radius: 3, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 3)
     }
 }

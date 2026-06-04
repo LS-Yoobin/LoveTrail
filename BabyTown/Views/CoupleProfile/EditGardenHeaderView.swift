@@ -29,7 +29,7 @@ struct EditGardenHeaderView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color(red: 0.22, green: 0.48, blue: 0.96), in: Capsule())
+                    .background(BabyTownTheme.savePillFill, in: Capsule())
             }
             .buttonStyle(.plain)
         }

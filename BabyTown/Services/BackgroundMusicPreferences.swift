@@ -1,35 +1,18 @@
 import Foundation
 
-/// User-selected background music link for the home screen (persisted in UserDefaults).
+/// User-selected background music for the home screen (imported audio in Documents).
 enum BackgroundMusicPreferences {
 
-    private static let customLinkKey = "customBackgroundMusicLink"
-
-    static var customLinkURL: URL? {
-        get {
-            guard let raw = UserDefaults.standard.string(forKey: customLinkKey)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-                  !raw.isEmpty else { return nil }
-            return URL(string: raw)
-        }
-        set {
-            if let url = newValue?.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines),
-               !url.isEmpty {
-                UserDefaults.standard.set(url, forKey: customLinkKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: customLinkKey)
-            }
-            NotificationCenter.default.post(name: .backgroundMusicPreferenceChanged, object: nil)
-        }
+    static var hasCustomSong: Bool {
+        BackgroundMusicImporter.hasImportedSong
     }
 
-    static var parsedLink: BackgroundMusicLink? {
-        guard let url = customLinkURL else { return nil }
-        return BackgroundMusicLinkParser.parse(url)
+    static var importedAudioURL: URL? {
+        BackgroundMusicImporter.importedAudioURL
     }
 
-    static func clearCustomLink() {
-        customLinkURL = nil
+    static func clearCustomSong() {
+        BackgroundMusicImporter.clearImportedSong()
     }
 }
 

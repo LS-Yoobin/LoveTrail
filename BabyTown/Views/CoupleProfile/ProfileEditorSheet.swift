@@ -252,7 +252,7 @@ struct ProfileEditorSheet: View {
                         Capsule()
                             .fill(
                                 canSave
-                                    ? AnyShapeStyle(BabyTownTheme.accentGradient)
+                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
                                     : AnyShapeStyle(Color.black.opacity(0.18))
                             )
                     )

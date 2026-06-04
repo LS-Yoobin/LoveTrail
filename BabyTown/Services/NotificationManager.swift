@@ -74,8 +74,20 @@ class NotificationManager: NSObject, ObservableObject {
     /// Rebuilds all state-conditional notifications from persisted state.
     @MainActor
     func refresh(now: Date = Date()) {
-        let snapshot = Self.buildSnapshot(now: now)
+        let dp = DataPersistenceManager.shared
+        var snapshot = Self.buildSnapshot(now: now)
+
+        if Self.petNeedsAreSatisfied(snapshot) {
+            dp.setPetNeedsNotifiedWhileLow(false)
+            snapshot.petNeedsNotifiedWhileLow = false
+        } else {
+            snapshot.petNeedsNotifiedWhileLow = dp.isPetNeedsNotifiedWhileLow()
+        }
+        snapshot.petMissesYouNotifiedForInteractionAt = dp.petMissesYouNotifiedForInteractionAt()
+
         let planned = planner.plan(snapshot: snapshot, now: now, calendar: pacificCalendar)
+        Self.persistAcknowledgments(for: planned, snapshot: snapshot, now: now)
+
         let center = UNUserNotificationCenter.current()
         // Capture the prefixes on the main actor; the completion below runs on an
         // arbitrary UNS queue, so it must not touch @MainActor-isolated `self`.
@@ -94,6 +106,57 @@ class NotificationManager: NSObject, ObservableObject {
                 center.add(UNNotificationRequest(identifier: item.id, content: content, trigger: trigger))
             }
         }
+    }
+
+    /// Marks one-shot notifications as acknowledged so they are not re-scheduled on
+    /// every lifecycle refresh. Call when the user taps a banner or it is delivered.
+    @MainActor
+    func acknowledgeNotification(identifier: String) {
+        let dp = DataPersistenceManager.shared
+        switch identifier {
+        case "pet_needs":
+            dp.setPetNeedsNotifiedWhileLow(true)
+        case "pet_misses_you":
+            let interactionAt = dp.loadPetState().lastPetInteractionAt ?? Date()
+            dp.setPetMissesYouNotifiedForInteractionAt(interactionAt)
+        default:
+            return
+        }
+        refresh()
+    }
+
+    private static func petNeedsAreSatisfied(_ snapshot: NotificationSnapshot) -> Bool {
+        guard let hunger = snapshot.hunger, let thirst = snapshot.thirst else { return true }
+        return hunger.level >= hunger.gate && thirst.level >= thirst.gate
+    }
+
+    @MainActor
+    private static func persistAcknowledgments(for planned: [PlannedNotification],
+                                               snapshot: NotificationSnapshot,
+                                               now: Date) {
+        let dp = DataPersistenceManager.shared
+        if planned.contains(where: { $0.id == "pet_needs" }),
+           petNeedsAlreadyLow(snapshot) {
+            dp.setPetNeedsNotifiedWhileLow(true)
+        }
+        if planned.contains(where: { $0.id == "pet_misses_you" }) {
+            let interactionAt = snapshot.lastPetInteractionAt ?? now
+            let candidate = interactionAt.addingTimeInterval(7 * 86_400)
+            if candidate <= now {
+                dp.setPetMissesYouNotifiedForInteractionAt(interactionAt)
+            }
+        }
+    }
+
+    private static func petNeedsAlreadyLow(_ snapshot: NotificationSnapshot) -> Bool {
+        func hoursToGate(_ need: PetNeedSnapshot?) -> Double? {
+            guard let need, need.decayPerHour > 0 else { return nil }
+            let remaining = need.level - need.gate
+            return remaining <= 0 ? 0 : remaining / need.decayPerHour
+        }
+        guard let soonest = [hoursToGate(snapshot.hunger), hoursToGate(snapshot.thirst)]
+            .compactMap({ $0 }).min() else { return false }
+        return soonest <= 0
     }
 
     private static func makeTrigger(_ trigger: PlannedTrigger) -> UNNotificationTrigger {

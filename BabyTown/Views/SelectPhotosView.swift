@@ -372,8 +372,8 @@ struct SelectPhotosView: View {
             .padding(.vertical, 16)
             .background(
                 Capsule()
-                    .fill(LinearGradient(colors: [.blue], startPoint: .leading, endPoint: .trailing))
-                    .shadow(color: Color.blue.opacity(0.35), radius: 12, y: 6)
+                    .fill(BabyTownTheme.savePillFill)
+                    .shadow(color: BabyTownTheme.savePillShadow, radius: 10, y: 4)
             )
         }
         .disabled(viewModel.isSaving || viewModel.selectedCount == 0)

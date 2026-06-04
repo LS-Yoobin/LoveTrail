@@ -50,6 +50,10 @@ enum BabyTownTheme {
     )
     static let buttonShadow = Color.pink.opacity(0.3)
 
+    /// Solid blue for Save confirmation pills (edit garden, editors, etc.).
+    static let savePillFill = Color(red: 0.22, green: 0.48, blue: 0.96)
+    static let savePillShadow = savePillFill.opacity(0.35)
+
     /// Pink → red icon tint used on onboarding access cards and the home camera control.
     static let accentIconGradient = LinearGradient(
         colors: [accent, accentDeep],

@@ -15,12 +15,19 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     // Handle notification when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        Task { @MainActor in
+            NotificationManager.shared.acknowledgeNotification(identifier: notification.request.identifier)
+        }
         completionHandler([.banner, .sound])
     }
     
     // Handle notification tap
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        if response.notification.request.identifier == "daily_morning_notification" {
+        let identifier = response.notification.request.identifier
+        Task { @MainActor in
+            NotificationManager.shared.acknowledgeNotification(identifier: identifier)
+        }
+        if identifier == "daily_morning_notification" {
             // Post notification to let the app know to open the camera
             NotificationCenter.default.post(name: NotificationManager.openCameraNotificationName, object: nil)
         }

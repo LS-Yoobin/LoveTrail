@@ -2202,13 +2202,31 @@ final class PetRoomScene: SKScene {
 
     /// Tap target for care props. Litter uses a tight zone on the tray graphic so
     /// sheet padding at the corners doesn't block taps on props behind it.
+    /// Plants use a small centered zone so transparent sprite padding doesn't steal taps.
     private func propTapHitFrame(for prop: RoomProp, node: SKNode) -> CGRect {
         let frame = node.calculateAccumulatedFrame()
-        guard prop == .litterBox else {
+        switch prop {
+        case .litterBox:
+            let width = frame.width * 0.56
+            let height = frame.height * 0.48
+            return CGRect(
+                x: frame.midX - width / 2,
+                y: frame.midY - height / 2,
+                width: width,
+                height: height
+            )
+        case .smallPlant:
+            return centeredHitRect(in: frame, widthFraction: 0.36, heightFraction: 0.32)
+        case .bigPlant:
+            return centeredHitRect(in: frame, widthFraction: 0.40, heightFraction: 0.36)
+        default:
             return frame.insetBy(dx: -16, dy: -16)
         }
-        let width = frame.width * 0.56
-        let height = frame.height * 0.48
+    }
+
+    private func centeredHitRect(in frame: CGRect, widthFraction: CGFloat, heightFraction: CGFloat) -> CGRect {
+        let width = frame.width * widthFraction
+        let height = frame.height * heightFraction
         return CGRect(
             x: frame.midX - width / 2,
             y: frame.midY - height / 2,
@@ -2323,10 +2341,14 @@ final class PetRoomScene: SKScene {
             return
         }
 
-        // Trick training is all about the cat — ignore taps on the cat and the
-        // care props (food/water bowls, litter box, furniture). Snack handling is
-        // driven separately from the SwiftUI controls.
-        if isTrickMode { return }
+        // Trick training: only the cat is tappable (petting). Props and furniture
+        // are ignored; snacks are handled from SwiftUI controls.
+        if isTrickMode {
+            if !isInteracting, isCatHit(at: location) {
+                beginCatPickUpCandidate(at: location)
+            }
+            return
+        }
 
         if isPlaying {
             isLaserEngaged = true
@@ -2748,7 +2770,12 @@ final class PetRoomScene: SKScene {
 
     /// Asks the cat to perform a reaction the view triggers after a care action.
     func playReaction(_ kind: ReactionKind) {
-        guard !isPlaying, !isTrickMode, !isCarryingCat else { return }
+        guard !isPlaying, !isCarryingCat else { return }
+        if isTrickMode {
+            guard kind == .happy else { return }
+            petCat()
+            return
+        }
         if isCustomizeMode, kind == .eat || kind == .drink { return }
         stopMovement()
         switch kind {
@@ -3566,7 +3593,9 @@ final class PetRoomScene: SKScene {
         wakeFromOccupiedBedIfNeeded()
         // Wake to a standing pose first, so petting a sleeping/grooming cat
         // reads as "woke up", then it bounces happily.
-        startAnimation(.idle)
+        if !isTrickMode {
+            startAnimation(.idle)
+        }
 
         let happyBounce = SKAction.sequence([
             .scale(to: 1.15, duration: 0.12),
@@ -3577,8 +3606,12 @@ final class PetRoomScene: SKScene {
         catVisual.run(happyBounce) { [weak self] in
             guard let self else { return }
             self.isInteracting = false
-            self.startAnimation(.idle)
-            self.runBehavior()
+            if self.isTrickMode {
+                self.beginTrickModeAttentiveSit()
+            } else {
+                self.startAnimation(.idle)
+                self.runBehavior()
+            }
         }
     }
 

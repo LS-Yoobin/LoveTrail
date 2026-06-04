@@ -11,6 +11,8 @@ struct CoupleSpaceCard: View {
     var avatar: UIImage?
     /// Partner portrait when available; `nil` shows the invite heart placeholder.
     var partnerAvatar: UIImage? = nil
+    /// Static garden backdrop thumbnail for the leading glyph.
+    var gardenThumbnail: UIImage? = nil
     var bloomCount: Int
     /// True when the user has purchased but has not finished inviting their partner.
     var isReadyToInvite: Bool
@@ -39,7 +41,7 @@ struct CoupleSpaceCard: View {
 
                     Text(subtitle)
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white)
                         .lineLimit(1)
                 }
 
@@ -72,22 +74,27 @@ struct CoupleSpaceCard: View {
     }
 
     private var gardenGlyph: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.78, green: 0.90, blue: 0.98),
-                            Color(red: 0.66, green: 0.80, blue: 0.55)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+        Group {
+            if let gardenThumbnail {
+                Image(uiImage: gardenThumbnail)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.78, green: 0.90, blue: 0.98),
+                                Color(red: 0.66, green: 0.80, blue: 0.55)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
-                .frame(width: 50, height: 50)
-            Text("🌿")
-                .font(.system(size: 24))
+            }
         }
+        .frame(width: 50, height: 50)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     /// Partner behind, user in front — same vertical center, ~45% of partner visible.
@@ -104,8 +111,26 @@ struct CoupleSpaceCard: View {
     }
 
     private var userAvatarCircle: some View {
-        avatarCircle(image: avatar, placeholderSystemName: "person.fill")
-        .zIndex(1)
+        userAvatarCircleContent
+            .zIndex(1)
+    }
+
+    private var userAvatarCircleContent: some View {
+        ZStack {
+            if let avatar {
+                Image(uiImage: avatar)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle().fill(BabyTownTheme.savePillFill)
+                Image(systemName: "person.fill")
+                    .font(.caption)
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(.white, lineWidth: 2))
     }
 
     private var partnerAvatarCircle: some View {

@@ -28,7 +28,6 @@ struct CoupleProfileView: View {
     @State private var showProfileNoteEditor = false
 
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
-    @State private var photoViewerContext: ImportantDatePhotoViewerContext?
     @State private var activeSubpage: CoupleProfileSubpage?
 
     @State private var showingPinnedViewer: PinnedMemoryType?
@@ -37,23 +36,15 @@ struct CoupleProfileView: View {
     @State private var showingMomentViewer = false
     @State private var viewerMoments: [Moment] = []
     @State private var viewerInitialIndex = 0
-    @State private var showingPromptPhotoViewer = false
-    @State private var viewerPromptPhotos: [PromptPhoto] = []
-    @State private var viewerPromptPhotoIndex = 0
-    @State private var viewerPromptText: String?
+    @State private var viewerMemoryPagePromptText: String?
+    @State private var viewerImportantDate: MemoryPageImportantDateInfo?
+    @State private var viewerPromptMemoryId: UUID?
 
     private var dpm: DataPersistenceManager { .shared }
 
-    /// Open canvas height below the cards where stickers float (also the edit-mode
-    /// scroll anchor target). Tall enough to arrange several stickers.
-    private let stickerCanvasHeight: CGFloat = 760
-
-    /// Matches the system navigation bar (same placement as Pet Room).
-    private let navigationBarClearance: CGFloat = 44
-    /// Garden band directly under the glass cards for profile + partner stickers.
-    private let profileAvatarsBandHeight: CGFloat = 168
-    /// Space between the last card and the avatar band.
-    private let profileAvatarsBandTopGap: CGFloat = 28
+    private var stickerCanvasHeight: CGFloat { ProfileGardenLayout.stickerCanvasHeight }
+    private var profileAvatarsBandHeight: CGFloat { ProfileGardenLayout.avatarBandHeight }
+    private var profileAvatarsBandTopGap: CGFloat { ProfileGardenLayout.avatarBandTopGap }
 
     private var dateItems: [ImportantDateItem] {
         ImportantDatesComposer().compose(
@@ -133,6 +124,11 @@ struct CoupleProfileView: View {
         profile.stickers.first(where: { $0.kind == .userAvatar })?.scale ?? ProfileSticker.defaultScale
     }
 
+    private var isFullPhotoViewerPresented: Bool {
+        showingPinnedViewer != nil
+            || showingMomentViewer
+    }
+
     var body: some View {
         NavigationStack {
             profileGardenBody
@@ -140,107 +136,108 @@ struct CoupleProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { profileGardenToolbar }
+        .toolbar(isFullPhotoViewerPresented ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private var profileGardenBody: some View {
-        GeometryReader { geo in
-            let scrollTopClearance = geo.safeAreaInsets.top + navigationBarClearance
-
-            ZStack(alignment: .top) {
-                Color(red: 0.78, green: 0.90, blue: 0.98)
-                    .ignoresSafeArea()
-
-                GardenBackgroundView(
-                    moments: gardenMoments,
-                    letters: gardenLetters,
-                    showsLivePet: true,
-                    petSkins: gardenPetSkins
-                )
+        ZStack(alignment: .top) {
+            Color(red: 0.78, green: 0.90, blue: 0.98)
                 .ignoresSafeArea()
 
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            Color.clear
-                                .frame(height: scrollTopClearance)
-                                .id("scrollRest")
+            GardenBackgroundView(
+                moments: gardenMoments,
+                letters: gardenLetters,
+                showsLivePet: true,
+                petSkins: gardenPetSkins
+            )
+            .ignoresSafeArea()
 
-                            profileCardsSection
-                                .id("contentTop")
-
-                            Color.clear
-                                .frame(height: profileAvatarsBandTopGap)
-
-                            Color.clear
-                                .frame(height: profileAvatarsBandHeight)
-
-                            Color.clear
-                                .frame(height: stickerCanvasHeight)
-                                .id("stickerCanvasTop")
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                        .overlay {
-                            GeometryReader { contentGeo in
-                                ProfileStickersLayer(
-                                    stickers: profile.stickers,
-                                    images: stickerImages,
-                                    profileNote: profile.profileNote,
-                                    profileNotePosition: profile.profileNotePosition,
-                                    userName: displayName,
-                                    partnerTitle: partnerSlotTitle,
-                                    isCustomizing: isCustomizing,
-                                    selectedID: selectedStickerID,
-                                    isNoteSelected: isNoteSelected,
-                                    onSelect: { id in
-                                        selectedStickerID = id
-                                        isNoteSelected = false
-                                    },
-                                    onSelectNote: {
-                                        isNoteSelected = true
-                                        selectedStickerID = nil
-                                    },
-                                    onDelete: deleteSticker,
-                                    onDeleteNote: deleteProfileNote,
-                                    onTapUser: { showEditProfile = true },
-                                    onTapPartner: handlePartnerSlotTap,
-                                    onTapNote: { showProfileNoteEditor = true },
-                                    onTapPhotoSticker: handlePhotoStickerTap,
-                                    onNotePositionChanged: updateProfileNotePosition,
-                                    onPositionChanged: updateStickerPosition,
-                                    onScaleChanged: updateStickerScale,
-                                    onRotationChanged: updateStickerRotation
-                                )
-                                .frame(width: contentGeo.size.width, height: contentGeo.size.height)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        profileCardsSection
+                            .id("contentTop")
+                            .overlay(alignment: .bottom) {
+                                Color.clear
+                                    .frame(width: 1, height: 1)
+                                    .id("editGardenScrollAnchor")
                             }
-                        }
+
+                        Color.clear
+                            .frame(height: profileAvatarsBandTopGap)
+
+                        Color.clear
+                            .frame(height: profileAvatarsBandHeight)
+
+                        Color.clear
+                            .frame(height: stickerCanvasHeight)
                     }
-                    .scrollIndicators(.hidden)
-                    .ignoresSafeArea(edges: .top)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if isCustomizing {
-                            EditGardenFooterBar(
-                                onAddNote: { showProfileNoteEditor = true },
-                                onCreateStickers: { showStickerPicker = true }
+                    .padding(.horizontal, ProfileGardenLayout.contentTopPadding)
+                    .padding(.top, ProfileGardenLayout.contentTopPadding)
+                    .padding(.bottom, 16)
+                    .overlay {
+                        GeometryReader { contentGeo in
+                            ProfileStickersLayer(
+                                stickers: profile.stickers,
+                                images: stickerImages,
+                                profileNote: profile.profileNote,
+                                profileNotePosition: profile.profileNotePosition,
+                                userName: displayName,
+                                partnerTitle: partnerSlotTitle,
+                                isCustomizing: isCustomizing,
+                                selectedID: selectedStickerID,
+                                isNoteSelected: isNoteSelected,
+                                onSelect: { id in
+                                    selectedStickerID = id
+                                    isNoteSelected = false
+                                },
+                                onSelectNote: {
+                                    isNoteSelected = true
+                                    selectedStickerID = nil
+                                },
+                                onDelete: deleteSticker,
+                                onDeleteNote: deleteProfileNote,
+                                onTapUser: { showEditProfile = true },
+                                onTapPartner: handlePartnerSlotTap,
+                                onTapNote: { showProfileNoteEditor = true },
+                                onTapPhotoSticker: handlePhotoStickerTap,
+                                onNotePositionChanged: updateProfileNotePosition,
+                                onPositionChanged: updateStickerPosition,
+                                onScaleChanged: updateStickerScale,
+                                onRotationChanged: updateStickerRotation
                             )
-                        } else {
-                            CoupleProfileFooterBar(
-                                onVisitPet: { showVisitPet = true },
-                                onEditGarden: beginCustomize
-                            )
-                        }
-                    }
-                    .onChange(of: isCustomizing) { _, editing in
-                        guard editing else { return }
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo("stickerCanvasTop", anchor: .top)
+                            .frame(width: contentGeo.size.width, height: contentGeo.size.height)
                         }
                     }
                 }
-
-                pinnedMemoryOverlays
+                .scrollIndicators(.hidden)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if isCustomizing {
+                        EditGardenFooterBar(
+                            onAddNote: { showProfileNoteEditor = true },
+                            onCreateStickers: { showStickerPicker = true }
+                        )
+                    } else {
+                        CoupleProfileFooterBar(
+                            onVisitPet: { showVisitPet = true },
+                            onEditGarden: beginCustomize
+                        )
+                    }
+                }
+                .onAppear {
+                    scrollToBrowseTop(proxy: proxy)
+                }
+                .onChange(of: isCustomizing) { _, editing in
+                    if editing {
+                        scrollToEditGardenFocus(proxy: proxy)
+                    } else {
+                        scrollToBrowseTop(proxy: proxy)
+                    }
+                }
             }
+
+            pinnedMemoryOverlays
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear(perform: load)
@@ -388,23 +385,6 @@ struct CoupleProfileView: View {
                 saveProfileNote(note)
             }
         }
-        .overlay {
-            if activeSubpage == nil, let context = photoViewerContext {
-                ImportantDatePhotoViewer(
-                    title: context.title,
-                    date: context.date,
-                    image: context.image,
-                    onDismiss: {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            photoViewerContext = nil
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(20)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: photoViewerContext != nil)
     }
 
     @ViewBuilder
@@ -440,7 +420,6 @@ struct CoupleProfileView: View {
                 )
             }
         }
-        .padding(.top, 12)
         .allowsHitTesting(!isCustomizing)
     }
 
@@ -468,7 +447,12 @@ struct CoupleProfileView: View {
                 Button(action: finishCustomize) {
                     Text("Save")
                         .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(BabyTownTheme.savePillFill, in: Capsule())
                 }
+                .buttonStyle(.plain)
             } else {
                 Button(action: { showPartnerPaywall = true }) {
                     HStack(spacing: 6) {
@@ -506,16 +490,18 @@ struct CoupleProfileView: View {
             .zIndex(10)
         }
 
-        if showingMomentViewer, let homeViewModel {
+        if showingMomentViewer {
             MomentPhotoViewer(
                 moments: viewerMoments,
                 initialIndex: viewerInitialIndex,
                 onDismiss: {
                     withAnimation(.easeOut(duration: 0.25)) {
                         showingMomentViewer = false
+                        clearMemoryPageViewerContext()
                     }
                 },
                 onUpdateMoments: { updatedMoments in
+                    guard let homeViewModel else { return }
                     var newMoments = homeViewModel.moments
                     for moment in updatedMoments {
                         if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
@@ -525,34 +511,87 @@ struct CoupleProfileView: View {
                     homeViewModel.moments = newMoments
                 },
                 onDeleteMoment: { moment in
+                    guard let homeViewModel else { return }
                     withAnimation { homeViewModel.deleteMoment(moment) }
+                },
+                memoryPagePromptText: viewerMemoryPagePromptText,
+                memoryPageImportantDate: viewerImportantDate,
+                promptMemoryId: viewerPromptMemoryId,
+                onEditPromptMemory: { memoryId, _, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                    homeViewModel?.updatePromptMemory(
+                        memoryId: memoryId,
+                        primaryPhotoId: viewerMoments.first?.id ?? UUID(),
+                        loveNote: caption,
+                        placeName: placeName,
+                        latitude: latitude,
+                        longitude: longitude,
+                        isPlaceNameUserSet: isPlaceNameUserSet
+                    )
+                },
+                onAddPromptPhotos: { memoryId, images in
+                    homeViewModel?.addPhotosToPromptMemory(memoryId: memoryId, images: images)
+                },
+                onRemovePromptPhoto: { memoryId, photoId in
+                    homeViewModel?.removePhotoFromPromptMemory(memoryId: memoryId, photoId: photoId)
+                },
+                onSyncPromptMemoryPhotos: { memoryId, assetIds, orphanIds in
+                    await homeViewModel?.syncPromptMemoryPhotos(
+                        memoryId: memoryId,
+                        selectedAssetIds: assetIds,
+                        selectedOrphanMomentIds: orphanIds
+                    )
+                },
+                onReloadPromptMoments: {
+                    guard let memoryId = viewerPromptMemoryId else { return viewerMoments }
+                    let memories = homeViewModel?.promptMemories ?? dpm.loadPromptMemories()
+                    guard let memory = memories.first(where: { $0.id == memoryId }) else {
+                        return viewerMoments
+                    }
+                    return memory.sortedViewerMoments
                 }
             )
             .transition(.opacity)
             .zIndex(11)
         }
+    }
 
-        if showingPromptPhotoViewer {
-            PromptPhotoViewer(
-                photos: viewerPromptPhotos,
-                initialIndex: viewerPromptPhotoIndex,
-                onDismiss: {
-                    withAnimation(.easeOut(duration: 0.25)) {
-                        showingPromptPhotoViewer = false
-                    }
-                },
-                onUpdatePhotos: { updatedPhotos in
-                    homeViewModel?.updatePromptMemoryPhotos(viewerPromptPhotos, with: updatedPhotos)
-                },
-                onDeletePhoto: { photo in
-                    withAnimation {
-                        homeViewModel?.deletePromptPhoto(photo, from: viewerPromptPhotos)
-                    }
-                },
-                promptText: viewerPromptText
+    private func clearMemoryPageViewerContext() {
+        viewerMemoryPagePromptText = nil
+        viewerImportantDate = nil
+        viewerPromptMemoryId = nil
+    }
+
+    private func openImportantDateMemoryPage(
+        title: String,
+        date: Date,
+        image: UIImage,
+        itemId: String
+    ) {
+        clearMemoryPageViewerContext()
+        viewerMoments = [
+            MemoryPageMomentFactory.moment(
+                image: image,
+                importantDate: MemoryPageImportantDateInfo(title: title, date: date),
+                itemId: itemId
             )
-            .transition(.opacity)
-            .zIndex(12)
+        ]
+        viewerInitialIndex = 0
+        viewerImportantDate = MemoryPageImportantDateInfo(title: title, date: date)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
+    }
+
+    private func openPromptMemoryPage(memory: PromptMemory, photo: PromptPhoto) {
+        let moments = memory.sortedViewerMoments
+        guard !moments.isEmpty else { return }
+        clearMemoryPageViewerContext()
+        viewerMoments = moments
+        viewerInitialIndex = moments.firstIndex(where: { $0.id == photo.id }) ?? 0
+        viewerMemoryPagePromptText = memory.promptText
+        viewerPromptMemoryId = memory.id
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
         }
     }
 
@@ -594,13 +633,12 @@ struct CoupleProfileView: View {
 
     private func openSpecialDate(_ special: SpecialDate) {
         guard let image = dpm.loadSpecialDatePhoto(id: special.id) else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            photoViewerContext = ImportantDatePhotoViewerContext(
-                title: special.title,
-                date: special.date,
-                image: image
-            )
-        }
+        openImportantDateMemoryPage(
+            title: special.title,
+            date: special.date,
+            image: image,
+            itemId: special.id.uuidString
+        )
     }
 
     private func handlePhotoStickerTap(_ sticker: ProfileSticker) {
@@ -627,6 +665,7 @@ struct CoupleProfileView: View {
             let dayMoments = moments
                 .filter { calendar.startOfDay(for: $0.dateTaken) == day }
                 .sorted { $0.dateTaken < $1.dateTaken }
+            clearMemoryPageViewerContext()
             viewerMoments = dayMoments
             viewerInitialIndex = dayMoments.firstIndex(where: { $0.id == id }) ?? 0
             withAnimation(.easeInOut(duration: 0.25)) {
@@ -637,12 +676,7 @@ struct CoupleProfileView: View {
 
         for memory in homeViewModel?.promptMemories ?? dpm.loadPromptMemories() {
             guard let photo = memory.photos.first(where: { $0.id == id }) else { continue }
-            viewerPromptPhotos = memory.photos
-            viewerPromptPhotoIndex = memory.photos.firstIndex(where: { $0.id == photo.id }) ?? 0
-            viewerPromptText = memory.promptText
-            withAnimation(.easeInOut(duration: 0.25)) {
-                showingPromptPhotoViewer = true
-            }
+            openPromptMemoryPage(memory: memory, photo: photo)
             return
         }
     }
@@ -650,18 +684,15 @@ struct CoupleProfileView: View {
     private func openPinnedItem(_ item: PinnedItem) {
         switch item {
         case .moment(_, let all):
+            clearMemoryPageViewerContext()
             viewerMoments = all
             viewerInitialIndex = 0
             withAnimation(.easeInOut(duration: 0.25)) {
                 showingMomentViewer = true
             }
         case .prompt(let p):
-            viewerPromptPhotos = p.photos
-            viewerPromptPhotoIndex = 0
-            viewerPromptText = p.promptText
-            withAnimation(.easeInOut(duration: 0.25)) {
-                showingPromptPhotoViewer = true
-            }
+            guard let photo = p.photos.first else { return }
+            openPromptMemoryPage(memory: p, photo: photo)
         }
     }
 
@@ -748,6 +779,26 @@ struct CoupleProfileView: View {
 
     private func beginCustomize() {
         isCustomizing = true
+    }
+
+    /// Default browse position: card stack flush under the toolbar (matches side padding).
+    private func scrollToBrowseTop(proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            withAnimation(.easeInOut(duration: 0.28)) {
+                proxy.scrollTo("contentTop", anchor: .top)
+            }
+        }
+    }
+
+    /// Scrolls just past the three cards so edit mode opens on the garden band.
+    private func scrollToEditGardenFocus(proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(80))
+            withAnimation(.easeInOut(duration: 0.32)) {
+                proxy.scrollTo("editGardenScrollAnchor", anchor: .top)
+            }
+        }
     }
 
     private func cancelCustomize() {
@@ -852,19 +903,19 @@ struct CoupleProfileView: View {
 
     private func presentPhotoViewer(for item: ImportantDateItem) {
         guard let image = photo(for: item) else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            photoViewerContext = ImportantDatePhotoViewerContext(
-                title: item.title,
-                date: item.date,
-                image: image
-            )
-        }
+        openImportantDateMemoryPage(
+            title: item.title,
+            date: item.date,
+            image: image,
+            itemId: item.id
+        )
     }
 
     private func beginEditSpecial(id: String) {
         guard let uid = UUID(uuidString: id),
               let match = profile.specialDates.first(where: { $0.id == uid }) else { return }
-        photoViewerContext = nil
+        showingMomentViewer = false
+        clearMemoryPageViewerContext()
         dateEditorPresentation = .edit(match, image: dpm.loadSpecialDatePhoto(id: uid))
     }
 

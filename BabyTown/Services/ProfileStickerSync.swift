@@ -11,39 +11,6 @@ enum ProfileStickerSync {
         var stickers = profile.stickers
         var bySource = Dictionary(uniqueKeysWithValues: stickers.map { ($0.sourceKey, $0) })
 
-        func ensure(_ kind: ProfileSticker.Kind, sourceKey: String, image: UIImage?, defaultPosition: NormalizedPoint) {
-            guard let image else {
-                if let existing = bySource[sourceKey] {
-                    dpm.deleteStickerImage(id: existing.id)
-                    stickers.removeAll { $0.sourceKey == sourceKey }
-                    bySource.removeValue(forKey: sourceKey)
-                }
-                return
-            }
-            if var sticker = bySource[sourceKey] {
-                let processed = SubjectLiftService.stickerImage(from: image)
-                dpm.saveStickerImage(processed.image, id: sticker.id)
-                sticker.usedSubjectLift = processed.usedSubjectLift
-                if let idx = stickers.firstIndex(where: { $0.sourceKey == sourceKey }) {
-                    stickers[idx] = sticker
-                }
-                bySource[sourceKey] = sticker
-            } else {
-                let processed = SubjectLiftService.stickerImage(from: image)
-                let sticker = ProfileSticker(
-                    kind: kind,
-                    sourceKey: sourceKey,
-                    position: defaultPosition,
-                    rotation: Double.random(in: -12...12),
-                    scale: ProfileSticker.defaultScale,
-                    usedSubjectLift: processed.usedSubjectLift
-                )
-                dpm.saveStickerImage(processed.image, id: sticker.id)
-                stickers.append(sticker)
-                bySource[sourceKey] = sticker
-            }
-        }
-
         syncUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
         dedupePartnerInviteStickers(stickers: &stickers, bySource: &bySource, dpm: dpm)
@@ -58,16 +25,11 @@ enum ProfileStickerSync {
             stickers[idx].position = ProfileSticker.defaultPartnerPosition
         }
 
-        for date in profile.specialDates {
-            let key = date.id.uuidString
-            ensure(.specialDate, sourceKey: key, image: dpm.loadSpecialDatePhoto(id: date.id),
-                   defaultPosition: specialDateDefaultPosition(for: key, existing: stickers))
-        }
-
-        let validSpecialKeys = Set(profile.specialDates.map(\.id.uuidString))
+        // Special dates no longer auto-spawn garden stickers — they live only in
+        // Important Dates. Remove any that earlier versions created so a deleted
+        // one can't resurrect on the next load.
         stickers.removeAll { sticker in
             guard sticker.kind == .specialDate else { return false }
-            if validSpecialKeys.contains(sticker.sourceKey) { return false }
             dpm.deleteStickerImage(id: sticker.id)
             bySource.removeValue(forKey: sticker.sourceKey)
             return true
@@ -167,22 +129,18 @@ enum ProfileStickerSync {
         if isLegacyUserAvatarPosition(point) { return kind == .userAvatar }
         let xs: [CGFloat] = kind == .userAvatar ? [0.30, 0.32] : [0.68, 0.70]
         guard xs.contains(where: { abs(point.x - $0) < 0.06 }) else { return false }
-        // Legacy positions from earlier layout passes (including the brief above-cards band).
-        return abs(point.y - 0.62) < 0.04
+        // Legacy positions from earlier layout passes (including overlap with cards).
+        return abs(point.y - 0.46) < 0.04
+            || abs(point.y - 0.484) < 0.02
             || abs(point.y - 0.50) < 0.04
+            || abs(point.y - 0.540) < 0.04
+            || abs(point.y - 0.559) < 0.04
+            || abs(point.y - 0.56) < 0.04
+            || abs(point.y - 0.62) < 0.04
             || abs(point.y - 0.12) < 0.04
     }
 
     private static func isLegacyUserAvatarPosition(_ point: NormalizedPoint) -> Bool {
         abs(point.x - 0.28) < 0.02 && abs(point.y - 0.24) < 0.02
-    }
-
-    private static func specialDateDefaultPosition(for key: String, existing: [ProfileSticker]) -> NormalizedPoint {
-        let specials = existing.filter { $0.kind == .specialDate }
-        let index = specials.count
-        let x = 0.18 + CGFloat(index % 3) * 0.20
-        let y = 0.22 + CGFloat(index / 3) * 0.10
-        _ = key
-        return NormalizedPoint(x: min(x, 0.72), y: min(y, 0.36))
     }
 }

@@ -202,9 +202,7 @@ final class PetSpeechCommandRecognizer: ObservableObject {
 
         liveTranscript = PetTrickTrainingState.displayTranscript(slice)
 
-        // Wait for a finalized utterance so partial "hi" from "high five" doesn't trigger Speak.
-        guard isFinal else { return }
-        guard let trick = PetTrickTrainingState.trick(matching: slice) else { return }
+        guard let trick = PetTrickTrainingState.trick(matching: slice, isFinal: isFinal) else { return }
 
         let now = Date()
         guard trick != lastFiredTrick || now.timeIntervalSince(lastFiredAt) >= commandCooldown else { return }

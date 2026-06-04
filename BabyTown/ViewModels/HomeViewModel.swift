@@ -1080,10 +1080,17 @@ final class HomeViewModel: ObservableObject {
         if let section = foundingDaySections.first(where: { $0.moments.contains(where: { $0.id == momentId }) }) {
             return flattenedPhotos(for: section)
         }
+        if let memory = promptMemories.first(where: { $0.photos.contains(where: { $0.id == momentId }) }) {
+            return memory.sortedViewerMoments
+        }
         if let moment = moments.first(where: { $0.id == momentId }) {
             return [moment]
         }
         return []
+    }
+
+    func promptMemory(containingPhotoId photoId: UUID) -> PromptMemory? {
+        promptMemories.first(where: { $0.photos.contains(where: { $0.id == photoId }) })
     }
     
     /// Check if a moment has already been added to the timeline from On This Day
