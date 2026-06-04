@@ -11,8 +11,8 @@ struct BabyTownLogoView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.95, blue: 0.95),
-                            Color(red: 1.0, green: 0.9, blue: 0.9)
+                            BabyTownTheme.accent.opacity(0.10),
+                            BabyTownTheme.accent.opacity(0.18)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -27,8 +27,8 @@ struct BabyTownLogoView: View {
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.95, green: 0.3, blue: 0.35).opacity(1.0 - CGFloat(index) * 0.3),
-                                Color(red: 0.85, green: 0.2, blue: 0.3).opacity(1.0 - CGFloat(index) * 0.3)
+                                BabyTownTheme.accent.opacity(1.0 - CGFloat(index) * 0.3),
+                                BabyTownTheme.accentDeep.opacity(1.0 - CGFloat(index) * 0.3)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -47,14 +47,14 @@ struct BabyTownLogoView: View {
                 .foregroundStyle(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.98, green: 0.35, blue: 0.4),
-                            Color(red: 0.9, green: 0.25, blue: 0.35)
+                            BabyTownTheme.accent,
+                            BabyTownTheme.accentDeep
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: Color(red: 0.9, green: 0.25, blue: 0.35).opacity(0.4), radius: 8, y: 4)
+                .shadow(color: BabyTownTheme.accentDeep.opacity(0.4), radius: 8, y: 4)
         }
     }
 }
@@ -109,8 +109,8 @@ struct AppIconGeneratorView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.95, blue: 0.95),
-                            Color(red: 1.0, green: 0.88, blue: 0.88)
+                            BabyTownTheme.accent.opacity(0.10),
+                            BabyTownTheme.accent.opacity(0.18)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -122,7 +122,7 @@ struct AppIconGeneratorView: View {
                 Image(systemName: "heart.fill")
                     .font(.system(size: size * 0.32 * (1.0 - CGFloat(index) * 0.2)))
                     .foregroundStyle(
-                        Color(red: 0.95, green: 0.3, blue: 0.35).opacity(0.9 - CGFloat(index) * 0.2)
+                        BabyTownTheme.accentDeep.opacity(0.9 - CGFloat(index) * 0.2)
                     )
                     .offset(
                         x: CGFloat(index) * size * 0.06,
@@ -137,14 +137,14 @@ struct AppIconGeneratorView: View {
                 .foregroundStyle(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.98, green: 0.35, blue: 0.4),
-                            Color(red: 0.9, green: 0.25, blue: 0.35)
+                            BabyTownTheme.accent,
+                            BabyTownTheme.accentDeep
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: Color(red: 0.9, green: 0.25, blue: 0.35).opacity(0.5), radius: size * 0.03, y: size * 0.015)
+                .shadow(color: BabyTownTheme.accentDeep.opacity(0.5), radius: size * 0.03, y: size * 0.015)
         }
         .frame(width: size, height: size)
     }
