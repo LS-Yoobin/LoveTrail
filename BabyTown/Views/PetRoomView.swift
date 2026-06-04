@@ -13,6 +13,8 @@ struct PetRoomView: View {
     @Environment(\.dismiss) private var environmentDismiss
 
     @State private var scene: PetRoomScene?
+    /// Tracks which pet the SpriteKit scene was built for (guards layout refresh).
+    @State private var sceneSkin: CatSkin?
     @State private var inspect: PetRoomScene.RoomProp?
     @State private var showStatsDetail = false
     @State private var showPetProfile = false
@@ -93,8 +95,13 @@ struct PetRoomView: View {
     private let wateringCanTopAnchorOffsetLeft = CGSize(width: 18, height: -16)
     private let wateringOverflow: CGFloat = 40
 
+    /// Active room pet; follows `viewModel.adoptedSkin` when the HUD switcher changes pets.
+    private var activeSkin: CatSkin {
+        viewModel.adoptedSkin ?? skin
+    }
+
     private var petDisplayName: String {
-        viewModel.displayName(for: skin)
+        viewModel.displayName(for: activeSkin)
     }
 
     private var showingToiletPaperModal: Bool {
@@ -265,7 +272,7 @@ struct PetRoomView: View {
                                     }
                                 }
                             PetProfileCard(
-                                skin: skin,
+                                skin: activeSkin,
                                 displayName: petDisplayName,
                                 birthDate: DataPersistenceManager.shared.loadOrCreateAppJoinedDate(),
                                 smartnessLevel: viewModel.smartMeterLevel,
@@ -326,17 +333,11 @@ struct PetRoomView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
                         marketToolbarButton
-
-                        Menu {
-                            Button {
-                                beginCustomizeRoom()
-                            } label: {
-                                Label("Customize Room", systemImage: "square.dashed")
-                            }
-                            Button("Choose a different pet", systemImage: "arrow.triangle.2.circlepath", action: onChangePet)
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                        Button(action: beginCustomizeRoom) {
+                            Image(systemName: "square.dashed")
+                                .font(.system(size: 18))
                         }
+                        .accessibilityLabel("Customize Room")
                     }
                 }
             }
@@ -380,17 +381,28 @@ struct PetRoomView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             } else if !isInspectingPictureFrame && !isRefillingFood {
                 TimelineView(.periodic(from: .now, by: 5)) { _ in
-                    PetHUDView(coins: viewModel.coins,
-                               hunger: viewModel.hunger,
-                               thirst: viewModel.thirst,
-                               litter: viewModel.litter,
-                               happiness: viewModel.happiness,
-                               onInventoryTap: { openOwnedItems() },
-                               onStatsTap: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showStatsDetail = true
-                        }
-                    })
+                    PetHUDView(
+                        coins: viewModel.coins,
+                        hunger: viewModel.hunger,
+                        thirst: viewModel.thirst,
+                        litter: viewModel.litter,
+                        happiness: viewModel.happiness,
+                        currentSkin: activeSkin,
+                        ownedSkins: viewModel.ownedSkins,
+                        onInventoryTap: { openOwnedItems() },
+                        onStatsTap: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showStatsDetail = true
+                            }
+                        },
+                        onSelectPet: { newSkin in
+                            guard newSkin != viewModel.adoptedSkin else { return }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                viewModel.visit(newSkin)
+                            }
+                        },
+                        onAdoptMore: onChangePet
+                    )
                 }
             }
         }
@@ -438,6 +450,7 @@ struct PetRoomView: View {
             if let award = viewModel.lastAward { triggerCoinBurst(award.amount) }
         }
         .onChange(of: viewModel.roomLayout) { _, _ in
+            guard viewModel.adoptedSkin == sceneSkin else { return }
             refreshRoomLayout()
         }
         .onChange(of: showMarket) { _, _ in
@@ -544,7 +557,7 @@ struct PetRoomView: View {
             laserPlayProgressBar
             Text("Drag the laser to fill the bar")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
@@ -680,7 +693,11 @@ struct PetRoomView: View {
                     }
                 }
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color(red: 0.22, green: 0.2, blue: 0.22))
+                .foregroundStyle(
+                    listening && (speechRecognizer.liveTranscript ?? "").isEmpty
+                        ? .white
+                        : Color(red: 0.22, green: 0.2, blue: 0.22)
+                )
                 .lineLimit(2)
             }
             Spacer()
@@ -947,6 +964,15 @@ struct PetRoomView: View {
                         viewModel.selectPlayToy(toy.id)
                     }
                 }
+
+                playToyChip(
+                    title: "+ Buy",
+                    iconSystemName: "plus.circle.fill",
+                    imageName: nil,
+                    selected: false
+                ) {
+                    openMarket(category: .catToys)
+                }
             }
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
@@ -1087,13 +1113,13 @@ struct PetRoomView: View {
 
     private var renameSheetContent: some View {
         PetRenameSheet(
-            defaultName: skin.petName,
+            defaultName: activeSkin.petName,
             currentName: petDisplayName,
             cost: PetEconomy.renameCost,
             coinBalance: viewModel.coins,
             onCancel: { showRenameSheet = false },
             onConfirm: { newName in
-                let result = viewModel.renamePet(for: skin, to: newName)
+                let result = viewModel.renamePet(for: activeSkin, to: newName)
                 if let reason = result.blockedReason {
                     return reason
                 }
@@ -1261,7 +1287,11 @@ struct PetRoomView: View {
         .onAppear {
             viewModel.registerPetInteraction()
             if scene == nil {
-                installScene(makeConfiguredScene(skin: skin, size: geo.size), geo: geo)
+                installScene(
+                    makeConfiguredScene(skin: activeSkin, size: geo.size),
+                    for: activeSkin,
+                    geo: geo
+                )
             }
         }
         .overlay {
@@ -1288,18 +1318,24 @@ struct PetRoomView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: isPictureFrameInspectAnimating)
-        .onChange(of: skin) { _, newSkin in
-            installScene(makeConfiguredScene(skin: newSkin, size: geo.size), geo: geo)
+        .onChange(of: viewModel.adoptedSkin) { _, newSkin in
+            guard let newSkin, newSkin != sceneSkin else { return }
+            installScene(
+                makeConfiguredScene(skin: newSkin, size: geo.size),
+                for: newSkin,
+                geo: geo
+            )
         }
     }
 
-    private func installScene(_ newScene: PetRoomScene, geo: GeometryProxy) {
+    private func installScene(_ newScene: PetRoomScene, for skin: CatSkin, geo: GeometryProxy) {
         if isCustomizing { exitCustomizeMode() }
         if isTrickMode { exitTrickMode() }
         isInspectingPictureFrame = false
         isPictureFrameInspectAnimating = false
         showingPictureFrameMomentViewer = false
         scene = newScene
+        sceneSkin = skin
         lastKnownLitterDirty = viewModel.isLitterBoxDirty
         refreshRoomLayout()
     }
@@ -1456,7 +1492,7 @@ struct PetRoomView: View {
         }
         let isDirty = viewModel.isLitterBoxDirty
         if isDirty && !lastKnownLitterDirty {
-            scene?.playLitterBoxUseAnimation(for: skin)
+            scene?.playLitterBoxUseAnimation(for: activeSkin)
         } else {
             scene?.setLitterBoxDirty(isDirty)
         }
@@ -1680,10 +1716,11 @@ struct PetRoomView: View {
     }
 
     private func toggleSecondPetAdoptionBypassIfNeeded() {
-        guard !viewModel.ownedSkins.contains(.cowCat) else { return }
+        guard viewModel.ownedSkins.count == 1 else { return }
         let enabled = viewModel.toggleSecondPetAdoptionBypass()
         if enabled {
-            showToast("Secret mode: Arabella unlocked. Long-press the level pill again to undo.")
+            let lockedName = CatSkin.allCases.first { !viewModel.ownedSkins.contains($0) }?.petName ?? "second pet"
+            showToast("Secret mode: \(lockedName) unlocked. Long-press the level pill again to undo.")
         } else {
             showToast("Secret mode undone. Level \(PetEconomy.secondPetUnlockLevel) required again.")
         }

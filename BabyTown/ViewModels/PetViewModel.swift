@@ -151,8 +151,10 @@ final class PetViewModel: ObservableObject {
     func visit(_ skin: CatSkin) {
         guard state.ownedSkins.contains(skin) else { return }
         petRoomSkinBeforeSelection = nil
-        state.adoptedSkin = skin
-        state.updateRoomLayout(for: skin) { $0.seedMissingBuiltInPositions() }
+        var next = state
+        next.adoptedSkin = skin
+        next.updateRoomLayout(for: skin) { $0.seedMissingBuiltInPositions() }
+        state = next
     }
 
     // MARK: Live need values (decay applied at read), 0…100
@@ -378,7 +380,8 @@ final class PetViewModel: ObservableObject {
 
     // MARK: - Hidden easter eggs
 
-    /// Long-press the level pill to bypass the second-pet adoption level gate.
+    /// Long-press the level pill (owned or unowned profile on Select One, or in-room
+    /// when you have one pet) to bypass the second-pet adoption level gate.
     @discardableResult
     func toggleSecondPetAdoptionBypass() -> Bool {
         secondPetAdoptionBypassActive.toggle()

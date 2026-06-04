@@ -48,4 +48,22 @@ final class ImportantDatesComposerTests: XCTestCase {
         XCTAssertEqual(items[0].id, uid.uuidString)
         XCTAssertEqual(items[0].kind, .special)
     }
+
+    func testBirthdaysAreOrderedLatestToOldestAmongChronologicalList() {
+        let items = ImportantDatesComposer().compose(
+            firstMet: date(2020, 1, 1),
+            official: nil,
+            special: [
+                SpecialDateInput(id: UUID(), title: "Partner's Birthday", date: date(1992, 3, 4), isBirthday: true),
+                SpecialDateInput(id: UUID(), title: "My Birthday", date: date(1998, 7, 15), isBirthday: true),
+                SpecialDateInput(id: UUID(), title: "Anniversary", date: date(2024, 6, 1)),
+            ]
+        )
+        XCTAssertEqual(items.map(\.title), [
+            "My Birthday",
+            "Partner's Birthday",
+            "When we first met",
+            "Anniversary",
+        ])
+    }
 }

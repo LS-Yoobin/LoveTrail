@@ -15,6 +15,7 @@ struct AdoptAPetRootView: View {
                     onChangePet: { viewModel.releasePet() },
                     onDismiss: onDismiss
                 )
+                .id(skin)
                 .transition(.opacity)
                 .zIndex(1)
             } else {

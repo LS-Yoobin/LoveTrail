@@ -28,13 +28,13 @@ struct PetRoomLayoutState: Codable, Equatable {
     /// Most-recently-used play toys, newest first (`PetShopItem.id`).
     var playToyUsageOrder: [String]
 
-    private static let currentBuiltInLayoutVersion = 5
+    private static let currentBuiltInLayoutVersion = 7
 
     /// Canonical normalized anchors for built-in care props (pre pixel-offset nudge).
     static let canonicalBuiltInPropPositions: [String: NormalizedPoint] = [
         PetRoomPropKey.catTree: NormalizedPoint(x: 0.84, y: 0.30),
-        // Bottom-left, spaced apart, just above the Train pill (Artemis layout).
-        PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.085, y: 0.125),
+        // Bottom-left bowls sit closer together, just above the Train pill.
+        PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.15, y: 0.125),
         PetRoomPropKey.waterBowl: NormalizedPoint(x: 0.31, y: 0.125),
         // Bottom-right above Play, clear of the CTA (Arabella layout).
         PetRoomPropKey.litterBox: NormalizedPoint(x: 0.81, y: 0.17)
@@ -136,6 +136,12 @@ struct PetRoomLayoutState: Codable, Equatable {
         if builtInLayoutVersion < 5 {
             migrateToBuiltInLayoutV5()
         }
+        if builtInLayoutVersion < 6 {
+            migrateToBuiltInLayoutV6()
+        }
+        if builtInLayoutVersion < 7 {
+            migrateToBuiltInLayoutV7()
+        }
         builtInLayoutVersion = Self.currentBuiltInLayoutVersion
     }
 
@@ -144,6 +150,16 @@ struct PetRoomLayoutState: Codable, Equatable {
         for (key, point) in Self.canonicalBuiltInPropPositions {
             propPositions[key] = point
         }
+    }
+
+    /// v7: nudge the food bowl slightly left.
+    private mutating func migrateToBuiltInLayoutV7() {
+        applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.foodBowl])
+    }
+
+    /// v6: tuck the food bowl closer to the water bowl (less horizontal gap).
+    private mutating func migrateToBuiltInLayoutV6() {
+        applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.foodBowl])
     }
 
     /// v5: spread bowls lower (above Train pill) without overlapping each other.

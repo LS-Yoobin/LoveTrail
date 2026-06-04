@@ -136,37 +136,172 @@ struct PetLevelPill: View {
     }
 }
 
-/// The top overlay strip in the pet room: coins pill + four compact need
-/// meters (incl. happiness, so the user can check how the cat's feeling).
+/// Horizontal row of pet face avatars under the coin pill — switch rooms or adopt more.
+struct PetRoomPetSwitcher: View {
+    let currentSkin: CatSkin
+    let ownedSkins: [CatSkin]
+    var onSelectPet: (CatSkin) -> Void
+    var onAdoptMore: () -> Void
+
+    private let circleSize: CGFloat = 44
+
+    private var orderedOwnedSkins: [CatSkin] {
+        CatSkin.allCases.filter { ownedSkins.contains($0) }
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(orderedOwnedSkins) { skin in
+                Button {
+                    onSelectPet(skin)
+                } label: {
+                    PetRoomPetFaceCircle(
+                        skin: skin,
+                        style: skin == currentSkin ? .selected : .unselected,
+                        size: circleSize
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(skin.petName)
+                .accessibilityAddTraits(skin == currentSkin ? .isSelected : [])
+                .accessibilityHint(skin == currentSkin ? "Current pet" : "Switch to this pet's room")
+            }
+
+            Button(action: onAdoptMore) {
+                PetRoomPetFaceCircle(style: .add, size: circleSize)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Adopt another pet")
+            .accessibilityHint("Opens pet selection")
+        }
+    }
+}
+
+/// White circular avatar used in the pet-room switcher (face crop + add slot).
+struct PetRoomPetFaceCircle: View {
+    enum Style {
+        case selected
+        case unselected
+        case add
+    }
+
+    var skin: CatSkin?
+    let style: Style
+    var size: CGFloat = 44
+
+    init(skin: CatSkin, style: Style, size: CGFloat = 44) {
+        self.skin = skin
+        self.style = style
+        self.size = size
+    }
+
+    init(style: Style, size: CGFloat = 44) {
+        self.skin = nil
+        self.style = style
+        self.size = size
+    }
+
+    var body: some View {
+        ZStack {
+            switch style {
+            case .selected:
+                Circle()
+                    .fill(Color.white)
+                faceImage
+                    .clipShape(Circle())
+                    .padding(3)
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2.5)
+            case .unselected:
+                faceImage
+                    .clipShape(Circle())
+                    .padding(3)
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2)
+            case .add:
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2)
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+    }
+
+    @ViewBuilder
+    private var faceImage: some View {
+        if let skin {
+            Group {
+                if UIImage(named: skin.profileSitAsset) != nil {
+                    Image(skin.profileSitAsset)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "cat.fill")
+                        .font(.system(size: size * 0.4))
+                        .foregroundStyle(skin.placeholderColor)
+                }
+            }
+            .frame(width: size, height: size)
+            .offset(y: size * 0.06)
+        }
+    }
+}
+
+/// The top overlay strip in the pet room: coins pill + pet switcher + need meters.
 struct PetHUDView: View {
     let coins: Int
     let hunger: Int
     let thirst: Int
     let litter: Int
     let happiness: Int
+    var currentSkin: CatSkin?
+    var ownedSkins: [CatSkin] = []
     var onInventoryTap: () -> Void = {}
     var onStatsTap: () -> Void = {}
+    var onSelectPet: ((CatSkin) -> Void)?
+    var onAdoptMore: (() -> Void)?
+
+    private var showsPetSwitcher: Bool {
+        currentSkin != nil && onSelectPet != nil && onAdoptMore != nil
+    }
 
     var body: some View {
-        HStack(alignment: .center) {
-            Button(action: onInventoryTap) {
-                HStack(spacing: 6) {
-                    PetCoinIcon(size: 22)
-                    Text("\(coins)")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .fixedSize(horizontal: true, vertical: false)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 16) {
+                Button(action: onInventoryTap) {
+                    HStack(spacing: 6) {
+                        PetCoinIcon(size: 22)
+                        Text("\(coins)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .buttonStyle(.plain)
+                .accessibilityLabel("My items")
+                .accessibilityValue("\(coins) coins")
+                .accessibilityHint("Opens décor you own for this room")
+
+                if showsPetSwitcher,
+                   let currentSkin,
+                   let onSelectPet,
+                   let onAdoptMore {
+                    PetRoomPetSwitcher(
+                        currentSkin: currentSkin,
+                        ownedSkins: ownedSkins,
+                        onSelectPet: onSelectPet,
+                        onAdoptMore: onAdoptMore
+                    )
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("My items")
-            .accessibilityValue("\(coins) coins")
-            .accessibilityHint("Opens décor you own for this room")
 
             Spacer()
 

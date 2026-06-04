@@ -62,15 +62,26 @@ final class PetRoomScene: SKScene {
     private let toiletPaperZ: CGFloat = 8
     /// How far in front of a bowl (toward the camera / bottom of screen) the cat stops.
     private let bowlApproachFrontInset: CGFloat = 22
-    /// Eat/drink poses lower the muzzle — negative inset raises the landing point
-    /// toward the bowl so the head sits over the rim instead of below it.
-    private let bowlEatDrinkFrontInset: CGFloat = -36
+    /// Eat pose lowers the muzzle — negative inset raises the landing point toward
+    /// the bowl so the head sits over the rim instead of below it.
+    private var bowlEatFrontInset: CGFloat {
+        skin == .cowCat ? -20 : -36
+    }
+    /// Drink at the water bowl — less negative inset than eat so the cat sits lower
+    /// (closer to the rim). Cow-cat drink frames anchor nearer the feet.
+    private var bowlDrinkFrontInset: CGFloat {
+        skin == .cowCat ? 4 : -16
+    }
     /// Horizontal gap from the bowl's visual center to the cat's feet.
     private let bowlApproachLateralGap: CGFloat = 30
     /// Tighter side offset for eat/drink so the muzzle lines up with the bowl opening.
-    private let bowlEatDrinkLateralGap: CGFloat = 22
+    private var bowlEatDrinkLateralGap: CGFloat {
+        skin == .cowCat ? 10 : 22
+    }
     /// Extra shift right at the water bowl so the drink pose lines up with the rim.
-    private let bowlDrinkRightShift: CGFloat = 18
+    private var bowlDrinkRightShift: CGFloat {
+        skin == .cowCat ? 18 : 26
+    }
     /// Extra upward nudge when eating a floor snack so the lowered head aligns.
     private let snackApproachRaise: CGFloat = 12
     /// Shop item ids for cat beds that support occupied art (`_0` calico, `_1` cow cat).
@@ -2128,7 +2139,12 @@ final class PetRoomScene: SKScene {
         let side: CGFloat = catPosition.x < bowlCenterX ? -1 : 1
         let margin = maxCatHorizontalHalfWidth
         let targetX = min(max(bowlCenterX + lateralGap * side, margin), size.width - margin)
-        let frontInset = forEatDrink ? bowlEatDrinkFrontInset : bowlApproachFrontInset
+        let frontInset: CGFloat
+        if forEatDrink {
+            frontInset = pose == .drink ? bowlDrinkFrontInset : bowlEatFrontInset
+        } else {
+            frontInset = bowlApproachFrontInset
+        }
         let frontY = anchor.y - frontInset
         let targetY = min(max(frontY, size.height * catFloorBand.lowerBound),
                           size.height * catFloorBand.upperBound)
@@ -2876,8 +2892,9 @@ final class PetRoomScene: SKScene {
             // sits over the food/water instead of missing to one side.
             let bowlCenterX = bowl.calculateAccumulatedFrame().midX
             let centerDelta = bowlCenterX - target.x
-            let maxCenterPull: CGFloat = 20
-            let centerPull = max(-maxCenterPull, min(maxCenterPull, centerDelta * 0.6))
+            let maxCenterPull: CGFloat = skin == .cowCat ? 28 : 20
+            let centerPullScale: CGFloat = skin == .cowCat ? 0.85 : 0.6
+            let centerPull = max(-maxCenterPull, min(maxCenterPull, centerDelta * centerPullScale))
             target.x += centerPull
             if pose == .drink || pose == .confused {
                 target.x = min(size.width - maxCatHorizontalHalfWidth, target.x + bowlDrinkRightShift)

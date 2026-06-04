@@ -54,7 +54,12 @@ struct CoupleProfileView: View {
             firstMet: dpm.loadFoundingPhotoDate(promptText: "When we first met"),
             official: dpm.loadFoundingPhotoDate(promptText: "When we became official"),
             special: profile.specialDates.map {
-                SpecialDateInput(id: $0.id, title: $0.title, date: $0.date)
+                SpecialDateInput(
+                    id: $0.id,
+                    title: $0.title,
+                    date: $0.date,
+                    isBirthday: $0.isBirthday
+                )
             })
     }
 

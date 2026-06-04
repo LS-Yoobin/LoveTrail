@@ -1,7 +1,7 @@
 import Foundation
 
 /// Sort rules for the home "Our Adventures" feed (newest memories first, birthdays
-/// anchored just above founding moments, partner birthdays ordered by birth date).
+/// anchored just above founding moments, birthdays ordered latest-to-oldest).
 enum HomeTimelineOrdering {
 
     struct SortableItem {
@@ -12,7 +12,7 @@ enum HomeTimelineOrdering {
     }
 
     /// Newest-first for regular items and processing rows; birthdays are placed after
-    /// all other rows, oldest birth date closest to the founding section at the bottom.
+    /// all other rows, ordered latest-to-oldest (younger birth dates above older).
     static func sorted<Item>(
         _ items: [Item],
         sortable: (Item) -> SortableItem
@@ -41,7 +41,7 @@ enum HomeTimelineOrdering {
 
         let sortedProcessing = processing.sorted { compareNewestFirst($0.1, $1.1) }.map(\.0)
         let sortedRegular = regular.sorted { compareNewestFirst($0.1, $1.1) }.map(\.0)
-        let sortedBirthdays = birthdays.sorted { compareOldestFirst($0.1, $1.1) }.map(\.0)
+        let sortedBirthdays = birthdays.sorted { compareNewestFirst($0.1, $1.1) }.map(\.0)
 
         return sortedProcessing + sortedRegular + sortedBirthdays
     }

@@ -35,13 +35,15 @@ struct FoundingPlaceholderCard: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
-                    .lineLimit(2)
+            // Timeline placeholders use `foundingMomentLabelPlaceholder` below the card;
+            // only pinned-strip cards repeat the title here.
+            if showsPinnedLabel {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .lineLimit(2)
 
-                if showsPinnedLabel {
                     HStack(spacing: 4) {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 8))

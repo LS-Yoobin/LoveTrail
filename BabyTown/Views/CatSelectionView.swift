@@ -151,11 +151,16 @@ struct CatSelectionView: View {
     }
 
     private func toggleSecondPetAdoptionBypassIfNeeded() {
-        guard selected == .cowCat, !viewModel.ownedSkins.contains(.cowCat) else { return }
+        guard viewModel.ownedSkins.count == 1, let owned = viewModel.ownedSkins.first else { return }
+        let viewingUnownedSecond = !viewModel.ownedSkins.contains(selected)
+        let viewingOwnedOnlyPet = selected == owned
+        guard viewingUnownedSecond || viewingOwnedOnlyPet else { return }
+
         let enabled = viewModel.toggleSecondPetAdoptionBypass()
         blockedMessage = nil
         if enabled {
-            showToast("Secret mode: Arabella unlocked. Long-press the level pill again to undo.")
+            let lockedName = CatSkin.allCases.first { !viewModel.ownedSkins.contains($0) }?.petName ?? "second pet"
+            showToast("Secret mode: \(lockedName) unlocked. Long-press the level pill again to undo.")
         } else {
             showToast("Secret mode undone. Level \(PetEconomy.secondPetUnlockLevel) required again.")
         }
@@ -188,7 +193,7 @@ private struct CatChoiceCard: View {
                     .foregroundStyle(BabyTownTheme.textPrimary)
                 Text(skin.breedName)
                     .font(.system(size: 13))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(Color(red: 0.35, green: 0.35, blue: 0.38))
                 Text(isOwned ? "Owned" : "Available to adopt")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(BabyTownTheme.accentDeep)

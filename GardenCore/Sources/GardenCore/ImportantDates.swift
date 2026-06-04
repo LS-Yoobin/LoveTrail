@@ -6,10 +6,12 @@ public struct SpecialDateInput: Equatable, Sendable {
     public let id: UUID
     public let title: String
     public let date: Date
-    public init(id: UUID, title: String, date: Date) {
+    public let isBirthday: Bool
+    public init(id: UUID, title: String, date: Date, isBirthday: Bool = false) {
         self.id = id
         self.title = title
         self.date = date
+        self.isBirthday = isBirthday
     }
 }
 
@@ -26,17 +28,20 @@ public struct ImportantDateItem: Equatable, Sendable, Identifiable {
     public let title: String
     public let date: Date
     public let kind: Kind
+    public let isBirthday: Bool
 
-    public init(id: String, title: String, date: Date, kind: Kind) {
+    public init(id: String, title: String, date: Date, kind: Kind, isBirthday: Bool = false) {
         self.id = id
         self.title = title
         self.date = date
         self.kind = kind
+        self.isBirthday = isBirthday
     }
 }
 
 /// Merges the two foundational dates (when present) with the user's special
-/// dates into one chronologically ascending list. Pure and deterministic.
+/// dates. Non-birthdays stay in chronological order; birthdays are ordered
+/// latest-to-oldest (same rule as the home timeline birthday block).
 public struct ImportantDatesComposer {
     public init() {}
 
@@ -56,8 +61,32 @@ public struct ImportantDatesComposer {
         }
         for s in special {
             items.append(ImportantDateItem(id: s.id.uuidString,
-                                           title: s.title, date: s.date, kind: .special))
+                                           title: s.title,
+                                           date: s.date,
+                                           kind: .special,
+                                           isBirthday: s.isBirthday))
         }
-        return items.sorted { $0.date < $1.date }
+        return Self.sortedForDisplay(items)
+    }
+
+    /// Ascending timeline order, with birthday rows among themselves latest-first.
+    static func sortedForDisplay(_ items: [ImportantDateItem]) -> [ImportantDateItem] {
+        var sorted = items.sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.id < $1.id
+        }
+        let birthdayIndices = sorted.indices.filter { sorted[$0].isBirthday }
+        guard birthdayIndices.count > 1 else { return sorted }
+
+        let orderedBirthdays = birthdayIndices
+            .map { sorted[$0] }
+            .sorted {
+                if $0.date != $1.date { return $0.date > $1.date }
+                return $0.id < $1.id
+            }
+        for (index, item) in zip(birthdayIndices, orderedBirthdays) {
+            sorted[index] = item
+        }
+        return sorted
     }
 }

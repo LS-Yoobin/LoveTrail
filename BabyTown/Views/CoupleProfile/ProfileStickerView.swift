@@ -19,22 +19,19 @@ struct ProfileStickerView: View {
     var onDragActiveChanged: ((Bool) -> Void)? = nil
     /// Set for garden moment stickers only; profile avatars omit this.
     var onRotationChanged: ((Double) -> Void)?
+    /// Live scale from `ForgivingPinchGestureOverlay` while pinching off-sticker.
+    var overlayPinchPreviewScale: CGFloat? = nil
 
     @State private var dragOrigin: NormalizedPoint?
-    @State private var pinchBaseScale: CGFloat = 1
-    @State private var pinchPreviewScale: CGFloat?
     @State private var rotationBase: Double = 0
     @State private var rotationPreview: Double?
-
-    /// Lower = finer pinch control (0.25 ≈ quarter of native sensitivity).
-    private static let pinchSensitivity: CGFloat = 0.22
 
     private var scaleLimits: (min: CGFloat, max: CGFloat) {
         ProfileSticker.scaleLimits(for: sticker.kind)
     }
 
     private var effectiveScale: CGFloat {
-        pinchPreviewScale ?? sticker.scale
+        overlayPinchPreviewScale ?? sticker.scale
     }
 
     private var effectiveRotation: Double {
@@ -87,12 +84,7 @@ struct ProfileStickerView: View {
         .position(center)
         .allowsHitTesting(isCustomizing || onTap != nil)
         .onAppear {
-            pinchBaseScale = sticker.scale
             rotationBase = sticker.rotation
-        }
-        .onChange(of: sticker.scale) { _, newScale in
-            pinchBaseScale = newScale
-            pinchPreviewScale = nil
         }
         .onChange(of: sticker.rotation) { _, newRotation in
             rotationBase = newRotation
@@ -188,24 +180,6 @@ struct ProfileStickerView: View {
             }
     }
 
-    private var pinchGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { amount in
-                let damped = 1 + (amount - 1) * Self.pinchSensitivity
-                let proposed = pinchBaseScale * damped
-                let limits = scaleLimits
-                pinchPreviewScale = min(max(proposed, limits.min), limits.max)
-            }
-            .onEnded { amount in
-                let damped = 1 + (amount - 1) * Self.pinchSensitivity
-                let limits = scaleLimits
-                let final = min(max(pinchBaseScale * damped, limits.min), limits.max)
-                pinchBaseScale = final
-                pinchPreviewScale = nil
-                onScaleChanged(final)
-            }
-    }
-
     private var rotationGesture: some Gesture {
         RotationGesture()
             .onChanged { angle in
@@ -224,9 +198,6 @@ struct ProfileStickerView: View {
     /// A single concrete gesture type (required by `some Gesture`); rotation is
     /// gated inside `rotationGesture` via `canRotate`.
     private var customizeGestures: some Gesture {
-        SimultaneousGesture(
-            dragGesture,
-            SimultaneousGesture(pinchGesture, rotationGesture)
-        )
+        SimultaneousGesture(dragGesture, rotationGesture)
     }
 }
