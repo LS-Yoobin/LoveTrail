@@ -34,7 +34,7 @@ struct PetOwnedItemsSheet: View {
             colors: [
                 BabyTownTheme.cardTintLight,
                 BabyTownTheme.cardTintDeep,
-                Color(red: 0.98, green: 0.88, blue: 0.91),
+                BabyTownTheme.cardTintDeep,
             ],
             startPoint: .top,
             endPoint: .bottom

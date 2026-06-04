@@ -67,6 +67,11 @@ enum BabyTownTheme {
         isBlue ? Color(red: 0.86, green: 0.92, blue: 0.99) : Color(red: 0.99, green: 0.90, blue: 0.93)
     }
 
+    /// Rose tint for locked pet-trick icons. Pink: medium rose (original). Blue: medium blue.
+    static var lockedIconTint: Color {
+        isBlue ? Color(red: 0.30, green: 0.50, blue: 0.80) : Color(red: 0.84, green: 0.41, blue: 0.45)
+    }
+
     // MARK: - Buttons
 
     static var buttonGradient: LinearGradient {

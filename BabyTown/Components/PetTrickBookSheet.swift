@@ -9,10 +9,9 @@ struct PetTrickBookSheet: View {
     private let bodyText = Color(red: 0.13, green: 0.11, blue: 0.13)
     /// Slightly muted dark for captions, still clearly legible on the cream card.
     private let mutedText = Color(red: 0.32, green: 0.29, blue: 0.31)
-    /// Soft, lighter red for locked trick icons — clearly legible on the cream
-    /// pillow background without the harsh, washed-out look of the deep accent.
-    private let lockedIconTint = Color(red: 0.84, green: 0.41, blue: 0.45)
-    private let lockedIconBackdrop = Color(red: 0.84, green: 0.41, blue: 0.45).opacity(0.14)
+    /// Soft, lighter tint for locked trick icons — themed via BabyTownTheme.
+    private var lockedTint: Color { BabyTownTheme.lockedIconTint }
+    private var lockedBackdrop: Color { BabyTownTheme.lockedIconTint.opacity(0.14) }
 
     var body: some View {
         NavigationStack {
@@ -161,11 +160,11 @@ struct PetTrickBookSheet: View {
     private func trickIcon(_ trick: PetTrick, unlocked: Bool) -> some View {
         ZStack {
             Circle()
-                .fill(unlocked ? BabyTownTheme.accent.opacity(0.15) : lockedIconBackdrop)
+                .fill(unlocked ? BabyTownTheme.accent.opacity(0.15) : lockedBackdrop)
                 .frame(width: 44, height: 44)
             Image(systemName: trick.symbolName)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(unlocked ? BabyTownTheme.accentDeep : lockedIconTint)
+                .foregroundStyle(unlocked ? BabyTownTheme.accentDeep : lockedTint)
         }
     }
 
