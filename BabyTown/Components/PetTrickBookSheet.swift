@@ -27,7 +27,7 @@ struct PetTrickBookSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .background(Color(red: 0.99, green: 0.96, blue: 0.94).ignoresSafeArea())
+            .background(BabyTownTheme.cardTintLight.ignoresSafeArea())
             .navigationTitle("Tricks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -30,8 +30,8 @@ struct PetNameTagLabel: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.97, blue: 0.94),
-                                    Color(red: 0.99, green: 0.90, blue: 0.93)
+                                    BabyTownTheme.cardTintLight,
+                                    BabyTownTheme.cardTintDeep
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -117,7 +117,7 @@ struct PetProfileCard: View {
             Color.white
             LinearGradient(
                 colors: [
-                    Color(red: 1.0, green: 0.98, blue: 0.99),
+                    BabyTownTheme.cardTintLight,
                     Color.white
                 ],
                 startPoint: .top,
@@ -130,9 +130,9 @@ struct PetProfileCard: View {
         ZStack(alignment: .top) {
             LinearGradient(
                 colors: [
-                    Color(red: 1.0, green: 0.94, blue: 0.96),
-                    Color(red: 0.99, green: 0.88, blue: 0.92),
-                    Color(red: 0.97, green: 0.84, blue: 0.89)
+                    BabyTownTheme.cardTintLight,
+                    BabyTownTheme.cardTintDeep,
+                    BabyTownTheme.cardTintDeep
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

@@ -38,9 +38,9 @@ struct PetRenameSheet: View {
     private var panelBackground: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 1.0, green: 0.93, blue: 0.95),
+                BabyTownTheme.cardTintLight,
                 BabyTownTheme.cardBackground,
-                Color(red: 0.97, green: 0.82, blue: 0.87),
+                BabyTownTheme.cardTintDeep,
             ],
             startPoint: .top,
             endPoint: .bottom

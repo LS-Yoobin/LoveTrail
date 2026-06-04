@@ -29,15 +29,17 @@ struct PetOwnedItemsSheet: View {
         viewModel.ownedItemCategories
     }
 
-    private let sheetBackground = LinearGradient(
-        colors: [
-            Color(red: 1.0, green: 0.98, blue: 0.99),
-            Color(red: 0.99, green: 0.94, blue: 0.96),
-            Color(red: 0.98, green: 0.88, blue: 0.91),
-        ],
-        startPoint: .top,
-        endPoint: .bottom
-    )
+    private var sheetBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                BabyTownTheme.cardTintLight,
+                BabyTownTheme.cardTintDeep,
+                Color(red: 0.98, green: 0.88, blue: 0.91),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 
     var body: some View {
         NavigationStack {

@@ -59,6 +59,14 @@ enum BabyTownTheme {
         isBlue ? Color(red: 0.92, green: 0.95, blue: 1.0) : Color(red: 1.0, green: 0.92, blue: 0.94)
     }
 
+    /// Light card gradient endpoints used by pet cards/sheets. Pink: warm rose. Blue: cool blue.
+    static var cardTintLight: Color {
+        isBlue ? Color(red: 0.96, green: 0.98, blue: 1.0) : Color(red: 1.0, green: 0.97, blue: 0.94)
+    }
+    static var cardTintDeep: Color {
+        isBlue ? Color(red: 0.86, green: 0.92, blue: 0.99) : Color(red: 0.99, green: 0.90, blue: 0.93)
+    }
+
     // MARK: - Buttons
 
     static var buttonGradient: LinearGradient {
