@@ -11,9 +11,9 @@ enum ProfileStickerSync {
         var stickers = profile.stickers
         var bySource = Dictionary(uniqueKeysWithValues: stickers.map { ($0.sourceKey, $0) })
 
-        syncUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
+        ensureUserAvatarSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
-        dedupePartnerInviteStickers(stickers: &stickers, bySource: &bySource, dpm: dpm)
+        ensurePartnerInviteSticker(stickers: &stickers, bySource: &bySource, dpm: dpm)
 
         if let idx = stickers.firstIndex(where: { $0.kind == .userAvatar }),
            Self.shouldMigrateToDefaultProfilePosition(stickers[idx].position, kind: .userAvatar) {
@@ -61,16 +61,32 @@ enum ProfileStickerSync {
     /// Legacy default for user avatar stickers (customize mode only).
     static let canonicalUserAvatarPosition = NormalizedPoint(x: 0.19, y: 0.138)
 
-    /// Updates an existing user-avatar sticker cutout when the profile photo changes.
-    /// Does **not** create a sticker if the user removed it from the garden.
-    private static func syncUserAvatarSticker(
+    /// Guarantees exactly one user-avatar sticker (placeholder when no photo).
+    private static func ensureUserAvatarSticker(
         stickers: inout [ProfileSticker],
         bySource: inout [String: ProfileSticker],
         dpm: DataPersistenceManager
     ) {
         let key = "userAvatar"
-        guard var sticker = bySource[key] else { return }
+        if bySource[key] == nil {
+            var sticker = ProfileSticker(
+                kind: .userAvatar,
+                sourceKey: key,
+                position: ProfileSticker.defaultUserAvatarPosition,
+                rotation: 0,
+                scale: ProfileSticker.profileAvatarScale
+            )
+            if let image = dpm.loadUserAvatar() {
+                let processed = SubjectLiftService.stickerImage(from: image)
+                dpm.saveStickerImage(processed.image, id: sticker.id)
+                sticker.usedSubjectLift = processed.usedSubjectLift
+            }
+            stickers.append(sticker)
+            bySource[key] = sticker
+            return
+        }
 
+        guard var sticker = bySource[key] else { return }
         if let image = dpm.loadUserAvatar() {
             let processed = SubjectLiftService.stickerImage(from: image)
             dpm.saveStickerImage(processed.image, id: sticker.id)
@@ -108,20 +124,33 @@ enum ProfileStickerSync {
         profile.stickers.append(sticker)
     }
 
-    /// Collapses duplicate partner-invite stickers only; never re-adds one the user removed.
-    private static func dedupePartnerInviteStickers(
+    /// Guarantees exactly one persistent partner-invite sticker (heart placeholder).
+    private static func ensurePartnerInviteSticker(
         stickers: inout [ProfileSticker],
         bySource: inout [String: ProfileSticker],
         dpm: DataPersistenceManager
     ) {
         let existing = stickers.filter { $0.kind == .partnerInvite }
-        guard existing.count > 1 else { return }
-        for extra in existing.dropFirst() {
-            dpm.deleteStickerImage(id: extra.id)
-            bySource.removeValue(forKey: extra.sourceKey)
+        if existing.count > 1 {
+            for extra in existing.dropFirst() {
+                dpm.deleteStickerImage(id: extra.id)
+                bySource.removeValue(forKey: extra.sourceKey)
+            }
+            let keepID = existing.first!.id
+            stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
         }
-        let keepID = existing.first!.id
-        stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
+        guard stickers.contains(where: { $0.kind == .partnerInvite }) else {
+            let sticker = ProfileSticker(
+                kind: .partnerInvite,
+                sourceKey: "partnerInvite",
+                position: ProfileSticker.defaultPartnerPosition,
+                rotation: 0,
+                scale: ProfileSticker.profileAvatarScale
+            )
+            stickers.append(sticker)
+            bySource[sticker.sourceKey] = sticker
+            return
+        }
     }
 
     /// Bumps profile avatars that still use the old 1.0 default; clamps below minimum.

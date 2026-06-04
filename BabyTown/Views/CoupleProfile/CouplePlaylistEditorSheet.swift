@@ -17,7 +17,7 @@ struct CouplePlaylistEditorSheet: View {
                     ContentUnavailableView(
                         "No songs yet",
                         systemImage: "music.note.list",
-                        description: Text("Import your first song from the Our Song screen.")
+                        description: Text("Import your first song from Settings or Secret Garden → Our Song.")
                     )
                 } else {
                     List {
@@ -41,7 +41,6 @@ struct CouplePlaylistEditorSheet: View {
                     title: "Rename song",
                     subtitle: "Update how this track appears in your playlist.",
                     initialName: track.displayName,
-                    confirmTitle: "Save",
                     onCancel: { trackToRename = nil },
                     onConfirm: { name in
                         CouplePlaylistStore.updateDisplayName(id: track.id, displayName: name)

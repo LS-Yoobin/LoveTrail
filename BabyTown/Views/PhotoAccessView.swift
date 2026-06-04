@@ -108,14 +108,12 @@ struct PhotoAccessView: View {
             AccessLevelCard(
                 icon: "clock.arrow.circlepath",
                 title: "Moments from your past",
-                description: "Save the photos you already love—we'll place them on your map and timeline.",
-                isRecommended: true
+                description: "Save photos from your camera roll anytime.\nWe organize them into moments you can add."
             )
             AccessLevelCard(
                 icon: "camera.fill",
                 title: "Use our camera",
-                description: "For what's happening now—snap together in Baby Town and the moment is yours.",
-                isRecommended: false
+                description: "Take new photos right in the app.\nThey appear on your map and timeline."
             )
         }
         .padding(.horizontal, 24)
@@ -185,7 +183,6 @@ private struct AccessLevelCard: View {
     let icon: String
     let title: String
     let description: String
-    let isRecommended: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -206,27 +203,9 @@ private struct AccessLevelCard: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.black)
-
-                    if isRecommended {
-                        Text("Recommended")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(LinearGradient(
-                                        colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep.opacity(0.8)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    ))
-                            )
-                    }
-                }
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.black)
 
                 Text(description)
                     .font(.system(size: 13))

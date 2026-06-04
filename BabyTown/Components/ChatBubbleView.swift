@@ -18,7 +18,7 @@ struct ChatBubbleView: View {
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 18)
-                        .fill(isFromJinky ? AnyShapeStyle(Color.red.opacity(0.75)) : AnyShapeStyle(BabyTownTheme.accentGradient))
+                        .fill(isFromJinky ? AnyShapeStyle(jinkyBubbleFill) : AnyShapeStyle(BabyTownTheme.accentGradient))
                 )
                 .frame(maxWidth: .infinity, alignment: isFromJinky ? .leading : .trailing)
             
@@ -28,6 +28,14 @@ struct ChatBubbleView: View {
         }
     }
     
+    private var jinkyBubbleFill: AnyShapeStyle {
+        if BabyTownTheme.theme == .blue {
+            AnyShapeStyle(BabyTownTheme.accentGradient)
+        } else {
+            AnyShapeStyle(Color.red.opacity(0.75))
+        }
+    }
+
     private var avatarCircle: some View {
         Circle()
             .fill(

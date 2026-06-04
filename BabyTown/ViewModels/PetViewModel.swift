@@ -69,7 +69,9 @@ final class PetViewModel: ObservableObject {
             awardExperience(.adopt)
         }
         if state.roomLayoutsByPet[skin.rawValue] == nil {
-            state.roomLayoutsByPet[skin.rawValue] = PetRoomLayoutState()
+            state.roomLayoutsByPet[skin.rawValue] = PetRoomLayoutState.freshRoomLayout()
+        } else {
+            state.updateRoomLayout(for: skin) { $0.seedMissingBuiltInPositions() }
         }
         if state.trickTrainingByPet[skin.rawValue] == nil {
             state.trickTrainingByPet[skin.rawValue] = PetTrickTrainingState()
@@ -150,6 +152,7 @@ final class PetViewModel: ObservableObject {
         guard state.ownedSkins.contains(skin) else { return }
         petRoomSkinBeforeSelection = nil
         state.adoptedSkin = skin
+        state.updateRoomLayout(for: skin) { $0.seedMissingBuiltInPositions() }
     }
 
     // MARK: Live need values (decay applied at read), 0…100
@@ -427,12 +430,12 @@ final class PetViewModel: ObservableObject {
         for key in [PetRoomPropKey.foodBowl, PetRoomPropKey.waterBowl] {
             if let fixed = arabellaLayout.propPositions[key] {
                 layout.propPositions[key] = fixed
-            } else {
-                // If Arabella never moved them, fall back to the scene defaults.
-                layout.propPositions.removeValue(forKey: key)
+            } else if let canonical = PetRoomLayoutState.builtInDefaultPosition(for: key) {
+                layout.propPositions[key] = canonical
             }
         }
 
+        layout.seedMissingBuiltInPositions()
         return layout
     }
 

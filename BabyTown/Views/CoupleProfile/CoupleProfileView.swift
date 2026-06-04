@@ -902,6 +902,12 @@ struct CoupleProfileView: View {
 
     private func deleteSticker(_ id: UUID) {
         guard let idx = profile.stickers.firstIndex(where: { $0.id == id }) else { return }
+        switch profile.stickers[idx].kind {
+        case .userAvatar, .partnerInvite:
+            return
+        case .moment, .specialDate, .pet:
+            break
+        }
         profile.stickers.remove(at: idx)
         stickerImages[id] = nil
         pendingImageDeletions.insert(id)

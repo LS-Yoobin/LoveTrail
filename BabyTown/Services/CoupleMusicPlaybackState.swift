@@ -6,7 +6,9 @@ final class CoupleMusicPlaybackState: ObservableObject {
     static let shared = CoupleMusicPlaybackState()
 
     @Published private(set) var isPlaying = false
-    @Published private(set) var currentTrackTitle = "Default song"
+    static let emptyPlaylistTitle = "No song yet"
+
+    @Published private(set) var currentTrackTitle = emptyPlaylistTitle
 
     private var observer: NSObjectProtocol?
 
@@ -26,10 +28,8 @@ final class CoupleMusicPlaybackState: ObservableObject {
     func refreshFromStore() {
         if let track = CouplePlaylistStore.nowPlayingTrack {
             currentTrackTitle = track.displayName
-        } else if CouplePlaylistStore.hasTracks {
-            currentTrackTitle = "Our song"
         } else {
-            currentTrackTitle = "Default song"
+            currentTrackTitle = Self.emptyPlaylistTitle
         }
     }
 

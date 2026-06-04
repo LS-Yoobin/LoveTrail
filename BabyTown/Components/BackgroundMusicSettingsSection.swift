@@ -3,15 +3,15 @@ import SwiftUI
 
 struct BackgroundMusicSettingsSection: View {
 
+    @ObservedObject private var playbackState = CoupleMusicPlaybackState.shared
     @StateObject private var importCoordinator = BackgroundMusicImportCoordinator()
+    @State private var showPlaylistEditor = false
 
     private var trackSummary: String {
-        let count = CouplePlaylistStore.tracks.count
-        if count == 0 { return "Default song" }
-        if count == 1, let name = CouplePlaylistStore.nowPlayingTrack?.displayName {
-            return name
+        guard CouplePlaylistStore.hasTracks else {
+            return CoupleMusicPlaybackState.emptyPlaylistTitle
         }
-        return "\(count) songs in playlist"
+        return playbackState.currentTrackTitle
     }
 
     var body: some View {
@@ -41,46 +41,68 @@ struct BackgroundMusicSettingsSection: View {
                 Spacer()
                 Text(trackSummary)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
             }
 
             if CouplePlaylistStore.hasTracks {
-                Button("Use default song") {
-                    useDefaultSong()
+                Button("Manage playlist") {
+                    showPlaylistEditor = true
                 }
-            }
 
-            if let statusMessage = importCoordinator.statusMessage {
-                Text(statusMessage)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                Button("Remove all songs", role: .destructive) {
+                    clearPlaylist()
+                }
             }
         } header: {
             Text("Background Music")
         } footer: {
-            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. You can manage up to 10 songs in Secret Garden → Our Song.")
+            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. Songs play on the home screen and in Secret Garden → Our Song.")
+        }
+        .onAppear {
+            importCoordinator.clearStatus()
+            playbackState.refreshFromStore()
         }
         .onChange(of: importCoordinator.pickerItem) { _, newItem in
             guard let newItem else { return }
             Task { await importCoordinator.importPickedVideo(newItem) }
+        }
+        .sheet(isPresented: $showPlaylistEditor) {
+            CouplePlaylistEditorSheet()
         }
         .sheet(item: $importCoordinator.trackAwaitingName) { track in
             CoupleSongNameSheet(
                 title: "Name your song",
                 subtitle: "Give this track a name for your couple playlist.",
                 initialName: track.displayName,
-                confirmTitle: "Save & play",
                 onCancel: { importCoordinator.dismissNamingPrompt() },
                 onConfirm: { name in
                     importCoordinator.finishNamingTrack(id: track.id, displayName: name)
                 }
             )
         }
+        .alert(
+            "Couldn't import",
+            isPresented: importErrorPresented,
+            actions: {
+                Button("OK") { importCoordinator.clearStatus() }
+            },
+            message: {
+                Text(importCoordinator.statusMessage ?? "")
+            }
+        )
     }
 
-    private func useDefaultSong() {
+    private var importErrorPresented: Binding<Bool> {
+        Binding(
+            get: { importCoordinator.statusMessage != nil },
+            set: { if !$0 { importCoordinator.clearStatus() } }
+        )
+    }
+
+    private func clearPlaylist() {
         importCoordinator.clearStatus()
         CouplePlaylistStore.clearAll()
-        AudioManager.shared.reloadHomeMusic()
-        importCoordinator.statusMessage = "Using the default Baby Town song."
+        AudioManager.shared.stopHomeMusic()
+        playbackState.refreshFromStore()
     }
 }

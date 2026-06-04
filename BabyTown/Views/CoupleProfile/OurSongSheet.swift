@@ -89,7 +89,6 @@ struct OurSongSheet: View {
                     title: "Name your song",
                     subtitle: "Give this track a name for your couple playlist.",
                     initialName: track.displayName,
-                    confirmTitle: "Save & play",
                     onCancel: { importCoordinator.dismissNamingPrompt() },
                     onConfirm: { name in
                         importCoordinator.finishNamingTrack(id: track.id, displayName: name)

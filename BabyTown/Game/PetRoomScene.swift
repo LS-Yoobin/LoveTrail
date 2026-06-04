@@ -604,7 +604,7 @@ final class PetRoomScene: SKScene {
             key: PetRoomPropKey.catTree,
             slot: .catTree,
             roomProp: nil,
-            defaultPoint: NormalizedPoint(x: 0.84, y: 0.30),
+            defaultPoint: builtInDefaultPoint(for: PetRoomPropKey.catTree),
             pixelOffset: CGPoint(x: 0, y: -15),
             depthHeight: sharedDepthHeight
         )
@@ -612,7 +612,7 @@ final class PetRoomScene: SKScene {
             key: PetRoomPropKey.foodBowl,
             slot: .foodBowl,
             roomProp: .foodBowl,
-            defaultPoint: NormalizedPoint(x: 0.18, y: 0.22),
+            defaultPoint: builtInDefaultPoint(for: PetRoomPropKey.foodBowl),
             pixelOffset: CGPoint(x: -14, y: 0),
             depthHeight: sharedDepthHeight,
             draggableInCustomize: false
@@ -621,7 +621,7 @@ final class PetRoomScene: SKScene {
             key: PetRoomPropKey.waterBowl,
             slot: .waterBowl,
             roomProp: .waterBowl,
-            defaultPoint: NormalizedPoint(x: 0.34, y: 0.21),
+            defaultPoint: builtInDefaultPoint(for: PetRoomPropKey.waterBowl),
             pixelOffset: waterBowlPixelOffset(
                 for: layoutState.equippedItemID(for: .waterBowl)
             ),
@@ -632,7 +632,7 @@ final class PetRoomScene: SKScene {
             key: PetRoomPropKey.litterBox,
             slot: .litterBox,
             roomProp: .litterBox,
-            defaultPoint: NormalizedPoint(x: 0.93, y: 0.12),
+            defaultPoint: builtInDefaultPoint(for: PetRoomPropKey.litterBox),
             pixelOffset: litterBoxPixelOffset(
                 for: layoutState.equippedItemID(for: .litterBox)
             ),
@@ -658,19 +658,23 @@ final class PetRoomScene: SKScene {
         }
     }
 
-    /// Horizontal nudge so each litter variant lines up on the floor (art anchors differ).
+    /// Horizontal nudge so alternate litter variants line up on the floor (art anchors differ).
     private func litterBoxPixelOffset(for equippedItemID: String?) -> CGPoint {
         switch equippedItemID {
         case "litter_auto":
             return CGPoint(x: 40, y: 0)
-        case "litter_steel", "litter_classic":
+        case "litter_steel", "litter_hooded":
             return CGPoint(x: 30, y: 0)
-        case nil:
-            // Starter classic when nothing is explicitly equipped.
-            return CGPoint(x: 30, y: 0)
+        case "litter_classic", nil:
+            return .zero
         default:
             return .zero
         }
+    }
+
+    private func builtInDefaultPoint(for key: String) -> NormalizedPoint {
+        PetRoomLayoutState.builtInDefaultPosition(for: key)
+            ?? NormalizedPoint(x: 0.5, y: 0.2)
     }
 
     private func installEquippedProp(
@@ -2628,13 +2632,13 @@ final class PetRoomScene: SKScene {
         node.xScale = abs(node.xScale) * (mirrored ? -1 : 1)
     }
 
-    /// Litter box art opens toward the room center by default (right-side placement).
-    /// Arabella's box faces the opposite way by default; a user flip toggles from
-    /// whichever default the current cat has.
+    /// Litter box art opens toward the room center on the right wall. Calico art
+    /// faces center without mirroring; cow-cat art is mirrored by default. A user
+    /// flip toggles from whichever default the current cat has.
     private func propShouldMirrorHorizontally(key: String) -> Bool {
         if key == PetRoomPropKey.litterBox {
-            let defaultMirrored = (skin != .cowCat)
-            return defaultMirrored != layoutState.isFlipped(key)   // XOR: flip from default
+            let defaultMirrored = (skin == .cowCat)
+            return defaultMirrored != layoutState.isFlipped(key)
         }
         return layoutState.isFlipped(key)
     }

@@ -33,7 +33,7 @@ struct CatSelectionView: View {
                     ForEach(CatSkin.allCases) { skin in
                         CatChoiceCard(
                             skin: skin,
-                            isSelected: skin == .calico,
+                            isSelected: showingProfile && skin == selected,
                             isOwned: viewModel.ownedSkins.contains(skin)
                         )
                             .onTapGesture {

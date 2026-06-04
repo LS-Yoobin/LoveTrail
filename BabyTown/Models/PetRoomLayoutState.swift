@@ -28,7 +28,26 @@ struct PetRoomLayoutState: Codable, Equatable {
     /// Most-recently-used play toys, newest first (`PetShopItem.id`).
     var playToyUsageOrder: [String]
 
-    private static let currentBuiltInLayoutVersion = 2
+    private static let currentBuiltInLayoutVersion = 3
+
+    /// Canonical normalized anchors for built-in care props (pre pixel-offset nudge).
+    static let canonicalBuiltInPropPositions: [String: NormalizedPoint] = [
+        PetRoomPropKey.catTree: NormalizedPoint(x: 0.84, y: 0.30),
+        PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.18, y: 0.22),
+        PetRoomPropKey.waterBowl: NormalizedPoint(x: 0.34, y: 0.21),
+        PetRoomPropKey.litterBox: NormalizedPoint(x: 0.90, y: 0.12)
+    ]
+
+    static func builtInDefaultPosition(for key: String) -> NormalizedPoint? {
+        canonicalBuiltInPropPositions[key]
+    }
+
+    /// Fresh per-pet layout with built-in prop anchors persisted up front.
+    static func freshRoomLayout() -> PetRoomLayoutState {
+        var layout = PetRoomLayoutState()
+        layout.applyCanonicalBuiltInPositions()
+        return layout
+    }
 
     init(
         builtInLayoutVersion: Int = currentBuiltInLayoutVersion,
@@ -103,15 +122,26 @@ struct PetRoomLayoutState: Codable, Equatable {
 
     mutating func migrateBuiltInLayoutIfNeeded() {
         guard builtInLayoutVersion < Self.currentBuiltInLayoutVersion else { return }
-        for key in [
-            PetRoomPropKey.catTree,
-            PetRoomPropKey.foodBowl,
-            PetRoomPropKey.waterBowl,
-            PetRoomPropKey.litterBox
-        ] {
-            propPositions.removeValue(forKey: key)
-        }
+        applyCanonicalBuiltInPositions()
+        flippedItemIDs.removeAll { $0 == PetRoomPropKey.litterBox }
         builtInLayoutVersion = Self.currentBuiltInLayoutVersion
+    }
+
+    /// Writes the shipped default anchors for food, water, litter, and cat tree.
+    mutating func applyCanonicalBuiltInPositions() {
+        for (key, point) in Self.canonicalBuiltInPropPositions {
+            propPositions[key] = point
+        }
+    }
+
+    /// Fills any missing built-in anchors without overwriting customized placements.
+    mutating func seedMissingBuiltInPositions() {
+        for (key, point) in Self.canonicalBuiltInPropPositions where propPositions[key] == nil {
+            propPositions[key] = point
+        }
+        if builtInLayoutVersion < Self.currentBuiltInLayoutVersion {
+            builtInLayoutVersion = Self.currentBuiltInLayoutVersion
+        }
     }
 
     /// Moves legacy single-frame saves onto the new per-frame ids.

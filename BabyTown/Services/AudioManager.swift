@@ -70,9 +70,9 @@ class AudioManager: NSObject {
         _ = CouplePlaylistStore.tracks
         if CouplePlaylistStore.hasTracks {
             playCurrentPlaylistTrack()
-            return
+        } else {
+            stopHomeMusicForEmptyPlaylist()
         }
-        playBundledHomeMusic()
     }
 
     func reloadHomeMusic() {
@@ -88,12 +88,12 @@ class AudioManager: NSObject {
 
     private func playCurrentPlaylistTrack() {
         guard let track = resolvedNowPlayingTrack() else {
-            playBundledHomeMusic()
+            stopHomeMusicForEmptyPlaylist()
             return
         }
         let url = CouplePlaylistStore.audioURL(for: track)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            playBundledHomeMusic()
+            stopHomeMusicForEmptyPlaylist()
             return
         }
 
@@ -118,7 +118,7 @@ class AudioManager: NSObject {
         } catch {
             print("Error playing imported home music: \(error.localizedDescription)")
             currentPlayingTrackID = nil
-            playBundledHomeMusic()
+            stopHomeMusicForEmptyPlaylist()
         }
     }
 
@@ -126,43 +126,10 @@ class AudioManager: NSObject {
         CouplePlaylistStore.nowPlayingTrack
     }
 
-    private func playBundledHomeMusic() {
+    private func stopHomeMusicForEmptyPlaylist() {
         currentPlayingTrackID = nil
-
-        let musicFiles = [
-            "The Weeknd - The Abyss (Audio)",
-            "The weekend - the abyss",
-            "the_weekend_the_abyss",
-            "The Weeknd - The Abyss"
-        ]
-
-        var url: URL?
-        for file in musicFiles {
-            if let fileUrl = Bundle.main.url(forResource: file, withExtension: "mp3") {
-                url = fileUrl
-                break
-            }
-        }
-
-        guard let musicUrl = url else {
-            print("Home music file not found. Tried: \(musicFiles)")
-            updatePlaybackState(isPlaying: false, track: nil)
-            return
-        }
-
-        do {
-            activatePlaybackSession()
-            let player = try AVAudioPlayer(contentsOf: musicUrl)
-            player.numberOfLoops = -1
-            player.volume = 0.3
-            player.prepareToPlay()
-            player.play()
-            homeAudioPlayer = player
-            updatePlaybackState(isPlaying: true, track: nil)
-        } catch {
-            print("Error playing home music: \(error.localizedDescription)")
-            updatePlaybackState(isPlaying: false, track: nil)
-        }
+        stopBundledHomeMusic()
+        updatePlaybackState(isPlaying: false, track: nil)
     }
 
     func stopHomeMusic() {
@@ -180,7 +147,7 @@ class AudioManager: NSObject {
 
     private func advanceToNextTrack() {
         guard CouplePlaylistStore.hasTracks else {
-            playBundledHomeMusic()
+            stopHomeMusicForEmptyPlaylist()
             return
         }
 
@@ -190,7 +157,7 @@ class AudioManager: NSObject {
         }
 
         guard let nextID = nextTrackID() else {
-            playBundledHomeMusic()
+            stopHomeMusicForEmptyPlaylist()
             return
         }
 

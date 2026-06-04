@@ -5,7 +5,6 @@ struct CoupleSongNameSheet: View {
     let title: String
     let subtitle: String
     let initialName: String
-    let confirmTitle: String
     var onCancel: () -> Void
     var onConfirm: (String) -> Void
 
@@ -47,20 +46,6 @@ struct CoupleSongNameSheet: View {
                 )
                 .padding(.horizontal)
 
-                Button(action: confirm) {
-                    Text(confirmTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(canConfirm ? BabyTownTheme.accent : Color.gray.opacity(0.4))
-                        )
-                }
-                .disabled(!canConfirm)
-                .padding(.horizontal)
-
                 Spacer(minLength: 0)
             }
             .padding(.top, 8)
@@ -69,6 +54,23 @@ struct CoupleSongNameSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel", action: onCancel)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: confirm) {
+                        Text("SAVE")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                canConfirm
+                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
+                                    : AnyShapeStyle(Color.black.opacity(0.18)),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canConfirm)
                 }
             }
             .onAppear {
