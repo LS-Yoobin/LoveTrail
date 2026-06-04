@@ -1810,7 +1810,7 @@ struct HomeView: View {
 
                     Image(systemName: "camera.fill")
                         .font(.system(size: 26))
-                        .foregroundStyle(BabyTownTheme.accentIconGradient)
+                        .foregroundStyle(.white)
                 }
             }
             .padding(.bottom, 32)
