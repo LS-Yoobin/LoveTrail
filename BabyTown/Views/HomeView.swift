@@ -157,6 +157,7 @@ struct HomeView: View {
 
                     if isYearFilterPinned && showsTimelineYearFilter {
                         timelineYearFilterBar(isPinned: true)
+                            .zIndex(2)
                     }
 
                     ScrollViewReader { proxy in
@@ -169,7 +170,7 @@ struct HomeView: View {
                                 if !isUsingMemorySearch {
                                     MapPullHintView(
                                         progress: min(currentPullProgress, 1),
-                                        isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView,
+                                        isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView && !isYearFilterPinned,
                                         isNightMode: nightModeManager.isNightMode
                                     )
                                 }
@@ -268,6 +269,12 @@ struct HomeView: View {
                         .onChange(of: selectedTimelineYear) { _, _ in
                             visibleRowCount = Self.timelinePageSize
                             clampVisibleRowCount()
+                        }
+                        .onChange(of: isYearFilterPinned) { _, pinned in
+                            if pinned {
+                                peakPullOffset = 0
+                                didCrossMapOpenThreshold = false
+                            }
                         }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
                             geometry.contentOffset.y + geometry.contentInsets.top
@@ -768,7 +775,7 @@ struct HomeView: View {
             }
         }
 
-        guard !isUsingMemorySearch else {
+        guard !isUsingMemorySearch, !isYearFilterPinned else {
             peakPullOffset = 0
             didCrossMapOpenThreshold = false
             return
@@ -811,7 +818,7 @@ struct HomeView: View {
     }
 
     private func openVisitPet() {
-        guard !showVisitPet else { return }
+        guard !showVisitPet, !isYearFilterPinned else { return }
         mapOpenHapticTick += 1
         withAnimation(.easeInOut(duration: 0.3)) {
             showVisitPet = true
@@ -1412,11 +1419,15 @@ struct HomeView: View {
                 Rectangle()
                     .fill(
                         nightModeManager.isNightMode
-                            ? Color.black.opacity(0.92)
+                            // Match the night sky's top gradient color so the pinned bar
+                            // blends in instead of showing a black strip, while still
+                            // masking the memories scrolling underneath.
+                            ? Color(red: 0.05, green: 0.08, blue: 0.15)
                             : BabyTownTheme.background
                     )
             }
         }
+        .contentShape(Rectangle())
     }
 
     private var timelineSection: some View {
@@ -2084,7 +2095,8 @@ struct HomeView: View {
     private var cameraButton: some View {
         VStack {
             Spacer()
-            
+                .allowsHitTesting(false)
+
             Button {
                 if !viewModel.polaroidStore.canCapturePhoto() {
                     showCameraSheet = true
@@ -2114,10 +2126,12 @@ struct HomeView: View {
     private var upButton: some View {
         VStack {
             Spacer()
-            
+                .allowsHitTesting(false)
+
             HStack {
                 Spacer()
-                
+                    .allowsHitTesting(false)
+
                 Button {
                     scrollToTop = true
                 } label: {
