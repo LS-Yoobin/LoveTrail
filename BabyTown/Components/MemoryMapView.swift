@@ -17,8 +17,6 @@ struct MemoryMapView: UIViewRepresentable {
         mapView.isPitchEnabled = false
         mapView.selectableMapFeatures = [.pointsOfInterest]
 
-        // App-controlled clustering only (no native MapKit clustering): register the
-        // individual pin and the count marker under their own identifiers.
         mapView.register(
             MemoryPhotoMarkerView.self,
             forAnnotationViewWithReuseIdentifier: "MemoryPin"
@@ -32,19 +30,82 @@ struct MemoryMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // We cluster ourselves at the current span instead of relying on MapKit's automatic
-        // clustering, which re-evaluates (and visibly reshuffles) whenever annotations are
-        // added. Recomputing here means a filter change just adds/removes the delta of plain
-        // pins/clusters, and grouping only changes when the span changes (i.e. the user zooms).
-        let displayAnnotations = clusterMemoryAnnotations(annotations, span: region.span)
+        let coordinator = context.coordinator
+        coordinator.parent = self
+        coordinator.scheduleSourceAnnotationSync(annotations, on: uiView)
 
-        let currentManaged = uiView.annotations.filter {
-            $0 is MemoryMapAnnotation || $0 is MemoryClusterAnnotation
+        if coordinator.shouldApplyBindingRegion(region) {
+            coordinator.isProgrammaticRegionChange = true
+            uiView.setRegion(sanitizedMapRegion(region), animated: true)
         }
-        let currentIDs = Set(currentManaged.compactMap(memoryMapAnnotationID))
-        let newIDs = Set(displayAnnotations.compactMap(memoryMapAnnotationID))
+    }
 
-        if currentIDs != newIDs {
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: MemoryMapView
+        private var sourceAnnotations: [MemoryMapAnnotation] = []
+        private var sourceAnnotationIDs: Set<String> = []
+        private var lastClusteredSpan: MKCoordinateSpan?
+        private var lastAppliedBindingRegion: MKCoordinateRegion?
+        private var syncTask: Task<Void, Never>?
+        private var clusteringTask: Task<Void, Never>?
+        var isProgrammaticRegionChange = false
+
+        private let annotationBatchSize = 25
+
+        init(_ parent: MemoryMapView) {
+            self.parent = parent
+        }
+
+        func scheduleSourceAnnotationSync(_ annotations: [MemoryMapAnnotation], on mapView: MKMapView) {
+            let newIDs = Set(annotations.map(\.id))
+            guard newIDs != sourceAnnotationIDs else { return }
+
+            syncTask?.cancel()
+            syncTask = Task { @MainActor in
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+
+                sourceAnnotations = annotations
+                sourceAnnotationIDs = newIDs
+                await applyClustering(on: mapView, span: mapView.region.span)
+            }
+        }
+
+        func shouldApplyBindingRegion(_ region: MKCoordinateRegion) -> Bool {
+            guard let last = lastAppliedBindingRegion else {
+                lastAppliedBindingRegion = region
+                return true
+            }
+
+            let centerChanged =
+                abs(last.center.latitude - region.center.latitude) > 0.001 ||
+                abs(last.center.longitude - region.center.longitude) > 0.001
+            let spanChanged =
+                abs(last.span.latitudeDelta - region.span.latitudeDelta) > 0.001 ||
+                abs(last.span.longitudeDelta - region.span.longitudeDelta) > 0.001
+
+            guard centerChanged || spanChanged else { return false }
+            lastAppliedBindingRegion = region
+            return true
+        }
+
+        private func applyClustering(on mapView: MKMapView, span: MKCoordinateSpan) async {
+            clusteringTask?.cancel()
+            let displayAnnotations = clusterMemoryAnnotations(sourceAnnotations, span: span)
+            lastClusteredSpan = span
+
+            let currentManaged = mapView.annotations.filter {
+                $0 is MemoryMapAnnotation || $0 is MemoryClusterAnnotation
+            }
+            let currentIDs = Set(currentManaged.compactMap(memoryMapAnnotationID))
+            let newIDs = Set(displayAnnotations.compactMap(memoryMapAnnotationID))
+
+            guard currentIDs != newIDs else { return }
+
             let toRemove = currentManaged.filter {
                 guard let id = memoryMapAnnotationID($0) else { return false }
                 return !newIDs.contains(id)
@@ -53,32 +114,24 @@ struct MemoryMapView: UIViewRepresentable {
                 guard let id = memoryMapAnnotationID($0) else { return false }
                 return !currentIDs.contains(id)
             }
-            uiView.removeAnnotations(toRemove)
-            uiView.addAnnotations(toAdd)
+
+            mapView.removeAnnotations(toRemove)
+
+            guard !toAdd.isEmpty else { return }
+
+            clusteringTask = Task { @MainActor in
+                for start in stride(from: 0, to: toAdd.count, by: annotationBatchSize) {
+                    guard !Task.isCancelled else { return }
+                    let end = min(start + annotationBatchSize, toAdd.count)
+                    mapView.addAnnotations(Array(toAdd[start..<end]))
+                    if end < toAdd.count {
+                        await Task.yield()
+                    }
+                }
+            }
+            await clusteringTask?.value
         }
-        
-        // Update region if it's significantly different
-        let currentRegion = uiView.region
-        let regionChanged = abs(currentRegion.center.latitude - region.center.latitude) > 0.001 ||
-                           abs(currentRegion.center.longitude - region.center.longitude) > 0.001 ||
-                           abs(currentRegion.span.latitudeDelta - region.span.latitudeDelta) > 0.001
-        
-        if regionChanged {
-            uiView.setRegion(region, animated: true)
-        }
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, MKMapViewDelegate {
-        var parent: MemoryMapView
-        
-        init(_ parent: MemoryMapView) {
-            self.parent = parent
-        }
-        
+
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MemoryClusterAnnotation {
                 let view = mapView.dequeueReusableAnnotationView(
@@ -99,10 +152,7 @@ struct MemoryMapView: UIViewRepresentable {
             }
             return nil
         }
-        
-        // Apple Maps POI features have no custom annotation view, so the
-        // view-based didSelect never fires for them — the annotation-based
-        // variant does, and it also fires for our pins and clusters.
+
         func mapView(_ mapView: MKMapView, didSelect annotation: MKAnnotation) {
             guard parent.isInteractive else {
                 mapView.deselectAnnotation(annotation, animated: false)
@@ -120,13 +170,26 @@ struct MemoryMapView: UIViewRepresentable {
                     let point = MKMapPoint(member.coordinate)
                     return rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
                 }
+                isProgrammaticRegionChange = true
                 mapView.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 80, left: 80, bottom: 80, right: 80), animated: true)
             }
         }
-        
+
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            DispatchQueue.main.async {
-                self.parent.region = mapView.region
+            if isProgrammaticRegionChange {
+                isProgrammaticRegionChange = false
+                let span = mapView.region.span
+                guard mapSpanChangedSignificantly(from: lastClusteredSpan, to: span) else { return }
+                clusteringTask = Task { @MainActor in
+                    await applyClustering(on: mapView, span: span)
+                }
+                return
+            }
+
+            let span = mapView.region.span
+            guard mapSpanChangedSignificantly(from: lastClusteredSpan, to: span) else { return }
+            clusteringTask = Task { @MainActor in
+                await applyClustering(on: mapView, span: span)
             }
         }
     }

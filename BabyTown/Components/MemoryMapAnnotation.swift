@@ -8,6 +8,7 @@ class MemoryMapAnnotation: NSObject, Identifiable, MKAnnotation {
     let id: String
     let coordinate: CLLocationCoordinate2D
     let section: DaySection
+    let showsPhotoThumbnail: Bool
     
     var title: String? {
         section.placeName ?? "Memory"
@@ -20,9 +21,10 @@ class MemoryMapAnnotation: NSObject, Identifiable, MKAnnotation {
         return formatter.string(from: section.date)
     }
     
-    init(section: DaySection) {
+    init(section: DaySection, showsPhotoThumbnail: Bool = true) {
         self.id = section.id
         self.section = section
+        self.showsPhotoThumbnail = showsPhotoThumbnail
         
         // Use the first moment's location as the pin coordinate
         if let firstMoment = section.moments.first,
@@ -80,32 +82,50 @@ func memoryMapAnnotationID(_ annotation: MKAnnotation) -> String? {
 /// - At larger spans the cluster radius scales with the visible range, so grouping feels
 ///   consistent at every zoom level.
 ///
-/// Greedy nearest-center assignment: O(n²), fine for the small memory counts in practice.
+/// Grid-bucket clustering: O(n). Re-clusters only when span changes meaningfully.
 func clusterMemoryAnnotations(
     _ annotations: [MemoryMapAnnotation],
     span: MKCoordinateSpan
 ) -> [MKAnnotation] {
     let clusterCutoffSpan: CLLocationDegrees = 0.15
-    guard span.latitudeDelta >= clusterCutoffSpan else {
+    let largePinCountThreshold = 30
+    let forceCluster = annotations.count > largePinCountThreshold
+
+    guard span.latitudeDelta >= clusterCutoffSpan || forceCluster else {
         return annotations
     }
 
     let radiusDeg = max(0.05, span.latitudeDelta * 0.12)
-    var centers: [CLLocationCoordinate2D] = []
+    let cellSize: CLLocationDegrees = forceCluster && span.latitudeDelta < clusterCutoffSpan
+        ? max(0.005, span.latitudeDelta * 0.15)
+        : radiusDeg
+
+    var cellToGroupIndex: [String: Int] = [:]
     var groups: [[MemoryMapAnnotation]] = []
 
     for item in annotations {
         let coord = item.coordinate
-        // Correct longitude tolerance for latitude distortion.
         let lonFactor = max(0.01, cos(coord.latitude * .pi / 180))
-        if let idx = centers.indices.first(where: { i in
-            abs(centers[i].latitude - coord.latitude) < radiusDeg &&
-            abs(centers[i].longitude - coord.longitude) < radiusDeg / lonFactor
-        }) {
-            groups[idx].append(item)
-        } else {
-            centers.append(coord)
+        let latCell = Int(floor(coord.latitude / cellSize))
+        let lonCell = Int(floor(coord.longitude / (cellSize / lonFactor)))
+
+        var assigned = false
+        for dLat in -1...1 where !assigned {
+            for dLon in -1...1 {
+                let key = "\(latCell + dLat),\(lonCell + dLon)"
+                if let idx = cellToGroupIndex[key] {
+                    groups[idx].append(item)
+                    cellToGroupIndex["\(latCell),\(lonCell)"] = idx
+                    assigned = true
+                    break
+                }
+            }
+        }
+
+        if !assigned {
+            let idx = groups.count
             groups.append([item])
+            cellToGroupIndex["\(latCell),\(lonCell)"] = idx
         }
     }
 
@@ -113,4 +133,60 @@ func clusterMemoryAnnotations(
         guard let first = group.first else { return nil }
         return group.count == 1 ? first : MemoryClusterAnnotation(members: group)
     }
+}
+
+func mapSpanChangedSignificantly(from old: MKCoordinateSpan?, to new: MKCoordinateSpan) -> Bool {
+    guard let old else { return true }
+    let latRatio = abs(new.latitudeDelta - old.latitudeDelta) / max(old.latitudeDelta, 0.0001)
+    let lonRatio = abs(new.longitudeDelta - old.longitudeDelta) / max(old.longitudeDelta, 0.0001)
+    return latRatio > 0.08 || lonRatio > 0.08
+}
+
+/// Builds a map region that fits all coordinates, including sets that cross the antimeridian.
+func coordinateRegion(
+    fitting coordinates: [CLLocationCoordinate2D],
+    paddingFactor: Double = 1.5,
+    minimumSpan: CLLocationDegrees = 0.05,
+    maximumLatitudeSpan: CLLocationDegrees = 80,
+    maximumLongitudeSpan: CLLocationDegrees = 360
+) -> MKCoordinateRegion? {
+    guard !coordinates.isEmpty else { return nil }
+
+    var mapRect = coordinates.reduce(MKMapRect.null) { rect, coordinate in
+        let point = MKMapPoint(coordinate)
+        let pointRect = MKMapRect(origin: point, size: MKMapSize())
+        return rect.isNull ? pointRect : rect.union(pointRect)
+    }
+
+    if paddingFactor > 1 {
+        let padX = mapRect.size.width * (paddingFactor - 1) / 2
+        let padY = mapRect.size.height * (paddingFactor - 1) / 2
+        mapRect = mapRect.insetBy(dx: -padX, dy: -padY)
+    }
+
+    var region = MKCoordinateRegion(mapRect)
+    region.span.latitudeDelta = min(
+        max(region.span.latitudeDelta, minimumSpan),
+        maximumLatitudeSpan
+    )
+    region.span.longitudeDelta = min(
+        max(region.span.longitudeDelta, minimumSpan),
+        maximumLongitudeSpan
+    )
+    return region
+}
+
+/// Clamps a region to values MapKit accepts so `setRegion` cannot crash.
+func sanitizedMapRegion(_ region: MKCoordinateRegion) -> MKCoordinateRegion {
+    var sanitized = region
+    sanitized.center.latitude = min(max(sanitized.center.latitude, -90), 90)
+
+    var longitude = sanitized.center.longitude.truncatingRemainder(dividingBy: 360)
+    if longitude > 180 { longitude -= 360 }
+    if longitude < -180 { longitude += 360 }
+    sanitized.center.longitude = longitude
+
+    sanitized.span.latitudeDelta = min(max(sanitized.span.latitudeDelta, 0.001), 180)
+    sanitized.span.longitudeDelta = min(max(sanitized.span.longitudeDelta, 0.001), 360)
+    return sanitized
 }

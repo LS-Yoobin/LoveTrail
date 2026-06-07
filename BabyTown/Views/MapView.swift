@@ -24,7 +24,11 @@ struct MapView: View {
     @State private var isSearchActive = false
     @State private var selectedCountry: String?
     @FocusState private var isSearchFocused: Bool
+    @State private var annotationUpdateTask: Task<Void, Never>?
+    @State private var mapSetupTask: Task<Void, Never>?
+    @State private var isLoadingMapData = true
 
+    private let photoPinThumbnailLimit = 60
     private let minMapSpan: CLLocationDegrees = 0.001
     private let maxMapSpan: CLLocationDegrees = 80
     private let userLocationSpan: CLLocationDegrees = 0.02
@@ -72,9 +76,21 @@ struct MapView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: isSearchActive)
         .onAppear {
-            setupMapData()
             showEmptyStatePrompt = true
-            viewModel.backfillCountriesIfNeeded()
+            mapSetupTask?.cancel()
+            mapSetupTask = Task { @MainActor in
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                await setupMapData()
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                viewModel.backfillCountriesIfNeeded()
+            }
+        }
+        .onDisappear {
+            mapSetupTask?.cancel()
+            annotationUpdateTask?.cancel()
         }
         .sheet(item: $poiSelection) { selection in
             POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
@@ -177,7 +193,14 @@ struct MapView: View {
                 .ignoresSafeArea()
             )
 
-            if annotations.isEmpty && showEmptyStatePrompt {
+            if isLoadingMapData {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            if !isLoadingMapData && annotations.isEmpty && showEmptyStatePrompt {
                 MapEmptyStateView(
                     selectedYear: selectedYear,
                     onScanPhotos: onScanPhotos,
@@ -295,7 +318,7 @@ struct MapView: View {
                 .autocorrectionDisabled()
                 .focused($isSearchFocused)
                 .onChange(of: searchText) { _, _ in
-                    updateAnnotations()
+                    scheduleAnnotationUpdate()
                 }
 
                 if !searchText.isEmpty {
@@ -380,18 +403,55 @@ struct MapView: View {
         }
     }
 
-    private func setupMapData() {
+    private func setupMapData() async {
+        isLoadingMapData = true
+        defer { isLoadingMapData = false }
+
         var years = viewModel.availableYears()
         if !years.isEmpty {
             years.insert(0, at: 0)
         }
         availableYears = years
-        updateAnnotations()
+
+        let sections = filteredSections
+        let showsPhotoThumbnails = sections.count <= photoPinThumbnailLimit
+        var built: [MemoryMapAnnotation] = []
+        built.reserveCapacity(sections.count)
+
+        let batchSize = 50
+        for start in stride(from: 0, to: sections.count, by: batchSize) {
+            guard !Task.isCancelled else { return }
+            let end = min(start + batchSize, sections.count)
+            for section in sections[start..<end] {
+                built.append(
+                    MemoryMapAnnotation(
+                        section: section,
+                        showsPhotoThumbnail: showsPhotoThumbnails
+                    )
+                )
+            }
+            annotations = built
+            await Task.yield()
+        }
+
         centerMapOnMemories()
     }
 
     private func updateAnnotations() {
-        annotations = filteredSections.map { MemoryMapAnnotation(section: $0) }
+        let sections = filteredSections
+        let showsPhotoThumbnails = sections.count <= photoPinThumbnailLimit
+        annotations = sections.map {
+            MemoryMapAnnotation(section: $0, showsPhotoThumbnail: showsPhotoThumbnails)
+        }
+    }
+
+    private func scheduleAnnotationUpdate() {
+        annotationUpdateTask?.cancel()
+        annotationUpdateTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            updateAnnotations()
+        }
     }
 
     private func zoomMap(spanMultiplier: Double) {
@@ -418,24 +478,16 @@ struct MapView: View {
     private func centerMapOnMemories() {
         guard !annotations.isEmpty else { return }
 
-        let coordinates = annotations.map(\.coordinate)
-        let minLat = coordinates.map(\.latitude).min() ?? 0
-        let maxLat = coordinates.map(\.latitude).max() ?? 0
-        let minLon = coordinates.map(\.longitude).min() ?? 0
-        let maxLon = coordinates.map(\.longitude).max() ?? 0
-
-        let centerLat = (minLat + maxLat) / 2
-        let centerLon = (minLon + maxLon) / 2
         let padding = selectedYear == 0 ? 2.0 : 1.5
-        let paddedSpanLat = max((maxLat - minLat) * padding, 0.05)
-        let paddedSpanLon = max((maxLon - minLon) * padding, 0.05)
+        guard let fitted = coordinateRegion(
+            fitting: annotations.map(\.coordinate),
+            paddingFactor: padding,
+            minimumSpan: 0.05,
+            maximumLatitudeSpan: maxMapSpan,
+            maximumLongitudeSpan: 360
+        ) else { return }
 
-        withAnimation(.easeInOut(duration: 0.5)) {
-            region = MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
-                span: MKCoordinateSpan(latitudeDelta: paddedSpanLat, longitudeDelta: paddedSpanLon)
-            )
-        }
+        region = fitted
     }
 }
 

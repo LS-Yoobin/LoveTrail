@@ -25,9 +25,11 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
         didSet { applyContent() }
     }
 
+    private static let pinImageCache = NSCache<NSString, UIImage>()
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        displayPriority = .required
+        displayPriority = .defaultHigh
         clipsToBounds = false
         canShowCallout = false
         setupViews()
@@ -92,8 +94,9 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
             return
         }
 
-        if let thumbnail = memory.section.moments.first?.thumbnail {
-            imageView.image = thumbnail
+        if memory.showsPhotoThumbnail,
+           let thumbnail = memory.section.moments.first?.thumbnail {
+            imageView.image = Self.pinImage(from: thumbnail, cacheKey: memory.id)
             imageView.isHidden = false
             glyphView.isHidden = true
         } else {
@@ -145,5 +148,18 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
         imageView.image = nil
         placeNamePill.isHidden = true
         placeNameLabel.text = nil
+    }
+
+    private static func pinImage(from source: UIImage, cacheKey: String) -> UIImage {
+        if let cached = pinImageCache.object(forKey: cacheKey as NSString) {
+            return cached
+        }
+
+        let size = CGSize(width: Self.imageDiameter, height: Self.imageDiameter)
+        let scaled = UIGraphicsImageRenderer(size: size).image { _ in
+            source.draw(in: CGRect(origin: .zero, size: size))
+        }
+        pinImageCache.setObject(scaled, forKey: cacheKey as NSString)
+        return scaled
     }
 }

@@ -24,7 +24,7 @@ final class MemoryMapMarkerAnnotationView: MKMarkerAnnotationView {
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         canShowCallout = false
-        displayPriority = .required
+        displayPriority = .defaultHigh
         clipsToBounds = false
         setupPlaceNamePill()
         applyStyle()

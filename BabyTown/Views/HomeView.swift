@@ -70,8 +70,10 @@ struct HomeView: View {
     @State private var didCrossMapOpenThreshold = false
     @State private var mapThresholdHapticTick = 0
     @State private var mapOpenHapticTick = 0
-    
+    @State private var visibleRowCount = HomeView.timelinePageSize
+
     private let mapOpenThreshold: CGFloat = 110
+    private static let timelinePageSize = 8
 
 
     init(
@@ -239,14 +241,19 @@ struct HomeView: View {
                             }
                         }
                         .onChange(of: viewModel.moments.count) { _, _ in
+                            clampVisibleRowCount()
                             if isMemorySearchActive {
                                 rebuildMemorySearchRowsCache()
                             }
                         }
                         .onChange(of: viewModel.promptMemories.count) { _, _ in
+                            clampVisibleRowCount()
                             if isMemorySearchActive {
                                 rebuildMemorySearchRowsCache()
                             }
+                        }
+                        .onChange(of: homeSpecialDates.count) { _, _ in
+                            clampVisibleRowCount()
                         }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
                             geometry.contentOffset.y + geometry.contentInsets.top
@@ -1312,7 +1319,7 @@ struct HomeView: View {
                     sectionCount: memoryTimelineItems.count + birthdayTimelineItems.count + viewModel.foundingTimelineSlots.count
                 )
 
-                let memoryRows = memoryTimelineRows
+                let memoryRows = paginatedMemoryTimelineRows
                 let birthdayRows = birthdayTimelineRows
                 LazyVStack(spacing: 24) {
                     ForEach(memoryRows) { row in
@@ -1497,6 +1504,11 @@ struct HomeView: View {
                         }
                     }
 
+                    if hasMoreTimelineItems {
+                        loadOlderMemoriesButton
+                    }
+
+                    if !hasMoreTimelineItems {
                     // "The Beginning..." after regular memories (newest-first above)
                     HStack(spacing: 8) {
                         HeartbeatIconView()
@@ -1621,6 +1633,7 @@ struct HomeView: View {
                                 index.isMultiple(of: 2) ? 46 : 20
                             )
                         }
+                    }
                     }
                 }
             }
@@ -1752,6 +1765,34 @@ struct HomeView: View {
         homeSpecialDates.filter { !$0.isPinned }
     }
 
+    private var hasMoreTimelineItems: Bool {
+        visibleRowCount < memoryTimelineItems.count
+    }
+
+    /// Instagram-style load-more affordance. Auto-loads the next page when it scrolls
+    /// into view (`.onAppear`), and doubles as a manual tap fallback when the list is
+    /// too short to scroll the button into view on its own.
+    private var loadOlderMemoriesButton: some View {
+        Button(action: loadMoreTimelineRows) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle")
+                Text("Load older memories")
+            }
+            .font(.system(size: 15, weight: .medium, design: .serif))
+            .foregroundStyle(
+                nightModeManager.isNightMode
+                    ? .white.opacity(0.85)
+                    : BabyTownTheme.textPrimary.opacity(0.7)
+            )
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 32)
+        .padding(.top, 8)
+        .onAppear { loadMoreTimelineRows() }
+    }
+
     /// Photos and non-birthday special dates — newest first.
     private var memoryTimelineItems: [TimelineItem] {
         var items: [TimelineItem] = []
@@ -1821,15 +1862,31 @@ struct HomeView: View {
         return rows
     }
 
-    private var memoryTimelineRows: [TimelineRow] {
-        buildTimelineRows(from: memoryTimelineItems)
+    /// Only the visible page is turned into rows — year-header boundaries are computed
+    /// within the prefix, which preserves correctness since rows stay newest-first.
+    private var paginatedMemoryTimelineRows: [TimelineRow] {
+        buildTimelineRows(from: Array(memoryTimelineItems.prefix(visibleRowCount)))
+    }
+
+    /// Grow the visible window by one page. Called by the load-more button's `.onAppear`
+    /// (auto on scroll) and its tap action (manual fallback). Clamped to the total.
+    private func loadMoreTimelineRows() {
+        guard hasMoreTimelineItems else { return }
+        visibleRowCount = min(visibleRowCount + Self.timelinePageSize, memoryTimelineItems.count)
+    }
+
+    private func clampVisibleRowCount() {
+        let total = memoryTimelineItems.count
+        if total > 0, visibleRowCount > total {
+            visibleRowCount = total
+        }
     }
 
     private var birthdayTimelineRows: [TimelineRow] {
         let foundingCount = viewModel.foundingTimelineSlots.count
         return buildTimelineRows(
             from: birthdayTimelineItems,
-            startingDisplayIndex: memoryTimelineRows.count + foundingCount
+            startingDisplayIndex: memoryTimelineItems.count + foundingCount
         )
     }
 

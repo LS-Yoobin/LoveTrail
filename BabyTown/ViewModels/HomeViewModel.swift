@@ -113,7 +113,9 @@ final class HomeViewModel: ObservableObject {
     @Published var moments: [Moment] {
         didSet {
             DataPersistenceManager.shared.saveMoments(moments)
+            refreshDaySections()
             refreshOnThisDay()
+            refreshMapDaySections()
             handleMomentCountChange()
         }
     }
@@ -121,6 +123,9 @@ final class HomeViewModel: ObservableObject {
     /// Cached "On This Day" sections. Recomputed only when moments change or the
     /// view appears — never inside `body`, so scrolling doesn't trigger Photos fetches.
     @Published private(set) var onThisDaySections: [DaySection] = []
+
+    /// Cached geolocated day sections for the map — avoids re-grouping on every filter pass.
+    @Published private(set) var mapDaySections: [DaySection] = []
     
     
     var allPinnedItems: [PinnedItem] {
@@ -130,6 +135,7 @@ final class HomeViewModel: ObservableObject {
     @Published var promptMemories: [PromptMemory] = [] {
         didSet {
             DataPersistenceManager.shared.savePromptMemories(promptMemories)
+            refreshMapDaySections()
         }
     }
     
@@ -147,9 +153,13 @@ final class HomeViewModel: ObservableObject {
         "When we became official"
     ]
 
-    var daySections: [DaySection] {
+    /// Cached timeline day sections. Recomputed only when moments change — never inside
+    /// `body`, so scrolling doesn't re-run the O(n log n) grouping/sorting over all moments.
+    @Published private(set) var daySections: [DaySection] = []
+
+    private func refreshDaySections() {
         let unpinnedMoments = moments.filter { !$0.isPinned && !Self.isFoundingMoment($0) }
-        return DaySection.grouped(from: unpinnedMoments)
+        daySections = DaySection.grouped(from: unpinnedMoments)
     }
 
     var foundingMoments: [Moment] {
@@ -422,7 +432,9 @@ final class HomeViewModel: ObservableObject {
         isInitializing = false
         ensureFoundingTimelineMoments()
         ensureFoundingMomentsFromPinnedPhotos()
+        refreshDaySections()
         refreshOnThisDay()
+        refreshMapDaySections()
 
         setupPolaroidStoreObserver()
     }
@@ -1105,12 +1117,16 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Map Helpers
     
     func memoriesWithLocation() -> [DaySection] {
+        mapDaySections
+    }
+
+    private func refreshMapDaySections() {
         let momentsWithCoordinates = moments.filter { $0.location != nil }
         let promptMomentsWithCoordinates = promptMemories
             .filter { $0.latitude != nil && $0.longitude != nil }
             .map { convertToMapMoment($0) }
-        
-        return DaySection.grouped(from: momentsWithCoordinates + promptMomentsWithCoordinates)
+
+        mapDaySections = DaySection.grouped(from: momentsWithCoordinates + promptMomentsWithCoordinates)
     }
     
     var availableCountries: [String] {
