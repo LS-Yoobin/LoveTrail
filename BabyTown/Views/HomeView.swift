@@ -73,7 +73,7 @@ struct HomeView: View {
     @State private var visibleRowCount = HomeView.timelinePageSize
 
     private let mapOpenThreshold: CGFloat = 110
-    private static let timelinePageSize = 8
+    private static let timelinePageSize = 15
 
 
     init(
@@ -263,6 +263,22 @@ struct HomeView: View {
                                 to: topOffset
                             )
                             handleScrollTopOffsetChange(topOffset)
+                        }
+                        .onScrollGeometryChange(for: TimelinePagingSignal.self) { geometry in
+                            TimelinePagingSignal(
+                                offsetY: geometry.contentOffset.y,
+                                distanceFromBottom: geometry.contentSize.height
+                                    - (geometry.contentOffset.y + geometry.containerSize.height)
+                            )
+                        } action: { _, signal in
+                            // Grow the window only once the user has genuinely scrolled down
+                            // (offsetY guard) AND is near the bottom. The offsetY guard is what
+                            // prevents a launch-time cascade: at launch offsetY ≈ 0, so nothing
+                            // auto-loads no matter what the still-settling content height reads.
+                            // No per-frame @State write here, so scrolling stays smooth.
+                            if hasMoreTimelineItems, signal.offsetY > 120, signal.distanceFromBottom < 700 {
+                                loadMoreTimelineRows()
+                            }
                         }
                         .onChange(of: scrollToNewMemory) { _, newValue in
                             if newValue {
@@ -1765,13 +1781,17 @@ struct HomeView: View {
         homeSpecialDates.filter { !$0.isPinned }
     }
 
+    private struct TimelinePagingSignal: Equatable {
+        let offsetY: CGFloat
+        let distanceFromBottom: CGFloat
+    }
+
     private var hasMoreTimelineItems: Bool {
         visibleRowCount < memoryTimelineItems.count
     }
 
-    /// Instagram-style load-more affordance. Auto-loads the next page when it scrolls
-    /// into view (`.onAppear`), and doubles as a manual tap fallback when the list is
-    /// too short to scroll the button into view on its own.
+    /// Manual "load more" fallback. Auto-loading is driven by scroll position as the user
+    /// nears the bottom; this button covers any case where that didn't fire.
     private var loadOlderMemoriesButton: some View {
         Button(action: loadMoreTimelineRows) {
             HStack(spacing: 8) {
@@ -1790,7 +1810,6 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 32)
         .padding(.top, 8)
-        .onAppear { loadMoreTimelineRows() }
     }
 
     /// Photos and non-birthday special dates — newest first.

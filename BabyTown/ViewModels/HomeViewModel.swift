@@ -345,26 +345,7 @@ final class HomeViewModel: ObservableObject {
         
         // Pinned Moments - founding entries stay single-photo cards.
         for moment in moments.filter({ $0.isPinned && Self.isFoundingMoment($0) }) {
-            let allMomentsFromDay = [moment]
-            let duplicateAssetEntries = Dictionary(grouping: allMomentsFromDay.compactMap(\.assetIdentifier), by: { $0 })
-                .filter { $0.value.count > 1 }
-            if !duplicateAssetEntries.isEmpty {
-                // #region agent log
-                agentDebugLog(
-                    runId: "initial",
-                    hypothesisId: "H4",
-                    location: "HomeViewModel.pinnedItems",
-                    message: "duplicate assets included in pinned viewer payload",
-                    data: [
-                        "pinnedMomentId": moment.id.uuidString,
-                        "pinnedAssetId": moment.assetIdentifier ?? "nil",
-                        "duplicateAssetKeys": Array(duplicateAssetEntries.keys),
-                        "allMomentsFromDayCount": allMomentsFromDay.count
-                    ]
-                )
-                // #endregion
-            }
-            items.append(.moment(moment, allMomentsFromDay))
+            items.append(.moment(moment, [moment]))
         }
 
         // Pinned Moments - regular memories grouped by day/place into one card.
@@ -542,40 +523,6 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    // #region agent log
-    private func agentDebugLog(
-        runId: String,
-        hypothesisId: String,
-        location: String,
-        message: String,
-        data: [String: Any]
-    ) {
-        let payload: [String: Any] = [
-            "sessionId": "0ff6b2",
-            "runId": runId,
-            "hypothesisId": hypothesisId,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-        ]
-        guard JSONSerialization.isValidJSONObject(payload),
-              let jsonData = try? JSONSerialization.data(withJSONObject: payload),
-              let jsonLine = String(data: jsonData, encoding: .utf8) else { return }
-        let logPath = "/Users/justinseo/Desktop/BabyTown/.cursor/debug-0ff6b2.log"
-        let lineWithNewline = jsonLine + "\n"
-        if FileManager.default.fileExists(atPath: logPath),
-           let fileHandle = FileHandle(forWritingAtPath: logPath),
-           let bytes = lineWithNewline.data(using: .utf8) {
-            fileHandle.seekToEndOfFile()
-            fileHandle.write(bytes)
-            try? fileHandle.close()
-        } else {
-            try? lineWithNewline.write(toFile: logPath, atomically: true, encoding: .utf8)
-        }
-    }
-    // #endregion
-    
     func addMoments(_ newMoments: [Moment]) {
         var combined = moments + newMoments
         
@@ -861,24 +808,7 @@ final class HomeViewModel: ObservableObject {
         let sectionMomentIds = Set(section.moments.map(\.id))
         let shouldPin = !section.moments.contains(where: \.isPinned)
         let pinTimestamp = Date()
-        let matchingMoments = moments.filter { sectionMomentIds.contains($0.id) }
 
-        // #region agent log
-        agentDebugLog(
-            runId: "initial",
-            hypothesisId: "H1",
-            location: "HomeViewModel.togglePin:before",
-            message: "togglePin called for section",
-            data: [
-                "firstMomentId": section.moments.first?.id.uuidString ?? "nil",
-                "firstMomentIsPinned": section.moments.first?.isPinned ?? false,
-                "firstMomentAssetId": section.moments.first?.assetIdentifier ?? "nil",
-                "matchingCount": matchingMoments.count,
-                "matchingPinnedCount": matchingMoments.filter(\.isPinned).count,
-                "shouldPin": shouldPin
-            ]
-        )
-        // #endregion
         var newMoments = moments
         for index in newMoments.indices where sectionMomentIds.contains(newMoments[index].id) {
             newMoments[index].isPinned = shouldPin
@@ -907,23 +837,8 @@ final class HomeViewModel: ObservableObject {
             newMoments[index].pinnedAt = nil
         }
         moments = newMoments
-
-        // #region agent log
-        agentDebugLog(
-            runId: "initial",
-            hypothesisId: "H3",
-            location: "HomeViewModel.unpinMoment",
-            message: "unpin converted row to unpinned instead of removing",
-            data: [
-                "momentId": moment.id.uuidString,
-                "assetId": moment.assetIdentifier ?? "nil",
-                "matchingRowsAfterUnpin": moments.filter { $0.assetIdentifier == moment.assetIdentifier }.count,
-                "matchingPinnedAfterUnpin": moments.filter { $0.assetIdentifier == moment.assetIdentifier && $0.isPinned }.count
-            ]
-        )
-        // #endregion
     }
-    
+
     func deleteMoment(_ moment: Moment) {
         moments.removeAll { $0.id == moment.id }
     }
