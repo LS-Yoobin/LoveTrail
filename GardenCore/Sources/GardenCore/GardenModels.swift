@@ -2,9 +2,15 @@ import Foundation
 
 /// The kind of loving act a garden element grew from.
 public enum GardenActKind: String, Codable, Equatable, Sendable {
-    case moment   // a captured moment with no distinct place
-    case place    // a moment tied to a named place / country
-    case letter   // a written love letter
+    case basicMilestone // every 10 unlocked moments
+    case milestone50
+    case milestone100
+    case birthday
+    case anniversary
+    case letter
+    // Legacy values kept for tolerant decoding of older builds.
+    case moment
+    case place
 }
 
 /// A minimal, UI-free description of one loving act. The app converts its real
@@ -24,6 +30,8 @@ public struct GardenActInput: Equatable, Sendable {
 /// The visual archetype an act becomes in the garden.
 public enum GardenElementKind: String, Codable, Equatable, Sendable {
     case flower
+    case birthdayFlower
+    case anniversaryFlower
     case placeFlower
     case tree
 }
@@ -40,7 +48,7 @@ public struct GardenPoint: Equatable, Sendable {
 
 /// Chapter color for a bloom, derived from how many moments existed when it grew.
 public enum BloomChapter: String, Codable, Equatable, Sendable {
-    case white, yellow, red, blue, purple, black
+    case white, yellow, red, blue, purple, black, birthday, anniversary
 }
 
 /// Procedural petal layout for a bloom.
@@ -72,9 +80,9 @@ public struct GardenElement: Equatable, Sendable {
     public let position: GardenPoint
     public let chapter: BloomChapter
     public let shape: BloomShape
-    /// Shrine bloom at 10 / 50 / 100 total moments (not tied to a single memory).
+    /// Large shrine bloom at 50 / 100 moment milestones.
     public let isLegend: Bool
-    /// 0 = first color cycle (moments 1–49); 1 = richer second cycle (50–99).
+    /// Reserved for richer petal rendering on milestone bouquets.
     public let cycle: Int
 
     public init(

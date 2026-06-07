@@ -54,8 +54,8 @@ struct LoveGardenView: View {
         let loadedMoments = dpm.loadMoments()
         moments = loadedMoments
 
-        let letters = dpm.loadUserLetters()
-        let elements = GardenActMapper.composeElements(moments: loadedMoments, letters: letters)
+        let context = GardenActMapper.persistedContext(moments: loadedMoments, dpm: dpm)
+        let elements = GardenActMapper.composeElements(context: context)
         gardenElements = elements
 
         // Register today's visit; reflect & persist any warm revival.
@@ -76,10 +76,12 @@ struct LoveGardenView: View {
     private func handleBloomTap(id: UUID) {
         guard let element = gardenElements.first(where: { $0.sourceID == id }),
               let lore = BloomChapterResolver.lore(for: element) else { return }
-        if element.isLegend {
+        if element.isLegend || element.kind != .flower {
             tapPresentation = .legend(lore)
         } else if let moment = moments.first(where: { $0.id == id }) {
             tapPresentation = .moment(moment, lore)
+        } else {
+            tapPresentation = .legend(lore)
         }
     }
 }

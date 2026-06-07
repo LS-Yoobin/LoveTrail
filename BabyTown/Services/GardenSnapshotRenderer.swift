@@ -10,8 +10,8 @@ enum GardenSnapshotRenderer {
     /// SpriteKit must run on the main actor and needs at least one display pass after
     /// `presentScene` before `texture(from:)` returns pixels (cold launch often fails otherwise).
     @MainActor
-    static func render(moments: [Moment], letters: [UserLetter], season: GardenSeason) async -> UIImage? {
-        let elements = GardenActMapper.composeElements(moments: moments, letters: letters)
+    static func render(context: GardenActMapper.Context, season: GardenSeason) async -> UIImage? {
+        let elements = GardenActMapper.composeElements(context: context)
         let view = SKView(frame: CGRect(origin: .zero, size: renderSize))
         view.allowsTransparency = true
 

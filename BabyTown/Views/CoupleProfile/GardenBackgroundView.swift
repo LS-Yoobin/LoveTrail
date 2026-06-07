@@ -7,9 +7,13 @@ import GardenCore
 /// transparent SpriteKit layer on top. Rebuilds when saved moments change so
 /// new blooms appear after each save. Used behind the Couples Profile Page.
 struct GardenBackgroundView: View {
-    /// Timeline moments (one flower per calendar day) and love letters (trees).
+    /// Timeline moments, special dates, and love letters that grow the garden.
     var moments: [Moment] = []
+    var promptMemories: [PromptMemory] = []
     var letters: [UserLetter] = []
+    var specialDates: [SpecialDate] = []
+    var officialDate: Date?
+    var firstMetDate: Date?
     /// Hide the live cats while arranging stickers so static pet cutouts can be moved.
     var showsLivePet: Bool = true
     /// Skins for every owned pet; one roaming cat is shown per skin.
@@ -23,10 +27,21 @@ struct GardenBackgroundView: View {
     @State private var builtGardenToken: GardenRebuildToken?
     @State private var builtIsNightMode = false
 
+    private var gardenContext: GardenActMapper.Context {
+        GardenActMapper.Context(
+            moments: moments,
+            promptMemories: promptMemories,
+            letters: letters,
+            specialDates: specialDates,
+            officialDate: officialDate,
+            firstMetDate: firstMetDate
+        )
+    }
+
     private var gardenRebuildToken: GardenRebuildToken {
         GardenRebuildToken(
-            momentCount: moments.count,
-            actIDs: GardenActMapper.bloomActIDs(moments: moments, letters: letters)
+            memoryClusterCount: GardenActMapper.gardenMilestoneCount(from: gardenContext),
+            actIDs: GardenActMapper.bloomActIDs(context: gardenContext)
                 .sorted { $0.uuidString < $1.uuidString }
         )
     }
@@ -57,6 +72,10 @@ struct GardenBackgroundView: View {
             .onChange(of: geo.size) { _, newSize in updateScenes(size: newSize) }
             .onChange(of: petSkins) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: letters) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: promptMemories.count) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: specialDates) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: officialDate) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: firstMetDate) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: showsLivePet) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: isNightMode) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: gardenRebuildToken) { _, _ in updateScenes(size: geo.size) }
@@ -71,7 +90,7 @@ struct GardenBackgroundView: View {
             || builtGardenToken != token
             || builtIsNightMode != isNightMode
         if gardenNeedsBuild {
-            let elements = GardenActMapper.composeElements(moments: moments, letters: letters)
+            let elements = GardenActMapper.composeElements(context: gardenContext)
             let season = DataPersistenceManager.shared.loadGardenState().season(now: Date())
             gardenScene = LoveGardenScene(
                 size: size,
@@ -120,8 +139,8 @@ struct GardenBackgroundView: View {
     }
 }
 
-/// Rebuild when act IDs or total moment count changes (legend shrines use count).
+/// Rebuild when act IDs or memory-cluster count changes (milestone shrines use clusters).
 private struct GardenRebuildToken: Equatable {
-    let momentCount: Int
+    let memoryClusterCount: Int
     let actIDs: [UUID]
 }

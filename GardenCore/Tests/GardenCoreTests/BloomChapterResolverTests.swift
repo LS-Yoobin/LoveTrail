@@ -2,52 +2,30 @@ import XCTest
 @testable import GardenCore
 
 final class BloomChapterResolverTests: XCTestCase {
-    func testChapterBands() {
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 1), .white)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 9), .white)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 10), .yellow)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 19), .yellow)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 20), .red)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 30), .blue)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 40), .purple)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 50), .white)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 99), .purple)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 100), .black)
-        XCTAssertEqual(BloomChapterResolver.chapter(forMomentOrdinal: 250), .black)
+    func testBasicMilestonePaletteNeverUsesBlack() {
+        XCTAssertEqual(BloomChapterResolver.chapter(forBasicMilestone: 10), .yellow)
+        XCTAssertEqual(BloomChapterResolver.chapter(forBasicMilestone: 20), .red)
+        XCTAssertEqual(BloomChapterResolver.chapter(forBasicMilestone: 30), .blue)
+        XCTAssertEqual(BloomChapterResolver.chapter(forBasicMilestone: 40), .purple)
+        XCTAssertEqual(BloomChapterResolver.chapter(forBasicMilestone: 50), .white)
     }
 
-    func testCycleBands() {
-        XCTAssertEqual(BloomChapterResolver.cycle(forMomentOrdinal: 1), 0)
-        XCTAssertEqual(BloomChapterResolver.cycle(forMomentOrdinal: 49), 0)
-        XCTAssertEqual(BloomChapterResolver.cycle(forMomentOrdinal: 50), 1)
-        XCTAssertEqual(BloomChapterResolver.cycle(forMomentOrdinal: 99), 1)
-        XCTAssertEqual(BloomChapterResolver.cycle(forMomentOrdinal: 100), 0)
-    }
-
-    func testLegendShapes() {
+    func testLegendShapesOnlyAtFiftyAndHundred() {
         XCTAssertEqual(
-            BloomChapterResolver.shape(for: .moment, isLegend: true, milestone: 10),
-            .daisy12
-        )
-        XCTAssertEqual(
-            BloomChapterResolver.shape(for: .moment, isLegend: true, milestone: 50),
+            BloomChapterResolver.shape(for: .milestone50, isLegend: true, milestone: 50),
             .tulip3
         )
         XCTAssertEqual(
-            BloomChapterResolver.shape(for: .moment, isLegend: true, milestone: 100),
+            BloomChapterResolver.shape(for: .milestone100, isLegend: true, milestone: 100),
             .lotus8
-        )
-        XCTAssertEqual(
-            BloomChapterResolver.shape(for: .place, isLegend: false, milestone: nil),
-            .place5
         )
     }
 
     func testLegendIDsStable() {
-        let a = BloomChapterResolver.legendID(milestone: 10)
-        let b = BloomChapterResolver.legendID(milestone: 10)
+        let a = BloomChapterResolver.legendID(milestone: 50)
+        let b = BloomChapterResolver.legendID(milestone: 50)
         XCTAssertEqual(a, b)
-        XCTAssertEqual(BloomChapterResolver.legendMilestone(for: a), 10)
+        XCTAssertEqual(BloomChapterResolver.legendMilestone(for: a), 50)
     }
 
     func testLegendLore() {
@@ -57,45 +35,51 @@ final class BloomChapterResolverTests: XCTestCase {
 }
 
 final class GardenComposerLegendTests: XCTestCase {
-    private func id(_ s: String) -> UUID { UUID(uuidString: s)! }
-
-    func testNoLegendsBelowTen() {
-        let acts = [GardenActInput(id: id("00000000-0000-0000-0000-000000000001"),
-                                   date: Date(), kind: .moment)]
-        let elements = GardenComposer().compose(acts: acts, totalMomentCount: 9)
+    func testNoLegendsBelowFifty() {
+        let acts = GardenMilestoneBloomComposer().acts(
+            from: GardenBloomScheduleInput(unlockedMomentCount: 49, now: Date())
+        )
+        let elements = GardenComposer().compose(acts: acts)
         XCTAssertFalse(elements.contains { $0.isLegend })
     }
 
-    func testLegendAtTen() {
-        let elements = GardenComposer().compose(acts: [], totalMomentCount: 10)
-        XCTAssertEqual(elements.filter(\.isLegend).count, 1)
-        XCTAssertEqual(elements.first?.shape, .daisy12)
-        XCTAssertEqual(elements.first?.chapter, .yellow)
-    }
-
-    func testThreeLegendsAtHundred() {
-        let elements = GardenComposer().compose(acts: [], totalMomentCount: 100)
-        XCTAssertEqual(elements.filter(\.isLegend).count, 3)
-        let milestones = elements.filter(\.isLegend).compactMap { BloomChapterResolver.legendMilestone(for: $0.sourceID) }
-        XCTAssertEqual(Set(milestones), Set([10, 50, 100]))
-    }
-
-    func testOrdinalAssignsChapter() {
-        let act = GardenActInput(id: id("00000000-0000-0000-0000-000000000001"),
-                                 date: Date(), kind: .moment)
-        let elements = GardenComposer().compose(
-            acts: [act],
-            momentOrdinalByActID: [act.id: 25],
-            totalMomentCount: 25
+    func testLegendAtFifty() {
+        let acts = GardenMilestoneBloomComposer().acts(
+            from: GardenBloomScheduleInput(unlockedMomentCount: 50, now: Date())
         )
-        let flower = elements.first { !$0.isLegend }
-        XCTAssertEqual(flower?.chapter, .red)
-        XCTAssertEqual(flower?.cycle, 0)
+        let legends = GardenComposer().compose(acts: acts).filter(\.isLegend)
+        XCTAssertEqual(legends.count, 1)
+        XCTAssertEqual(legends.first?.shape, .tulip3)
+        XCTAssertEqual(legends.first?.chapter, .purple)
+    }
+
+    func testTwoLegendsAtHundred() {
+        let acts = GardenMilestoneBloomComposer().acts(
+            from: GardenBloomScheduleInput(unlockedMomentCount: 100, now: Date())
+        )
+        let legends = GardenComposer().compose(acts: acts).filter(\.isLegend)
+        XCTAssertEqual(legends.count, 2)
+        let milestones = legends.compactMap { BloomChapterResolver.legendMilestone(for: $0.sourceID) }
+        XCTAssertEqual(Set(milestones), Set([50, 100]))
+    }
+
+    func testBasicMilestoneAssignsSoftChapter() {
+        let act = GardenActInput(
+            id: GardenMilestoneBloomComposer.basicMilestoneID(threshold: 40),
+            date: Date(),
+            kind: .basicMilestone
+        )
+        let flower = GardenComposer().compose(acts: [act]).first
+        XCTAssertEqual(flower?.chapter, .purple)
+        XCTAssertFalse(flower?.isLegend ?? true)
     }
 
     func testLegendPositionsFixed() {
-        let elements = GardenComposer().compose(acts: [], totalMomentCount: 100)
-        let ten = elements.first { BloomChapterResolver.legendMilestone(for: $0.sourceID) == 10 }
-        XCTAssertEqual(ten?.position, BloomChapterResolver.legendPosition(milestone: 10))
+        let acts = GardenMilestoneBloomComposer().acts(
+            from: GardenBloomScheduleInput(unlockedMomentCount: 100, now: Date())
+        )
+        let elements = GardenComposer().compose(acts: acts)
+        let fifty = elements.first { BloomChapterResolver.legendMilestone(for: $0.sourceID) == 50 }
+        XCTAssertEqual(fifty?.position, BloomChapterResolver.legendPosition(milestone: 50))
     }
 }

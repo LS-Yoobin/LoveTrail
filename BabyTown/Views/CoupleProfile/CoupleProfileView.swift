@@ -163,7 +163,11 @@ struct CoupleProfileView: View {
 
             GardenBackgroundView(
                 moments: gardenMoments,
+                promptMemories: homeViewModel?.promptMemories ?? dpm.loadPromptMemories(),
                 letters: gardenLetters,
+                specialDates: profile.specialDates,
+                officialDate: dpm.loadFoundingPhotoDate(promptText: "When we became official"),
+                firstMetDate: dpm.loadFoundingPhotoDate(promptText: "When we first met"),
                 showsLivePet: true,
                 petSkins: gardenPetSkins,
                 isNightMode: nightModeManager.isNightMode

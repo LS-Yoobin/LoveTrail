@@ -594,14 +594,17 @@ struct HomeView: View {
         coupleSpaceAvatar = dpm.loadUserAvatar()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
-        let letters = dpm.loadUserLetters()
-        coupleSpaceBloomCount = GardenActMapper.composeElements(moments: moments, letters: letters).count
+        let gardenContext = GardenActMapper.persistedContext(
+            moments: moments,
+            promptMemories: viewModel.promptMemories,
+            dpm: dpm
+        )
+        coupleSpaceBloomCount = GardenActMapper.composeElements(context: gardenContext).count
 
         let season = dpm.loadGardenState().season(now: Date())
         Task { @MainActor in
             let thumbnail = await GardenSnapshotRenderer.render(
-                moments: moments,
-                letters: letters,
+                context: gardenContext,
                 season: season
             )
             coupleSpaceGardenThumbnail = thumbnail

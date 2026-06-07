@@ -2,10 +2,8 @@ import SpriteKit
 import UIKit
 import GardenCore
 
-/// The Love Garden scene. Renders garden elements (one flower per day with a
-/// saved moment, one tree per love letter) as procedural blooms — no art assets
-/// required. Sibling
-/// to `PetRoomScene`; the cat room is never touched.
+/// The Love Garden scene. Renders milestone bouquets, annual birthday/anniversary
+/// blooms, shrine flowers at 50/100 moments, and one tree per love letter.
 final class LoveGardenScene: SKScene {
 
     /// Reports the source act id of a tapped bloom so the SwiftUI layer can
@@ -61,7 +59,11 @@ final class LoveGardenScene: SKScene {
             elementNodes[element.sourceID] = node
 
             var depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
-            if element.isLegend { depthScale *= 1.35 }
+            if element.isLegend {
+                depthScale *= 1.35
+            } else if element.kind == .flower && element.shape == .daisy12 {
+                depthScale *= 1.22
+            }
             if isStaticSnapshot {
                 node.setScale(depthScale)
             } else {
@@ -240,7 +242,7 @@ final class LoveGardenScene: SKScene {
 
     private func makeNode(for element: GardenElement) -> SKNode {
         switch element.kind {
-        case .flower, .placeFlower:
+        case .flower, .placeFlower, .birthdayFlower, .anniversaryFlower:
             return makeFlower(
                 chapter: element.chapter,
                 shape: element.shape,
@@ -379,6 +381,10 @@ final class LoveGardenScene: SKScene {
             base = SKColor(red: 0.72, green: 0.52, blue: 0.88, alpha: 1)
         case .black:
             base = SKColor(red: 0.10, green: 0.08, blue: 0.13, alpha: 1)
+        case .birthday:
+            base = SKColor(red: 0.98, green: 0.55, blue: 0.68, alpha: 1)
+        case .anniversary:
+            base = SKColor(red: 1.0, green: 0.78, blue: 0.36, alpha: 1)
         }
         var color = enrich(base, cycle: cycle)
         if season == .resting {

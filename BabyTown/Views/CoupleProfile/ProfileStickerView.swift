@@ -98,7 +98,10 @@ struct ProfileStickerView: View {
             rotationBase = newRotation
             rotationPreview = nil
         }
-        .gesture(isCustomizing ? customizeGestures : nil)
+        // Only the selected sticker is draggable/resizable/rotatable so overlapping
+        // stickers don't fight over the same gesture. Tapping an unselected sticker
+        // selects it first; the gesture bundle arms on the next interaction.
+        .gesture(isCustomizing && isSelected ? customizeGestures : nil)
         .onTapGesture {
             if isCustomizing {
                 onSelect?()
@@ -127,15 +130,11 @@ struct ProfileStickerView: View {
         .frame(width: side, height: side)
         .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
         .overlay {
-            if showChrome {
+            // Outline only the selected sticker so edit mode reads as a single
+            // active target instead of every sticker looking grabbable at once.
+            if showChrome, isSelected {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(
-                        Color.white,
-                        style: StrokeStyle(
-                            lineWidth: isSelected ? 3 : 2,
-                            dash: isSelected ? [] : [6, 4]
-                        )
-                    )
+                    .strokeBorder(Color.white, lineWidth: 3)
             }
         }
     }
