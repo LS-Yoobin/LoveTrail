@@ -207,6 +207,10 @@ final class PetRoomScene: SKScene {
     /// the grass band so they don't stack on top of each other.
     var gardenSpawnIndex = 0
     var gardenSpawnCount = 1
+    /// When set, the live cat renders inside the garden scene so it depth-sorts
+    /// against blooms (lower Y = closer = in front). This scene stays presented
+    /// in a transparent overlay to drive movement and animation updates.
+    weak var gardenHost: LoveGardenScene?
 
     /// Fired when the default-mode "walk up to the frame" inspect zoom begins or ends.
     var onPictureFrameInspectChanged: ((Bool) -> Void)?
@@ -356,15 +360,19 @@ final class PetRoomScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         view.allowsTransparency = true
-        removeAllChildren()
         if isGardenBackdrop {
-            buildCat()
+            if catFacing.parent == nil {
+                buildCat()
+            } else {
+                attachCatToGardenHostIfNeeded()
+            }
             startAnimation(.idle)
             let stagger = Double(gardenSpawnIndex) * 0.65 + Double.random(in: 0...0.4)
             runBehaviorAction(.wait(forDuration: stagger)) { [weak self] in
                 self?.runBehavior()
             }
         } else {
+            removeAllChildren()
             setupRoomCamera()
             buildRoom()
             buildCat()
@@ -1371,9 +1379,12 @@ final class PetRoomScene: SKScene {
 
     /// Cat draw order on the floor — same curve as `propDepthZ` so the cat
     /// naturally renders in front of props closer to the camera and behind
-    /// props farther up the room.
+    /// props farther up the room. In the secret garden, blooms share `floorDepthZ`.
     private func catFloorDepthZ(for baseY: CGFloat) -> CGFloat {
-        propDepthZ(for: baseY)
+        if isGardenBackdrop {
+            return LoveGardenScene.floorDepthZ(for: baseY, sceneHeight: size.height)
+        }
+        return propDepthZ(for: baseY)
     }
 
     /// Keeps all floor props (care props + movable furniture + toilet paper mess)
@@ -1415,11 +1426,17 @@ final class PetRoomScene: SKScene {
     // MARK: Cat
 
     private func buildCat() {
-        addChild(cat)
+        if cat.parent == nil {
+            addChild(cat)
+        }
 
-        cat.addChild(catFacing)
-        catVisual.anchorPoint = CGPoint(x: 0.5, y: 0) // feet at the node origin
-        catFacing.addChild(catVisual)
+        if catFacing.parent == nil {
+            cat.addChild(catFacing)
+        }
+        if catVisual.parent == nil {
+            catVisual.anchorPoint = CGPoint(x: 0.5, y: 0) // feet at the node origin
+            catFacing.addChild(catVisual)
+        }
 
         if let frame = frames(for: .idle).first {
             applyCatFrame(frame)
@@ -1436,6 +1453,20 @@ final class PetRoomScene: SKScene {
         }
         cat.position = clampCatPosition(CGPoint(x: spawnX, y: randomFloorY()))
         cat.zPosition = catFloorDepthZ(for: cat.position.y)
+        attachCatToGardenHostIfNeeded()
+    }
+
+    /// Reparents the cat into `gardenHost` when roaming the Couples Profile garden.
+    func attachCatToGardenHostIfNeeded() {
+        guard isGardenBackdrop, let host = gardenHost, catFacing.parent != nil else { return }
+        host.adoptGardenCat(cat)
+    }
+
+    /// Pulls the cat back onto this controller scene before the garden scene is replaced.
+    func detachCatFromGardenHost() {
+        guard isGardenBackdrop, cat.parent !== self else { return }
+        cat.removeFromParent()
+        addChild(cat)
     }
 
     private func preloadFrameDisplaySizes() {
@@ -2391,10 +2422,9 @@ final class PetRoomScene: SKScene {
             return
         }
 
-        // Trick training: only the cat is tappable (petting). Props and furniture
-        // are ignored; snacks are handled from SwiftUI controls.
+        // Trick training: tap the cat to pet it; props are ignored.
         if isTrickMode {
-            if !isInteracting, isCatHit(at: location) {
+            if canReceiveTrickPet(at: location) {
                 beginCatPickUpCandidate(at: location)
             }
             return
@@ -3646,23 +3676,35 @@ final class PetRoomScene: SKScene {
         cat.zPosition = catFloorDepthZ(for: cat.position.y)
     }
 
+    private func canReceiveTrickPet(at location: CGPoint) -> Bool {
+        !isInteracting
+            && !isSnackBeingEaten
+            && !isPlaying
+            && isCatHit(at: location)
+    }
+
     private func petCat() {
-        guard !isInteracting else { return }
+        guard !isInteracting, !isSnackBeingEaten else { return }
         isInteracting = true
+        isHoldingPose = false
         stopMovement()
+        cat.removeAction(forKey: "behavior")
         wakeFromOccupiedBedIfNeeded()
+        catVisual.removeAction(forKey: "anim")
+        resetVisualTransform()
         // Wake to a standing pose first, so petting a sleeping/grooming cat
         // reads as "woke up", then it bounces happily.
-        if !isTrickMode {
-            startAnimation(.idle)
+        if isTrickMode {
+            face(towards: size.width * 0.5)
         }
+        startAnimation(.idle)
 
         let happyBounce = SKAction.sequence([
             .scale(to: 1.15, duration: 0.12),
             .scale(to: 0.97, duration: 0.12),
             .scale(to: 1.0, duration: 0.1)
         ])
-        spawnHearts()
+        spawnHearts(count: isTrickMode ? 6 : 4)
         catVisual.run(happyBounce) { [weak self] in
             guard let self else { return }
             self.isInteracting = false

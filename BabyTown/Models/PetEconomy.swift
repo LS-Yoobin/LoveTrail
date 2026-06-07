@@ -63,8 +63,10 @@ enum PetEconomy {
     /// Back-compat/default reward for generic plant-water task contexts.
     static let plantWaterCoinReward = bigPlantWaterCoinReward
     static let plantWaterCooldown: TimeInterval = 3 * 3600   // 3h
+    /// Seconds to hold/drag during food, litter, and plant care mini-games.
+    static let careTaskDurationRequired: TimeInterval = 3
     /// Seconds the watering can must stay over the plant before coins are awarded.
-    static let plantWaterDurationRequired: TimeInterval = 5
+    static let plantWaterDurationRequired: TimeInterval = careTaskDurationRequired
 
     // MARK: Happiness boosts from interactions
 

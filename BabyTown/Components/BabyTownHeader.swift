@@ -11,11 +11,12 @@ struct BabyTownHeader: View {
 
     var body: some View {
         ZStack {
-            Image("BabyTownLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 120)
-            
+            // Logo hidden for now — restore to bring back the BabyTown wordmark.
+            // Image("BabyTownLogo")
+            //     .resizable()
+            //     .scaledToFit()
+            //     .frame(height: 120)
+
             HStack {
                 if let onSettingsTap = onSettingsTap {
                     Button {

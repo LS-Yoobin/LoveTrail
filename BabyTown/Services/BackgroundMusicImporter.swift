@@ -41,9 +41,8 @@ enum BackgroundMusicImporter {
         CouplePlaylistStore.importedAudioURL
     }
 
-    /// Extracts audio from a screen recording and appends it to the couple playlist.
-    @discardableResult
-    static func importFromVideo(at videoURL: URL) async throws -> CouplePlaylistTrack {
+    /// Extracts audio from a screen recording to a temp M4A (does not save to playlist).
+    static func extractAudioFromVideo(at videoURL: URL) async throws -> URL {
         guard CouplePlaylistStore.canAddTrack else {
             throw ImportError.playlistFull
         }
@@ -79,10 +78,15 @@ enum BackgroundMusicImporter {
             throw ImportError.exportFailed
         }
 
-        defer {
-            try? fileManager.removeItem(at: tempURL)
-            cleanupTemporaryFile(at: videoURL)
-        }
+        cleanupTemporaryFile(at: videoURL)
+        return tempURL
+    }
+
+    /// Extracts audio from a screen recording and appends it to the couple playlist.
+    @discardableResult
+    static func importFromVideo(at videoURL: URL) async throws -> CouplePlaylistTrack {
+        let tempURL = try await extractAudioFromVideo(at: videoURL)
+        defer { try? fileManager.removeItem(at: tempURL) }
 
         do {
             let track = try CouplePlaylistStore.addTrack(fromExportedAudioAt: tempURL)
@@ -91,6 +95,10 @@ enum BackgroundMusicImporter {
         } catch CouplePlaylistStore.PlaylistError.playlistFull {
             throw ImportError.playlistFull
         }
+    }
+
+    static func discardExtractedAudio(at url: URL) {
+        try? fileManager.removeItem(at: url)
     }
 
     static func clearImportedSong() {

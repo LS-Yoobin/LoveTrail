@@ -67,8 +67,8 @@ struct PetRoomView: View {
     @State private var refillProgress: TimeInterval = 0
     @State private var refillHoldTimer: Timer?
     private let litterScheduleTicker = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-    private let litterCleanDurationRequired: TimeInterval = 5
-    private let refillDurationRequired: TimeInterval = 5
+    private let litterCleanDurationRequired: TimeInterval = PetEconomy.careTaskDurationRequired
+    private let refillDurationRequired: TimeInterval = PetEconomy.careTaskDurationRequired
     private let litterScooperAssetName = "litter_scooper"
     private let litterScooperSize = CGSize(width: 110, height: 82.5)
     /// Scoop/scrub hotspot to the right of the finger (overlay coordinates).

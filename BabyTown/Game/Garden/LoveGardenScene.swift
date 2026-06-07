@@ -53,7 +53,7 @@ final class LoveGardenScene: SKScene {
         for (index, element) in elements.enumerated() {
             let node = makeNode(for: element)
             node.position = screenPosition(for: element.position)
-            node.zPosition = node.position.y
+            node.zPosition = Self.floorDepthZ(for: node.position.y, sceneHeight: size.height)
             node.name = element.sourceID.uuidString
             addChild(node)
             elementNodes[element.sourceID] = node
@@ -81,6 +81,25 @@ final class LoveGardenScene: SKScene {
     }
 
     // MARK: Layout
+
+    /// Draw order for blooms and roaming cats — lower Y (closer to camera) renders
+    /// in front, matching pet-room `propDepthZ` (front = higher z, back = lower z).
+    static func floorDepthZ(for baseY: CGFloat, sceneHeight: CGFloat) -> CGFloat {
+        let frontEdge = sceneHeight * 0.02
+        let backEdge = sceneHeight * 0.46
+        let span = max(backEdge - frontEdge, 1)
+        let t = min(max((baseY - frontEdge) / span, 0), 1) // 0 front … 1 back
+        let frontZ: CGFloat = 420
+        let backZ: CGFloat = 80
+        return frontZ + (backZ - frontZ) * t
+    }
+
+    /// Adds a live pet cat so it depth-sorts against blooms in this scene.
+    func adoptGardenCat(_ cat: SKNode) {
+        guard cat.parent !== self else { return }
+        cat.removeFromParent()
+        addChild(cat)
+    }
 
     private func screenPosition(for p: GardenPoint) -> CGPoint {
         CGPoint(x: CGFloat(p.x) * size.width, y: CGFloat(p.y) * size.height)

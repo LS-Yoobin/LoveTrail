@@ -3,9 +3,10 @@ import SwiftUI
 
 struct BackgroundMusicSettingsSection: View {
 
+    var onManagePlaylist: () -> Void = {}
+
     @ObservedObject private var playbackState = CoupleMusicPlaybackState.shared
     @StateObject private var importCoordinator = BackgroundMusicImportCoordinator()
-    @State private var showPlaylistEditor = false
 
     private var trackSummary: String {
         guard CouplePlaylistStore.hasTracks else {
@@ -46,11 +47,7 @@ struct BackgroundMusicSettingsSection: View {
 
             if CouplePlaylistStore.hasTracks {
                 Button("Manage playlist") {
-                    showPlaylistEditor = true
-                }
-
-                Button("Remove all songs", role: .destructive) {
-                    clearPlaylist()
+                    onManagePlaylist()
                 }
             }
         } header: {
@@ -66,8 +63,21 @@ struct BackgroundMusicSettingsSection: View {
             guard let newItem else { return }
             Task { await importCoordinator.importPickedVideo(newItem) }
         }
-        .sheet(isPresented: $showPlaylistEditor) {
-            CouplePlaylistEditorSheet()
+        .sheet(item: $importCoordinator.draftAwaitingTrim) { draft in
+            CoupleSongTrimSheet(
+                draft: draft,
+                isSaving: importCoordinator.isTrimming,
+                onCancel: { importCoordinator.cancelTrim(draft: draft) },
+                onSave: { start, end in
+                    Task {
+                        await importCoordinator.confirmTrim(
+                            draft: draft,
+                            startSeconds: start,
+                            endSeconds: end
+                        )
+                    }
+                }
+            )
         }
         .sheet(item: $importCoordinator.trackAwaitingName) { track in
             CoupleSongNameSheet(
@@ -99,10 +109,4 @@ struct BackgroundMusicSettingsSection: View {
         )
     }
 
-    private func clearPlaylist() {
-        importCoordinator.clearStatus()
-        CouplePlaylistStore.clearAll()
-        AudioManager.shared.stopHomeMusic()
-        playbackState.refreshFromStore()
-    }
 }

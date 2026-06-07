@@ -71,6 +71,8 @@ struct HomeView: View {
     @State private var mapThresholdHapticTick = 0
     @State private var mapOpenHapticTick = 0
     @State private var visibleRowCount = HomeView.timelinePageSize
+    @State private var selectedTimelineYear = 0
+    @State private var isYearFilterPinned = false
 
     private let mapOpenThreshold: CGFloat = 110
     private static let timelinePageSize = 15
@@ -153,6 +155,10 @@ struct HomeView: View {
                             .padding(.bottom, 14)
                     }
 
+                    if isYearFilterPinned && showsTimelineYearFilter {
+                        timelineYearFilterBar(isPinned: true)
+                    }
+
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: isMemorySearchActive ? 16 : 28) {
@@ -221,6 +227,10 @@ struct HomeView: View {
                             .padding(.top, isSearchBarPinned ? (isMemorySearchActive ? 4 : 8) : 18)
                             .padding(.bottom, 100)
                         }
+                        .coordinateSpace(name: "homeScroll")
+                        .onPreferenceChange(TimelineYearFilterAnchorKey.self) { minY in
+                            updateYearFilterPinState(minY: minY)
+                        }
                         .scrollDismissesKeyboard(
                             isMemorySearchFocused ? .immediately : .interactively
                         )
@@ -253,6 +263,10 @@ struct HomeView: View {
                             }
                         }
                         .onChange(of: homeSpecialDates.count) { _, _ in
+                            clampVisibleRowCount()
+                        }
+                        .onChange(of: selectedTimelineYear) { _, _ in
+                            visibleRowCount = Self.timelinePageSize
                             clampVisibleRowCount()
                         }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -1323,6 +1337,88 @@ struct HomeView: View {
 
     // MARK: - Timeline
 
+    private var showsTimelineYearFilter: Bool {
+        !isUsingMemorySearch && !viewModel.isEmpty && timelineAvailableYears.count > 1
+    }
+
+    private var timelineAvailableYears: [Int] {
+        var years = Set(viewModel.availableYears())
+        let calendar = Calendar.current
+        for special in homeSpecialDates where !special.isPinned {
+            years.insert(calendar.component(.year, from: special.date))
+        }
+        let sorted = years.sorted(by: >)
+        guard !sorted.isEmpty else { return [] }
+        return [0] + sorted
+    }
+
+    private func timelineItemMatchesYear(_ item: TimelineItem, year: Int) -> Bool {
+        guard year != 0 else { return true }
+        return Calendar.current.component(.year, from: item.yearHeaderDate) == year
+    }
+
+    private var filteredMemoryTimelineItems: [TimelineItem] {
+        memoryTimelineItems.filter { timelineItemMatchesYear($0, year: selectedTimelineYear) }
+    }
+
+    private var filteredBirthdayTimelineItems: [TimelineItem] {
+        birthdayTimelineItems.filter { timelineItemMatchesYear($0, year: selectedTimelineYear) }
+    }
+
+    private func shouldShowFoundingSlot(_ slot: (promptText: String, moment: Moment?, section: DaySection?)) -> Bool {
+        guard selectedTimelineYear != 0 else { return true }
+        guard let moment = slot.moment else { return false }
+        return Calendar.current.component(.year, from: moment.dateTaken) == selectedTimelineYear
+    }
+
+    private var filteredFoundingTimelineSlots: [(promptText: String, moment: Moment?, section: DaySection?)] {
+        viewModel.foundingTimelineSlots.filter(shouldShowFoundingSlot)
+    }
+
+    private func updateYearFilterPinState(minY: CGFloat) {
+        guard showsTimelineYearFilter else {
+            if isYearFilterPinned {
+                isYearFilterPinned = false
+            }
+            return
+        }
+
+        let shouldPin = minY <= 0.5
+        guard shouldPin != isYearFilterPinned else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isYearFilterPinned = shouldPin
+        }
+    }
+
+    private func timelineYearFilterBar(isPinned: Bool) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(timelineAvailableYears, id: \.self) { year in
+                    YearFilterChip(
+                        title: year == 0 ? "All" : String(year),
+                        isSelected: year == selectedTimelineYear
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            selectedTimelineYear = year
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.vertical, 8)
+        .background {
+            if isPinned {
+                Rectangle()
+                    .fill(
+                        nightModeManager.isNightMode
+                            ? Color.black.opacity(0.92)
+                            : BabyTownTheme.background
+                    )
+            }
+        }
+    }
+
     private var timelineSection: some View {
         VStack(spacing: 12) {
             sectionLabel(
@@ -1333,17 +1429,46 @@ struct HomeView: View {
             .padding(.horizontal, 20)
             .id("timeline")
 
+            if showsTimelineYearFilter {
+                timelineYearFilterBar(isPinned: false)
+                    .opacity(isYearFilterPinned ? 0 : 1)
+                    .allowsHitTesting(!isYearFilterPinned)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: TimelineYearFilterAnchorKey.self,
+                                value: geometry.frame(in: .named("homeScroll")).minY
+                            )
+                        }
+                    }
+            }
+
             ZStack(alignment: .top) {
                 HeartTrailBackground(
-                    sectionCount: memoryTimelineItems.count + birthdayTimelineItems.count + viewModel.foundingTimelineSlots.count
+                    sectionCount: filteredMemoryTimelineItems.count
+                        + filteredBirthdayTimelineItems.count
+                        + filteredFoundingTimelineSlots.count
                 )
 
                 let memoryRows = paginatedMemoryTimelineRows
                 let birthdayRows = birthdayTimelineRows
                 LazyVStack(spacing: 24) {
+                    if filteredMemoryTimelineItems.isEmpty && selectedTimelineYear != 0 {
+                        Text("No memories from \(selectedTimelineYear) yet.")
+                            .font(.system(size: 15, weight: .medium, design: .serif))
+                            .foregroundStyle(
+                                nightModeManager.isNightMode
+                                    ? .white.opacity(0.7)
+                                    : BabyTownTheme.textPrimary.opacity(0.65)
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 32)
+                            .padding(.top, 24)
+                    }
+
                     ForEach(memoryRows) { row in
                         let index = row.displayIndex
-                        if let year = row.yearHeader {
+                        if selectedTimelineYear == 0, let year = row.yearHeader {
                             yearHeaderView(year)
                         }
 
@@ -1529,6 +1654,7 @@ struct HomeView: View {
 
                     if !hasMoreTimelineItems {
                     // "The Beginning..." after regular memories (newest-first above)
+                    if selectedTimelineYear == 0 || !filteredFoundingTimelineSlots.isEmpty {
                     HStack(spacing: 8) {
                         HeartbeatIconView()
 
@@ -1544,7 +1670,7 @@ struct HomeView: View {
                     .padding(.top, 8)
 
                     // Founding moments anchored at the very bottom
-                    ForEach(Array(viewModel.foundingTimelineSlots.enumerated()), id: \.offset) { _, slot in
+                    ForEach(Array(filteredFoundingTimelineSlots.enumerated()), id: \.offset) { _, slot in
                         if let section = slot.section, let moment = slot.moment {
                         VStack(spacing: 12) {
                             DayClusterCard(
@@ -1620,11 +1746,12 @@ struct HomeView: View {
                             .padding(.top, 16)
                         }
                     }
+                    }
 
                     // Birthdays — oldest anchor at the absolute bottom (below founding)
                     ForEach(birthdayRows) { row in
                         let index = row.displayIndex
-                        if let year = row.yearHeader {
+                        if selectedTimelineYear == 0, let year = row.yearHeader {
                             yearHeaderView(year)
                         }
 
@@ -1790,7 +1917,7 @@ struct HomeView: View {
     }
 
     private var hasMoreTimelineItems: Bool {
-        visibleRowCount < memoryTimelineItems.count
+        visibleRowCount < filteredMemoryTimelineItems.count
     }
 
     /// Manual "load more" fallback. Auto-loading is driven by scroll position as the user
@@ -1887,28 +2014,28 @@ struct HomeView: View {
     /// Only the visible page is turned into rows — year-header boundaries are computed
     /// within the prefix, which preserves correctness since rows stay newest-first.
     private var paginatedMemoryTimelineRows: [TimelineRow] {
-        buildTimelineRows(from: Array(memoryTimelineItems.prefix(visibleRowCount)))
+        buildTimelineRows(from: Array(filteredMemoryTimelineItems.prefix(visibleRowCount)))
     }
 
     /// Grow the visible window by one page. Called by the load-more button's `.onAppear`
     /// (auto on scroll) and its tap action (manual fallback). Clamped to the total.
     private func loadMoreTimelineRows() {
         guard hasMoreTimelineItems else { return }
-        visibleRowCount = min(visibleRowCount + Self.timelinePageSize, memoryTimelineItems.count)
+        visibleRowCount = min(visibleRowCount + Self.timelinePageSize, filteredMemoryTimelineItems.count)
     }
 
     private func clampVisibleRowCount() {
-        let total = memoryTimelineItems.count
+        let total = filteredMemoryTimelineItems.count
         if total > 0, visibleRowCount > total {
             visibleRowCount = total
         }
     }
 
     private var birthdayTimelineRows: [TimelineRow] {
-        let foundingCount = viewModel.foundingTimelineSlots.count
+        let foundingCount = filteredFoundingTimelineSlots.count
         return buildTimelineRows(
-            from: birthdayTimelineItems,
-            startingDisplayIndex: memoryTimelineItems.count + foundingCount
+            from: filteredBirthdayTimelineItems,
+            startingDisplayIndex: filteredMemoryTimelineItems.count + foundingCount
         )
     }
 
@@ -2165,6 +2292,14 @@ private struct PulsingHeartView: View {
                     scale = 1.18
                 }
             }
+    }
+}
+
+private struct TimelineYearFilterAnchorKey: PreferenceKey {
+    static var defaultValue: CGFloat = .infinity
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = min(value, nextValue())
     }
 }
 

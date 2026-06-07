@@ -129,6 +129,20 @@ enum CouplePlaylistStore {
         notifyChanged()
     }
 
+    static func replaceAudio(for id: UUID, from trimmedSourceURL: URL) throws {
+        migrateLegacyIfNeeded()
+        guard track(withID: id) != nil else { return }
+
+        ensureDirectories()
+        let destination = tracksDirectory.appendingPathComponent("\(id.uuidString).m4a")
+
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.copyItem(at: trimmedSourceURL, to: destination)
+        notifyChanged()
+    }
+
     @discardableResult
     static func updateDisplayName(id: UUID, displayName: String) -> Bool {
         migrateLegacyIfNeeded()

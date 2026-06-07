@@ -90,6 +90,7 @@ struct GardenBackgroundView: View {
             || builtGardenToken != token
             || builtIsNightMode != isNightMode
         if gardenNeedsBuild {
+            detachPetsFromGarden()
             let elements = GardenActMapper.composeElements(context: gardenContext)
             let season = DataPersistenceManager.shared.loadGardenState().season(now: Date())
             gardenScene = LoveGardenScene(
@@ -105,10 +106,26 @@ struct GardenBackgroundView: View {
         }
 
         updatePetScenes(size: size)
+        linkPetsToGarden()
+    }
+
+    private func detachPetsFromGarden() {
+        for scene in petScenes.values {
+            scene.detachCatFromGardenHost()
+        }
+    }
+
+    private func linkPetsToGarden() {
+        guard let gardenScene else { return }
+        for scene in petScenes.values {
+            scene.gardenHost = gardenScene
+            scene.attachCatToGardenHostIfNeeded()
+        }
     }
 
     private func updatePetScenes(size: CGSize) {
         guard showsLivePet, !petSkins.isEmpty else {
+            detachPetsFromGarden()
             petScenes = [:]
             builtPetSkins = []
             return
@@ -116,6 +133,7 @@ struct GardenBackgroundView: View {
 
         let spawnCount = petSkins.count
         if builtPetSkins != petSkins {
+            detachPetsFromGarden()
             var scenes: [CatSkin: PetRoomScene] = [:]
             for (index, skin) in petSkins.enumerated() {
                 let pet = PetRoomScene(skin: skin, size: size)

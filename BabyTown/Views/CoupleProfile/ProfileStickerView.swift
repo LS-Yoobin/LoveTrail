@@ -25,9 +25,12 @@ struct ProfileStickerView: View {
     @State private var pinchPreviewScale: CGFloat?
     @State private var rotationBase: Double = 0
     @State private var rotationPreview: Double?
+    /// Matches `PetRoomScene.highlightDraggable` — gentle alpha pulse in edit mode.
+    @State private var editModePulse = false
 
     /// Lower = finer pinch control (0.25 ≈ quarter of native sensitivity).
     private static let pinchSensitivity: CGFloat = 0.22
+    private static let editModePulseAnimation = Animation.easeInOut(duration: 0.55).repeatForever(autoreverses: true)
 
     private var scaleLimits: (min: CGFloat, max: CGFloat) {
         ProfileSticker.scaleLimits(for: sticker.kind)
@@ -84,11 +87,16 @@ struct ProfileStickerView: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+        .opacity(showChrome ? (editModePulse ? 0.72 : 1.0) : 1.0)
         .position(center)
         .allowsHitTesting(isCustomizing || onTap != nil)
         .onAppear {
             pinchBaseScale = sticker.scale
             rotationBase = sticker.rotation
+            setEditModePulse(active: showChrome)
+        }
+        .onChange(of: showChrome) { _, active in
+            setEditModePulse(active: active)
         }
         .onChange(of: sticker.scale) { _, newScale in
             pinchBaseScale = newScale
@@ -227,5 +235,20 @@ struct ProfileStickerView: View {
             dragGesture,
             SimultaneousGesture(pinchGesture, rotationGesture)
         )
+    }
+
+    private func setEditModePulse(active: Bool) {
+        if active {
+            editModePulse = false
+            withAnimation(Self.editModePulseAnimation) {
+                editModePulse = true
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                editModePulse = false
+            }
+        }
     }
 }

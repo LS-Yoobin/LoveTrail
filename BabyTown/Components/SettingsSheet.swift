@@ -16,11 +16,12 @@ struct SettingsSheet: View {
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
     @State private var showPaywall = false
+    @State private var showPlaylistEditor = false
     
     var body: some View {
         NavigationStack {
             List {
-                BackgroundMusicSettingsSection()
+                BackgroundMusicSettingsSection(onManagePlaylist: { showPlaylistEditor = true })
 
                 Section {
                     Button {
@@ -213,6 +214,9 @@ struct SettingsSheet: View {
                     onUnlock: { showPaywall = false },
                     onDismiss: { showPaywall = false }
                 )
+            }
+            .sheet(isPresented: $showPlaylistEditor) {
+                CouplePlaylistEditorSheet(dismissOnSelect: false)
             }
             .confirmationDialog(
                 "Reset Baby Town?",

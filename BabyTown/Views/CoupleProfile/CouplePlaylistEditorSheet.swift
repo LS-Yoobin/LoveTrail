@@ -3,12 +3,15 @@ import SwiftUI
 
 /// Manage the couple playlist (Change): select now playing, remove tracks.
 struct CouplePlaylistEditorSheet: View {
+    var dismissOnSelect = true
+
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var playbackState = CoupleMusicPlaybackState.shared
 
     @State private var tracks: [CouplePlaylistTrack] = []
     @State private var nowPlayingID: UUID?
-    @State private var trackToRename: CouplePlaylistTrack?
+    @State private var trackToEdit: CouplePlaylistTrack?
+    @State private var showRemoveAllConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +31,17 @@ struct CouplePlaylistEditorSheet: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !tracks.isEmpty {
+                    Button("Remove all songs", role: .destructive) {
+                        showRemoveAllConfirmation = true
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(.bar)
+                }
+            }
             .navigationTitle("Couple Playlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -36,19 +50,28 @@ struct CouplePlaylistEditorSheet: View {
                 }
             }
             .onAppear(perform: reload)
-            .sheet(item: $trackToRename) { track in
-                CoupleSongNameSheet(
-                    title: "Rename song",
-                    subtitle: "Update how this track appears in your playlist.",
-                    initialName: track.displayName,
-                    onCancel: { trackToRename = nil },
-                    onConfirm: { name in
-                        CouplePlaylistStore.updateDisplayName(id: track.id, displayName: name)
-                        trackToRename = nil
+            .sheet(item: $trackToEdit) { track in
+                CoupleSongEditSheet(
+                    track: track,
+                    onCancel: { trackToEdit = nil },
+                    onSaved: {
+                        trackToEdit = nil
                         reload()
                         playbackState.refreshFromStore()
                     }
                 )
+            }
+            .confirmationDialog(
+                "Remove all songs?",
+                isPresented: $showRemoveAllConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Remove all songs", role: .destructive) {
+                    removeAllSongs()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes every imported song from your couple playlist. This can't be undone.")
             }
         }
     }
@@ -79,7 +102,7 @@ struct CouplePlaylistEditorSheet: View {
             .buttonStyle(.plain)
 
             Button {
-                trackToRename = track
+                trackToEdit = track
             } label: {
                 Image(systemName: "pencil")
                     .font(.body.weight(.semibold))
@@ -87,7 +110,7 @@ struct CouplePlaylistEditorSheet: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Rename \(track.displayName)")
+            .accessibilityLabel("Edit \(track.displayName)")
         }
     }
 
@@ -110,7 +133,9 @@ struct CouplePlaylistEditorSheet: View {
         nowPlayingID = track.id
         AudioManager.shared.reloadHomeMusic()
         playbackState.refreshFromStore()
-        dismiss()
+        if dismissOnSelect {
+            dismiss()
+        }
     }
 
     private func deleteTracks(at offsets: IndexSet) {
@@ -122,5 +147,12 @@ struct CouplePlaylistEditorSheet: View {
         reload()
         AudioManager.shared.reloadHomeMusic()
         playbackState.refreshFromStore()
+    }
+
+    private func removeAllSongs() {
+        CouplePlaylistStore.clearAll()
+        AudioManager.shared.stopHomeMusic()
+        playbackState.refreshFromStore()
+        dismiss()
     }
 }

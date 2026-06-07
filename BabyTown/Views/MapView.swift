@@ -475,14 +475,34 @@ struct MapView: View {
         }
     }
 
+    /// How many of the newest places to consider when framing the map.
+    private let recentPlaceWindow = 12
+    /// Recent places farther than this from the newest one (in degrees lat/lon) are
+    /// treated as a separate trip and excluded, so an old/far outlier can't widen the view.
+    private let recentPlaceClusterDegrees: CLLocationDegrees = 1.5
+
+    /// Frames the map around the *latest* places rather than the geographic midpoint of
+    /// every memory. Anchors on the newest place and includes only recent places near it.
     private func centerMapOnMemories() {
         guard !annotations.isEmpty else { return }
 
-        let padding = selectedYear == 0 ? 2.0 : 1.5
+        let newestFirst = annotations.sorted {
+            $0.section.timelineSortDate > $1.section.timelineSortDate
+        }
+        guard let anchor = newestFirst.first?.coordinate else { return }
+
+        let nearbyRecent = newestFirst.prefix(recentPlaceWindow)
+            .map(\.coordinate)
+            .filter {
+                abs($0.latitude - anchor.latitude) <= recentPlaceClusterDegrees
+                    && abs($0.longitude - anchor.longitude) <= recentPlaceClusterDegrees
+            }
+        let coordinates = nearbyRecent.isEmpty ? [anchor] : nearbyRecent
+
         guard let fitted = coordinateRegion(
-            fitting: annotations.map(\.coordinate),
-            paddingFactor: padding,
-            minimumSpan: 0.05,
+            fitting: coordinates,
+            paddingFactor: 1.5,
+            minimumSpan: 0.08,
             maximumLatitudeSpan: maxMapSpan,
             maximumLongitudeSpan: 360
         ) else { return }

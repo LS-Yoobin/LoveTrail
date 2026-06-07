@@ -84,6 +84,22 @@ struct OurSongSheet: View {
             .sheet(isPresented: $showPlaylistEditor) {
                 CouplePlaylistEditorSheet()
             }
+            .sheet(item: $importCoordinator.draftAwaitingTrim) { draft in
+                CoupleSongTrimSheet(
+                    draft: draft,
+                    isSaving: importCoordinator.isTrimming,
+                    onCancel: { importCoordinator.cancelTrim(draft: draft) },
+                    onSave: { start, end in
+                        Task {
+                            await importCoordinator.confirmTrim(
+                                draft: draft,
+                                startSeconds: start,
+                                endSeconds: end
+                            )
+                        }
+                    }
+                )
+            }
             .sheet(item: $importCoordinator.trackAwaitingName) { track in
                 CoupleSongNameSheet(
                     title: "Name your song",
