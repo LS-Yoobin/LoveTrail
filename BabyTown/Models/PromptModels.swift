@@ -14,13 +14,17 @@ struct PromptItem: Identifiable, Equatable {
 struct PromptPhoto: Identifiable, Codable {
     let id: UUID
     let dateTaken: Date
-    let thumbnail: UIImage
     var assetIdentifier: String?
     var isFromCamera: Bool
     var unlockTime: Date?
     var latitude: Double?
     var longitude: Double?
-    
+
+    /// Thumbnail bytes live on disk via `ThumbnailStore`, not in this struct.
+    var thumbnail: UIImage {
+        ThumbnailStore.shared.image(for: id) ?? Moment.missingThumbnailPlaceholder
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, dateTaken, thumbnailData, assetIdentifier, isFromCamera, unlockTime, latitude, longitude
     }
@@ -28,7 +32,7 @@ struct PromptPhoto: Identifiable, Codable {
     init(id: UUID = UUID(), dateTaken: Date, thumbnail: UIImage, assetIdentifier: String? = nil, isFromCamera: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil) {
         self.id = id
         self.dateTaken = dateTaken
-        self.thumbnail = thumbnail
+        ThumbnailStore.shared.cache(thumbnail, for: id)
         self.assetIdentifier = assetIdentifier
         self.isFromCamera = isFromCamera
         self.unlockTime = unlockTime
@@ -46,11 +50,9 @@ struct PromptPhoto: Identifiable, Codable {
         latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
         
-        if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
-           let image = UIImage(data: thumbnailData) {
-            thumbnail = image
-        } else {
-            thumbnail = UIImage(systemName: "photo")!
+        // Legacy inline JPEG → migrate to disk immediately (and cache for display).
+        if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData) {
+            ThumbnailStore.shared.importLegacyData(thumbnailData, for: id)
         }
     }
     
@@ -63,10 +65,7 @@ struct PromptPhoto: Identifiable, Codable {
         try container.encodeIfPresent(unlockTime, forKey: .unlockTime)
         try container.encodeIfPresent(latitude, forKey: .latitude)
         try container.encodeIfPresent(longitude, forKey: .longitude)
-        
-        if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
-            try container.encode(thumbnailData, forKey: .thumbnailData)
-        }
+        // Thumbnail bytes are persisted separately by `ThumbnailStore`, not inline here.
     }
 }
 

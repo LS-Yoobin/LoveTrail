@@ -95,6 +95,10 @@ final class DataPersistenceManager {
     func saveMoments(_ moments: [Moment]) {
         guard let data = try? encoder.encode(moments) else { return }
         try? data.write(to: momentsFileURL)
+        // Persist any thumbnails not yet on disk (new moments + lazy migration of legacy data).
+        for moment in moments {
+            ThumbnailStore.shared.persistIfNeeded(for: moment.id)
+        }
     }
 
     func loadCelebratedMomentMilestones() -> Set<Int> {
@@ -194,6 +198,9 @@ final class DataPersistenceManager {
     func savePromptMemories(_ memories: [PromptMemory]) {
         guard let data = try? encoder.encode(memories) else { return }
         try? data.write(to: promptMemoriesFileURL)
+        for photo in memories.flatMap(\.photos) {
+            ThumbnailStore.shared.persistIfNeeded(for: photo.id)
+        }
     }
     
     func loadPromptMemories() -> [PromptMemory] {

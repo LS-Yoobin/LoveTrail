@@ -323,9 +323,7 @@ struct DayClusterCard: View {
             }
         } label: {
             ZStack {
-                Image(uiImage: moment.thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                MomentThumbnailView(id: moment.id)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                     .clipped()
                     .blur(radius: moment.isLocked ? 20 : 0)

@@ -5,7 +5,6 @@ struct Moment: Identifiable, Codable {
     let id: UUID
     let dateTaken: Date
     var assetIdentifier: String?
-    let thumbnail: UIImage
     var placeName: String?
     var caption: String?
     var voiceNotePath: String?
@@ -20,6 +19,14 @@ struct Moment: Identifiable, Codable {
     var isPlaceNameUserSet: Bool
     var country: String?
 
+    /// Thumbnail bytes live on disk (via `ThumbnailStore`), not in this struct, so loading
+    /// many moments doesn't decode every image into RAM. Resolves cache → disk → placeholder.
+    var thumbnail: UIImage {
+        ThumbnailStore.shared.image(for: id) ?? Moment.missingThumbnailPlaceholder
+    }
+
+    static let missingThumbnailPlaceholder = UIImage(systemName: "photo") ?? UIImage()
+
     enum CodingKeys: String, CodingKey {
         case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay, isPlaceNameUserSet, country
     }
@@ -28,7 +35,7 @@ struct Moment: Identifiable, Codable {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
-        self.thumbnail = thumbnail
+        ThumbnailStore.shared.cache(thumbnail, for: id)
         self.placeName = placeName
         self.caption = caption
         self.voiceNotePath = voiceNotePath
@@ -63,11 +70,10 @@ struct Moment: Identifiable, Codable {
         isPlaceNameUserSet = try container.decodeIfPresent(Bool.self, forKey: .isPlaceNameUserSet) ?? false
         country = try container.decodeIfPresent(String.self, forKey: .country)
 
-        if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData),
-           let image = UIImage(data: thumbnailData) {
-            thumbnail = image
-        } else {
-            thumbnail = UIImage(systemName: "photo")!
+        // Legacy data stored the JPEG inline. Migrate it to disk immediately (and cache for
+        // display); the next save drops `thumbnailData` from the JSON.
+        if let thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData) {
+            ThumbnailStore.shared.importLegacyData(thumbnailData, for: id)
         }
     }
     
@@ -89,10 +95,7 @@ struct Moment: Identifiable, Codable {
         try container.encode(isAddedFromOnThisDay, forKey: .isAddedFromOnThisDay)
         try container.encode(isPlaceNameUserSet, forKey: .isPlaceNameUserSet)
         try container.encodeIfPresent(country, forKey: .country)
-
-        if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
-            try container.encode(thumbnailData, forKey: .thumbnailData)
-        }
+        // Thumbnail bytes are persisted separately by `ThumbnailStore`, not inline here.
     }
     
     var location: CLLocation? {
