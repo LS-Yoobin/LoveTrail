@@ -20,6 +20,7 @@ struct CoupleProfileView: View {
     @State private var isCustomizing = false
     @State private var selectedStickerID: UUID?
     @State private var isNoteSelected = false
+    @State private var isRecordPlayerSelected = false
     /// Sticker image files to delete from disk only when the user taps Save.
     @State private var pendingImageDeletions: Set<UUID> = []
     @State private var showEditProfile = false
@@ -212,13 +213,21 @@ struct CoupleProfileView: View {
                                 isCustomizing: isCustomizing,
                                 selectedID: selectedStickerID,
                                 isNoteSelected: isNoteSelected,
+                                isRecordPlayerSelected: isRecordPlayerSelected,
                                 onSelect: { id in
                                     selectedStickerID = id
                                     isNoteSelected = false
+                                    isRecordPlayerSelected = false
                                 },
                                 onSelectNote: {
                                     isNoteSelected = true
                                     selectedStickerID = nil
+                                    isRecordPlayerSelected = false
+                                },
+                                onSelectRecordPlayer: {
+                                    isRecordPlayerSelected = true
+                                    selectedStickerID = nil
+                                    isNoteSelected = false
                                 },
                                 onDelete: deleteSticker,
                                 onDeleteNote: deleteProfileNote,
@@ -761,8 +770,9 @@ struct CoupleProfileView: View {
         } else {
             profile.profileNote = trimmed
             if profile.profileNotePosition == nil {
-                profile.profileNotePosition = ProfileGardenNoteLayout.defaultNormalizedPosition(
-                    stickers: profile.stickers
+                profile.profileNotePosition = ProfileGardenNoteLayout.defaultPosition(
+                    stickers: profile.stickers,
+                    canvasSize: ProfileGardenLayout.stickerLayerCanvasSize()
                 )
             }
         }
@@ -785,6 +795,7 @@ struct CoupleProfileView: View {
         profile.profileNote = nil
         profile.profileNotePosition = nil
         isNoteSelected = false
+        isRecordPlayerSelected = false
     }
 
     // MARK: Data
@@ -846,6 +857,7 @@ struct CoupleProfileView: View {
         isCustomizing = false
         selectedStickerID = nil
         isNoteSelected = false
+        isRecordPlayerSelected = false
         pendingImageDeletions.removeAll()
         load()
     }
@@ -854,6 +866,7 @@ struct CoupleProfileView: View {
         isCustomizing = false
         selectedStickerID = nil
         isNoteSelected = false
+        isRecordPlayerSelected = false
         for id in pendingImageDeletions {
             dpm.deleteStickerImage(id: id)
         }

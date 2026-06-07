@@ -88,15 +88,14 @@ struct ProfileNoteEditorSheet: View {
                 .shadow(color: .black.opacity(0.14), radius: 12, y: 6)
 
             ZStack(alignment: .topLeading) {
-                if draftText.isEmpty, !isNoteFocused {
-                    Text("Write something for your garden…")
-                        .font(.body)
-                        .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 6)
-                        .allowsHitTesting(false)
-                }
+                Text("Write something for your garden…")
+                    .font(.body)
+                    .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, ProfileGardenNoteLayout.editorTextTopOffset)
+                    .opacity(draftText.isEmpty && !isNoteFocused ? 1 : 0)
+                    .allowsHitTesting(false)
 
                 FixedLineNoteTextEditor(
                     text: $draftText,

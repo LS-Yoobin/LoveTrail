@@ -1,4 +1,5 @@
 import CoreGraphics
+import UIKit
 
 /// Shared scroll/sticker layout math for the Secret Garden profile page.
 enum ProfileGardenLayout {
@@ -32,6 +33,19 @@ enum ProfileGardenLayout {
         return NormalizedPoint(
             x: 0.86,
             y: min(profileSlotNormalizedY - 0.06, max(0.10, centerY / totalH))
+        )
+    }
+
+    /// Size of the `ProfileStickersLayer` geometry reader over the scroll content.
+    static func stickerLayerCanvasSize(screenWidth: CGFloat = UIScreen.main.bounds.width) -> CGSize {
+        CGSize(
+            width: screenWidth - 2 * contentTopPadding,
+            height: contentTopPadding
+                + estimatedCardsHeight
+                + avatarBandTopGap
+                + avatarBandHeight
+                + stickerCanvasHeight
+                + 16
         )
     }
 

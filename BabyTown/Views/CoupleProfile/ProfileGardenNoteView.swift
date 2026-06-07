@@ -27,6 +27,8 @@ enum ProfileGardenNoteLayout {
     static let textBottomInsetFraction: CGFloat = 0.22
     /// Maximum visible lines inside the note text area (no scrolling).
     static let maxTextLines = 7
+    /// Nudges editor text down to match the placeholder baseline in the note sheet.
+    static let editorTextTopOffset: CGFloat = 6
 
     static func textAreaWidth(noteWidth: CGFloat) -> CGFloat {
         noteWidth * (1 - 2 * textHorizontalInsetFraction)
@@ -73,6 +75,13 @@ enum ProfileGardenNoteLayout {
         return result
     }
 
+    private static let noteDragBounds = (
+        minX: CGFloat(0.08),
+        maxX: CGFloat(0.92),
+        minY: CGFloat(0.12),
+        maxY: CGFloat(0.90)
+    )
+
     /// Default note center from avatar sticker layout (normalized canvas coords).
     static func defaultNormalizedPosition(stickers: [ProfileSticker]) -> NormalizedPoint {
         let profileStickers = stickers.filter {
@@ -96,11 +105,105 @@ enum ProfileGardenNoteLayout {
         guard canvasSize.width > 0, canvasSize.height > 0 else {
             return defaultNormalizedPosition(stickers: stickers)
         }
+
         var point = defaultNormalizedPosition(stickers: stickers)
         let noteH = noteHeight(for: noteWidth(for: canvasSize.width))
         let minY = (noteH / 2 + 8) / canvasSize.height
         point.y = max(point.y, minY)
-        return point
+
+        return positionAvoidingStickers(
+            preferred: point,
+            stickers: stickers,
+            canvasSize: canvasSize
+        )
+    }
+
+    private struct NormalizedRect {
+        let centerX: CGFloat
+        let centerY: CGFloat
+        let halfWidth: CGFloat
+        let halfHeight: CGFloat
+
+        func intersects(_ other: NormalizedRect, gap: CGFloat) -> Bool {
+            abs(centerX - other.centerX) < (halfWidth + other.halfWidth + gap)
+                && abs(centerY - other.centerY) < (halfHeight + other.halfHeight + gap)
+        }
+    }
+
+    private static func stickerIncludesLabel(_ sticker: ProfileSticker) -> Bool {
+        sticker.kind == .userAvatar || sticker.kind == .partnerInvite
+    }
+
+    private static func stickerLayoutBounds(
+        _ sticker: ProfileSticker,
+        canvasSize: CGSize
+    ) -> NormalizedRect {
+        let side = ProfileSticker.renderedSize(scale: sticker.scale)
+        let includesLabel = stickerIncludesLabel(sticker)
+        let labelBlock: CGFloat = includesLabel ? 46 : 0
+        let width = includesLabel ? max(side, 120) : side
+        let totalHeight = side + labelBlock
+        return NormalizedRect(
+            centerX: CGFloat(sticker.position.x),
+            centerY: CGFloat(sticker.position.y),
+            halfWidth: (width / 2) / canvasSize.width,
+            halfHeight: (totalHeight / 2) / canvasSize.height
+        )
+    }
+
+    private static func noteLayoutBounds(
+        at position: NormalizedPoint,
+        canvasSize: CGSize
+    ) -> NormalizedRect {
+        let width = noteWidth(for: canvasSize.width)
+        let height = noteHeight(for: width)
+        return NormalizedRect(
+            centerX: CGFloat(position.x),
+            centerY: CGFloat(position.y),
+            halfWidth: (width / 2) / canvasSize.width,
+            halfHeight: (height / 2) / canvasSize.height
+        )
+    }
+
+    private static func positionAvoidingStickers(
+        preferred: NormalizedPoint,
+        stickers: [ProfileSticker],
+        canvasSize: CGSize,
+        gap: CGFloat = 0.02
+    ) -> NormalizedPoint {
+        let stickerRects = stickers.map { stickerLayoutBounds($0, canvasSize: canvasSize) }
+        let bounds = noteDragBounds
+
+        func fits(_ point: NormalizedPoint) -> Bool {
+            guard CGFloat(point.x) >= bounds.minX,
+                  CGFloat(point.x) <= bounds.maxX,
+                  CGFloat(point.y) >= bounds.minY,
+                  CGFloat(point.y) <= bounds.maxY else {
+                return false
+            }
+            let noteRect = noteLayoutBounds(at: point, canvasSize: canvasSize)
+            return !stickerRects.contains { noteRect.intersects($0, gap: gap) }
+        }
+
+        if fits(preferred) { return preferred }
+
+        let xOffsets: [CGFloat] = [0, 0.14, -0.14, 0.28, -0.28, 0.42, -0.42]
+        let yStep: CGFloat = 0.05
+        let maxY = min(CGFloat(preferred.y) + 0.45, bounds.maxY)
+        var y = CGFloat(preferred.y)
+
+        while y <= maxY {
+            for xOffset in xOffsets {
+                let candidate = NormalizedPoint(
+                    x: Double(min(max(CGFloat(preferred.x) + xOffset, bounds.minX), bounds.maxX)),
+                    y: Double(y)
+                )
+                if fits(candidate) { return candidate }
+            }
+            y += yStep
+        }
+
+        return preferred
     }
 }
 
@@ -121,7 +224,12 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
         textView.textAlignment = .center
         textView.font = ProfileGardenNoteLayout.noteUIFont()
         textView.textColor = UIColor(red: 0.38, green: 0.30, blue: 0.24, alpha: 1)
-        textView.textContainerInset = .zero
+        textView.textContainerInset = UIEdgeInsets(
+            top: ProfileGardenNoteLayout.editorTextTopOffset,
+            left: 0,
+            bottom: 0,
+            right: 0
+        )
         textView.textContainer.lineFragmentPadding = 0
         textView.textContainer.lineBreakMode = .byWordWrapping
         textView.textContainer.maximumNumberOfLines = ProfileGardenNoteLayout.maxTextLines
@@ -130,12 +238,11 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
-        let clamped = ProfileGardenNoteLayout.clampedNoteText(text, noteWidth: noteWidth)
-        if clamped != text {
-            text = clamped
-        }
-        if textView.text != clamped {
-            textView.text = clamped
+        if !textView.isFirstResponder {
+            let clamped = ProfileGardenNoteLayout.clampedNoteText(text, noteWidth: noteWidth)
+            if textView.text != clamped {
+                textView.text = clamped
+            }
         }
 
         if isFocused.wrappedValue, !textView.isFirstResponder {
@@ -161,7 +268,9 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
             if textView.text != clamped {
                 textView.text = clamped
             }
-            text = clamped
+            if text != clamped {
+                text = clamped
+            }
         }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
@@ -176,7 +285,14 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
-            isFocused.wrappedValue = false
+            // SwiftUI re-renders on each keystroke can briefly end editing; reclaim focus
+            // when the parent still intends the keyboard to stay open.
+            DispatchQueue.main.async {
+                guard self.isFocused.wrappedValue, textView.window != nil else { return }
+                if !textView.isFirstResponder {
+                    textView.becomeFirstResponder()
+                }
+            }
         }
     }
 }
@@ -242,6 +358,7 @@ struct ProfileGardenNoteView: View {
     var dragBounds: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? = nil
     var onSelect: (() -> Void)?
     var onDelete: (() -> Void)?
+    var showsDeleteButton: Bool = true
     let onPositionChanged: (NormalizedPoint) -> Void
     var onDragEnded: (() -> Void)? = nil
     var onDragActiveChanged: ((Bool) -> Void)? = nil
@@ -269,6 +386,7 @@ struct ProfileGardenNoteView: View {
 
     private var canDrag: Bool { isDraggable ?? isCustomizing }
     private var showChrome: Bool { showsArrangementChrome ?? isCustomizing }
+    private var shouldPulse: Bool { showChrome && !isSelected }
 
     var body: some View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -282,23 +400,16 @@ struct ProfileGardenNoteView: View {
                 }
             }
             .contentShape(Rectangle())
+            .editGardenPulse(shouldPulse)
             .overlay(alignment: .top) {
-                if showChrome, isSelected, let onDelete {
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(10)
-                            .background(Color.red, in: Circle())
-                            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-                    }
-                    .buttonStyle(.plain)
-                    .offset(y: -44)
-                    .transition(.scale.combined(with: .opacity))
+                if showsDeleteButton, showChrome, isSelected, let onDelete {
+                    EditGardenTrashButton(action: onDelete)
+                        .offset(y: -44)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .position(center)
-            .gesture(canDrag ? dragGesture : nil)
+            .gesture(canDrag && isSelected ? dragGesture : nil)
             .onTapGesture {
                 if canDrag {
                     if let onTapWhileCustomizing {
@@ -314,19 +425,7 @@ struct ProfileGardenNoteView: View {
 
     private func noteBody(_ trimmed: String) -> some View {
         ProfileGardenNoteChrome(text: trimmed, noteWidth: noteWidth)
-            .overlay {
-                if showChrome {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(
-                            Color.white,
-                            style: StrokeStyle(
-                                lineWidth: isSelected ? 3 : 2,
-                                dash: isSelected ? [] : [6, 4]
-                            )
-                        )
-                        .padding(4)
-                }
-            }
+            .customizeDottedOutline(showChrome && isSelected, cornerRadius: 8, padding: 4, lineWidth: 3)
     }
 
     private var dragLimits: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {

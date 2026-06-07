@@ -6,9 +6,11 @@ struct ProfileGardenRecordPlayerView: View {
     let scale: CGFloat?
     let canvasSize: CGSize
     let isCustomizing: Bool
+    var isSelected: Bool = false
     let isPlaying: Bool
     let onPositionChanged: (NormalizedPoint) -> Void
     let onScaleChanged: (CGFloat) -> Void
+    var onSelect: (() -> Void)?
     var onTap: (() -> Void)?
 
     @State private var dragOrigin: NormalizedPoint?
@@ -17,6 +19,8 @@ struct ProfileGardenRecordPlayerView: View {
 
     /// Lower = finer pinch control (matches `ProfileStickerView`).
     private static let pinchSensitivity: CGFloat = 0.22
+
+    private var shouldPulse: Bool { isCustomizing && !isSelected }
 
     private var resolvedPosition: NormalizedPoint {
         position ?? ProfileGardenLayout.defaultRecordPlayerPosition(canvasSize: canvasSize)
@@ -42,9 +46,15 @@ struct ProfileGardenRecordPlayerView: View {
 
     var body: some View {
         VinylRecordPlayerView(isPlaying: isPlaying, scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
-            .customizeDottedOutline(isCustomizing, cornerRadius: 14, padding: 4)
+            .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
+            .editGardenPulse(shouldPulse)
             .position(center)
-            .gesture(isCustomizing ? customizeGestures : nil)
+            .gesture(isCustomizing && isSelected ? customizeGestures : nil)
+            .onTapGesture {
+                if isCustomizing {
+                    onSelect?()
+                }
+            }
             .onAppear { pinchBaseScale = resolvedScale }
             .onChange(of: scale) { _, newScale in
                 pinchBaseScale = max(

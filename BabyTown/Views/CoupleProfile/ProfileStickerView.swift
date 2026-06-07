@@ -13,6 +13,7 @@ struct ProfileStickerView: View {
     var dragBounds: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? = nil
     var onSelect: (() -> Void)?
     var onDelete: (() -> Void)?
+    var showsDeleteButton: Bool = true
     let onPositionChanged: (NormalizedPoint) -> Void
     let onScaleChanged: (CGFloat) -> Void
     var onDragEnded: (() -> Void)? = nil
@@ -26,11 +27,10 @@ struct ProfileStickerView: View {
     @State private var rotationBase: Double = 0
     @State private var rotationPreview: Double?
     /// Matches `PetRoomScene.highlightDraggable` — gentle alpha pulse in edit mode.
-    @State private var editModePulse = false
+    private var shouldPulse: Bool { showChrome && !isSelected }
 
     /// Lower = finer pinch control (0.25 ≈ quarter of native sensitivity).
     private static let pinchSensitivity: CGFloat = 0.22
-    private static let editModePulseAnimation = Animation.easeInOut(duration: 0.55).repeatForever(autoreverses: true)
 
     private var scaleLimits: (min: CGFloat, max: CGFloat) {
         ProfileSticker.scaleLimits(for: sticker.kind)
@@ -73,30 +73,18 @@ struct ProfileStickerView: View {
         .contentShape(Rectangle())
         .rotationEffect(.degrees(effectiveRotation))
         .overlay(alignment: .top) {
-            if showChrome, isSelected, let onDelete {
-                Button(action: onDelete) {
-                    Image(systemName: "trash.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Color.red, in: Circle())
-                        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-                }
-                .buttonStyle(.plain)
-                .offset(y: -44)
-                .transition(.scale.combined(with: .opacity))
+            if showsDeleteButton, showChrome, isSelected, let onDelete {
+                EditGardenTrashButton(action: onDelete)
+                    .offset(y: -44)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .opacity(showChrome ? (editModePulse ? 0.72 : 1.0) : 1.0)
+        .editGardenPulse(shouldPulse)
         .position(center)
         .allowsHitTesting(isCustomizing || onTap != nil)
         .onAppear {
             pinchBaseScale = sticker.scale
             rotationBase = sticker.rotation
-            setEditModePulse(active: showChrome)
-        }
-        .onChange(of: showChrome) { _, active in
-            setEditModePulse(active: active)
         }
         .onChange(of: sticker.scale) { _, newScale in
             pinchBaseScale = newScale
@@ -137,14 +125,7 @@ struct ProfileStickerView: View {
         }
         .frame(width: side, height: side)
         .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
-        .overlay {
-            // Outline only the selected sticker so edit mode reads as a single
-            // active target instead of every sticker looking grabbable at once.
-            if showChrome, isSelected {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(Color.white, lineWidth: 3)
-            }
-        }
+        .customizeDottedOutline(showChrome && isSelected, cornerRadius: 4, padding: 0, lineWidth: 3)
     }
 
     private func userAvatarPlaceholderBody(side: CGFloat) -> some View {
@@ -235,20 +216,5 @@ struct ProfileStickerView: View {
             dragGesture,
             SimultaneousGesture(pinchGesture, rotationGesture)
         )
-    }
-
-    private func setEditModePulse(active: Bool) {
-        if active {
-            editModePulse = false
-            withAnimation(Self.editModePulseAnimation) {
-                editModePulse = true
-            }
-        } else {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                editModePulse = false
-            }
-        }
     }
 }

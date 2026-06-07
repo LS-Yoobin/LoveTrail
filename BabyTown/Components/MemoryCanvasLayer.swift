@@ -230,15 +230,14 @@ private struct MemoryPageNoteComposer: View {
                 .shadow(color: .black.opacity(0.16), radius: 10, y: 5)
 
             ZStack(alignment: .topLeading) {
-                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isFocused.wrappedValue {
-                    Text("Leave a note for your future self.")
-                        .font(.body)
-                        .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 6)
-                        .allowsHitTesting(false)
-                }
+                Text("Leave a note for your future self.")
+                    .font(.body)
+                    .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, ProfileGardenNoteLayout.editorTextTopOffset)
+                    .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isFocused.wrappedValue ? 1 : 0)
+                    .allowsHitTesting(false)
 
                 FixedLineNoteTextEditor(
                     text: $text,

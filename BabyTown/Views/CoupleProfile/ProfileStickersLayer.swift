@@ -15,8 +15,10 @@ struct ProfileStickersLayer: View {
     let isCustomizing: Bool
     let selectedID: UUID?
     let isNoteSelected: Bool
+    var isRecordPlayerSelected: Bool = false
     let onSelect: (UUID?) -> Void
     let onSelectNote: () -> Void
+    var onSelectRecordPlayer: (() -> Void)?
     let onDelete: (UUID) -> Void
     let onDeleteNote: () -> Void
     let onTapUser: () -> Void
@@ -41,6 +43,18 @@ struct ProfileStickersLayer: View {
                         .onTapGesture { onSelect(nil) }
                 }
 
+                // Profile + partner stickers stay underneath so user-created
+                // photo stickers never hide behind them.
+                ForEach(profileStickers) { sticker in
+                    stickerView(sticker, canvasSize: geo.size)
+                        .zIndex(stickerZIndex(for: sticker.id))
+                }
+
+                ForEach(photoStickers) { sticker in
+                    stickerView(sticker, canvasSize: geo.size)
+                        .zIndex(stickerZIndex(for: sticker.id))
+                }
+
                 if let profileNote {
                     ProfileGardenNoteView(
                         text: profileNote,
@@ -51,19 +65,11 @@ struct ProfileStickersLayer: View {
                         isSelected: isNoteSelected,
                         onSelect: isCustomizing ? onSelectNote : nil,
                         onDelete: isCustomizing ? onDeleteNote : nil,
+                        showsDeleteButton: false,
                         onPositionChanged: onNotePositionChanged,
                         onTap: isCustomizing ? nil : onTapNote
                     )
-                }
-
-                // Profile + partner stickers stay underneath so user-created
-                // photo stickers never hide behind them.
-                ForEach(profileStickers) { sticker in
-                    stickerView(sticker, canvasSize: geo.size)
-                }
-
-                ForEach(photoStickers) { sticker in
-                    stickerView(sticker, canvasSize: geo.size)
+                    .zIndex(noteZIndex)
                 }
 
                 ProfileGardenRecordPlayerView(
@@ -71,17 +77,88 @@ struct ProfileStickersLayer: View {
                     scale: recordPlayerScale,
                     canvasSize: geo.size,
                     isCustomizing: isCustomizing,
+                    isSelected: isRecordPlayerSelected,
                     isPlaying: isRecordPlayerPlaying,
                     onPositionChanged: onRecordPlayerPositionChanged,
                     onScaleChanged: onRecordPlayerScaleChanged,
+                    onSelect: onSelectRecordPlayer,
                     onTap: isCustomizing ? nil : onTapRecordPlayer
                 )
-                .zIndex(20)
+                .zIndex(recordPlayerZIndex)
+
+                if isCustomizing {
+                    editGardenDeleteButtons(canvasSize: geo.size)
+                        .zIndex(30)
+                }
             }
         }
         // User/partner stickers are tappable in browse mode too; individual
         // ProfileStickerViews gate their own hit-testing by kind.
         .allowsHitTesting(true)
+    }
+
+    private var noteZIndex: Double {
+        if isNoteSelected { return 25 }
+        return isCustomizing ? 10 : 0
+    }
+
+    private var recordPlayerZIndex: Double {
+        isRecordPlayerSelected ? 25 : 20
+    }
+
+    private func stickerZIndex(for id: UUID) -> Double {
+        selectedID == id ? 25 : 1
+    }
+
+    private static let trashLift: CGFloat = 44
+
+    @ViewBuilder
+    private func editGardenDeleteButtons(canvasSize: CGSize) -> some View {
+        if isNoteSelected, profileNote != nil {
+            let noteWidth = ProfileGardenNoteLayout.noteWidth(for: canvasSize.width)
+            let noteHeight = ProfileGardenNoteLayout.noteHeight(for: noteWidth)
+            let fallback = ProfileGardenNoteLayout.defaultPosition(
+                stickers: stickers,
+                canvasSize: canvasSize
+            )
+            let center = resolvedCenter(
+                normalized: profileNotePosition,
+                fallback: fallback,
+                canvasSize: canvasSize
+            )
+            EditGardenTrashButton(action: onDeleteNote)
+                .position(x: center.x, y: center.y - noteHeight / 2 - Self.trashLift)
+        } else if let selectedID,
+                  let sticker = stickers.first(where: { $0.id == selectedID }),
+                  isDeletable(sticker) {
+            let center = CGPoint(
+                x: CGFloat(sticker.position.x) * canvasSize.width,
+                y: CGFloat(sticker.position.y) * canvasSize.height
+            )
+            let contentHeight = stickerContentHeight(sticker)
+            EditGardenTrashButton(action: { onDelete(selectedID) })
+                .position(x: center.x, y: center.y - contentHeight / 2 - Self.trashLift)
+        }
+    }
+
+    private func resolvedCenter(
+        normalized: NormalizedPoint?,
+        fallback: NormalizedPoint,
+        canvasSize: CGSize
+    ) -> CGPoint {
+        let point = normalized ?? fallback
+        return CGPoint(
+            x: CGFloat(point.x) * canvasSize.width,
+            y: CGFloat(point.y) * canvasSize.height
+        )
+    }
+
+    private func stickerContentHeight(_ sticker: ProfileSticker) -> CGFloat {
+        let side = ProfileSticker.renderedSize(scale: sticker.scale)
+        let labelBlock: CGFloat = (
+            sticker.kind == .userAvatar || sticker.kind == .partnerInvite
+        ) ? 46 : 0
+        return side + labelBlock
     }
 
     private var profileStickers: [ProfileSticker] {
@@ -104,6 +181,7 @@ struct ProfileStickersLayer: View {
             isSelected: selectedID == sticker.id,
             onSelect: { onSelect(sticker.id) },
             onDelete: isDeletable(sticker) ? { onDelete(sticker.id) } : nil,
+            showsDeleteButton: false,
             onPositionChanged: { onPositionChanged(sticker.id, $0) },
             onScaleChanged: { onScaleChanged(sticker.id, $0) },
             onRotationChanged: sticker.kind == .moment
