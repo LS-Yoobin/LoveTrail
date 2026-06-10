@@ -18,7 +18,6 @@ final class SmartPlaceResolver {
     static let shared = SmartPlaceResolver()
 
     private let cache = PlaceCacheStore.shared
-    private let geocoder = CLGeocoder()
 
     /// MKLocalSearch radius in meters
     private let poiSearchRadius: CLLocationDistance = 150
@@ -50,6 +49,13 @@ final class SmartPlaceResolver {
         return await resolvePlaceName(for: location)
     }
 
+    /// Resolve from coordinates (e.g. photo cluster center from Scan).
+    func resolvePlaceName(for coordinate: CLLocationCoordinate2D) async -> String {
+        await resolvePlaceName(
+            for: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        )
+    }
+
     // MARK: - Pipeline
 
     /// Main resolution pipeline. Returns a human-readable place name.
@@ -73,16 +79,19 @@ final class SmartPlaceResolver {
             return poi
         }
 
-        // Stage D: CLGeocoder reverse geocode
+        // Stage D: Persistent geocode cache, then CLGeocoder reverse geocode
+        if let cached = GeocodeCacheStore.shared.entry(for: location.coordinate)?.placeName {
+            cache.store(name: cached, for: location)
+            return cached
+        }
+
         if let geocoded = await reverseGeocode(location) {
             cache.store(name: geocoded, for: location)
             return geocoded
         }
 
-        // Stage E: Final fallback
-        let fallback = "Unknown Place"
-        cache.store(name: fallback, for: location)
-        return fallback
+        // Stage E: Final fallback (not cached so a later retry can succeed)
+        return "Unknown Place"
     }
 
     // MARK: - Stage C: MKLocalSearch
@@ -130,52 +139,13 @@ final class SmartPlaceResolver {
     // MARK: - Stage D: CLGeocoder
 
     private func reverseGeocode(_ location: CLLocation) async -> String? {
-        geocoder.cancelGeocode()
-
-        do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            guard let placemark = placemarks.first else { return nil }
-            return Self.buildDisplayName(from: placemark)
-        } catch {
-            print("[SmartPlaceResolver] Reverse geocode failed: \(error.localizedDescription)")
-            return nil
-        }
+        guard ReverseGeocodeService.isValidCoordinate(location.coordinate) else { return nil }
+        let placemark = await ReverseGeocodeService.shared.placemark(for: location)
+        return placemark.flatMap { PlacemarkDisplayNameBuilder.build(from: $0) }
     }
 
-    // MARK: - Display Name Builder
-
     static func buildDisplayName(from placemark: CLPlacemark) -> String? {
-        // 1. Recognizable place name (e.g. "Blue Bottle Coffee")
-        if let name = placemark.name,
-           name != placemark.locality,
-           name != placemark.administrativeArea {
-            return name
-        }
-
-        // 2. City + State
-        if let city = placemark.locality {
-            if let state = placemark.administrativeArea {
-                return "\(city), \(state)"
-            }
-            return city
-        }
-
-        // 3. Neighborhood
-        if let subLocality = placemark.subLocality {
-            return subLocality
-        }
-
-        // 4. State alone
-        if let state = placemark.administrativeArea {
-            return state
-        }
-
-        // 5. Country
-        if let country = placemark.country {
-            return country
-        }
-
-        return nil
+        PlacemarkDisplayNameBuilder.build(from: placemark)
     }
 
     // MARK: - EXIF GPS Extraction

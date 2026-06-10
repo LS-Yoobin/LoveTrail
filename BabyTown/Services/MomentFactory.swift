@@ -6,7 +6,7 @@ import Photos
 final class MomentFactory {
 
     private let imageManager = PHCachingImageManager()
-    private let locationResolver = LocationNameResolver()
+    private let locationResolver = LocationNameResolver.shared
 
     func createMoments(from assets: [PHAsset]) async -> [Moment] {
         // Step 1: Load all thumbnails concurrently

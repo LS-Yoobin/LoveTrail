@@ -5,11 +5,11 @@ import ImageIO
 
 final class LocationNameResolver {
 
-    /// Cache keyed by rounded coordinates (~100m precision) to avoid redundant geocode calls
-    private var cache: [String: String?] = [:]
-    private var countryCache: [String: String?] = [:]
+    static let shared = LocationNameResolver()
 
-    // MARK: - Public API
+    private var inFlightLookups: [String: Task<(name: String?, country: String?), Never>] = [:]
+
+    private init() {}
 
     /// Resolve a place name from a PHAsset's embedded GPS location.
     func resolve(from asset: PHAsset?) async -> String? {
@@ -34,72 +34,68 @@ final class LocationNameResolver {
     }
     
     /// Resolve a place name from coordinates (for Scan feature).
-    func reverseGeocode(_ coordinate: CLLocationCoordinate2D, useCache: Bool = true) async -> String {
+    /// Uses cache and coalesces concurrent lookups so each photo group triggers at most one geocode API call.
+    func placeName(for coordinate: CLLocationCoordinate2D) async -> String {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         if let name = await reverseGeocode(location) {
             return name
         }
-        // Fallback to "Unknown Area" if geocoding fails
         return "Unknown Area"
     }
+
+    func reverseGeocode(_ coordinate: CLLocationCoordinate2D, useCache: Bool = true) async -> String {
+        await placeName(for: coordinate)
+    }
     
-    /// Clear the geocoding cache.
+    /// Clear cached geocode results (memory and disk).
     func clearCache() {
-        cache.removeAll()
-        countryCache.removeAll()
+        inFlightLookups.removeAll()
+        GeocodeCacheStore.shared.clear()
+    }
+
+    /// Stable cache key for a coordinate (~100m grid). Used to dedupe geocode calls across photo groups.
+    static func coordinateCacheKey(for coordinate: CLLocationCoordinate2D) -> String {
+        ReverseGeocodeService.coordinateCacheKey(for: coordinate)
     }
 
 
     // MARK: - Reverse Geocoding
 
     private func cacheKey(for location: CLLocation) -> String {
-        // Round to ~100m precision so nearby photos share the same result
-        let lat = (location.coordinate.latitude * 1000).rounded() / 1000
-        let lon = (location.coordinate.longitude * 1000).rounded() / 1000
-        return "\(lat),\(lon)"
+        Self.coordinateCacheKey(for: location.coordinate)
     }
 
     private func reverseGeocode(_ location: CLLocation) async -> String? {
-        let key = cacheKey(for: location)
-
-        // Return cached result if available
-        if let cached = cache[key] {
-            return cached
-        }
-
-        let geocoder = CLGeocoder()
-        do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            let name = placemarks.first.flatMap { Self.buildDisplayName(from: $0) }
-            cache[key] = name
-            return name
-        } catch {
-            print("[LocationNameResolver] Reverse geocode failed: \(error.localizedDescription)")
-            cache[key] = nil
-            return nil
-        }
+        await resolveNameAndCountry(from: location).name
     }
 
-    /// Resolve display name and country in a single geocode call (both cached).
+    /// Resolve display name and country in a single geocode call (cached on disk).
     func resolveNameAndCountry(from location: CLLocation) async -> (name: String?, country: String?) {
         let key = cacheKey(for: location)
-        if let name = cache[key], let country = countryCache[key] {
-            return (name, country)
+
+        if let cached = GeocodeCacheStore.shared.entry(forKey: key) {
+            return (cached.placeName, cached.country)
         }
 
-        let geocoder = CLGeocoder()
-        do {
-            let placemark = try await geocoder.reverseGeocodeLocation(location).first
-            let name = placemark.flatMap { Self.buildDisplayName(from: $0) }
-            let country = placemark?.country
-            cache[key] = name
-            countryCache[key] = country
-            return (name, country)
-        } catch {
-            cache[key] = nil
-            countryCache[key] = nil
-            return (nil, nil)
+        if let existing = inFlightLookups[key] {
+            return await existing.value
         }
+
+        let task = Task<(name: String?, country: String?), Never> {
+            guard ReverseGeocodeService.isValidCoordinate(location.coordinate) else {
+                return (nil, nil)
+            }
+
+            let placemark = await ReverseGeocodeService.shared.placemark(for: location)
+            let name = placemark.flatMap { PlacemarkDisplayNameBuilder.build(from: $0) }
+            let country = placemark?.country
+            return (name, country)
+        }
+        inFlightLookups[key] = task
+
+        let result = await task.value
+        inFlightLookups.removeValue(forKey: key)
+        return result
     }
 
     /// Resolve just the country for a coordinate (cached, shares the geocode above).
@@ -109,40 +105,8 @@ final class LocationNameResolver {
         ).country
     }
 
-    // MARK: - Display Name Builder
-
     static func buildDisplayName(from placemark: CLPlacemark) -> String? {
-        // 1. Prefer a recognizable place name (e.g. "Blue Bottle Coffee", street address)
-        if let name = placemark.name,
-           name != placemark.locality,
-           name != placemark.administrativeArea {
-            return name
-        }
-
-        // 2. City + State (e.g. "San Francisco, CA")
-        if let city = placemark.locality {
-            if let state = placemark.administrativeArea {
-                return "\(city), \(state)"
-            }
-            return city
-        }
-
-        // 3. Sub-locality (neighborhood)
-        if let subLocality = placemark.subLocality {
-            return subLocality
-        }
-
-        // 4. State alone
-        if let state = placemark.administrativeArea {
-            return state
-        }
-
-        // 5. Country as last resort
-        if let country = placemark.country {
-            return country
-        }
-
-        return nil
+        PlacemarkDisplayNameBuilder.build(from: placemark)
     }
 
     // MARK: - EXIF GPS Extraction

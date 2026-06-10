@@ -144,7 +144,7 @@ final class HomeViewModel: ObservableObject {
     private var periodicCheckTimer: Timer?
     private var isInitializing = true
     private var cancellables = Set<AnyCancellable>()
-    private let locationResolver = LocationNameResolver()
+    private let locationResolver = LocationNameResolver.shared
     private var isBackfillingCountries = false
     private var lastKnownMomentCount = DataPersistenceManager.shared.loadMoments().count
 

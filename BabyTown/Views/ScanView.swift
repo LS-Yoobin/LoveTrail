@@ -43,7 +43,7 @@ struct ScanView: View {
                 viewModel.existingAssetIdentifiers = existingAssetIdentifiers
                 await viewModel.checkPhotoPermission()
                 if viewModel.authorizationStatus == .authorized {
-                    await viewModel.scanPhotosForYear(viewModel.selectedYear)
+                    viewModel.scanPhotosForYear(viewModel.selectedYear)
                 }
             }
             .onChange(of: viewModel.isScanning) { _, isScanning in
@@ -89,9 +89,7 @@ struct ScanView: View {
         HStack(spacing: 16) {
             Button {
                 viewModel.selectedYear -= 1
-                Task {
-                    await viewModel.scanPhotosForYear(viewModel.selectedYear)
-                }
+                viewModel.scanPhotosForYear(viewModel.selectedYear)
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .semibold))
@@ -105,9 +103,7 @@ struct ScanView: View {
             
             Button {
                 viewModel.selectedYear += 1
-                Task {
-                    await viewModel.scanPhotosForYear(viewModel.selectedYear)
-                }
+                viewModel.scanPhotosForYear(viewModel.selectedYear)
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 16, weight: .semibold))
@@ -122,12 +118,18 @@ struct ScanView: View {
     private var content: some View {
         if viewModel.authorizationStatus == .denied || viewModel.authorizationStatus == .restricted {
             permissionDeniedView
-        } else if viewModel.isScanning {
+        } else if viewModel.potentialCards.isEmpty && viewModel.isScanning {
             scanningView
         } else if viewModel.potentialCards.isEmpty {
             emptyStateView
         } else {
-            resultsListView
+            ZStack(alignment: .bottom) {
+                resultsListView
+
+                if viewModel.isScanning {
+                    scanningFooter
+                }
+            }
         }
     }
     
@@ -153,6 +155,40 @@ struct ScanView: View {
             
             Spacer()
         }
+    }
+
+    private var scanningFooter: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .tint(BabyTownTheme.accent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Finding more memories…")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+
+                if viewModel.totalClusterCount > 0 {
+                    Text("\(viewModel.processedClusterCount) of \(viewModel.totalClusterCount) places")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BabyTownTheme.textSecondary)
+                }
+            }
+
+            Spacer()
+
+            Text("\(Int(viewModel.scanProgress * 100))%")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(BabyTownTheme.textTertiary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(BabyTownTheme.background)
+                .shadow(color: .black.opacity(0.08), radius: 12, y: -2)
+        )
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
     
     private var emptyStateView: some View {
@@ -229,7 +265,7 @@ struct ScanView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, viewModel.isScanning ? 88 : 16)
                 .padding(.top, monthFilterBarHeight + monthFilterListSpacing)
             }
 

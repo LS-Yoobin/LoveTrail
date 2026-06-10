@@ -9,6 +9,8 @@ class ScanViewModel: ObservableObject {
     @Published var potentialCards: [PotentialMemoryCard] = []
     @Published var isScanning: Bool = false
     @Published var scanProgress: Double = 0.0
+    @Published var processedClusterCount: Int = 0
+    @Published var totalClusterCount: Int = 0
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     @Published var errorMessage: String?
     
@@ -30,122 +32,110 @@ class ScanViewModel: ObservableObject {
     private let photoScanService = PhotoScanService()
     private let clusteringService = PhotoClusteringService()
     private let photoSelector = BestPhotoSelector()
-    private let locationResolver = LocationNameResolver()
+    private let locationResolver = LocationNameResolver.shared
+    private var scanTask: Task<Void, Never>?
     
     func checkPhotoPermission() async {
         authorizationStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
     }
     
-    func scanPhotosForYear(_ year: Int) async {
+    func scanPhotosForYear(_ year: Int) {
+        scanTask?.cancel()
+        scanTask = Task {
+            await performScan(for: year)
+        }
+    }
+    
+    private func performScan(for year: Int) async {
         isScanning = true
         scanProgress = 0.0
+        processedClusterCount = 0
+        totalClusterCount = 0
         potentialCards = []
         errorMessage = nil
         
-        // Step 1: Fetch photos (30% of progress)
+        // Step 1: Fetch photos
         let photos = await photoScanService.fetchPhotosForYear(year)
-        scanProgress = 0.3
+        guard !Task.isCancelled else { return finishScan() }
+        scanProgress = 0.15
         
         guard !photos.isEmpty else {
-            isScanning = false
+            finishScan()
             return
         }
         
-        // Step 2: Cluster photos (50% of progress)
+        // Step 2: Cluster photos into location/time groups
         let clusters = await clusteringService.clusterPhotos(photos)
-        scanProgress = 0.5
+        guard !Task.isCancelled else { return finishScan() }
+        scanProgress = 0.2
         
-        // Step 3: Process each cluster (50% to 100%)
-        let progressPerCluster = 0.5 / Double(max(clusters.count, 1))
-        
-        for cluster in clusters {
-            let card = await processCluster(cluster)
-            potentialCards.append(card)
-            scanProgress += progressPerCluster
+        guard !clusters.isEmpty else {
+            finishScan()
+            return
         }
 
-        sortPotentialCardsChronologically()
-        syncSelectedMonthAfterScan()
-        
-        scanProgress = 1.0
-        isScanning = false
-    }
-
-    private func syncSelectedMonthAfterScan() {
-        let months = availableMonths
-        guard !months.isEmpty else { return }
-        if months.contains(selectedMonth) { return }
-        selectedMonth = months.last ?? selectedMonth
-    }
-    
-    private func processCluster(_ cluster: PhotoCluster) async -> PotentialMemoryCard {
-        // Select best photo
-        guard let bestPhoto = await photoSelector.selectBestPhoto(from: cluster) else {
-            fatalError("Cluster must have at least one photo")
-        }
-        
-        // Select secondary photos
-        let secondaryPhotos = await photoSelector.selectSecondaryPhotos(
-            from: cluster,
-            excluding: bestPhoto,
-            limit: 3
-        )
-        
-        // Load images
-        let coverImage = await photoScanService.loadImage(for: bestPhoto.asset) ?? UIImage()
-        let secondaryImages = await withTaskGroup(of: UIImage?.self) { group in
-            for photo in secondaryPhotos {
-                group.addTask {
-                    await self.photoScanService.loadImage(
-                        for: photo.asset,
-                        targetSize: CGSize(width: 100, height: 100)
-                    )
-                }
-            }
-            
-            var images: [UIImage] = []
-            for await image in group {
-                if let image = image {
-                    images.append(image)
-                }
-            }
-            return images
-        }
-        
-        // Reverse geocode location
-        let locationName = await locationResolver.reverseGeocode(cluster.centerCoordinate)
-        
-        // Create card
-        return PotentialMemoryCard(
-            id: UUID(),
-            locationName: locationName,
-            coordinate: cluster.centerCoordinate,
-            dateRange: cluster.dateRange,
-            photoCount: cluster.photos.count,
-            coverPhoto: coverImage,
-            secondaryThumbnails: secondaryImages,
-            assetIdentifiers: cluster.photos.map { $0.asset.localIdentifier },
-            coverAssetIdentifier: bestPhoto.asset.localIdentifier,
-            isAdded: cluster.photos.contains { existingAssetIdentifiers.contains($0.asset.localIdentifier) }
-        )
-    }
-    
-    private func sortPotentialCardsChronologically() {
-        potentialCards.sort { lhs, rhs in
+        let sortedClusters = clusters.sorted { lhs, rhs in
             if lhs.dateRange.start != rhs.dateRange.start {
                 return lhs.dateRange.start < rhs.dateRange.start
             }
             return lhs.dateRange.end < rhs.dateRange.end
         }
+        totalClusterCount = sortedClusters.count
+
+        // Step 3: Process each photo group progressively — one geocode lookup per group (cache-backed)
+        for (index, cluster) in sortedClusters.enumerated() {
+            guard !Task.isCancelled else { break }
+
+            let card = await processCluster(cluster)
+            potentialCards.append(card)
+            processedClusterCount = index + 1
+            scanProgress = 0.2 + (0.8 * Double(processedClusterCount) / Double(totalClusterCount))
+
+            if potentialCards.count == 1 {
+                syncSelectedMonthAfterFirstCard(card)
+            }
+        }
+
+        finishScan()
+    }
+
+    private func finishScan() {
+        scanProgress = 1.0
+        isScanning = false
+    }
+
+    private func syncSelectedMonthAfterFirstCard(_ card: PotentialMemoryCard) {
+        let calendar = Calendar.current
+        selectedMonth = calendar.component(.month, from: card.dateRange.start)
+    }
+    
+    private func processCluster(_ cluster: PhotoCluster) async -> PotentialMemoryCard {
+        guard let bestPhoto = await photoSelector.selectBestPhoto(from: cluster) else {
+            fatalError("Cluster must have at least one photo")
+        }
+
+        async let coverImage = photoScanService.loadImage(for: bestPhoto.asset)
+        async let locationName = locationResolver.placeName(for: cluster.centerCoordinate)
+
+        return PotentialMemoryCard(
+            id: UUID(),
+            locationName: await locationName,
+            coordinate: cluster.centerCoordinate,
+            dateRange: cluster.dateRange,
+            photoCount: cluster.photos.count,
+            coverPhoto: await coverImage ?? UIImage(),
+            secondaryThumbnails: [],
+            assetIdentifiers: cluster.photos.map { $0.asset.localIdentifier },
+            coverAssetIdentifier: bestPhoto.asset.localIdentifier,
+            isAdded: cluster.photos.contains { existingAssetIdentifiers.contains($0.asset.localIdentifier) }
+        )
     }
 
     func addCardToHome(_ card: PotentialMemoryCard) async -> [Moment] {
-        // Mark card as added
         if let index = potentialCards.firstIndex(where: { $0.id == card.id }) {
             potentialCards[index].isAdded = true
         }
         
-        // Convert to Moments
         var moments: [Moment] = []
         
         for assetId in card.assetIdentifiers {
