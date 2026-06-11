@@ -18,6 +18,7 @@ struct MemorySelectionCard: View {
             trailingIcon
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(.white)
@@ -34,22 +35,29 @@ struct MemorySelectionCard: View {
 
     private var thumbnailView: some View {
         ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 64, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-            } else {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(BabyTownTheme.accent.opacity(0.06))
-                    .frame(width: 64, height: 64)
-                    .overlay(
-                        Image(systemName: "heart")
-                            .font(.system(size: 22, weight: .light))
-                            .foregroundStyle(BabyTownTheme.accent.opacity(0.3))
-                    )
+            Group {
+                if let image {
+                    // Color.clear anchors a fixed 64×64 slot; without it the
+                    // resizable image can expand to its intrinsic size and clip
+                    // off the leading edge of the row.
+                    Color.clear
+                        .overlay {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                } else {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(BabyTownTheme.accent.opacity(0.06))
+                        .overlay(
+                            Image(systemName: "heart")
+                                .font(.system(size: 22, weight: .light))
+                                .foregroundStyle(BabyTownTheme.accent.opacity(0.3))
+                        )
+                }
             }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
 
             Image(systemName: "heart.fill")
                 .font(.system(size: 26))
@@ -57,6 +65,7 @@ struct MemorySelectionCard: View {
                 .scaleEffect(heartPopScale)
                 .opacity(heartPopOpacity)
         }
+        .frame(width: 64, height: 64)
     }
 
     private var textContent: some View {

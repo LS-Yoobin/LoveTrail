@@ -489,5 +489,6 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
         userDefaults.removeObject(forKey: colorThemeKey)
         BackgroundMusicImporter.clearImportedSong()
+        MomentVideoStore.shared.removeAll()
     }
 }

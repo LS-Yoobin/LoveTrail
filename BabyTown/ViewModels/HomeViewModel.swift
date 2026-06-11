@@ -238,13 +238,15 @@ final class HomeViewModel: ObservableObject {
 
     /// Recreates founding timeline rows from persisted pinned JPEGs when moments were deleted.
     private func ensureFoundingMomentsFromPinnedPhotos() {
-        restoreFoundingMomentIfMissing(
-            promptText: "When we became official",
-            image: pinnedOfficial,
-            pinnedAt: Date()
-        )
+        if let officialImage = DataPersistenceManager.shared.loadPinnedOfficial() {
+            restoreFoundingMomentIfMissing(
+                promptText: "When we became official",
+                image: officialImage,
+                pinnedAt: Date()
+            )
+        }
 
-        if let firstMetImage = pinnedFirstMet ?? DataPersistenceManager.shared.loadPinnedFirstMet() {
+        if let firstMetImage = DataPersistenceManager.shared.loadPinnedFirstMet() {
             restoreFoundingMomentIfMissing(
                 promptText: "When we first met",
                 image: firstMetImage,
@@ -727,6 +729,9 @@ final class HomeViewModel: ObservableObject {
 
     func removeMoments(from section: DaySection) {
         let momentIdsToRemove = Set(section.moments.map { $0.id })
+        for moment in section.moments where moment.isReel {
+            MomentVideoStore.shared.delete(for: moment.id)
+        }
         moments.removeAll { momentIdsToRemove.contains($0.id) }
     }
     
@@ -840,6 +845,9 @@ final class HomeViewModel: ObservableObject {
     }
 
     func deleteMoment(_ moment: Moment) {
+        if moment.isReel {
+            MomentVideoStore.shared.delete(for: moment.id)
+        }
         moments.removeAll { $0.id == moment.id }
     }
     
@@ -870,6 +878,15 @@ final class HomeViewModel: ObservableObject {
                     }
                 }
                 
+                var videoFileName: String?
+                if let polaroidVideoFileName = entry.videoFileName {
+                    MomentVideoStore.shared.importFromPolaroid(
+                        momentId: entry.id,
+                        polaroidFileName: polaroidVideoFileName
+                    )
+                    videoFileName = MomentVideoStore.shared.fileName(for: entry.id)
+                }
+
                 let moment = Moment(
                     id: entry.id,
                     dateTaken: entry.capturedAt,
@@ -879,7 +896,8 @@ final class HomeViewModel: ObservableObject {
                     isLocked: isLocked,
                     unlockTime: unlockTime,
                     latitude: entry.latitude,
-                    longitude: entry.longitude
+                    longitude: entry.longitude,
+                    videoFileName: videoFileName
                 )
                 newMoments.append(moment)
             }

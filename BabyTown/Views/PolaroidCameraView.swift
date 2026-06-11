@@ -627,8 +627,11 @@ struct PolaroidCameraView: View {
                 let image = thumbnail ?? UIImage()
                 lastCaptureWasVibe = false
                 await handleCapturedPhoto(image, videoSourceURL: videoURL)
-                if saveToPhotosEnabled, let thumbnail {
-                    saveImageToPhotosLibrary(thumbnail)
+                if saveToPhotosEnabled {
+                    saveVideoToPhotosLibrary(videoURL)
+                    if let thumbnail {
+                        saveImageToPhotosLibrary(thumbnail)
+                    }
                 }
             }
         }
@@ -689,6 +692,12 @@ struct PolaroidCameraView: View {
     private func saveImageToPhotosLibrary(_ image: UIImage) {
         PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }
+    }
+
+    private func saveVideoToPhotosLibrary(_ videoURL: URL) {
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
         }
     }
 

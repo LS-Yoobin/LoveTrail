@@ -84,6 +84,7 @@ struct FirstMemoriesView: View {
                 )
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
 
             PhotosPicker(
                 selection: $viewModel.firstMetItem,
@@ -97,6 +98,7 @@ struct FirstMemoriesView: View {
                 )
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 20)
     }

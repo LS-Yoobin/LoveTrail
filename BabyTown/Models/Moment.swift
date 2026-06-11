@@ -18,6 +18,7 @@ struct Moment: Identifiable, Codable {
     var isAddedFromOnThisDay: Bool
     var isPlaceNameUserSet: Bool
     var country: String?
+    var videoFileName: String?
 
     /// Thumbnail bytes live on disk (via `ThumbnailStore`), not in this struct, so loading
     /// many moments doesn't decode every image into RAM. Resolves cache → disk → placeholder.
@@ -28,10 +29,18 @@ struct Moment: Identifiable, Codable {
     static let missingThumbnailPlaceholder = UIImage(systemName: "photo") ?? UIImage()
 
     enum CodingKeys: String, CodingKey {
-        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay, isPlaceNameUserSet, country
+        case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay, isPlaceNameUserSet, country, videoFileName
+    }
+
+    var isReel: Bool {
+        resolvedVideoURL != nil
+    }
+
+    var resolvedVideoURL: URL? {
+        MomentVideoStore.shared.resolvedURL(for: id, fileName: videoFileName)
     }
     
-    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil, isAddedFromOnThisDay: Bool = false, isPlaceNameUserSet: Bool = false, country: String? = nil) {
+    init(id: UUID, dateTaken: Date, assetIdentifier: String? = nil, thumbnail: UIImage, placeName: String? = nil, caption: String? = nil, voiceNotePath: String? = nil, promptText: String? = nil, isPinned: Bool = false, pinnedAt: Date? = nil, isLocked: Bool = false, unlockTime: Date? = nil, latitude: Double? = nil, longitude: Double? = nil, isAddedFromOnThisDay: Bool = false, isPlaceNameUserSet: Bool = false, country: String? = nil, videoFileName: String? = nil) {
         self.id = id
         self.dateTaken = dateTaken
         self.assetIdentifier = assetIdentifier
@@ -49,6 +58,7 @@ struct Moment: Identifiable, Codable {
         self.isAddedFromOnThisDay = isAddedFromOnThisDay
         self.isPlaceNameUserSet = isPlaceNameUserSet
         self.country = country
+        self.videoFileName = videoFileName
     }
     
     init(from decoder: Decoder) throws {
@@ -69,6 +79,7 @@ struct Moment: Identifiable, Codable {
         isAddedFromOnThisDay = try container.decodeIfPresent(Bool.self, forKey: .isAddedFromOnThisDay) ?? false
         isPlaceNameUserSet = try container.decodeIfPresent(Bool.self, forKey: .isPlaceNameUserSet) ?? false
         country = try container.decodeIfPresent(String.self, forKey: .country)
+        videoFileName = try container.decodeIfPresent(String.self, forKey: .videoFileName)
 
         // Legacy data stored the JPEG inline. Migrate it to disk immediately (and cache for
         // display); the next save drops `thumbnailData` from the JSON.
@@ -95,6 +106,7 @@ struct Moment: Identifiable, Codable {
         try container.encode(isAddedFromOnThisDay, forKey: .isAddedFromOnThisDay)
         try container.encode(isPlaceNameUserSet, forKey: .isPlaceNameUserSet)
         try container.encodeIfPresent(country, forKey: .country)
+        try container.encodeIfPresent(videoFileName, forKey: .videoFileName)
         // Thumbnail bytes are persisted separately by `ThumbnailStore`, not inline here.
     }
     

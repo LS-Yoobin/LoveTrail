@@ -413,11 +413,7 @@ struct MomentPhotoViewer: View {
 
         return TabView(selection: $currentIndex) {
             ForEach(Array(updatedMoments.enumerated()), id: \.element.id) { index, moment in
-                Image(uiImage: moment.thumbnail)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+                momentHeroContent(moment, index: index)
                     .tag(index)
             }
         }
@@ -527,6 +523,35 @@ struct MomentPhotoViewer: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    @ViewBuilder
+    private func momentHeroContent(_ moment: Moment, index: Int) -> some View {
+        if let videoURL = moment.resolvedVideoURL {
+            ReelPlayerView(url: videoURL, style: .hero, isActive: index == currentIndex)
+                .frame(maxWidth: .infinity)
+                .clipped()
+        } else {
+            Image(uiImage: moment.thumbnail)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .clipped()
+        }
+    }
+
+    @ViewBuilder
+    private func momentImmersiveContent(_ moment: Moment, index: Int) -> some View {
+        if let videoURL = moment.resolvedVideoURL {
+            ReelPlayerView(url: videoURL, style: .immersive, isActive: index == currentIndex)
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Image(uiImage: moment.thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
     // MARK: - Immersive photo
 
     private var immersivePhotoView: some View {
@@ -535,10 +560,7 @@ struct MomentPhotoViewer: View {
 
             TabView(selection: $currentIndex) {
                 ForEach(Array(updatedMoments.enumerated()), id: \.element.id) { index, moment in
-                    Image(uiImage: moment.thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    momentImmersiveContent(moment, index: index)
                         .tag(index)
                 }
             }

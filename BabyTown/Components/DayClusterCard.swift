@@ -342,6 +342,11 @@ struct DayClusterCard: View {
                             TimeUntilUnlockView(unlockTime: unlockTime)
                         }
                     }
+                } else if moment.isReel {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
                 }
             }
         }

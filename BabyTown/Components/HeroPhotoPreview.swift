@@ -14,8 +14,8 @@ struct HeroPhotoPreview: View {
             if let image {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 320)
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .id(ObjectIdentifier(image))
                     .transition(.opacity)
