@@ -337,7 +337,6 @@ struct HomeView: View {
                 .onAppear {
                     viewModel.checkAndReleasePhotos()
                     viewModel.refreshOnThisDay()
-                    AudioManager.shared.playHomeMusic()
                 }
                 .onChange(of: viewModel.moments.count) { oldCount, newCount in
                     if newCount > oldCount {

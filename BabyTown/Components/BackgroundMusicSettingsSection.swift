@@ -53,7 +53,7 @@ struct BackgroundMusicSettingsSection: View {
         } header: {
             Text("Background Music")
         } footer: {
-            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. Songs play on the home screen and in Secret Garden → Our Song.")
+            Text("Screen-record a song in Spotify, Apple Music, or YouTube, then import the recording here. Songs play in Secret Garden → Our Song when you open your couple space.")
         }
         .onAppear {
             importCoordinator.clearStatus()

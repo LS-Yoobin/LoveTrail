@@ -93,7 +93,9 @@ final class BackgroundMusicImportCoordinator: ObservableObject {
 
     func beginPlayback(for track: CouplePlaylistTrack) {
         CouplePlaylistStore.setNowPlaying(id: track.id)
-        AudioManager.shared.reloadHomeMusic()
+        if AudioManager.shared.gardenIsActive {
+            AudioManager.shared.reloadGardenMusic()
+        }
         CoupleMusicPlaybackState.shared.refreshFromStore()
     }
 

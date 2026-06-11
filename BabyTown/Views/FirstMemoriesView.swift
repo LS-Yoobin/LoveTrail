@@ -4,6 +4,7 @@ import PhotosUI
 struct FirstMemoriesView: View {
 
     @StateObject private var viewModel = FirstMemoriesViewModel()
+    @State private var hasFinished = false
 
     var onBack: () -> Void
     var onFinished: (_ firstMet: UIImage?, _ official: UIImage, _ firstMetDate: Date?, _ officialDate: Date?) -> Void
@@ -13,15 +14,22 @@ struct FirstMemoriesView: View {
             background
 
             VStack(spacing: 0) {
-                titleSection
-                heroSection
-                cardsSection
-                Spacer()
+                ScrollView {
+                    VStack(spacing: 0) {
+                        titleSection
+                        heroSection
+                        cardsSection
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+
                 VStack(spacing: 14) {
                     doneButton
                     OnboardingLegalLinks()
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .onChange(of: viewModel.firstMetItem) { _, _ in
             Task { await viewModel.handleFirstMetSelection() }
@@ -82,9 +90,10 @@ struct FirstMemoriesView: View {
                     subtitle: "The day you said yes",
                     image: officialImage
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             PhotosPicker(
                 selection: $viewModel.firstMetItem,
@@ -96,10 +105,12 @@ struct FirstMemoriesView: View {
                     image: firstMetImage,
                     isOptional: true
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
     }
 
@@ -107,7 +118,8 @@ struct FirstMemoriesView: View {
 
     private var doneButton: some View {
         Button { [viewModel] in
-            guard let official = viewModel.officialImage else { return }
+            guard !hasFinished, let official = viewModel.officialImage else { return }
+            hasFinished = true
             onFinished(viewModel.firstMetImage, official, viewModel.firstMetDate, viewModel.officialDate)
         } label: {
             Text("Done")
@@ -137,7 +149,7 @@ struct FirstMemoriesView: View {
                         )
                 )
         }
-        .disabled(!viewModel.canFinish)
+        .disabled(!viewModel.canFinish || hasFinished)
         .padding(.horizontal, 40)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.3), value: viewModel.canFinish)

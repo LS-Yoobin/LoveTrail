@@ -89,16 +89,18 @@ struct CoupleSongTrimSheet: View {
     }
 
     private func pauseHomeMusicIfNeeded() {
+        guard AudioManager.shared.gardenIsActive else { return }
         guard !didPauseHomeMusic else { return }
         didPauseHomeMusic = CoupleMusicPlaybackState.shared.isPlaying
         if didPauseHomeMusic {
-            AudioManager.shared.stopHomeMusic()
+            AudioManager.shared.pauseGardenMusic()
         }
     }
 
     private func resumeHomeMusicIfNeeded() {
+        guard AudioManager.shared.gardenIsActive else { return }
         guard didPauseHomeMusic else { return }
         didPauseHomeMusic = false
-        AudioManager.shared.playHomeMusic()
+        AudioManager.shared.resumeGardenMusic()
     }
 }

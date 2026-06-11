@@ -191,8 +191,8 @@ struct CoupleSongEditSheet: View {
                 try CouplePlaylistStore.replaceAudio(for: track.id, from: trimmedURL)
             }
 
-            if CouplePlaylistStore.nowPlayingID == track.id {
-                AudioManager.shared.reloadHomeMusic()
+            if CouplePlaylistStore.nowPlayingID == track.id, AudioManager.shared.gardenIsActive {
+                AudioManager.shared.reloadGardenMusic()
             }
             CoupleMusicPlaybackState.shared.refreshFromStore()
             onSaved()
@@ -202,16 +202,18 @@ struct CoupleSongEditSheet: View {
     }
 
     private func pauseHomeMusicIfNeeded() {
+        guard AudioManager.shared.gardenIsActive else { return }
         guard !didPauseHomeMusic else { return }
         didPauseHomeMusic = CoupleMusicPlaybackState.shared.isPlaying
         if didPauseHomeMusic {
-            AudioManager.shared.stopHomeMusic()
+            AudioManager.shared.pauseGardenMusic()
         }
     }
 
     private func resumeHomeMusicIfNeeded() {
+        guard AudioManager.shared.gardenIsActive else { return }
         guard didPauseHomeMusic else { return }
         didPauseHomeMusic = false
-        AudioManager.shared.playHomeMusic()
+        AudioManager.shared.resumeGardenMusic()
     }
 }

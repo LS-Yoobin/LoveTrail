@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 import PhotosUI
 
 struct PhotoPickerView: UIViewControllerRepresentable {
@@ -8,7 +9,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration()
+        var config = PHPickerConfiguration(photoLibrary: .shared())
         config.selectionLimit = selectionLimit
         config.filter = .images
         

@@ -197,6 +197,32 @@ final class HomeViewModel: ObservableObject {
         return foundingPrompts.contains(prompt)
     }
 
+    /// Older onboarding appended founding rows instead of replacing them — keep one pinned + one unpinned.
+    private func repairDuplicateFoundingMoments() {
+        var updated = moments
+        var changed = false
+
+        for prompt in Self.foundingPrompts {
+            let matches = updated.filter { $0.promptText == prompt }
+            let pinnedMatches = matches.filter(\.isPinned)
+            let unpinnedMatches = matches.filter { !$0.isPinned }
+            guard pinnedMatches.count > 1 || unpinnedMatches.count > 1 else { continue }
+
+            let pinned = pinnedMatches
+                .max(by: { ($0.pinnedAt ?? .distantPast) < ($1.pinnedAt ?? .distantPast) })
+            let unpinned = unpinnedMatches.first
+
+            updated.removeAll { $0.promptText == prompt }
+            if let pinned { updated.append(pinned) }
+            if let unpinned { updated.append(unpinned) }
+            changed = true
+        }
+
+        if changed {
+            moments = updated
+        }
+    }
+
     /// Timeline cards use unpinned founding rows; repair data that only has a pinned copy.
     private func ensureFoundingTimelineMoments() {
         var updated = moments
@@ -413,6 +439,7 @@ final class HomeViewModel: ObservableObject {
         }
         
         isInitializing = false
+        repairDuplicateFoundingMoments()
         ensureFoundingTimelineMoments()
         ensureFoundingMomentsFromPinnedPhotos()
         refreshDaySections()

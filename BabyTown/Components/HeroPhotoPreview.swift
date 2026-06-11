@@ -5,25 +5,26 @@ struct HeroPhotoPreview: View {
     let image: UIImage?
 
     var body: some View {
-        ZStack {
-            if image == nil {
-                placeholderView
-                    .transition(.opacity)
-            }
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 320)
+            .overlay {
+                ZStack {
+                    if image == nil {
+                        placeholderView
+                            .transition(.opacity)
+                    }
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .id(ObjectIdentifier(image))
-                    .transition(.opacity)
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .id(ObjectIdentifier(image))
+                            .transition(.opacity)
+                    }
+                }
             }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 320)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
         .background(
             RoundedRectangle(cornerRadius: 24)
                 .fill(BabyTownTheme.accent.opacity(0.04))

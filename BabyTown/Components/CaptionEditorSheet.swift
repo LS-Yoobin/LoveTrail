@@ -17,6 +17,7 @@ struct CaptionEditorSheet: View {
     @FocusState private var isTextFieldFocused: Bool
     @State private var showSystemGallery = false
     @State private var isEditingPhotos = false
+    @State private var showNoPhotosAlert = false
     @StateObject private var photoGalleryVM = MemoryMomentPhotoGalleryViewModel()
     
     // Location editing (fastblog-style flow)
@@ -122,18 +123,23 @@ struct CaptionEditorSheet: View {
                 photoGalleryVM.prepare(from: section)
                 isTextFieldFocused = true
             }
-            .fullScreenCover(isPresented: $showSystemGallery) {
+            .sheet(isPresented: $showSystemGallery) {
                 PhotoPickerView(
                     selectedImages: .constant([]),
                     selectionLimit: 0,
                     onFinish: { results in
                         showSystemGallery = false
                         Task {
-                            await photoGalleryVM.incorporatePickerResults(results)
+                            await photoGalleryVM.incorporatePickerResults(results, from: section)
                         }
                     }
                 )
                 .ignoresSafeArea()
+            }
+            .alert("Add at least one photo", isPresented: $showNoPhotosAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This memory needs at least one photo.")
             }
             .sheet(isPresented: $showMapTapPOIDisambiguation) {
                 poiDisambiguationSheet
@@ -457,26 +463,22 @@ struct CaptionEditorSheet: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 80, height: 80)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            
-            if photoGalleryVM.selectedCount > 1 {
-                Button {
-                    if section.moments.contains(where: { $0.id == moment.id }) {
-                        onRemovePhoto?(moment.id)
-                    }
-                    photoGalleryVM.removeMomentFromEditingSelection(moment)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                        .background(
-                            Circle()
-                                .fill(.black.opacity(0.5))
-                                .frame(width: 20, height: 20)
-                        )
-                }
-                .padding(.top, 5)
-                .padding(.trailing, 5)
+
+            Button {
+                photoGalleryVM.removeMomentFromEditingSelection(moment)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .background(
+                        Circle()
+                            .fill(.black.opacity(0.5))
+                            .frame(width: 20, height: 20)
+                    )
             }
+            .padding(.top, 5)
+            .padding(.trailing, 5)
+            .accessibilityLabel("Remove photo")
         }
     }
     
@@ -887,9 +889,28 @@ struct CaptionEditorSheet: View {
     
     private func saveMemory() {
         guard let firstMoment = section.moments.first else { return }
+        guard photoGalleryVM.selectedCount > 0 else {
+            showNoPhotosAlert = true
+            return
+        }
+
         syncUserSetPlaceFlagFromEdits()
         let trimmedPlace = PlaceNameFormatting.storedName(fromUserInput: editedPlaceName)
         let placeName = trimmedPlace.isEmpty ? nil : trimmedPlace
+
+        let existingOrphanIds = Set(
+            section.moments.filter { $0.assetIdentifier == nil }.map(\.id)
+        )
+        let newOrphanImages = photoGalleryVM.orphanMoments
+            .filter {
+                photoGalleryVM.selectedOrphanMomentIds.contains($0.id)
+                    && !existingOrphanIds.contains($0.id)
+            }
+            .map(\.thumbnail)
+        if !newOrphanImages.isEmpty {
+            onAddPhotos?(newOrphanImages)
+        }
+
         onSyncMemoryPhotos?(photoGalleryVM.selectedAssetIds, photoGalleryVM.selectedOrphanMomentIds)
         onSave(firstMoment.id, captionText, placeName, editedLatitude, editedLongitude, isPlaceNameUserSet)
         dismiss()

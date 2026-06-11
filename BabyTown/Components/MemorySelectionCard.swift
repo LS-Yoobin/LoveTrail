@@ -14,11 +14,11 @@ struct MemorySelectionCard: View {
         HStack(spacing: 14) {
             thumbnailView
             textContent
-            Spacer()
             trailingIcon
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(.white)
@@ -91,7 +91,9 @@ struct MemorySelectionCard: View {
             Text(subtitle)
                 .font(.system(size: 13))
                 .foregroundStyle(.black.opacity(0.6))
+                .lineLimit(2)
         }
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     }
 
     private var trailingIcon: some View {

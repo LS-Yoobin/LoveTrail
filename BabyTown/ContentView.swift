@@ -152,89 +152,37 @@ struct ContentView: View {
                     onFinished: { firstMet, official, firstMetDate, officialDate in
                     firstMetPhoto = firstMet
                     officialPhoto = official
-                    homeViewModel.pinnedFirstMet = firstMet
-                    homeViewModel.pinnedOfficial = official
-                    
-                    // Create moments for the first two memories
-                    var onboardingMoments: [Moment] = []
+
                     let now = Date()
-                    
-                    // Use the actual photo date or fallback to current date
                     let officialPhotoDate = officialDate ?? now
-                    
-                    // Add "When we became official" - both pinned and unpinned versions
-                    let officialMomentPinned = Moment(
-                        id: UUID(),
+
+                    // Replace any prior founding rows (e.g. user went back and changed photos).
+                    homeViewModel.upsertFoundingMoment(
+                        promptText: "When we became official",
+                        image: official,
                         dateTaken: officialPhotoDate,
                         assetIdentifier: nil,
-                        thumbnail: official,
-                        placeName: nil,
-                        caption: nil,
-                        voiceNotePath: nil,
-                        promptText: "When we became official",
-                        isPinned: true,
+                        latitude: nil,
+                        longitude: nil,
                         pinnedAt: now
                     )
-                    onboardingMoments.append(officialMomentPinned)
-                    
-                    let officialMomentUnpinned = Moment(
-                        id: UUID(),
-                        dateTaken: officialPhotoDate,
-                        assetIdentifier: nil,
-                        thumbnail: official,
-                        placeName: nil,
-                        caption: nil,
-                        voiceNotePath: nil,
-                        promptText: "When we became official",
-                        isPinned: false,
-                        pinnedAt: nil
-                    )
-                    onboardingMoments.append(officialMomentUnpinned)
-                    
-                    // Add "When we first met" - both pinned and unpinned versions (if provided)
-                    if let firstMet = firstMet {
-                        // Use the actual photo date or fallback to current date
+
+                    if let firstMet {
                         let firstMetPhotoDate = firstMetDate ?? now
-                        
-                        let firstMetMomentPinned = Moment(
-                            id: UUID(),
+                        homeViewModel.upsertFoundingMoment(
+                            promptText: "When we first met",
+                            image: firstMet,
                             dateTaken: firstMetPhotoDate,
                             assetIdentifier: nil,
-                            thumbnail: firstMet,
-                            placeName: nil,
-                            caption: nil,
-                            voiceNotePath: nil,
-                            promptText: "When we first met",
-                            isPinned: true,
+                            latitude: nil,
+                            longitude: nil,
                             pinnedAt: now.addingTimeInterval(-1)
                         )
-                        onboardingMoments.append(firstMetMomentPinned)
-                        
-                        let firstMetMomentUnpinned = Moment(
-                            id: UUID(),
-                            dateTaken: firstMetPhotoDate,
-                            assetIdentifier: nil,
-                            thumbnail: firstMet,
-                            placeName: nil,
-                            caption: nil,
-                            voiceNotePath: nil,
-                            promptText: "When we first met",
-                            isPinned: false,
-                            pinnedAt: nil
-                        )
-                        onboardingMoments.append(firstMetMomentUnpinned)
-                    }
-                    
-                    DataPersistenceManager.shared.saveFoundingPhotoDate(officialPhotoDate, promptText: "When we became official")
-                    if let firstMetDate {
-                        DataPersistenceManager.shared.saveFoundingPhotoDate(firstMetDate, promptText: "When we first met")
                     }
 
-                    homeViewModel.addMoments(onboardingMoments)
-                    
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .howItWorks
-                        }
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .howItWorks
+                    }
                     }
                 )
                 .transition(.opacity)

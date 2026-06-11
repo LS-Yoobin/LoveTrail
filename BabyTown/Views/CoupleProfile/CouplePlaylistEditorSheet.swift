@@ -131,7 +131,9 @@ struct CouplePlaylistEditorSheet: View {
     private func selectTrack(_ track: CouplePlaylistTrack) {
         CouplePlaylistStore.setNowPlaying(id: track.id)
         nowPlayingID = track.id
-        AudioManager.shared.reloadHomeMusic()
+        if AudioManager.shared.gardenIsActive {
+            AudioManager.shared.reloadGardenMusic()
+        }
         playbackState.refreshFromStore()
         if dismissOnSelect {
             dismiss()
@@ -145,13 +147,15 @@ struct CouplePlaylistEditorSheet: View {
             CouplePlaylistStore.removeTrack(id: track.id)
         }
         reload()
-        AudioManager.shared.reloadHomeMusic()
+        if AudioManager.shared.gardenIsActive {
+            AudioManager.shared.reloadGardenMusic()
+        }
         playbackState.refreshFromStore()
     }
 
     private func removeAllSongs() {
         CouplePlaylistStore.clearAll()
-        AudioManager.shared.stopHomeMusic()
+        AudioManager.shared.stopGardenMusic()
         playbackState.refreshFromStore()
         dismiss()
     }

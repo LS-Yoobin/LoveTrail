@@ -93,7 +93,6 @@ final class MemoryMomentPhotoGalleryViewModel: ObservableObject {
     func toggleSelection(_ asset: PHAsset) {
         let id = asset.localIdentifier
         if selectedAssetIds.contains(id) {
-            guard selectedCount > 1 else { return }
             selectedAssetIds.remove(id)
         } else {
             selectedAssetIds.insert(id)
@@ -102,7 +101,6 @@ final class MemoryMomentPhotoGalleryViewModel: ObservableObject {
 
     func toggleOrphanMoment(_ moment: Moment) {
         if selectedOrphanMomentIds.contains(moment.id) {
-            guard selectedCount > 1 else { return }
             selectedOrphanMomentIds.remove(moment.id)
         } else {
             selectedOrphanMomentIds.insert(moment.id)
@@ -118,21 +116,58 @@ final class MemoryMomentPhotoGalleryViewModel: ObservableObject {
         }
     }
 
-    func incorporatePickerResults(_ results: [PHPickerResult]) async {
+    func incorporatePickerResults(_ results: [PHPickerResult], from section: DaySection) async {
+        guard !results.isEmpty else { return }
+        guard let template = section.moments.first else { return }
+
         var newlyAdded: [PHAsset] = []
         for result in results {
-            guard let id = result.assetIdentifier else { continue }
-            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-            guard let asset = fetched.firstObject else { continue }
-            selectedAssetIds.insert(id)
-            if !assets.contains(where: { $0.localIdentifier == id }) {
-                assets.append(asset)
-                newlyAdded.append(asset)
+            if let id = result.assetIdentifier {
+                let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                if let asset = fetched.firstObject {
+                    selectedAssetIds.insert(id)
+                    if !assets.contains(where: { $0.localIdentifier == id }) {
+                        assets.append(asset)
+                        newlyAdded.append(asset)
+                    }
+                    continue
+                }
             }
+
+            guard let image = await loadImage(from: result.itemProvider) else { continue }
+            let moment = Moment(
+                id: UUID(),
+                dateTaken: Date(),
+                assetIdentifier: nil,
+                thumbnail: image,
+                placeName: template.placeName,
+                caption: template.caption,
+                voiceNotePath: template.voiceNotePath,
+                promptText: template.promptText,
+                isPinned: template.isPinned,
+                pinnedAt: template.pinnedAt,
+                isLocked: template.isLocked,
+                unlockTime: template.unlockTime,
+                latitude: template.latitude,
+                longitude: template.longitude,
+                isPlaceNameUserSet: template.isPlaceNameUserSet,
+                country: template.country
+            )
+            orphanMoments.append(moment)
+            selectedOrphanMomentIds.insert(moment.id)
         }
+
         if !newlyAdded.isEmpty {
             assets.sort { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
             prefetchThumbnails(for: newlyAdded)
+        }
+    }
+
+    private func loadImage(from provider: NSItemProvider) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                continuation.resume(returning: object as? UIImage)
+            }
         }
     }
 

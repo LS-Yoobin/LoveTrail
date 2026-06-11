@@ -278,7 +278,10 @@ struct CoupleProfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             load()
-            AudioManager.shared.playHomeMusic()
+            AudioManager.shared.setGardenActive(true)
+        }
+        .onDisappear {
+            AudioManager.shared.setGardenActive(false)
         }
         .sheet(isPresented: $showOurSongSheet) {
             OurSongSheet()

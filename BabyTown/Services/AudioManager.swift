@@ -13,6 +13,10 @@ class AudioManager: NSObject {
     private var shuffleQueue: [UUID] = []
     private var shuffleQueueIndex = 0
     private var currentPlayingTrackID: UUID?
+    private var isGardenActive = false
+    private var isUserPaused = false
+
+    var gardenIsActive: Bool { isGardenActive }
 
     private override init() {
         super.init()
@@ -21,7 +25,19 @@ class AudioManager: NSObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.reloadHomeMusic()
+            guard self?.isGardenActive == true else { return }
+            self?.reloadGardenMusic()
+        }
+    }
+
+    func setGardenActive(_ active: Bool) {
+        isGardenActive = active
+        if active {
+            isUserPaused = false
+            playGardenMusic()
+        } else {
+            stopGardenMusic()
+            isUserPaused = false
         }
     }
 
@@ -65,44 +81,101 @@ class AudioManager: NSObject {
         audioPlayer = nil
     }
 
-    func playHomeMusic() {
+    func playGardenMusic() {
+        guard isGardenActive else { return }
         stopMusic()
         _ = CouplePlaylistStore.tracks
         if CouplePlaylistStore.hasTracks {
             playCurrentPlaylistTrack()
         } else {
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
         }
     }
 
-    func reloadHomeMusic() {
-        stopHomeMusic()
+    func reloadGardenMusic() {
+        guard isGardenActive else { return }
+        stopBundledGardenMusic()
+        currentPlayingTrackID = nil
         resetShuffleQueue()
-        playHomeMusic()
+        if CouplePlaylistStore.hasTracks {
+            playCurrentPlaylistTrack()
+        } else {
+            stopGardenMusicForEmptyPlaylist()
+        }
     }
 
-    private var isHomeMusicPlaying: Bool {
+    func pauseGardenMusic() {
+        guard isGardenActive else { return }
+        homeAudioPlayer?.pause()
+        isUserPaused = true
+        updatePlaybackState(isPlaying: false, track: resolvedNowPlayingTrack())
+    }
+
+    func resumeGardenMusic() {
+        guard isGardenActive, CouplePlaylistStore.hasTracks else { return }
+        isUserPaused = false
+        if let player = homeAudioPlayer {
+            player.play()
+            updatePlaybackState(isPlaying: true, track: resolvedNowPlayingTrack())
+        } else {
+            playCurrentPlaylistTrack()
+        }
+    }
+
+    func toggleGardenPlayback() {
+        if isGardenMusicPlaying {
+            pauseGardenMusic()
+        } else {
+            resumeGardenMusic()
+        }
+    }
+
+    func skipToNextTrack() {
+        guard isGardenActive, CouplePlaylistStore.hasTracks else { return }
+        guard let nextID = nextTrackID() else { return }
+        CouplePlaylistStore.setNowPlaying(id: nextID)
+        stopBundledGardenMusic()
+        currentPlayingTrackID = nil
+        resetShuffleQueueIfNeeded()
+        playCurrentPlaylistTrack()
+    }
+
+    func skipToPreviousTrack() {
+        guard isGardenActive, CouplePlaylistStore.hasTracks else { return }
+        guard let previousID = previousTrackID() else { return }
+        CouplePlaylistStore.setNowPlaying(id: previousID)
+        stopBundledGardenMusic()
+        currentPlayingTrackID = nil
+        playCurrentPlaylistTrack()
+    }
+
+    private var isGardenMusicPlaying: Bool {
         if let player = homeAudioPlayer, player.isPlaying { return true }
         return false
     }
 
     private func playCurrentPlaylistTrack() {
+        guard isGardenActive else { return }
         guard let track = resolvedNowPlayingTrack() else {
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
             return
         }
         let url = CouplePlaylistStore.audioURL(for: track)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
             return
         }
 
-        if currentPlayingTrackID == track.id, isHomeMusicPlaying {
+        if currentPlayingTrackID == track.id, isGardenMusicPlaying {
             updatePlaybackState(isPlaying: true, track: track)
             return
         }
+        if currentPlayingTrackID == track.id, homeAudioPlayer != nil, isUserPaused {
+            updatePlaybackState(isPlaying: false, track: track)
+            return
+        }
 
-        stopBundledHomeMusic()
+        stopBundledGardenMusic()
         currentPlayingTrackID = track.id
 
         do {
@@ -112,13 +185,17 @@ class AudioManager: NSObject {
             player.numberOfLoops = CouplePlaylistStore.repeatEnabled ? -1 : 0
             player.volume = 0.3
             player.prepareToPlay()
-            player.play()
             homeAudioPlayer = player
-            updatePlaybackState(isPlaying: true, track: track)
+            if isUserPaused {
+                updatePlaybackState(isPlaying: false, track: track)
+            } else {
+                player.play()
+                updatePlaybackState(isPlaying: true, track: track)
+            }
         } catch {
-            print("Error playing imported home music: \(error.localizedDescription)")
+            print("Error playing imported garden music: \(error.localizedDescription)")
             currentPlayingTrackID = nil
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
         }
     }
 
@@ -126,19 +203,19 @@ class AudioManager: NSObject {
         CouplePlaylistStore.nowPlayingTrack
     }
 
-    private func stopHomeMusicForEmptyPlaylist() {
+    private func stopGardenMusicForEmptyPlaylist() {
         currentPlayingTrackID = nil
-        stopBundledHomeMusic()
+        stopBundledGardenMusic()
         updatePlaybackState(isPlaying: false, track: nil)
     }
 
-    func stopHomeMusic() {
-        stopBundledHomeMusic()
+    func stopGardenMusic() {
+        stopBundledGardenMusic()
         currentPlayingTrackID = nil
         updatePlaybackState(isPlaying: false, track: CouplePlaylistStore.nowPlayingTrack)
     }
 
-    private func stopBundledHomeMusic() {
+    private func stopBundledGardenMusic() {
         if let player = homeAudioPlayer, player.isPlaying {
             player.stop()
         }
@@ -147,7 +224,7 @@ class AudioManager: NSObject {
 
     private func advanceToNextTrack() {
         guard CouplePlaylistStore.hasTracks else {
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
             return
         }
 
@@ -157,7 +234,7 @@ class AudioManager: NSObject {
         }
 
         guard let nextID = nextTrackID() else {
-            stopHomeMusicForEmptyPlaylist()
+            stopGardenMusicForEmptyPlaylist()
             return
         }
 
@@ -192,6 +269,29 @@ class AudioManager: NSObject {
         }
         let nextIndex = (currentIndex + 1) % ordered.count
         return ordered[nextIndex].id
+    }
+
+    private func previousTrackID() -> UUID? {
+        let ordered = CouplePlaylistStore.tracks
+        guard !ordered.isEmpty else { return nil }
+
+        if CouplePlaylistStore.shuffleEnabled {
+            if shuffleQueue.isEmpty {
+                rebuildShuffleQueue(avoidingFirst: nil)
+            }
+            let current = currentPlayingTrackID ?? CouplePlaylistStore.nowPlayingID
+            if let current, let idx = shuffleQueue.firstIndex(of: current), idx > 0 {
+                return shuffleQueue[idx - 1]
+            }
+            return shuffleQueue.last ?? ordered.last?.id
+        }
+
+        guard let current = currentPlayingTrackID ?? CouplePlaylistStore.nowPlayingID,
+              let currentIndex = ordered.firstIndex(where: { $0.id == current }) else {
+            return ordered.last?.id
+        }
+        let previousIndex = (currentIndex - 1 + ordered.count) % ordered.count
+        return ordered[previousIndex].id
     }
 
     private func rebuildShuffleQueue(avoidingFirst avoidID: UUID?) {
