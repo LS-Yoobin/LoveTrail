@@ -63,6 +63,10 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("prelude_chapter.json")
     }
 
+    private var archiveBundleFileURL: URL {
+        documentsDirectory.appendingPathComponent("archive_bundle.json")
+    }
+
     private var preludeVoiceMemosDirectory: URL {
         documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
     }
@@ -442,6 +446,26 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: preludeVoiceMemoURL(fileId: fileId))
     }
 
+    // MARK: - Archive
+
+    func saveArchiveBundle(_ bundle: ArchiveBundle) {
+        guard let data = try? encoder.encode(bundle) else { return }
+        try? data.write(to: archiveBundleFileURL)
+    }
+
+    func loadArchiveBundle() -> ArchiveBundle? {
+        guard fileManager.fileExists(atPath: archiveBundleFileURL.path),
+              let data = try? Data(contentsOf: archiveBundleFileURL),
+              let bundle = try? decoder.decode(ArchiveBundle.self, from: data) else {
+            return nil
+        }
+        return bundle
+    }
+
+    func deleteArchiveBundle() {
+        try? fileManager.removeItem(at: archiveBundleFileURL)
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
@@ -545,6 +569,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: preludeCapturesFileURL)
         try? fileManager.removeItem(at: preludeChapterFileURL)
         try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
+        try? fileManager.removeItem(at: archiveBundleFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
