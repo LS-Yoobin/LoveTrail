@@ -21,6 +21,14 @@ struct CoupleProfile: Codable, Equatable {
     var watchTogetherTVPosition: NormalizedPoint?
     /// Garden canvas scale for the Watch Together TV; `nil` uses `WatchTogetherTVView.gardenDefaultScale`.
     var watchTogetherTVScale: CGFloat?
+    /// Shared couple identifier set by the backend when two users are linked.
+    var coupleId: String?
+    /// The date on which the couple broke up; `nil` when still together.
+    var breakupDate: Date?
+    /// Expiry date of the archive window after a breakup; data is deleted after this date.
+    var archiveExpiryDate: Date?
+    /// Whether the local user has "stepped out" of the relationship (soft-breakup initiator flag).
+    var hasSteppedOut: Bool
     var relationshipStage: RelationshipStage
     var inviteSent: Bool
 
@@ -34,6 +42,10 @@ struct CoupleProfile: Codable, Equatable {
         recordPlayerScale: CGFloat? = nil,
         watchTogetherTVPosition: NormalizedPoint? = nil,
         watchTogetherTVScale: CGFloat? = nil,
+        coupleId: String? = nil,
+        breakupDate: Date? = nil,
+        archiveExpiryDate: Date? = nil,
+        hasSteppedOut: Bool = false,
         relationshipStage: RelationshipStage = .prelude,
         inviteSent: Bool = false
     ) {
@@ -46,6 +58,10 @@ struct CoupleProfile: Codable, Equatable {
         self.recordPlayerScale = recordPlayerScale
         self.watchTogetherTVPosition = watchTogetherTVPosition
         self.watchTogetherTVScale = watchTogetherTVScale
+        self.coupleId = coupleId
+        self.breakupDate = breakupDate
+        self.archiveExpiryDate = archiveExpiryDate
+        self.hasSteppedOut = hasSteppedOut
         self.relationshipStage = relationshipStage
         self.inviteSent = inviteSent
     }
@@ -54,6 +70,7 @@ struct CoupleProfile: Codable, Equatable {
         case displayName, specialDates, stickers, profileNote, profileNotePosition
         case recordPlayerPosition, recordPlayerScale
         case watchTogetherTVPosition, watchTogetherTVScale
+        case coupleId, breakupDate, archiveExpiryDate, hasSteppedOut
         case relationshipStage, inviteSent
     }
 
@@ -68,6 +85,10 @@ struct CoupleProfile: Codable, Equatable {
         recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)
         watchTogetherTVPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .watchTogetherTVPosition)
         watchTogetherTVScale = try c.decodeIfPresent(CGFloat.self, forKey: .watchTogetherTVScale)
+        coupleId = try c.decodeIfPresent(String.self, forKey: .coupleId)
+        breakupDate = try c.decodeIfPresent(Date.self, forKey: .breakupDate)
+        archiveExpiryDate = try c.decodeIfPresent(Date.self, forKey: .archiveExpiryDate)
+        hasSteppedOut = try c.decodeIfPresent(Bool.self, forKey: .hasSteppedOut) ?? false
         relationshipStage = try c.decodeIfPresent(RelationshipStage.self, forKey: .relationshipStage) ?? .prelude
         inviteSent = try c.decodeIfPresent(Bool.self, forKey: .inviteSent) ?? false
     }
