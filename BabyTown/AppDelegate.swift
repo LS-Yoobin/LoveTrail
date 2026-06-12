@@ -3,6 +3,8 @@ import UserNotifications
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
+    static let openScrapbookNotificationName = Notification.Name("OpenScrapbookNotification")
+
     func application(
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
@@ -36,6 +38,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         }
         if identifier == "daily_morning_notification" {
             NotificationCenter.default.post(name: NotificationManager.openCameraNotificationName, object: nil)
+        } else if identifier == "archive_7_day" || identifier == "archive_3_day" {
+            NotificationCenter.default.post(name: AppDelegate.openScrapbookNotificationName, object: nil)
         } else if identifier == "archive_expired" {
             Task { @MainActor in
                 var profile = DataPersistenceManager.shared.loadCoupleProfile()

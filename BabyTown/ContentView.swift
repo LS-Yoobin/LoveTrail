@@ -318,6 +318,14 @@ struct ContentView: View {
                 screen = .selectPhotos
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: AppDelegate.openScrapbookNotificationName)) { _ in
+            let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
+            if stage == .archivedCouple {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    screen = .archivedCouple
+                }
+            }
+        }
         .task {
             StoreManager.shared.start()
         }
