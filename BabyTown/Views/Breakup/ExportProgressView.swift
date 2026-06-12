@@ -18,7 +18,7 @@ struct ExportProgressView: View {
                     .font(.system(size: 20, weight: .semibold, design: .serif))
                 Text(done
                      ? "All memories, dates, and captures included."
-                     : "Gathering your memories and captures")
+                     : "Gathering your memories and captures…")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
