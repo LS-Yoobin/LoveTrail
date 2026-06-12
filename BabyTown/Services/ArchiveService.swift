@@ -1,123 +1,222 @@
+import Combine
 import Foundation
-import GardenCore
+import UserNotifications
 
 @MainActor
-final class ArchiveService {
+final class ArchiveService: ObservableObject {
+
     static let shared = ArchiveService()
 
-    private let persistence = DataPersistenceManager.shared
-    private let api: ArchiveAPIClientProtocol = StubArchiveAPIClient.shared
+    @Published var isUploading: Bool = false
+    @Published var uploadProgress: Double = 0
+
+    private let dpm = DataPersistenceManager.shared
 
     private init() {}
 
-    // MARK: - Breakup Initiation
+    // MARK: - Breakup
 
-    /// Uploads all media, creates the server-side archive bundle, and transitions the
-    /// local profile to `archivedCouple`. `progress` is called with 0.0–1.0 as
-    /// each moment is uploaded.
-    func initiateBreakup(progress: @escaping @Sendable (Double) -> Void) async throws {
-        let moments = persistence.loadMoments()
-        let profile = persistence.loadCoupleProfile()
-        let petState = persistence.loadPetState()
-        let gardenState = persistence.loadGardenState()
-        let playlist = CouplePlaylistStore.tracks
-        let preludeChapter = persistence.loadPreludeChapter()
+    /// Creates a local ArchiveBundle snapshot from current device state and simulates an upload.
+    /// Updates CoupleProfile to .archivedCouple on completion.
+    func beginBreakup() async {
+        isUploading = true
+        uploadProgress = 0
 
-        let total = max(moments.count, 1)
-        for (index, moment) in moments.enumerated() {
-            try await api.uploadMomentMedia(moment)
-            let fraction = Double(index + 1) / Double(total)
-            progress(fraction)
-        }
-
+        let profile = dpm.loadCoupleProfile()
+        let moments = dpm.loadMoments()
+        let petState = dpm.loadPetState()
+        let preludeChapter = dpm.loadPreludeChapter()
         let breakupDate = Date()
-        let expiryDate = breakupDate.addingTimeInterval(30 * 24 * 60 * 60)
+        let expiryDate = Calendar.current.date(byAdding: .day, value: 30, to: breakupDate)!
 
         let bundle = ArchiveBundle(
-            coupleId: profile.coupleId ?? "",
+            coupleId: "local-\(profile.displayName ?? "couple")-\(Int(breakupDate.timeIntervalSince1970))",
             breakupDate: breakupDate,
             expiryDate: expiryDate,
+            userASteppedOut: false,
+            userBSteppedOut: false,
             moments: moments,
             coupleProfile: profile,
             petState: petState,
-            gardenState: gardenState,
-            playlist: playlist,
             preludeChapter: preludeChapter
         )
-        try await api.createArchiveBundle(bundle)
-        persistence.saveArchiveBundle(bundle)
+
+        // Simulate upload: 10 steps × 0.2s = 2s total
+        for step in 1...10 {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            uploadProgress = Double(step) / 10.0
+        }
+
+        dpm.saveArchiveBundle(bundle)
 
         var updated = profile
         updated.relationshipStage = .archivedCouple
         updated.breakupDate = breakupDate
         updated.archiveExpiryDate = expiryDate
         updated.hasSteppedOut = false
-        persistence.saveCoupleProfile(updated)
+        dpm.saveCoupleProfile(updated)
+
+        scheduleRetentionNotifications(expiryDate: expiryDate)
+
+        isUploading = false
     }
 
-    // MARK: - Extend Retention
+    // MARK: - Retention
 
-    /// Silently resets the retention clock to `now + 30 days`.
-    func extendRetention() async throws {
-        guard var bundle = persistence.loadArchiveBundle() else { return }
-        let newExpiry = Date().addingTimeInterval(30 * 24 * 60 * 60)
-        try await api.extendRetention(coupleId: bundle.coupleId, newExpiry: newExpiry)
-        bundle.expiryDate = newExpiry
-        persistence.saveArchiveBundle(bundle)
-
-        var profile = persistence.loadCoupleProfile()
+    func extendRetention() {
+        let newExpiry = Calendar.current.date(byAdding: .day, value: 30, to: Date())!
+        var profile = dpm.loadCoupleProfile()
         profile.archiveExpiryDate = newExpiry
-        persistence.saveCoupleProfile(profile)
+        dpm.saveCoupleProfile(profile)
+
+        if var bundle = dpm.loadArchiveBundle() {
+            bundle.expiryDate = newExpiry
+            dpm.saveArchiveBundle(bundle)
+        }
+
+        scheduleRetentionNotifications(expiryDate: newExpiry)
     }
 
     // MARK: - Step Out
 
-    /// Revokes server access, clears local archive, and transitions the profile to `.prelude`.
-    func stepOut() async throws {
-        let profile = persistence.loadCoupleProfile()
-        try await api.stepOut(coupleId: profile.coupleId ?? "")
-        persistence.deleteArchiveBundle()
-
-        var updated = profile
-        updated.relationshipStage = .prelude
-        updated.hasSteppedOut = true
-        updated.breakupDate = nil
-        updated.archiveExpiryDate = nil
-        persistence.saveCoupleProfile(updated)
-    }
-
-    // MARK: - Export
-
-    /// Requests a server-generated ZIP and returns the download URL for the share sheet.
-    func requestExportURL() async throws -> URL {
-        let profile = persistence.loadCoupleProfile()
-        return try await api.generateExportZip(coupleId: profile.coupleId ?? "")
+    func stepOut() {
+        var profile = dpm.loadCoupleProfile()
+        profile.hasSteppedOut = true
+        profile.relationshipStage = .prelude
+        profile.breakupDate = nil
+        profile.archiveExpiryDate = nil
+        dpm.saveCoupleProfile(profile)
+        dpm.deleteArchiveBundle()
+        dpm.clearReconnectInvite()
+        cancelRetentionNotifications()
     }
 
     // MARK: - Reconnect
 
-    func sendReconnectInvite() async throws -> BreakupReconnectInvite {
-        let profile = persistence.loadCoupleProfile()
-        return try await api.sendReconnectInvite(coupleId: profile.coupleId ?? "")
+    func sendReconnectInvite(fromUserId: String = "local-user", toUserId: String = "partner") {
+        let invite = BreakupReconnectInvite(
+            id: UUID(),
+            senderUserId: fromUserId,
+            recipientUserId: toUserId,
+            sentAt: Date(),
+            status: .pending
+        )
+        dpm.saveReconnectInvite(invite)
     }
 
-    /// Accepts an incoming reconnect invite and restores the couple to `officialCouple`.
-    /// Garden and pet resume from their frozen archive snapshots.
-    func acceptReconnectInvite(inviteId: UUID) async throws {
-        let profile = persistence.loadCoupleProfile()
-        try await api.acceptReconnectInvite(inviteId: inviteId, coupleId: profile.coupleId ?? "")
+    func acceptReconnect() {
+        var profile = dpm.loadCoupleProfile()
+        profile.relationshipStage = .officialCouple
+        profile.breakupDate = nil
+        profile.archiveExpiryDate = nil
+        profile.hasSteppedOut = false
+        dpm.saveCoupleProfile(profile)
+        dpm.clearReconnectInvite()
+        cancelRetentionNotifications()
+    }
 
-        if let bundle = persistence.loadArchiveBundle() {
-            persistence.savePetState(bundle.petState)
-            persistence.saveGardenState(bundle.gardenState)
+    func declineReconnect() {
+        guard var invite = dpm.loadReconnectInvite() else { return }
+        invite.status = .declined
+        dpm.saveReconnectInvite(invite)
+    }
+
+    // MARK: - Export
+
+    /// Returns a plain-text export of the archive bundle for sharing.
+    func generateExportText() -> String {
+        guard let bundle = dpm.loadArchiveBundle() else {
+            return "No archive found."
         }
-        persistence.deleteArchiveBundle()
 
-        var updated = profile
-        updated.relationshipStage = .officialCouple
-        updated.hasSteppedOut = false
-        updated.breakupDate = nil
-        updated.archiveExpiryDate = nil
-        persistence.saveCoupleProfile(updated)
+        let fmt = DateFormatter()
+        fmt.dateStyle = .medium
+        var lines: [String] = []
+
+        let name = bundle.coupleProfile.displayName ?? "Our Story"
+        lines.append("=== \(name) — Archive ===")
+        lines.append("Archived: \(fmt.string(from: bundle.breakupDate))")
+        lines.append("")
+
+        lines.append("MEMORIES (\(bundle.moments.count))")
+        lines.append(String(repeating: "-", count: 32))
+        for moment in bundle.moments.sorted(by: { $0.dateTaken < $1.dateTaken }) {
+            var entry = "[\(fmt.string(from: moment.dateTaken))]"
+            if let caption = moment.caption { entry += " \(caption)" }
+            if let place = moment.placeName { entry += " @ \(place)" }
+            lines.append(entry)
+        }
+
+        let dates = bundle.coupleProfile.specialDates
+        if !dates.isEmpty {
+            lines.append("")
+            lines.append("SPECIAL DATES")
+            lines.append(String(repeating: "-", count: 32))
+            for d in dates { lines.append("• \(d.title): \(fmt.string(from: d.date))") }
+        }
+
+        if let chapter = bundle.preludeChapter {
+            lines.append("")
+            lines.append("PRELUDE CHAPTER")
+            lines.append(String(repeating: "-", count: 32))
+            lines.append("Started: \(fmt.string(from: chapter.startDate))")
+            lines.append("Became official: \(fmt.string(from: chapter.officialDate))")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Local Notifications
+
+    func scheduleRetentionNotifications(expiryDate: Date) {
+        cancelRetentionNotifications()
+        let center = UNUserNotificationCenter.current()
+        let sevenDay = expiryDate.addingTimeInterval(-7 * 24 * 3600)
+        let threeDay = expiryDate.addingTimeInterval(-3 * 24 * 3600)
+
+        scheduleArchiveNotification(
+            center: center,
+            identifier: "archive_7_day",
+            title: "Your shared memories expire soon",
+            body: "Your shared memories expire in 7 days. Export or extend to keep them.",
+            fireDate: sevenDay
+        )
+        scheduleArchiveNotification(
+            center: center,
+            identifier: "archive_3_day",
+            title: "Last chance to export",
+            body: "Your shared memories expire in 3 days.",
+            fireDate: threeDay
+        )
+        scheduleArchiveNotification(
+            center: center,
+            identifier: "archive_expired",
+            title: "Your memories have been deleted.",
+            body: "Your shared archive has expired and can no longer be recovered.",
+            fireDate: expiryDate
+        )
+    }
+
+    private func scheduleArchiveNotification(
+        center: UNUserNotificationCenter,
+        identifier: String,
+        title: String,
+        body: String,
+        fireDate: Date
+    ) {
+        guard fireDate > Date() else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+    }
+
+    func cancelRetentionNotifications() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["archive_7_day", "archive_3_day", "archive_expired"]
+        )
     }
 }

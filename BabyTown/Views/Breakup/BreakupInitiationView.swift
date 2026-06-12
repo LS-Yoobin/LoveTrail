@@ -78,14 +78,9 @@ struct BreakupInitiationView: View {
     private func startBreakup() async {
         stage = .uploading
         uploadProgress = 0
-        do {
-            try await ArchiveService.shared.initiateBreakup { fraction in
-                Task { @MainActor in uploadProgress = fraction }
-            }
-            onComplete()
-        } catch {
-            errorMessage = error.localizedDescription
-            stage = .failed
-        }
+        let service = ArchiveService.shared
+        await service.beginBreakup()
+        uploadProgress = service.uploadProgress
+        onComplete()
     }
 }
