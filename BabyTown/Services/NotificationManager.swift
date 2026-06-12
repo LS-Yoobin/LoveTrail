@@ -48,12 +48,14 @@ class NotificationManager: NSObject, ObservableObject {
     }
     
     func scheduleDailyNotification() {
-        // Remove existing notifications to avoid duplicates or old schedules
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        
+        // Remove only daily notifications; archive expiry notifications are managed by ArchiveService
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["daily_morning_notification", "daily_evening_notification"]
+        )
+
         // Schedule morning notification
         scheduleMorningNotification()
-        
+
         // Schedule evening notification for 9PM
         scheduleEveningNotification()
     }
