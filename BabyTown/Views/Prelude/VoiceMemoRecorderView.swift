@@ -118,6 +118,7 @@ struct VoiceMemoRecorderView: View {
         guard let tempPath = recorder.saveRecording(for: UUID()) else { return }
         let tempURL = URL(fileURLWithPath: tempPath)
         guard let data = try? Data(contentsOf: tempURL) else { return }
+        try? FileManager.default.removeItem(at: tempURL)
         DataPersistenceManager.shared.savePreludeVoiceMemo(data: data, fileId: fileId)
         savedFileId = fileId
         onSaved(fileId)
