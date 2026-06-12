@@ -150,12 +150,13 @@ struct CaptureEditorView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(BabyTownTheme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Voice recorder — coming in next task")
-                .font(.system(size: 14))
-                .foregroundStyle(BabyTownTheme.textSecondary)
-                .padding(16)
-                .frame(maxWidth: .infinity)
-                .background(RoundedRectangle(cornerRadius: 12).fill(BabyTownTheme.cardBackground))
+
+            VoiceMemoRecorderView(
+                existingFileId: existing?.voiceMemoFileId,
+                onSaved: { fileId in
+                    savedVoiceMemoFileId = fileId
+                }
+            )
         }
     }
 
