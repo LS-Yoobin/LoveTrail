@@ -53,9 +53,7 @@ struct ReconnectInviteView: View {
     }
 
     private func sendInvite() {
-        Task {
-            _ = try? await ArchiveService.shared.sendReconnectInvite()
-            inviteSent = true
-        }
+        ArchiveService.shared.sendReconnectInvite()
+        inviteSent = true
     }
 }
