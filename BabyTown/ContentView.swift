@@ -12,6 +12,7 @@ struct ContentView: View {
     enum Screen {
         case launch, welcome, storyOnboarding, nickname, colorTheme, birthday, firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
+        case prelude
     }
 
     @State private var screen: Screen = .launch
@@ -29,10 +30,12 @@ struct ContentView: View {
         _screen = State(initialValue: .launch)
         
         if hasCompletedOnboarding {
-            // Check if user was last on the camera screen
             let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
+            let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
             if lastScreen == "selectPhotos" {
                 _targetScreen = State(initialValue: .selectPhotos)
+            } else if stage == .prelude {
+                _targetScreen = State(initialValue: .prelude)
             } else {
                 _targetScreen = State(initialValue: .home)
             }
@@ -277,6 +280,10 @@ struct ContentView: View {
                     withAnimation(.easeInOut(duration: 0.4)) { screen = .home }
                 })
                 .transition(.opacity)
+
+            case .prelude:
+                PreludeHomeView()
+                    .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
