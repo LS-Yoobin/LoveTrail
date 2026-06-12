@@ -13,6 +13,7 @@ struct ContentView: View {
         case launch, welcome, storyOnboarding, nickname, colorTheme, birthday, firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
         case prelude
+        case archivedCouple
     }
 
     @State private var screen: Screen = .launch
@@ -36,6 +37,8 @@ struct ContentView: View {
                 _targetScreen = State(initialValue: .selectPhotos)
             } else if stage == .prelude {
                 _targetScreen = State(initialValue: .prelude)
+            } else if stage == .archivedCouple {
+                _targetScreen = State(initialValue: .archivedCouple)
             } else {
                 _targetScreen = State(initialValue: .home)
             }
@@ -284,6 +287,28 @@ struct ContentView: View {
             case .prelude:
                 PreludeHomeView()
                     .transition(.opacity)
+
+            case .archivedCouple:
+                Group {
+                    if let bundle = DataPersistenceManager.shared.loadArchiveBundle() {
+                        ScrapbookHomeView(
+                            bundle: bundle,
+                            onStepOut: {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    screen = .prelude
+                                }
+                            },
+                            onReconnect: {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    screen = .home
+                                }
+                            }
+                        )
+                    } else {
+                        Color.clear.onAppear { screen = .home }
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
