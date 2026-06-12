@@ -52,9 +52,7 @@ struct StepOutConfirmationView: View {
     }
 
     private func performStepOut() {
-        Task {
-            try? await ArchiveService.shared.stepOut()
-            onConfirmed()
-        }
+        ArchiveService.shared.stepOut()
+        onConfirmed()
     }
 }

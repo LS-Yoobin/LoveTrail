@@ -116,7 +116,7 @@ struct ScrapbookHomeView: View {
     }
 
     private func extendRetention() {
-        Task { try? await ArchiveService.shared.extendRetention() }
+        ArchiveService.shared.extendRetention()
     }
 
     private func expiryLabel(_ expiry: Date) -> String {
