@@ -7,6 +7,7 @@ struct PreludeHomeView: View {
     @State private var editorType: PreludeCapture.CaptureType = .note
     @State private var editingCapture: PreludeCapture?
     @State private var showGiftCuration = false
+    @State private var captureToDelete: PreludeCapture?
 
     private var displayName: String {
         DataPersistenceManager.shared.loadCoupleProfile().displayName ?? "them"
@@ -92,7 +93,7 @@ struct PreludeHomeView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 14) {
                 ForEach(viewModel.captures) { capture in
-                    CaptureRowCard(capture: capture)
+                    CaptureRowCard(capture: capture, onDelete: { captureToDelete = capture })
                         .onTapGesture {
                             editingCapture = capture
                             editorType = capture.type
@@ -111,6 +112,22 @@ struct PreludeHomeView: View {
             .padding(.top, 16)
             .padding(.bottom, 120)
         }
+        .alert(
+            "Delete capture?",
+            isPresented: Binding(
+                get: { captureToDelete != nil },
+                set: { if !$0 { captureToDelete = nil } }
+            ),
+            presenting: captureToDelete
+        ) { capture in
+            Button("Delete", role: .destructive) {
+                withAnimation { viewModel.deleteCapture(capture) }
+                captureToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                captureToDelete = nil
+            }
+        } message: { _ in }
     }
 
     // MARK: - Empty State
@@ -183,6 +200,7 @@ struct PreludeHomeView: View {
 
 private struct CaptureRowCard: View {
     let capture: PreludeCapture
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -212,6 +230,15 @@ private struct CaptureRowCard: View {
             }
 
             Spacer()
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.system(size: 14))
+                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .padding(8)
+            }
+            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
         .padding(14)
         .background(
