@@ -221,23 +221,6 @@ private struct CaptureRowCard: View {
     }
 }
 
-// MARK: - Stubs (replaced in Tasks 7 and 9)
-
-struct CaptureEditorView: View {
-    let type: PreludeCapture.CaptureType
-    let existing: PreludeCapture?
-    var viewModel: PreludeViewModel
-    var onSave: () -> Void
-    var onCancel: () -> Void
-    var body: some View { Text("CaptureEditor stub") }
-}
-
-struct GiftCurationView: View {
-    var viewModel: PreludeViewModel
-    var onDone: () -> Void
-    var body: some View { Text("GiftCuration stub") }
-}
-
 #Preview {
     PreludeHomeView()
 }
