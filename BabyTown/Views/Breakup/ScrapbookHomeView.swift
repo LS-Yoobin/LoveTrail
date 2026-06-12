@@ -39,7 +39,7 @@ struct ScrapbookHomeView: View {
             Button("Export") { showExport = true }
                 .font(.caption.bold())
             Button("Extend") {
-                Task { [self] in try? await ArchiveService.shared.extendRetention() }
+                ArchiveService.shared.extendRetention()
             }
             .font(.caption.bold())
         }
