@@ -17,6 +17,12 @@ struct CoupleProfile: Codable, Equatable {
     var recordPlayerPosition: NormalizedPoint?
     /// Garden canvas scale for the vinyl player; `nil` uses `VinylRecordPlayerView.gardenDefaultScale`.
     var recordPlayerScale: CGFloat?
+    /// Normalized center of the Watch Together TV on the scroll canvas (0…1).
+    var watchTogetherTVPosition: NormalizedPoint?
+    /// Garden canvas scale for the Watch Together TV; `nil` uses `WatchTogetherTVView.gardenDefaultScale`.
+    var watchTogetherTVScale: CGFloat?
+    var relationshipStage: RelationshipStage
+    var inviteSent: Bool
 
     init(
         displayName: String? = nil,
@@ -25,7 +31,11 @@ struct CoupleProfile: Codable, Equatable {
         profileNote: String? = nil,
         profileNotePosition: NormalizedPoint? = nil,
         recordPlayerPosition: NormalizedPoint? = nil,
-        recordPlayerScale: CGFloat? = nil
+        recordPlayerScale: CGFloat? = nil,
+        watchTogetherTVPosition: NormalizedPoint? = nil,
+        watchTogetherTVScale: CGFloat? = nil,
+        relationshipStage: RelationshipStage = .prelude,
+        inviteSent: Bool = false
     ) {
         self.displayName = displayName
         self.specialDates = specialDates
@@ -34,11 +44,17 @@ struct CoupleProfile: Codable, Equatable {
         self.profileNotePosition = profileNotePosition
         self.recordPlayerPosition = recordPlayerPosition
         self.recordPlayerScale = recordPlayerScale
+        self.watchTogetherTVPosition = watchTogetherTVPosition
+        self.watchTogetherTVScale = watchTogetherTVScale
+        self.relationshipStage = relationshipStage
+        self.inviteSent = inviteSent
     }
 
     enum CodingKeys: String, CodingKey {
         case displayName, specialDates, stickers, profileNote, profileNotePosition
         case recordPlayerPosition, recordPlayerScale
+        case watchTogetherTVPosition, watchTogetherTVScale
+        case relationshipStage, inviteSent
     }
 
     init(from decoder: Decoder) throws {
@@ -50,5 +66,9 @@ struct CoupleProfile: Codable, Equatable {
         profileNotePosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .profileNotePosition)
         recordPlayerPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .recordPlayerPosition)
         recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)
+        watchTogetherTVPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .watchTogetherTVPosition)
+        watchTogetherTVScale = try c.decodeIfPresent(CGFloat.self, forKey: .watchTogetherTVScale)
+        relationshipStage = try c.decodeIfPresent(RelationshipStage.self, forKey: .relationshipStage) ?? .prelude
+        inviteSent = try c.decodeIfPresent(Bool.self, forKey: .inviteSent) ?? false
     }
 }
