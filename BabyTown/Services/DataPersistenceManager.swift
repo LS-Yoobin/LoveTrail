@@ -67,6 +67,10 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("archive_bundle.json")
     }
 
+    private var reconnectInviteFileURL: URL {
+        documentsDirectory.appendingPathComponent("reconnect_invite.json")
+    }
+
     private var preludeVoiceMemosDirectory: URL {
         documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
     }
@@ -466,6 +470,24 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: archiveBundleFileURL)
     }
 
+    func saveReconnectInvite(_ invite: BreakupReconnectInvite) {
+        guard let data = try? encoder.encode(invite) else { return }
+        try? data.write(to: reconnectInviteFileURL)
+    }
+
+    func loadReconnectInvite() -> BreakupReconnectInvite? {
+        guard fileManager.fileExists(atPath: reconnectInviteFileURL.path),
+              let data = try? Data(contentsOf: reconnectInviteFileURL),
+              let invite = try? decoder.decode(BreakupReconnectInvite.self, from: data) else {
+            return nil
+        }
+        return invite
+    }
+
+    func clearReconnectInvite() {
+        try? fileManager.removeItem(at: reconnectInviteFileURL)
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
@@ -570,6 +592,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: preludeChapterFileURL)
         try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
         try? fileManager.removeItem(at: archiveBundleFileURL)
+        try? fileManager.removeItem(at: reconnectInviteFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
