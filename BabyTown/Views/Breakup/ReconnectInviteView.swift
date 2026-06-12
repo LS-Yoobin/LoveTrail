@@ -41,7 +41,10 @@ struct ReconnectInviteView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Button(inviteSent ? "Close" : "Not yet") { dismiss() }
+                Button(inviteSent ? "Close" : "Not yet") {
+                    if inviteSent { onReconnected() }
+                    dismiss()
+                }
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
             }
