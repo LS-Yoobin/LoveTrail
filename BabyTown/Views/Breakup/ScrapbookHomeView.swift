@@ -38,10 +38,8 @@ struct ScrapbookHomeView: View {
             Spacer()
             Button("Export") { showExport = true }
                 .font(.caption.bold())
-            Button("Extend") {
-                ArchiveService.shared.extendRetention()
-            }
-            .font(.caption.bold())
+            Button("Extend") { extendRetention() }
+                .font(.caption.bold())
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -115,6 +113,10 @@ struct ScrapbookHomeView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+    }
+
+    private func extendRetention() {
+        Task { try? await ArchiveService.shared.extendRetention() }
     }
 
     private func expiryLabel(_ expiry: Date) -> String {

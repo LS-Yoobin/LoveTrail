@@ -29,8 +29,7 @@ struct ReconnectInviteView: View {
             VStack(spacing: 14) {
                 if !inviteSent {
                     Button {
-                        ArchiveService.shared.sendReconnectInvite()
-                        inviteSent = true
+                        sendInvite()
                     } label: {
                         Text("Send Reconnect Invite")
                             .font(.system(size: 16, weight: .semibold))
@@ -50,6 +49,13 @@ struct ReconnectInviteView: View {
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 44)
+        }
+    }
+
+    private func sendInvite() {
+        Task {
+            _ = try? await ArchiveService.shared.sendReconnectInvite()
+            inviteSent = true
         }
     }
 }
