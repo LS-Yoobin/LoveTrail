@@ -55,6 +55,22 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("memory_canvases.json")
     }
 
+    private var preludeCapturesFileURL: URL {
+        documentsDirectory.appendingPathComponent("prelude_captures.json")
+    }
+
+    private var preludeChapterFileURL: URL {
+        documentsDirectory.appendingPathComponent("prelude_chapter.json")
+    }
+
+    private var preludeVoiceMemosDirectory: URL {
+        documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
+    }
+
+    private func preludeVoiceMemoURL(fileId: String) -> URL {
+        preludeVoiceMemosDirectory.appendingPathComponent(fileId)
+    }
+
     private var userAvatarURL: URL {
         pinnedPhotosDirectory.appendingPathComponent("couple_user_avatar.jpg")
     }
@@ -89,6 +105,9 @@ final class DataPersistenceManager {
     private func createDirectoriesIfNeeded() {
         if !fileManager.fileExists(atPath: pinnedPhotosDirectory.path) {
             try? fileManager.createDirectory(at: pinnedPhotosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: preludeVoiceMemosDirectory.path) {
+            try? fileManager.createDirectory(at: preludeVoiceMemosDirectory, withIntermediateDirectories: true)
         }
     }
     
@@ -378,6 +397,51 @@ final class DataPersistenceManager {
         try? data.write(to: memoryCanvasesFileURL)
     }
 
+    // MARK: - Prelude
+
+    func savePreludeCaptures(_ captures: [PreludeCapture]) {
+        guard let data = try? encoder.encode(captures) else { return }
+        try? data.write(to: preludeCapturesFileURL)
+    }
+
+    func loadPreludeCaptures() -> [PreludeCapture] {
+        guard fileManager.fileExists(atPath: preludeCapturesFileURL.path),
+              let data = try? Data(contentsOf: preludeCapturesFileURL),
+              let captures = try? decoder.decode([PreludeCapture].self, from: data) else {
+            return []
+        }
+        return captures
+    }
+
+    func savePreludeChapter(_ chapter: PreludeChapter) {
+        guard let data = try? encoder.encode(chapter) else { return }
+        try? data.write(to: preludeChapterFileURL)
+    }
+
+    func loadPreludeChapter() -> PreludeChapter? {
+        guard fileManager.fileExists(atPath: preludeChapterFileURL.path),
+              let data = try? Data(contentsOf: preludeChapterFileURL),
+              let chapter = try? decoder.decode(PreludeChapter.self, from: data) else {
+            return nil
+        }
+        return chapter
+    }
+
+    func savePreludeVoiceMemo(data: Data, fileId: String) {
+        let url = preludeVoiceMemoURL(fileId: fileId)
+        try? data.write(to: url)
+    }
+
+    func loadPreludeVoiceMemoData(fileId: String) -> Data? {
+        let url = preludeVoiceMemoURL(fileId: fileId)
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    func deletePreludeVoiceMemo(fileId: String) {
+        try? fileManager.removeItem(at: preludeVoiceMemoURL(fileId: fileId))
+    }
+
     func setOnboardingCompleted(_ completed: Bool) {
         userDefaults.set(completed, forKey: hasCompletedOnboardingKey)
     }
@@ -478,6 +542,9 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: coupleProfileFileURL)
         try? fileManager.removeItem(at: memoryCanvasesFileURL)
         try? fileManager.removeItem(at: userAvatarURL)
+        try? fileManager.removeItem(at: preludeCapturesFileURL)
+        try? fileManager.removeItem(at: preludeChapterFileURL)
+        try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
