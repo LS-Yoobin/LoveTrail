@@ -172,8 +172,18 @@ struct ContentView: View {
                 .transition(.opacity)
 
             case .preludeOnboarding:
-                Color.clear
-                    .transition(.opacity)
+                PreludeOnboardingView(
+                    onBegin: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .prelude
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .prelude
+                        }
+                    }
+                )
+                .transition(.opacity)
 
             case .firstMemories:
                 FirstMemoriesView(
