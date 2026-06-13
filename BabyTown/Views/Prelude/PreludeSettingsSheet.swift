@@ -4,7 +4,7 @@ struct PreludeSettingsSheet: View {
 
     var onReturnToOnboarding: () -> Void
     var onSwitchToOfficial: () -> Void
-    var onSimulatePartnerInvite: () -> Void
+    var onSimulatePartnerInvite: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
 
