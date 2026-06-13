@@ -3,6 +3,7 @@ import SwiftUI
 struct PreludeHomeView: View {
 
     var onReturnToOnboarding: () -> Void = {}
+    var onSwitchToOfficial: () -> Void = {}
 
     @StateObject private var viewModel = PreludeViewModel()
     @State private var editorPresentation: CaptureEditorPresentation?
@@ -49,18 +50,21 @@ struct PreludeHomeView: View {
             Button {
                 showSettings = true
             } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 20, weight: .regular))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.leading, 12)
+            .padding(.leading, 8)
             .padding(.top, 4)
         }
         .sheet(isPresented: $showSettings) {
-            PreludeSettingsSheet(onReturnToOnboarding: onReturnToOnboarding)
+            PreludeSettingsSheet(
+                onReturnToOnboarding: onReturnToOnboarding,
+                onSwitchToOfficial: onSwitchToOfficial
+            )
         }
     }
 

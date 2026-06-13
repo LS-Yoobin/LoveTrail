@@ -328,6 +328,14 @@ struct ContentView: View {
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .welcome
                         }
+                    },
+                    onSwitchToOfficial: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .officialCouple
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
                     }
                 )
                 .transition(.opacity)
