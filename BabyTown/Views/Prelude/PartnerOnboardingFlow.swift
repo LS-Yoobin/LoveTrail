@@ -395,12 +395,9 @@ private struct PartnerGiftRevealStep: View {
 
                 if capturesVisible {
                     ZStack {
-                        Self.parchmentGradient
-                            .ignoresSafeArea()
+                        ruledLines()
 
-                        ruledLines(height: geo.size.height)
-
-                        parchmentPage(geo: geo)
+                        parchmentPage()
                     }
                     .transition(.opacity)
                 }
@@ -427,7 +424,7 @@ private struct PartnerGiftRevealStep: View {
 
     // MARK: - Ruled lines
 
-    private func ruledLines(height: CGFloat) -> some View {
+    private func ruledLines() -> some View {
         Canvas { ctx, size in
             let lineCount = Int(size.height / 28) + 1
             for i in 0..<lineCount {
@@ -447,7 +444,7 @@ private struct PartnerGiftRevealStep: View {
 
     // MARK: - Parchment page content
 
-    private func parchmentPage(geo: GeometryProxy) -> some View {
+    private func parchmentPage() -> some View {
         VStack(spacing: 0) {
             if captures.count > 1 {
                 Text("PAGE \(currentIndex + 1) OF \(captures.count)")
@@ -462,7 +459,7 @@ private struct PartnerGiftRevealStep: View {
             Spacer()
 
             if captures.isEmpty {
-                Text("Nothing here yet \u{2014} check back soon.")
+                Text("Nothing here yet. Check back soon.")
                     .font(.system(size: 17, design: .serif))
                     .foregroundStyle(Color(red: 0.239, green: 0.094, blue: 0.000))
                     .multilineTextAlignment(.center)
@@ -517,13 +514,14 @@ private struct PartnerGiftRevealStep: View {
                     .font(.system(size: 12, design: .serif))
                     .foregroundStyle(Color(red: 0.392, green: 0.235, blue: 0.078))
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 12)
                     .background(
                         Capsule()
                             .fill(Color(red: 0.392, green: 0.235, blue: 0.078).opacity(0.10))
                     )
             }
             .opacity(currentIndex == 0 ? 0 : 1)
+            .allowsHitTesting(currentIndex != 0)
 
             Spacer()
 
@@ -533,7 +531,7 @@ private struct PartnerGiftRevealStep: View {
                         .font(.system(size: 12, weight: .semibold, design: .serif))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 12)
                         .background(
                             Capsule()
                                 .fill(AnyShapeStyle(BabyTownTheme.accentGradient))
@@ -548,12 +546,13 @@ private struct PartnerGiftRevealStep: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 12)
                         .background(
                             Capsule()
                                 .fill(Color(red: 0.761, green: 0.392, blue: 0.165))
                         )
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 28)
