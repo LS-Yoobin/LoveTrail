@@ -373,6 +373,10 @@ final class DataPersistenceManager {
         userDefaults.set(trimmed, forKey: partnerEmailKey)
     }
 
+    func loadPartnerEmail() -> String? {
+        userDefaults.string(forKey: partnerEmailKey)
+    }
+
     func savePartnerProfilePhoto(_ image: UIImage) {
         guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
         try? jpeg.write(to: partnerAvatarURL)
