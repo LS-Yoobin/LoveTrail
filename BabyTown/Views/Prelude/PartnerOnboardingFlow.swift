@@ -59,12 +59,12 @@ struct PartnerOnboardingFlow: View {
     private func advance() {
         let next: Step?
         switch step {
-        case .welcome:      next = .username
+        case .welcome:      next = .giftReveal
+        case .giftReveal:   next = .username
         case .username:     next = .email
         case .email:        next = .profilePhoto
         case .profilePhoto: next = .colorTheme
-        case .colorTheme:   next = .giftReveal
-        case .giftReveal:   next = nil
+        case .colorTheme:   next = nil
         }
         if let next {
             withAnimation(.easeInOut(duration: 0.4)) { step = next }
