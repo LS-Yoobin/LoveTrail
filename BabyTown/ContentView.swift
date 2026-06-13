@@ -10,9 +10,12 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen {
-        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday, firstMemories, howItWorks, photoAccess, home, selectPhotos
+        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday
+        case pathSelector          // NEW — branch point after birthday
+        case firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
         case prelude
+        case preludeOnboarding     // NEW — prelude intro screen
         case archivedCouple
     }
 
@@ -142,11 +145,19 @@ struct ContentView: View {
                         let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
                         DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .firstMemories
+                            screen = .pathSelector
                         }
                     }
                 )
                 .transition(.opacity)
+
+            case .pathSelector:
+                Color.clear
+                    .transition(.opacity)
+
+            case .preludeOnboarding:
+                Color.clear
+                    .transition(.opacity)
 
             case .firstMemories:
                 FirstMemoriesView(
