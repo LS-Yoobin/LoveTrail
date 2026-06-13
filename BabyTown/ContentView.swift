@@ -322,8 +322,15 @@ struct ContentView: View {
                 .transition(.opacity)
 
             case .prelude:
-                PreludeHomeView()
-                    .transition(.opacity)
+                PreludeHomeView(
+                    onReturnToOnboarding: {
+                        DataPersistenceManager.shared.setOnboardingCompleted(false)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .welcome
+                        }
+                    }
+                )
+                .transition(.opacity)
 
             case .archivedCouple:
                 Group {
