@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct GiftCurationView: View {
 
@@ -51,9 +52,9 @@ struct GiftCurationView: View {
     private var captureList: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Toggle which captures to include in your gift. Private captures stay private forever.")
+                Text("Toggle what to include in your gift. Private captures stay private forever.")
                     .font(.system(size: 13))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(.black)
                     .padding(.top, 8)
 
                 ForEach(viewModel.captures) { capture in
@@ -76,7 +77,7 @@ struct GiftCurationView: View {
                 .foregroundStyle(BabyTownTheme.textPrimary)
             Text("Go back and add notes, firsts, voice memos, or reasons.")
                 .font(.system(size: 14))
-                .foregroundStyle(BabyTownTheme.textSecondary)
+                .foregroundStyle(.black)
                 .multilineTextAlignment(.center)
             Spacer()
         }
@@ -98,19 +99,16 @@ struct GiftCurationView: View {
             .padding(.vertical, 16)
             .background(
                 Capsule()
-                    .fill(viewModel.giftCaptures.isEmpty
-                        ? AnyShapeStyle(BabyTownTheme.accent.opacity(0.35))
-                        : AnyShapeStyle(BabyTownTheme.accentGradient))
+                    .fill(AnyShapeStyle(BabyTownTheme.accentGradient))
             )
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.giftCaptures.isEmpty)
     }
 }
 
 // MARK: - GiftCaptureRow
 
-private struct GiftCaptureRow: View {
+struct GiftCaptureRow: View {
     let capture: PreludeCapture
     var onToggle: () -> Void
 
@@ -165,7 +163,7 @@ private struct GiftPreviewSheet: View {
                 } else {
                     TabView(selection: $currentIndex) {
                         ForEach(Array(captures.enumerated()), id: \.offset) { idx, capture in
-                            GiftCardView(capture: capture)
+                            GiftCardView(capture: capture, isCurrentPage: currentIndex == idx)
                                 .tag(idx)
                                 .padding(.horizontal, 28)
                         }
@@ -188,12 +186,17 @@ private struct GiftPreviewSheet: View {
 
 struct GiftCardView: View {
     let capture: PreludeCapture
+    var isCurrentPage: Bool = true
+
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var isPlaying = false
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: capture.typeIcon)
+            Image(systemName: isPlaying ? "waveform" : capture.typeIcon)
                 .font(.system(size: 36))
                 .foregroundStyle(BabyTownTheme.accent)
+                .symbolEffect(.variableColor.iterative, isActive: isPlaying)
 
             Text(capture.typeLabel)
                 .font(.system(size: 13, weight: .semibold))
@@ -207,7 +210,7 @@ struct GiftCardView: View {
 
             Text(capture.createdAt, style: .date)
                 .font(.system(size: 13))
-                .foregroundStyle(BabyTownTheme.textSecondary)
+                .foregroundStyle(.black)
         }
         .padding(28)
         .frame(maxWidth: .infinity)
@@ -216,6 +219,32 @@ struct GiftCardView: View {
                 .fill(BabyTownTheme.cardBackground)
                 .shadow(color: BabyTownTheme.cardShadow, radius: 8, y: 4)
         )
+        .onAppear { if isCurrentPage { playVoiceMemoIfNeeded() } }
+        .onDisappear { stopVoiceMemo() }
+        .onChange(of: isCurrentPage) { _, isCurrent in
+            if isCurrent { playVoiceMemoIfNeeded() } else { stopVoiceMemo() }
+        }
+    }
+
+    private func playVoiceMemoIfNeeded() {
+        guard capture.type == .voiceMemo, let fileId = capture.voiceMemoFileId else { return }
+        let url = DataPersistenceManager.shared.preludeVoiceMemoFileURL(fileId: fileId)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.play()
+            isPlaying = true
+        } catch {
+            print("GiftCardView: failed to play voice memo: \(error)")
+        }
+    }
+
+    private func stopVoiceMemo() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
     }
 }
 
