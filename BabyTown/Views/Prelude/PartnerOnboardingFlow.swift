@@ -285,7 +285,95 @@ private struct PartnerEmailStep: View {
 
 private struct PartnerPhotoStep: View {
     var onContinue: (UIImage?) -> Void
-    var body: some View { Color.clear }
+
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                VStack(spacing: 14) {
+                    Text("Add a photo of yourself")
+                        .font(.system(size: 26, weight: .light, design: .serif))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+
+                    Text("Your partner will see this")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(.secondaryLabel))
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 32)
+
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 120)
+
+                        if let selectedImage {
+                            Image(uiImage: selectedImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 120, height: 120)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "plus")
+                                .font(.system(size: 32, weight: .light))
+                                .foregroundStyle(BabyTownTheme.accent)
+                        }
+                    }
+                }
+                .onChange(of: pickerItem) { _, newItem in
+                    guard let newItem else { return }
+                    Task {
+                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            selectedImage = image
+                        }
+                    }
+                }
+
+                Spacer()
+
+                VStack(spacing: 14) {
+                    Button {
+                        onContinue(selectedImage)
+                    } label: {
+                        Text("Continue")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(
+                                Capsule()
+                                    .fill(BabyTownTheme.buttonGradient)
+                                    .shadow(color: BabyTownTheme.accent.opacity(0.3), radius: 12, y: 6)
+                            )
+                    }
+                    .padding(.horizontal, 40)
+
+                    Button {
+                        onContinue(nil)
+                    } label: {
+                        Text("Skip")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color(.secondaryLabel))
+                    }
+                }
+                .padding(.bottom, 52)
+            }
+        }
+    }
 }
 
 private struct PartnerGiftRevealStep: View {
