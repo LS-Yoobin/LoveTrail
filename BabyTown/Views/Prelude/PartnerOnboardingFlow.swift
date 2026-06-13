@@ -543,7 +543,7 @@ private struct PartnerGiftRevealStep: View {
                     withAnimation(.easeInOut(duration: 0.25)) { currentIndex += 1 }
                 } label: {
                     Text("Next Page \u{2192}")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold, design: .serif))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 12)
