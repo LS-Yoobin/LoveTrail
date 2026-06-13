@@ -118,6 +118,7 @@ final class DataPersistenceManager {
     private let petMissesYouNotifiedForInteractionAtKey = "petMissesYouNotifiedForInteractionAt"
     private let colorThemeKey = "colorTheme"
     private let partnerEmailKey = "partnerEmail"
+    private let userEmailKey = "userEmail"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -375,6 +376,16 @@ final class DataPersistenceManager {
 
     func loadPartnerEmail() -> String? {
         userDefaults.string(forKey: partnerEmailKey)
+    }
+
+    func saveUserEmail(_ email: String) {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: userEmailKey)
+    }
+
+    func loadUserEmail() -> String? {
+        userDefaults.string(forKey: userEmailKey)
     }
 
     func savePartnerProfilePhoto(_ image: UIImage) {
@@ -665,6 +676,7 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
         userDefaults.removeObject(forKey: colorThemeKey)
         userDefaults.removeObject(forKey: partnerEmailKey)
+        userDefaults.removeObject(forKey: userEmailKey)
         BackgroundMusicImporter.clearImportedSong()
         MomentVideoStore.shared.removeAll()
     }
