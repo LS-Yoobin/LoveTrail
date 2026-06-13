@@ -288,6 +288,7 @@ private struct PartnerPhotoStep: View {
 
     @State private var pickerItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
+    @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -334,8 +335,9 @@ private struct PartnerPhotoStep: View {
                     }
                 }
                 .onChange(of: pickerItem) { _, newItem in
+                    loadTask?.cancel()
                     guard let newItem else { return }
-                    Task {
+                    loadTask = Task {
                         if let data = try? await newItem.loadTransferable(type: Data.self),
                            let image = UIImage(data: data) {
                             selectedImage = image
@@ -346,21 +348,9 @@ private struct PartnerPhotoStep: View {
                 Spacer()
 
                 VStack(spacing: 14) {
-                    Button {
+                    OnboardingContinueButton(isEnabled: true) {
                         onContinue(selectedImage)
-                    } label: {
-                        Text("Continue")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                            .background(
-                                Capsule()
-                                    .fill(BabyTownTheme.buttonGradient)
-                                    .shadow(color: BabyTownTheme.accent.opacity(0.3), radius: 12, y: 6)
-                            )
                     }
-                    .padding(.horizontal, 40)
 
                     Button {
                         onContinue(nil)
@@ -369,8 +359,8 @@ private struct PartnerPhotoStep: View {
                             .font(.system(size: 15))
                             .foregroundStyle(Color(.secondaryLabel))
                     }
+                    .padding(.bottom, 52)
                 }
-                .padding(.bottom, 52)
             }
         }
     }
