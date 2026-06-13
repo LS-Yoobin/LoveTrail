@@ -75,12 +75,24 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
     }
 
+    private var preludePhotosDirectory: URL {
+        documentsDirectory.appendingPathComponent("PreludePhotos")
+    }
+
     private func preludeVoiceMemoURL(fileId: String) -> URL {
         preludeVoiceMemosDirectory.appendingPathComponent(fileId)
     }
 
+    private func preludePhotoURL(photoId: UUID) -> URL {
+        preludePhotosDirectory.appendingPathComponent("\(photoId.uuidString).jpg")
+    }
+
     private var userAvatarURL: URL {
         pinnedPhotosDirectory.appendingPathComponent("couple_user_avatar.jpg")
+    }
+
+    private var partnerAvatarURL: URL {
+        pinnedPhotosDirectory.appendingPathComponent("partner_avatar.jpg")
     }
 
     private func specialDatePhotoURL(id: UUID) -> URL {
@@ -105,6 +117,7 @@ final class DataPersistenceManager {
     private let petNeedsNotifiedWhileLowKey = "petNeedsNotifiedWhileLow"
     private let petMissesYouNotifiedForInteractionAtKey = "petMissesYouNotifiedForInteractionAt"
     private let colorThemeKey = "colorTheme"
+    private let partnerEmailKey = "partnerEmail"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -116,6 +129,9 @@ final class DataPersistenceManager {
         }
         if !fileManager.fileExists(atPath: preludeVoiceMemosDirectory.path) {
             try? fileManager.createDirectory(at: preludeVoiceMemosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: preludePhotosDirectory.path) {
+            try? fileManager.createDirectory(at: preludePhotosDirectory, withIntermediateDirectories: true)
         }
     }
     
@@ -351,6 +367,23 @@ final class DataPersistenceManager {
         return UIImage(data: data)
     }
 
+    func savePartnerEmail(_ email: String) {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: partnerEmailKey)
+    }
+
+    func savePartnerProfilePhoto(_ image: UIImage) {
+        guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        try? jpeg.write(to: partnerAvatarURL)
+    }
+
+    func loadPartnerProfilePhoto() -> UIImage? {
+        guard fileManager.fileExists(atPath: partnerAvatarURL.path),
+              let data = try? Data(contentsOf: partnerAvatarURL) else { return nil }
+        return UIImage(data: data)
+    }
+
     func saveSpecialDatePhoto(_ image: UIImage?, id: UUID) {
         let url = specialDatePhotoURL(id: id)
         guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
@@ -435,6 +468,10 @@ final class DataPersistenceManager {
         return chapter
     }
 
+    func preludeVoiceMemoFileURL(fileId: String) -> URL {
+        preludeVoiceMemoURL(fileId: fileId)
+    }
+
     func savePreludeVoiceMemo(data: Data, fileId: String) {
         let url = preludeVoiceMemoURL(fileId: fileId)
         try? data.write(to: url)
@@ -448,6 +485,24 @@ final class DataPersistenceManager {
 
     func deletePreludeVoiceMemo(fileId: String) {
         try? fileManager.removeItem(at: preludeVoiceMemoURL(fileId: fileId))
+    }
+
+    func savePreludePhoto(_ image: UIImage, photoId: UUID) {
+        guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return }
+        try? jpegData.write(to: preludePhotoURL(photoId: photoId))
+    }
+
+    func loadPreludePhoto(photoId: UUID) -> UIImage? {
+        let url = preludePhotoURL(photoId: photoId)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return UIImage(data: data)
+    }
+
+    func deletePreludePhoto(photoId: UUID) {
+        try? fileManager.removeItem(at: preludePhotoURL(photoId: photoId))
     }
 
     // MARK: - Archive
@@ -588,9 +643,11 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: coupleProfileFileURL)
         try? fileManager.removeItem(at: memoryCanvasesFileURL)
         try? fileManager.removeItem(at: userAvatarURL)
+        try? fileManager.removeItem(at: partnerAvatarURL)
         try? fileManager.removeItem(at: preludeCapturesFileURL)
         try? fileManager.removeItem(at: preludeChapterFileURL)
         try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
+        try? fileManager.removeItem(at: preludePhotosDirectory)
         try? fileManager.removeItem(at: archiveBundleFileURL)
         try? fileManager.removeItem(at: reconnectInviteFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
@@ -603,6 +660,7 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: foundingOfficialDateKey)
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
         userDefaults.removeObject(forKey: colorThemeKey)
+        userDefaults.removeObject(forKey: partnerEmailKey)
         BackgroundMusicImporter.clearImportedSong()
         MomentVideoStore.shared.removeAll()
     }
