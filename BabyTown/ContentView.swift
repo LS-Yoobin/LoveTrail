@@ -17,6 +17,7 @@ struct ContentView: View {
         case prelude
         case preludeOnboarding     // NEW — prelude intro screen
         case archivedCouple
+        case partnerOnboarding(inviterName: String)
     }
 
     @State private var screen: Screen = .launch
@@ -336,6 +337,11 @@ struct ContentView: View {
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .home
                         }
+                    },
+                    onSimulatePartnerInvite: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .partnerOnboarding(inviterName: "Justin")
+                        }
                     }
                 )
                 .transition(.opacity)
@@ -361,6 +367,21 @@ struct ContentView: View {
                     }
                 }
                 .transition(.opacity)
+
+            case .partnerOnboarding(let inviterName):
+                PartnerOnboardingFlow(
+                    inviterName: inviterName,
+                    onComplete: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .officialCouple
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
+                    }
+                )
+                .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
@@ -385,6 +406,17 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 NotificationManager.shared.refresh()
+            }
+        }
+        .onOpenURL { url in
+            guard url.scheme == "babytown",
+                  url.host == "invite" else { return }
+            let name = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "from" })?
+                .value ?? "your partner"
+            withAnimation(.easeInOut(duration: 0.4)) {
+                screen = .partnerOnboarding(inviterName: name)
             }
         }
     }
