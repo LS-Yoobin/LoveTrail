@@ -4,6 +4,7 @@ struct PreludeHomeView: View {
 
     var onReturnToOnboarding: () -> Void = {}
     var onSwitchToOfficial: () -> Void = {}
+    var onSimulatePartnerInvite: () -> Void = {}
 
     @StateObject private var viewModel = PreludeViewModel()
     @State private var editorPresentation: CaptureEditorPresentation?
@@ -61,7 +62,8 @@ struct PreludeHomeView: View {
         .sheet(isPresented: $showSettings) {
             PreludeSettingsSheet(
                 onReturnToOnboarding: onReturnToOnboarding,
-                onSwitchToOfficial: onSwitchToOfficial
+                onSwitchToOfficial: onSwitchToOfficial,
+                onSimulatePartnerInvite: onSimulatePartnerInvite
             )
         }
     }
