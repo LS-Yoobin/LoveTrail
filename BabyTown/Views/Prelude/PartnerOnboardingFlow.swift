@@ -123,6 +123,43 @@ struct PartnerOnboardingFlow: View {
     }
 }
 
+// MARK: - Shared Components
+
+private struct OnboardingContinueButton: View {
+    var isEnabled: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Continue")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(
+                    Capsule()
+                        .fill(
+                            isEnabled
+                                ? BabyTownTheme.buttonGradient
+                                : LinearGradient(
+                                    colors: [Color(.systemGray4), Color(.systemGray4).opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                        )
+                        .shadow(
+                            color: isEnabled ? BabyTownTheme.accent.opacity(0.3) : .clear,
+                            radius: 12, y: 6
+                        )
+                )
+        }
+        .disabled(!isEnabled)
+        .padding(.horizontal, 40)
+        .padding(.bottom, 52)
+        .animation(.easeInOut(duration: 0.3), value: isEnabled)
+    }
+}
+
 // MARK: - Step Stubs (replaced in Tasks 8-11)
 
 private struct PartnerUsernameStep: View {
@@ -171,35 +208,9 @@ private struct PartnerUsernameStep: View {
 
                 Spacer()
 
-                Button {
+                OnboardingContinueButton(isEnabled: canContinue) {
                     if canContinue { onContinue(trimmed) }
-                } label: {
-                    Text("Continue")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    canContinue
-                                        ? BabyTownTheme.buttonGradient
-                                        : LinearGradient(
-                                            colors: [Color(.systemGray4), Color(.systemGray4).opacity(0.8)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                )
-                                .shadow(
-                                    color: canContinue ? BabyTownTheme.accent.opacity(0.3) : .clear,
-                                    radius: 12, y: 6
-                                )
-                        )
                 }
-                .disabled(!canContinue)
-                .padding(.horizontal, 40)
-                .padding(.bottom, 52)
-                .animation(.easeInOut(duration: 0.3), value: canContinue)
             }
         }
         .onAppear {
@@ -261,35 +272,9 @@ private struct PartnerEmailStep: View {
 
                 Spacer()
 
-                Button {
+                OnboardingContinueButton(isEnabled: canContinue) {
                     if canContinue { onContinue(trimmed) }
-                } label: {
-                    Text("Continue")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    canContinue
-                                        ? BabyTownTheme.buttonGradient
-                                        : LinearGradient(
-                                            colors: [Color(.systemGray4), Color(.systemGray4).opacity(0.8)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                )
-                                .shadow(
-                                    color: canContinue ? BabyTownTheme.accent.opacity(0.3) : .clear,
-                                    radius: 12, y: 6
-                                )
-                        )
                 }
-                .disabled(!canContinue)
-                .padding(.horizontal, 40)
-                .padding(.bottom, 52)
-                .animation(.easeInOut(duration: 0.3), value: canContinue)
             }
         }
         .onAppear {
