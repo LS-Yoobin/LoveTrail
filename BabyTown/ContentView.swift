@@ -152,8 +152,24 @@ struct ContentView: View {
                 .transition(.opacity)
 
             case .pathSelector:
-                Color.clear
-                    .transition(.opacity)
+                PathSelectorView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .birthday
+                        }
+                    },
+                    onSelectPrelude: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .preludeOnboarding
+                        }
+                    },
+                    onSelectOfficial: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .firstMemories
+                        }
+                    }
+                )
+                .transition(.opacity)
 
             case .preludeOnboarding:
                 Color.clear
