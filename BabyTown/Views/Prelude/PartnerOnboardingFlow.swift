@@ -160,8 +160,6 @@ private struct OnboardingContinueButton: View {
     }
 }
 
-// MARK: - Step Stubs (replaced in Tasks 8-11)
-
 private struct PartnerUsernameStep: View {
     var onContinue: (String) -> Void
 
@@ -369,5 +367,67 @@ private struct PartnerPhotoStep: View {
 private struct PartnerGiftRevealStep: View {
     let inviterName: String
     var onComplete: () -> Void
-    var body: some View { Color.clear }
+
+    @State private var bookAnimating = true
+
+    private static let mockCaptures: [PreludeCapture] = [
+        PreludeCapture(type: .note, noteText: "I keep thinking about you."),
+        PreludeCapture(type: .voiceMemo),
+        PreludeCapture(type: .first, firstLabel: "Our first real conversation"),
+    ]
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [BabyTownTheme.accentDeep.opacity(0.85), BabyTownTheme.background],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                BookFlipView(animating: bookAnimating, frameInterval: 0.18, size: 160)
+                    .padding(.top, 60)
+                    .padding(.bottom, 24)
+
+                Text("\(inviterName) made this for you")
+                    .font(.system(size: 24, weight: .light, design: .serif))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 24)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        ForEach(Self.mockCaptures) { capture in
+                            GiftCaptureRow(capture: capture, onToggle: {})
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+                }
+
+                Button(action: onComplete) {
+                    Text("Open our space")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            Capsule()
+                                .fill(AnyShapeStyle(BabyTownTheme.accentGradient))
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 28)
+                .padding(.top, 12)
+                .padding(.bottom, 52)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                bookAnimating = false
+            }
+        }
+    }
 }
