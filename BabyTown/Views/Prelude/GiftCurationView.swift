@@ -8,6 +8,7 @@ struct GiftCurationView: View {
 
     @State private var showPreview = false
     @State private var showInviteSent = false
+    @State private var showAccountSetup = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,20 @@ struct GiftCurationView: View {
             Button("Got it") { onDone() }
         } message: {
             Text("Your partner will receive your Prelude when they download the app. You can still add captures and update your gift until they accept.")
+        }
+        .fullScreenCover(isPresented: $showAccountSetup) {
+            AccountSetupFlow(
+                onCancel: { showAccountSetup = false },
+                onComplete: { result in
+                    DataPersistenceManager.shared.saveUserEmail(result.email)
+                    if let img = result.avatarImage {
+                        DataPersistenceManager.shared.saveUserAvatar(img)
+                    }
+                    showAccountSetup = false
+                    viewModel.sendInvite()
+                    showInviteSent = true
+                }
+            )
         }
     }
 
@@ -86,8 +101,12 @@ struct GiftCurationView: View {
 
     private var sendButton: some View {
         Button {
-            viewModel.sendInvite()
-            showInviteSent = true
+            if DataPersistenceManager.shared.loadUserEmail() != nil {
+                viewModel.sendInvite()
+                showInviteSent = true
+            } else {
+                showAccountSetup = true
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "envelope.badge.shield.half.filled.fill")
