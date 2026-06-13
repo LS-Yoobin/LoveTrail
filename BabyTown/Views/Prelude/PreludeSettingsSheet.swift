@@ -4,6 +4,7 @@ struct PreludeSettingsSheet: View {
 
     var onReturnToOnboarding: () -> Void
     var onSwitchToOfficial: () -> Void
+    var onSimulatePartnerInvite: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -20,10 +21,20 @@ struct PreludeSettingsSheet: View {
                         Label("Switch to Official Mode", systemImage: "heart.circle.fill")
                             .foregroundStyle(.primary)
                     }
+
+                    Button {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            onSimulatePartnerInvite()
+                        }
+                    } label: {
+                        Label("Preview Partner Onboarding", systemImage: "person.crop.circle")
+                            .foregroundStyle(.primary)
+                    }
                 } header: {
                     Text("Testing")
                 } footer: {
-                    Text("Switches your relationship stage to official so you can test the full app experience.")
+                    Text("Launches the partner invite flow with a mock inviter name.")
                         .font(.footnote)
                 }
 
@@ -57,6 +68,7 @@ struct PreludeSettingsSheet: View {
 #Preview {
     PreludeSettingsSheet(
         onReturnToOnboarding: { print("return to onboarding") },
-        onSwitchToOfficial: { print("switch to official") }
+        onSwitchToOfficial: { print("switch to official") },
+        onSimulatePartnerInvite: { print("simulate partner invite") }
     )
 }
