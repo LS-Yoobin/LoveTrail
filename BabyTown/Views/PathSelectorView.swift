@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PathSelectorView: View {
 
+    var onBack: () -> Void
     var onSelectPrelude: () -> Void
     var onSelectOfficial: () -> Void
 
@@ -38,20 +39,14 @@ struct PathSelectorView: View {
                         icon: "envelope.heart.fill",
                         title: "Prelude",
                         description: "There is someone special on your mind. Not official yet.",
-                        action: {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onSelectPrelude()
-                        }
+                        action: selectPrelude
                     )
 
                     PathCard(
                         icon: "heart.circle.fill",
                         title: "Already Official",
                         description: "You are in a relationship and ready to build your shared space.",
-                        action: {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onSelectOfficial()
-                        }
+                        action: selectOfficial
                     )
                 }
                 .padding(.horizontal, 24)
@@ -65,6 +60,17 @@ struct PathSelectorView: View {
                 contentOpacity = 1.0
             }
         }
+        .onboardingBackButton(action: onBack)
+    }
+
+    private func selectPrelude() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        onSelectPrelude()
+    }
+
+    private func selectOfficial() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        onSelectOfficial()
     }
 }
 
@@ -117,6 +123,7 @@ private struct PathCard: View {
 
 #Preview {
     PathSelectorView(
+        onBack: { print("back") },
         onSelectPrelude: { print("prelude") },
         onSelectOfficial: { print("official") }
     )
