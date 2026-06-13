@@ -7,6 +7,8 @@ struct PreludeHomeView: View {
 
     @StateObject private var viewModel = PreludeViewModel()
     @State private var editorPresentation: CaptureEditorPresentation?
+    @State private var firstDetailCapture: PreludeCapture?
+    @State private var firstEditCapture: PreludeCapture?
     @State private var showGiftCuration = false
     @State private var captureToDelete: PreludeCapture?
     @State private var showSettings = false
@@ -15,25 +17,25 @@ struct PreludeHomeView: View {
         DataPersistenceManager.shared.loadCoupleProfile().displayName ?? "them"
     }
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            BabyTownTheme.background.ignoresSafeArea()
+    private let bottomChromeHeight: CGFloat = 180
 
-            VStack(spacing: 0) {
-                inviteBanner
-                    .padding(.top, 8)
-                    .padding(.horizontal, 20)
+    var body: some View {
+        VStack(spacing: 0) {
+            BabyTownHeader(onSettingsTap: { showSettings = true })
+
+            ZStack(alignment: .bottom) {
+                BabyTownTheme.background.ignoresSafeArea()
 
                 if viewModel.captures.isEmpty {
                     emptyState
                 } else {
                     captureList
                 }
-            }
 
-            quickAddBar
-                .padding(.bottom, 28)
+                bottomChrome
+            }
         }
+        .background(BabyTownTheme.background)
         .sheet(item: $editorPresentation) { presentation in
             CaptureEditorView(
                 type: presentation.type,
@@ -43,22 +45,18 @@ struct PreludeHomeView: View {
                 onCancel: { editorPresentation = nil }
             )
         }
+        .sheet(item: $firstDetailCapture) { capture in
+            PreludeFirstDetailSheet(capture: capture) {
+                firstEditCapture = capture
+            }
+        }
+        .sheet(item: $firstEditCapture) { capture in
+            PreludeFirstEditSheet(capture: capture, viewModel: viewModel) {
+                firstEditCapture = nil
+            }
+        }
         .fullScreenCover(isPresented: $showGiftCuration) {
             GiftCurationView(viewModel: viewModel, onDone: { showGiftCuration = false })
-        }
-        .overlay(alignment: .topLeading) {
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.6))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 8)
-            .padding(.top, 4)
         }
         .sheet(isPresented: $showSettings) {
             PreludeSettingsSheet(
@@ -66,6 +64,18 @@ struct PreludeHomeView: View {
                 onSwitchToOfficial: onSwitchToOfficial
             )
         }
+    }
+
+    // MARK: - Bottom Chrome
+
+    private var bottomChrome: some View {
+        VStack(spacing: 10) {
+            inviteBanner
+                .padding(.horizontal, 20)
+
+            quickAddBar
+        }
+        .padding(.bottom, 28)
     }
 
     // MARK: - Invite Banner
@@ -83,14 +93,14 @@ struct PreludeHomeView: View {
                     if viewModel.inviteSent {
                         Text("Waiting for them to accept…")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(BabyTownTheme.textPrimary)
+                            .foregroundStyle(BabyTownTheme.inviteBannerText)
                     } else {
                         Text("Invite \(displayName)")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(BabyTownTheme.textPrimary)
+                            .foregroundStyle(BabyTownTheme.inviteBannerText)
                         Text("Share your Prelude when you're ready")
                             .font(.system(size: 12))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(BabyTownTheme.inviteBannerSubtext)
                     }
                 }
 
@@ -98,12 +108,16 @@ struct PreludeHomeView: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(BabyTownTheme.inviteBannerText)
             }
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(BabyTownTheme.cardBackground)
+                    .fill(BabyTownTheme.inviteBannerFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(BabyTownTheme.inviteBannerBorder, lineWidth: 1.5)
+                    )
             )
         }
         .buttonStyle(.plain)
@@ -117,7 +131,11 @@ struct PreludeHomeView: View {
                 ForEach(viewModel.captures) { capture in
                     CaptureRowCard(capture: capture, onDelete: { captureToDelete = capture })
                         .onTapGesture {
-                            editorPresentation = .edit(capture)
+                            if capture.type == .first {
+                                firstDetailCapture = capture
+                            } else {
+                                editorPresentation = .edit(capture)
+                            }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -130,7 +148,7 @@ struct PreludeHomeView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
-            .padding(.bottom, 120)
+            .padding(.bottom, bottomChromeHeight)
         }
         .alert(
             "Delete capture?",
@@ -153,22 +171,27 @@ struct PreludeHomeView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "heart.text.square")
-                .font(.system(size: 48))
-                .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
-            Text("Start capturing your story")
-                .font(.system(size: 20, weight: .semibold, design: .serif))
-                .foregroundStyle(BabyTownTheme.textPrimary)
-            Text("Notes, firsts, voice memos, and reasons —\nall private until you choose to share.")
-                .font(.system(size: 14))
-                .foregroundStyle(.black)
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-            Spacer()
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                Spacer(minLength: 80)
+
+                Image(systemName: "heart.text.square")
+                    .font(.system(size: 48))
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
+                Text("Start capturing your story")
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                Text("Notes, firsts, voice memos, and reasons —\nall private until you choose to share.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.black)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+
+                Spacer(minLength: bottomChromeHeight)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 32)
         }
-        .padding(.horizontal, 32)
     }
 
     // MARK: - Quick Add Bar
@@ -219,6 +242,8 @@ struct PreludeHomeView: View {
 private struct CaptureRowCard: View {
     let capture: PreludeCapture
     let onDelete: () -> Void
+
+    @State private var firstPhoto: UIImage?
 
     private static let lightTrashTint = Color(red: 0.94, green: 0.58, blue: 0.58)
 
@@ -307,6 +332,15 @@ private struct CaptureRowCard: View {
                 }
             }
 
+            if let firstPhoto {
+                Image(uiImage: firstPhoto)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 130)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+
             HStack {
                 Spacer()
 
@@ -325,6 +359,11 @@ private struct CaptureRowCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(cardBackground)
         )
+        .onAppear {
+            if let photoId = capture.firstPhotoId {
+                firstPhoto = DataPersistenceManager.shared.loadPreludePhoto(photoId: photoId)
+            }
+        }
     }
 }
 
