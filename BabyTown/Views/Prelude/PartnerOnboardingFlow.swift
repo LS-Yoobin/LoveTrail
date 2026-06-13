@@ -127,12 +127,175 @@ struct PartnerOnboardingFlow: View {
 
 private struct PartnerUsernameStep: View {
     var onContinue: (String) -> Void
-    var body: some View { Color.clear }
+
+    @State private var username = ""
+    @FocusState private var isFieldFocused: Bool
+
+    private var trimmed: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canContinue: Bool { !trimmed.isEmpty }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                Text("What should we call you?")
+                    .font(.system(size: 26, weight: .light, design: .serif))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 32)
+
+                TextField("Your nickname", text: $username)
+                    .textContentType(.nickname)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.continue)
+                    .focused($isFieldFocused)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(.systemGray6))
+                            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+                    )
+                    .padding(.horizontal, 40)
+                    .onSubmit { if canContinue { onContinue(trimmed) } }
+
+                Spacer()
+
+                Button {
+                    if canContinue { onContinue(trimmed) }
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    canContinue
+                                        ? BabyTownTheme.buttonGradient
+                                        : LinearGradient(
+                                            colors: [Color(.systemGray4), Color(.systemGray4).opacity(0.8)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                )
+                                .shadow(
+                                    color: canContinue ? BabyTownTheme.accent.opacity(0.3) : .clear,
+                                    radius: 12, y: 6
+                                )
+                        )
+                }
+                .disabled(!canContinue)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 52)
+                .animation(.easeInOut(duration: 0.3), value: canContinue)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { isFieldFocused = true }
+        }
+    }
 }
 
 private struct PartnerEmailStep: View {
     var onContinue: (String) -> Void
-    var body: some View { Color.clear }
+
+    @State private var email = ""
+    @FocusState private var isFieldFocused: Bool
+
+    private var trimmed: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canContinue: Bool { !trimmed.isEmpty }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                VStack(spacing: 14) {
+                    Text("Where can we reach you?")
+                        .font(.system(size: 26, weight: .light, design: .serif))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+
+                    Text("For account recovery when we launch")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(.secondaryLabel))
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 32)
+
+                TextField("Email address", text: $email)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.continue)
+                    .focused($isFieldFocused)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(.systemGray6))
+                            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+                    )
+                    .padding(.horizontal, 40)
+                    .onSubmit { if canContinue { onContinue(trimmed) } }
+
+                Spacer()
+
+                Button {
+                    if canContinue { onContinue(trimmed) }
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    canContinue
+                                        ? BabyTownTheme.buttonGradient
+                                        : LinearGradient(
+                                            colors: [Color(.systemGray4), Color(.systemGray4).opacity(0.8)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                )
+                                .shadow(
+                                    color: canContinue ? BabyTownTheme.accent.opacity(0.3) : .clear,
+                                    radius: 12, y: 6
+                                )
+                        )
+                }
+                .disabled(!canContinue)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 52)
+                .animation(.easeInOut(duration: 0.3), value: canContinue)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { isFieldFocused = true }
+        }
+    }
 }
 
 private struct PartnerPhotoStep: View {
