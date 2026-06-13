@@ -8,10 +8,13 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
     var isPartnerRetroactive: Bool
 
     var noteText: String?
+    var noteMood: ProfileNoteMood?
     var notePhotoId: UUID?
     var firstLabel: String?
+    var firstPhotoId: UUID?
     var voiceMemoFileId: String?
     var reasonText: String?
+    var firstDate: Date?
 
     enum CaptureType: String, Codable {
         case note, first, voiceMemo, reason
@@ -24,10 +27,13 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
         isIncludedInGift: Bool = true,
         isPartnerRetroactive: Bool = false,
         noteText: String? = nil,
+        noteMood: ProfileNoteMood? = nil,
         notePhotoId: UUID? = nil,
         firstLabel: String? = nil,
+        firstPhotoId: UUID? = nil,
         voiceMemoFileId: String? = nil,
-        reasonText: String? = nil
+        reasonText: String? = nil,
+        firstDate: Date? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -35,10 +41,13 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
         self.isIncludedInGift = isIncludedInGift
         self.isPartnerRetroactive = isPartnerRetroactive
         self.noteText = noteText
+        self.noteMood = noteMood
         self.notePhotoId = notePhotoId
         self.firstLabel = firstLabel
+        self.firstPhotoId = firstPhotoId
         self.voiceMemoFileId = voiceMemoFileId
         self.reasonText = reasonText
+        self.firstDate = firstDate
     }
 
     var displayTitle: String {

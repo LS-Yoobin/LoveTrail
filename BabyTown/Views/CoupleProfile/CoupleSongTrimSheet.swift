@@ -54,17 +54,13 @@ struct CoupleSongTrimSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: save) {
-                        Text("SAVE")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                canSave
-                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
-                                    : AnyShapeStyle(Color.black.opacity(0.18)),
-                                in: Capsule()
-                            )
+                        SavePillLabel(
+                            title: "SAVE",
+                            isEnabled: canSave,
+                            font: .subheadline.weight(.bold),
+                            horizontalPadding: 16,
+                            verticalPadding: 8
+                        )
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSave)

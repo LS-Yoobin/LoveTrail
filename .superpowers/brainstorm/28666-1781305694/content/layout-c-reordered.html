@@ -1,0 +1,128 @@
+<h2>Option C — Reordered Layout</h2>
+<p class="subtitle">Date banner at the top, custom text field below, preset options at the bottom.</p>
+
+<style>
+  .phone-frame {
+    width: 300px;
+    background: #f5f0eb;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    font-family: -apple-system, sans-serif;
+  }
+  .nav-bar {
+    background: #f5f0eb;
+    padding: 14px 16px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .nav-cancel { color: #888; font-size: 13px; }
+  .nav-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .nav-save { color: #c47b5a; font-size: 13px; font-weight: 600; }
+  .editor-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 11px; }
+
+  .section-label {
+    font-size: 11px; color: #888; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* Date banner - top */
+  .date-banner {
+    background: linear-gradient(135deg, #fdf0ea, #fce8de);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+  }
+  .date-left { display: flex; flex-direction: column; gap: 2px; }
+  .date-big { font-size: 24px; font-weight: 700; color: #c47b5a; line-height: 1; }
+  .date-year { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .date-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .cal-icon { font-size: 26px; }
+  .tap-hint { font-size: 10px; color: #c47b5a; opacity: 0.7; }
+
+  /* Divider */
+  .section-divider {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-divider .line { flex: 1; height: 1px; background: rgba(0,0,0,0.08); }
+  .section-divider .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+
+  /* Custom text field */
+  .text-field-dashed {
+    border: 1.5px dashed #1a1a1a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: rgba(0,0,0,0.35);
+    background: transparent;
+  }
+
+  .or-divider { text-align: center; font-size: 11px; color: #bbb; }
+
+  /* Option chips */
+  .option-chip {
+    background: #ede9e3;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .option-chip.selected {
+    background: #fdf0ea;
+    color: #c47b5a;
+  }
+  .checkmark { color: #c47b5a; font-size: 13px; }
+
+  .centered { display: flex; justify-content: center; }
+</style>
+
+<div class="centered">
+  <div class="phone-frame">
+    <div class="nav-bar">
+      <span class="nav-cancel">Cancel</span>
+      <span class="nav-title">A First</span>
+      <span class="nav-save">Save</span>
+    </div>
+    <div class="editor-body">
+
+      <!-- 1. Date at the top -->
+      <div class="section-label">📅 When was this?</div>
+      <div class="date-banner">
+        <div class="date-left">
+          <div class="date-big">June 12</div>
+          <div class="date-year">2026</div>
+        </div>
+        <div class="date-right">
+          <div class="cal-icon">🗓</div>
+          <div class="tap-hint">tap to change</div>
+        </div>
+      </div>
+
+      <!-- 2. Write your own -->
+      <div class="section-divider">
+        <div class="line"></div>
+        <div class="label">What was the first?</div>
+        <div class="line"></div>
+      </div>
+
+      <div class="text-field-dashed">✏️ &nbsp;<span>Write your own first…</span></div>
+
+      <div class="or-divider">or pick one</div>
+
+      <!-- 3. Presets -->
+      <div class="option-chip selected">First date <span class="checkmark">✓</span></div>
+      <div class="option-chip">First time they made you laugh</div>
+      <div class="option-chip">First text conversation</div>
+      <div class="option-chip">First time you felt nervous</div>
+
+    </div>
+  </div>
+</div>

@@ -7,6 +7,7 @@ struct PreludeHomeView: View {
     var onSimulatePartnerInvite: () -> Void = {}
 
     @StateObject private var viewModel = PreludeViewModel()
+    @StateObject private var nightModeManager = NightModeManager()
     @State private var editorPresentation: CaptureEditorPresentation?
     @State private var firstDetailCapture: PreludeCapture?
     @State private var firstEditCapture: PreludeCapture?
@@ -21,22 +22,34 @@ struct PreludeHomeView: View {
     private let bottomChromeHeight: CGFloat = 180
 
     var body: some View {
-        VStack(spacing: 0) {
-            BabyTownHeader(onSettingsTap: { showSettings = true })
-
-            ZStack(alignment: .bottom) {
-                BabyTownTheme.background.ignoresSafeArea()
-
-                if viewModel.captures.isEmpty {
-                    emptyState
+        ZStack {
+            Group {
+                if nightModeManager.isNightMode {
+                    HomeBackgroundView(isNightMode: true)
                 } else {
-                    captureList
+                    BabyTownTheme.background
                 }
+            }
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.8), value: nightModeManager.isNightMode)
 
-                bottomChrome
+            VStack(spacing: 0) {
+                BabyTownHeader(
+                    onSettingsTap: { showSettings = true },
+                    isNightMode: nightModeManager.isNightMode
+                )
+
+                ZStack(alignment: .bottom) {
+                    if viewModel.captures.isEmpty {
+                        emptyState
+                    } else {
+                        captureList
+                    }
+
+                    bottomChrome
+                }
             }
         }
-        .background(BabyTownTheme.background)
         .sheet(item: $editorPresentation) { presentation in
             CaptureEditorView(
                 type: presentation.type,
@@ -97,7 +110,7 @@ struct PreludeHomeView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(BabyTownTheme.inviteBannerText)
                     } else {
-                        Text("Invite \(displayName)")
+                        Text("Invite partner")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(BabyTownTheme.inviteBannerText)
                         Text("Share your Prelude when you're ready")
@@ -131,7 +144,11 @@ struct PreludeHomeView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 14) {
                 ForEach(viewModel.captures) { capture in
-                    CaptureRowCard(capture: capture, onDelete: { captureToDelete = capture })
+                    CaptureRowCard(
+                        capture: capture,
+                        isNightMode: nightModeManager.isNightMode,
+                        onDelete: { captureToDelete = capture }
+                    )
                         .onTapGesture {
                             if capture.type == .first {
                                 firstDetailCapture = capture
@@ -182,10 +199,10 @@ struct PreludeHomeView: View {
                     .foregroundStyle(BabyTownTheme.accent.opacity(0.4))
                 Text("Start capturing your story")
                     .font(.system(size: 20, weight: .semibold, design: .serif))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(nightModeManager.isNightMode ? .white : BabyTownTheme.textPrimary)
                 Text("Notes, firsts, voice memos, and reasons —\nall private until you choose to share.")
                     .font(.system(size: 14))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(nightModeManager.isNightMode ? .white.opacity(0.75) : .black)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
 
@@ -243,7 +260,10 @@ struct PreludeHomeView: View {
 
 private struct CaptureRowCard: View {
     let capture: PreludeCapture
+    var isNightMode: Bool = false
     let onDelete: () -> Void
+
+    private var secondaryTextColor: Color { .black }
 
     @State private var firstPhoto: UIImage?
 
@@ -309,7 +329,7 @@ private struct CaptureRowCard: View {
 
                         Text(headerDate, style: .date)
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(secondaryTextColor)
                     }
 
                     if capture.type == .note, capture.noteMood != nil {
@@ -330,7 +350,7 @@ private struct CaptureRowCard: View {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     Text(Self.relativeFormatter.localizedString(for: capture.createdAt, relativeTo: context.date))
                         .font(.system(size: 12))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
 
@@ -339,8 +359,8 @@ private struct CaptureRowCard: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 130)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(height: 190)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
 
             HStack {

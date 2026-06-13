@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
 
-    enum Screen {
+    enum Screen: Equatable {
         case launch, welcome, storyOnboarding, nickname, colorTheme, birthday
         case pathSelector          // NEW — branch point after birthday
         case firstMemories, howItWorks, photoAccess, home, selectPhotos
@@ -190,7 +190,7 @@ struct ContentView: View {
                 FirstMemoriesView(
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .birthday
+                            screen = .pathSelector
                         }
                     },
                     onFinished: { firstMet, official, firstMetDate, officialDate in

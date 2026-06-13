@@ -34,6 +34,7 @@ struct MomentPhotoViewer: View {
     @State private var isEditingStickers = false
     @State private var selectedStickerID: UUID?
     @State private var noteDraft = ""
+    @State private var noteDraftMood: ProfileNoteMood?
     @State private var composingNotePosition: NormalizedPoint?
     @State private var isCanvasDragActive = false
     @State private var metadataBottomY: CGFloat = 0
@@ -257,6 +258,7 @@ struct MomentPhotoViewer: View {
                                 isEditingStickers: isEditingStickers,
                                 selectedStickerID: selectedStickerID,
                                 noteDraft: $noteDraft,
+                                noteDraftMood: $noteDraftMood,
                                 isNoteFocused: $isNoteFocused,
                                 onSelectComposingNote: selectComposingNote,
                                 onDeselectComposingNote: { isComposingNoteSelected = false },
@@ -292,15 +294,23 @@ struct MomentPhotoViewer: View {
                 .scrollDisabled(isCanvasDragActive && (isComposingNote || isEditingStickers))
                 .scrollDismissesKeyboard(isComposingNote && isNoteFocused ? .never : .interactively)
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    browseTopBar
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
-                        .background {
-                            Color(red: 0.96, green: 0.95, blue: 0.93)
-                                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-                                .ignoresSafeArea(edges: .top)
+                    VStack(spacing: 0) {
+                        browseTopBar
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                            .padding(.bottom, 12)
+
+                        if isComposingNote {
+                            ProfileNoteMoodPickerBar(selectedMood: $noteDraftMood)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 12)
                         }
+                    }
+                    .background {
+                        Color(red: 0.96, green: 0.95, blue: 0.93)
+                            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                            .ignoresSafeArea(edges: .top)
+                    }
                 }
 
                 Group {
@@ -384,6 +394,7 @@ struct MomentPhotoViewer: View {
         canvas.upsertNote(author: .localUser, text: nil, position: nil)
         persistCanvas()
         noteDraft = ""
+        noteDraftMood = nil
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
@@ -611,21 +622,25 @@ struct MomentPhotoViewer: View {
             Spacer()
 
             if isComposingNote {
-                Button("SAVE") { saveNoteComposing() }
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 8)
-                    .background(BabyTownTheme.savePillFill, in: Capsule())
-                    .buttonStyle(.plain)
+                Button(action: saveNoteComposing) {
+                    SavePillLabel(
+                        title: "SAVE",
+                        font: .body.weight(.bold),
+                        horizontalPadding: 18,
+                        verticalPadding: 8
+                    )
+                }
+                .buttonStyle(.plain)
             } else if isEditingStickers {
-                Button("SAVE") { finishStickerEditing() }
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 8)
-                    .background(BabyTownTheme.savePillFill, in: Capsule())
-                    .buttonStyle(.plain)
+                Button(action: finishStickerEditing) {
+                    SavePillLabel(
+                        title: "SAVE",
+                        font: .body.weight(.bold),
+                        horizontalPadding: 18,
+                        verticalPadding: 8
+                    )
+                }
+                .buttonStyle(.plain)
             } else {
                 browseActionButtons
             }
@@ -864,6 +879,7 @@ struct MomentPhotoViewer: View {
         noteDraft = canvas.localUserNote.map {
             ProfileGardenNoteLayout.clampedNoteText($0.text, noteWidth: noteWidth)
         } ?? ""
+        noteDraftMood = canvas.localUserNote?.mood
         composingNotePosition = canvas.localUserNote?.position
         selectedStickerID = nil
         isComposingNoteSelected = false
@@ -890,6 +906,7 @@ struct MomentPhotoViewer: View {
         noteDraft = canvas.localUserNote.map {
             ProfileGardenNoteLayout.clampedNoteText($0.text, noteWidth: noteWidth)
         } ?? ""
+        noteDraftMood = canvas.localUserNote?.mood
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
@@ -907,7 +924,8 @@ struct MomentPhotoViewer: View {
         canvas.upsertNote(
             author: .localUser,
             text: trimmed.isEmpty ? nil : trimmed,
-            position: trimmed.isEmpty ? nil : position
+            position: trimmed.isEmpty ? nil : position,
+            mood: trimmed.isEmpty ? nil : noteDraftMood
         )
         persistCanvas()
         composingNotePosition = nil

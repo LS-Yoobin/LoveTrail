@@ -1,0 +1,181 @@
+<h2>Fixed Header + Scrollable Presets</h2>
+<p class="subtitle">Date, label, custom field, and "or pick one" are fixed. Only the preset list scrolls.</p>
+
+<style>
+  .phone-frame {
+    width: 300px;
+    height: 560px;
+    background: #f5f0eb;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    font-family: -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  .nav-bar {
+    background: #f5f0eb;
+    padding: 14px 16px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    flex-shrink: 0;
+  }
+  .nav-cancel { color: #888; font-size: 13px; }
+  .nav-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .nav-save { color: #c47b5a; font-size: 13px; font-weight: 600; }
+
+  /* Fixed section — does not scroll */
+  .fixed-section {
+    padding: 14px 14px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    flex-shrink: 0;
+  }
+
+  .section-label {
+    font-size: 11px; color: #888; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .date-banner {
+    background: linear-gradient(135deg, #fdf0ea, #fce8de);
+    border-radius: 14px;
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .date-left { display: flex; flex-direction: column; gap: 2px; }
+  .date-big { font-size: 24px; font-weight: 700; color: #c47b5a; line-height: 1; }
+  .date-year { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .date-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .cal-icon { font-size: 24px; }
+  .tap-hint { font-size: 10px; color: #c47b5a; opacity: 0.7; }
+
+  .section-divider {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-divider .line { flex: 1; height: 1px; background: rgba(0,0,0,0.08); }
+  .section-divider .lbl { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+
+  .text-field-dashed {
+    border: 1.5px dashed #1a1a1a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: rgba(0,0,0,0.35);
+    background: transparent;
+  }
+
+  .or-label {
+    text-align: center;
+    font-size: 11px;
+    color: #bbb;
+    padding-bottom: 2px;
+  }
+
+  /* Scrollable presets area */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* fade out at bottom to hint scrollability */
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  .option-chip {
+    background: #ede9e3;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .option-chip.selected {
+    background: #fdf0ea;
+    color: #c47b5a;
+  }
+  .checkmark { color: #c47b5a; font-size: 13px; }
+
+  /* annotation arrow */
+  .annotation {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 16px;
+    max-width: 340px;
+  }
+  .ann-arrow {
+    font-size: 20px;
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .ann-text { font-size: 12px; color: #666; line-height: 1.5; }
+  .ann-text strong { color: #333; }
+
+  .centered { display: flex; flex-direction: column; align-items: center; }
+</style>
+
+<div class="centered">
+  <div class="phone-frame">
+    <div class="nav-bar">
+      <span class="nav-cancel">Cancel</span>
+      <span class="nav-title">A First</span>
+      <span class="nav-save">Save</span>
+    </div>
+
+    <!-- FIXED top section -->
+    <div class="fixed-section">
+      <div class="section-label">📅 When was this?</div>
+      <div class="date-banner">
+        <div class="date-left">
+          <div class="date-big">June 12</div>
+          <div class="date-year">2026</div>
+        </div>
+        <div class="date-right">
+          <div class="cal-icon">🗓</div>
+          <div class="tap-hint">tap to change</div>
+        </div>
+      </div>
+
+      <div class="section-divider">
+        <div class="line"></div>
+        <div class="lbl">What was the first?</div>
+        <div class="line"></div>
+      </div>
+
+      <div class="text-field-dashed">✏️ &nbsp;<span>Write your own first…</span></div>
+
+      <div class="or-label">or pick one</div>
+    </div>
+
+    <!-- SCROLLABLE presets only -->
+    <div class="scroll-area">
+      <div class="option-chip selected">First date <span class="checkmark">✓</span></div>
+      <div class="option-chip">First time they made you laugh</div>
+      <div class="option-chip">First text conversation</div>
+      <div class="option-chip">First time you felt nervous around them</div>
+      <div class="option-chip">First time you imagined a future with them</div>
+      <div class="option-chip">First time you thought "I'm in trouble"</div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <div class="ann-arrow">↑</div>
+    <div class="ann-text">
+      <strong>Fixed:</strong> date banner, "What was the first?", custom field, "or pick one" — these never move.<br><br>
+      <strong>Scrollable:</strong> only the preset list scrolls inside its own container. Fades out at bottom to hint there's more.
+    </div>
+  </div>
+</div>

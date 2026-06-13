@@ -87,7 +87,7 @@ struct PartnerOnboardingFlow: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                BookFlipView(animating: true, frameInterval: 0.18, size: 160)
+                BookFlipView(animating: true, size: 160)
                     .padding(.bottom, 40)
 
                 VStack(spacing: 14) {
@@ -386,7 +386,7 @@ private struct PartnerGiftRevealStep: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                BookFlipView(animating: bookAnimating, frameInterval: 0.18, size: 160)
+                BookFlipView(animating: bookAnimating, size: 160)
                     .padding(.top, 60)
                     .padding(.bottom, 24)
 

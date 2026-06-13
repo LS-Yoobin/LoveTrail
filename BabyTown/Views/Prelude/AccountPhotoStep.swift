@@ -13,7 +13,6 @@ struct AccountPhotoStep: View {
 
     // Scratch binding used by pickers before committing to avatarImage
     @State private var pendingImage: UIImage?
-    @State private var libraryImages: [UIImage] = []
 
     private var ctaLabel: String {
         avatarImage != nil ? "Looks good" : "Continue"
@@ -47,7 +46,7 @@ struct AccountPhotoStep: View {
                         // Subtitle
                         Text("This will appear in your shared garden when your partner connects.")
                             .font(.system(size: 15))
-                            .foregroundStyle(BabyTownTheme.textSecondary)
+                            .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
                             .padding(.top, 8)
                             .padding(.horizontal, 32)
@@ -92,17 +91,19 @@ struct AccountPhotoStep: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack {
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color(.systemGray6)))
-            }
-            .buttonStyle(.plain)
+        ZStack {
+            HStack {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.textSecondary)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color(.systemGray6)))
+                }
+                .buttonStyle(.plain)
 
-            Spacer()
+                Spacer()
+            }
 
             stepDots
         }
@@ -178,7 +179,7 @@ struct AccountPhotoStep: View {
             } label: {
                 Text("Skip for now")
                     .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.38))
             }
             .buttonStyle(.plain)
         }

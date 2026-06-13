@@ -244,19 +244,13 @@ struct ProfileEditorSheet: View {
                 onSave(image, trimmedName)
                 dismiss()
             } label: {
-                Text("Save")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        Capsule()
-                            .fill(
-                                canSave
-                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
-                                    : AnyShapeStyle(Color.black.opacity(0.18))
-                            )
-                    )
+                SavePillLabel(
+                    title: "Save",
+                    isEnabled: canSave,
+                    font: .system(size: 16, weight: .semibold),
+                    verticalPadding: 14,
+                    fillsWidth: true
+                )
             }
             .buttonStyle(.plain)
             .disabled(!canSave)

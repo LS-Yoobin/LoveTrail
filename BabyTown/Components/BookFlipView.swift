@@ -3,7 +3,7 @@ import SwiftUI
 struct BookFlipView: View {
 
     var animating: Bool = true
-    var frameInterval: Double = 0.18
+    var frameInterval: Double = 0.24
     var size: CGFloat = 180
 
     private static let frames = ["BookFlip1", "BookFlip2", "BookFlip3", "BookFlip4"]
@@ -37,6 +37,6 @@ struct BookFlipView: View {
 }
 
 #Preview {
-    BookFlipView(animating: true, frameInterval: 0.18, size: 200)
+    BookFlipView(animating: true, size: 200)
         .padding()
 }

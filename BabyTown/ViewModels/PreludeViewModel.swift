@@ -51,6 +51,9 @@ final class PreludeViewModel: ObservableObject {
         if let fileId = capture.voiceMemoFileId {
             dpm.deletePreludeVoiceMemo(fileId: fileId)
         }
+        if let photoId = capture.firstPhotoId {
+            dpm.deletePreludePhoto(photoId: photoId)
+        }
         captures.removeAll { $0.id == capture.id }
         saveCaptures()
     }
@@ -109,10 +112,13 @@ final class PreludeViewModel: ObservableObject {
             isIncludedInGift: true,
             isPartnerRetroactive: true,
             noteText: capture.noteText,
+            noteMood: capture.noteMood,
             notePhotoId: capture.notePhotoId,
             firstLabel: capture.firstLabel,
+            firstPhotoId: capture.firstPhotoId,
             voiceMemoFileId: capture.voiceMemoFileId,
-            reasonText: capture.reasonText
+            reasonText: capture.reasonText,
+            firstDate: capture.firstDate
         )
         captures.append(updated)
         saveCaptures()
@@ -127,14 +133,42 @@ final class PreludeViewModel: ObservableObject {
         "What's something small they did that you keep thinking about?"
     ]
 
-    static let firstOptions: [String] = [
-        "First text conversation",
-        "First time they made you laugh",
-        "First date",
-        "First time you thought \"I'm in trouble\"",
-        "First time you felt nervous around them",
-        "First time you imagined a future with them"
+    static let firstOptionPages: [[String]] = [
+        [
+            "First text conversation",
+            "First time they made you laugh",
+            "First date",
+            "First time you thought \"I'm in trouble\"",
+            "First time you felt nervous around them",
+            "First time you imagined a future with them"
+        ],
+        [
+            "First kiss",
+            "First time you said \"I love you\"",
+            "First time meeting their friends",
+            "First road trip together",
+            "First time you stayed up all night talking",
+            "First time you missed them"
+        ],
+        [
+            "First time you held hands",
+            "First time they cooked for you",
+            "First time you met their family",
+            "First time you danced together",
+            "First time you felt truly seen",
+            "First time you couldn't stop smiling"
+        ]
     ]
 
+    static var firstOptions: [String] { firstOptionPages[0] }
+
     static let reasonPrompt = "One reason I'm falling for you:"
+
+    static let voicePrompts: [String] = [
+        "What's on your mind about them right now?",
+        "Say something you haven't had the words to text",
+        "Tell them how a moment this week actually felt",
+        "What would you say if they were sitting right here?",
+        "Describe the feeling — not the story"
+    ]
 }

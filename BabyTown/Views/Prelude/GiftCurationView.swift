@@ -50,7 +50,6 @@ struct GiftCurationView: View {
         }
         .fullScreenCover(isPresented: $showAccountSetup) {
             AccountSetupFlow(
-                onCancel: { showAccountSetup = false },
                 onComplete: { result in
                     DataPersistenceManager.shared.saveUserEmail(result.email)
                     if let img = result.avatarImage {
@@ -59,7 +58,8 @@ struct GiftCurationView: View {
                     showAccountSetup = false
                     viewModel.sendInvite()
                     showInviteSent = true
-                }
+                },
+                onCancel: { showAccountSetup = false }
             )
         }
     }

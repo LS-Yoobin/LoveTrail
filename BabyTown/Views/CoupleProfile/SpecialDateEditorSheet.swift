@@ -96,19 +96,7 @@ struct SpecialDateEditorSheet: View {
                         onSave(result, image)
                         dismiss()
                     } label: {
-                        Text("Save")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        canSave
-                                            ? AnyShapeStyle(BabyTownTheme.savePillFill)
-                                            : AnyShapeStyle(Color.gray.opacity(0.35))
-                                    )
-                            )
+                        SavePillLabel(title: "Save", isEnabled: canSave)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSave)

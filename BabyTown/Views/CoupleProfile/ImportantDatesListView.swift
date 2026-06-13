@@ -3,7 +3,6 @@ import GardenCore
 
 enum CoupleProfileSubpage: String, Identifiable {
     case importantDates
-    case pinnedMemories
 
     var id: String { rawValue }
 }

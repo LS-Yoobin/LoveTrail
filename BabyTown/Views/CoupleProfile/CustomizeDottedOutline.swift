@@ -86,7 +86,7 @@ struct EditGardenTrashButton: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(10)
-                .background(Color.red, in: Circle())
+                .background(Color(red: 0.94, green: 0.58, blue: 0.58), in: Circle())
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
         }
         .buttonStyle(.plain)

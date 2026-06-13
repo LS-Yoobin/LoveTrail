@@ -7,24 +7,27 @@ struct PreludeOnboardingView: View {
     @State private var contentOpacity: Double = 0
 
     var body: some View {
-        ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+        VStack(spacing: 0) {
+            heroSection
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    heroSection
                     featureList
                     giftSection
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
-                    beginButton
-                        .padding(.horizontal, 40)
-                        .padding(.top, 24)
-                        .padding(.bottom, 52)
+                        .padding(.bottom, 24)
                 }
             }
-            .opacity(contentOpacity)
+
+            beginButton
+                .padding(.horizontal, 40)
+                .padding(.top, 16)
+                .padding(.bottom, 52)
+                .background(Color(.systemBackground))
         }
+        .background(Color(.systemBackground).ignoresSafeArea())
+        .opacity(contentOpacity)
         .onAppear {
             withAnimation(.easeOut(duration: 0.7).delay(0.15)) {
                 contentOpacity = 1.0

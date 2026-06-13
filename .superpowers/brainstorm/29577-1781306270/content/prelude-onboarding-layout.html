@@ -1,0 +1,207 @@
+<style>
+  body { background: #f9f4f0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .question-title { font-size: 1.1rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .question-sub { color: #888; font-size: 0.88rem; margin-bottom: 24px; }
+
+  .cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .card {
+    width: 260px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    cursor: pointer;
+    border: 2.5px solid transparent;
+    transition: all 0.2s ease;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.12); }
+  .card.selected { border-color: #c97b8c; }
+
+  .phone-shell {
+    background: #1a1a1a;
+    border-radius: 14px 14px 0 0;
+    padding: 8px 8px 0;
+    margin: 12px 12px 0;
+    position: relative;
+  }
+  .phone-notch {
+    width: 60px; height: 8px;
+    background: #333;
+    border-radius: 4px;
+    margin: 0 auto 6px;
+  }
+  .phone-screen {
+    background: white;
+    border-radius: 10px 10px 0 0;
+    overflow: hidden;
+    min-height: 320px;
+  }
+
+  /* Option A — Single scroll page */
+  .scroll-hero {
+    background: linear-gradient(160deg, #fce4ec, #f8bbd0);
+    padding: 18px 14px 12px;
+    text-align: center;
+  }
+  .scroll-hero .icon { font-size: 28px; margin-bottom: 6px; }
+  .scroll-hero .title { font-size: 13px; font-weight: 700; color: #6d2d3a; line-height: 1.3; }
+  .scroll-hero .sub { font-size: 10px; color: #9c4158; margin-top: 3px; }
+  .scroll-feature { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-bottom: 1px solid #f5f5f5; }
+  .scroll-feature .fi { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .scroll-feature .ft { font-size: 10px; font-weight: 600; color: #333; }
+  .scroll-feature .fd { font-size: 9px; color: #888; margin-top: 1px; }
+  .scroll-cta {
+    background: linear-gradient(135deg, #c97b8c, #e8a0b0);
+    margin: 10px 12px;
+    border-radius: 20px;
+    padding: 8px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+  }
+
+  /* Option B — Paged carousel */
+  .carousel-dot-row { display: flex; justify-content: center; gap: 5px; padding: 6px; }
+  .dot { width: 6px; height: 6px; border-radius: 3px; background: #ddd; }
+  .dot.active { background: #c97b8c; width: 14px; }
+  .carousel-slide {
+    padding: 14px;
+    text-align: center;
+    min-height: 280px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #fff 60%, #fce4ec10 100%);
+  }
+  .carousel-slide .big-icon { font-size: 44px; margin-bottom: 10px; }
+  .carousel-slide .slide-title { font-size: 13px; font-weight: 700; color: #2a2a2a; line-height: 1.4; margin-bottom: 5px; }
+  .carousel-slide .slide-body { font-size: 9.5px; color: #666; line-height: 1.5; max-width: 180px; }
+  .slide-nav { display: flex; justify-content: space-between; padding: 6px 14px 10px; }
+  .slide-btn { font-size: 9px; color: #c97b8c; font-weight: 600; }
+
+  /* Option C — Path-reveal (2 screens: concept + features) */
+  .reveal-header {
+    background: linear-gradient(160deg, #4a1942, #8b3d5c);
+    padding: 20px 14px 16px;
+    text-align: center;
+  }
+  .reveal-header .rh-icon { font-size: 32px; }
+  .reveal-header .rh-title { font-size: 12px; font-weight: 700; color: #fff; margin-top: 6px; line-height: 1.4; }
+  .reveal-header .rh-sub { font-size: 9.5px; color: rgba(255,255,255,0.7); margin-top: 3px; }
+  .reveal-body { padding: 10px 12px; }
+  .reveal-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #fce4ec; border-radius: 20px; padding: 4px 10px;
+    font-size: 9.5px; font-weight: 600; color: #c97b8c;
+    margin: 3px 2px;
+  }
+  .reveal-cta {
+    background: linear-gradient(135deg, #8b3d5c, #c97b8c);
+    margin: 8px 12px 10px;
+    border-radius: 20px;
+    padding: 8px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+  }
+
+  .card-label {
+    padding: 14px 16px;
+    background: white;
+  }
+  .card-label h3 { font-size: 0.95rem; font-weight: 700; color: #222; margin: 0 0 4px; }
+  .card-label p { font-size: 0.8rem; color: #777; margin: 0; line-height: 1.4; }
+  .card-label .rec { display: inline-block; background: #fce4ec; color: #c97b8c; font-size: 0.7rem; font-weight: 700; border-radius: 8px; padding: 2px 8px; margin-top: 5px; }
+</style>
+
+<p class="question-title">How should the Prelude onboarding explanation look?</p>
+<p class="question-sub">After users pick "Prelude" at the path selector, how do we introduce them to the concept before they enter?</p>
+
+<div class="cards">
+
+  <!-- Option A: Single Scroll -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="phone-shell">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="scroll-hero">
+          <div class="icon">💌</div>
+          <div class="title">Your space to fall in love, quietly.</div>
+          <div class="sub">Capture every feeling before you're official.</div>
+        </div>
+        <div class="scroll-feature">
+          <div class="fi">📝</div>
+          <div><div class="ft">Notes & Reflections</div><div class="fd">Write how you feel about them today</div></div>
+        </div>
+        <div class="scroll-feature">
+          <div class="fi">⭐</div>
+          <div><div class="ft">Firsts</div><div class="fd">Log every milestone moment</div></div>
+        </div>
+        <div class="scroll-feature">
+          <div class="fi">🎙️</div>
+          <div><div class="ft">Voice Memos</div><div class="fd">Capture how your voice sounds right now</div></div>
+        </div>
+        <div class="scroll-feature">
+          <div class="fi">💗</div>
+          <div><div class="ft">Reasons</div><div class="fd">Why you like them, in your own words</div></div>
+        </div>
+        <div class="scroll-cta">Begin my Prelude →</div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>A — Single Scroll Page</h3>
+      <p>Everything on one beautiful screen. Simple, fast, one tap to start.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Paged Carousel -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="phone-shell">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="carousel-dot-row">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="carousel-slide">
+          <div class="big-icon">💌</div>
+          <div class="slide-title">Someone special is on your mind.</div>
+          <div class="slide-body">Your Prelude is a private space to capture how you feel — before you're official.</div>
+        </div>
+        <div class="slide-nav">
+          <div class="slide-btn">Skip</div>
+          <div class="slide-btn">Next →</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>B — Paged Carousel (3–4 slides)</h3>
+      <p>Each feature gets its own screen. More immersive, sets the mood step by step.</p>
+      <span class="rec">Recommended</span>
+    </div>
+  </div>
+
+  <!-- Option C: 2-screen concept reveal -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="phone-shell">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="reveal-header">
+          <div class="rh-icon">🌸</div>
+          <div class="rh-title">Your story starts before the relationship does.</div>
+          <div class="rh-sub">Capture it. When you're ready, invite them.</div>
+        </div>
+        <div class="reveal-body">
+          <div style="font-size:10px;font-weight:600;color:#555;margin-bottom:6px;">You'll be able to capture:</div>
+          <div><span class="reveal-tag">📝 Notes</span><span class="reveal-tag">⭐ Firsts</span><span class="reveal-tag">🎙️ Voice</span><span class="reveal-tag">💗 Reasons</span></div>
+          <div style="font-size:9px;color:#999;margin-top:8px;line-height:1.5;">When you invite them, they'll see exactly how you felt — before you were ever official.</div>
+        </div>
+        <div class="reveal-cta">Start my Prelude →</div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>C — Concept Reveal (single screen)</h3>
+      <p>Minimal and emotional. Dark header sets a mood, tags list features at a glance.</p>
+    </div>
+  </div>
+
+</div>

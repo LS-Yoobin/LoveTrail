@@ -21,12 +21,12 @@ struct PathSelectorView: View {
                 VStack(spacing: 12) {
                     Text("Where are you right now?")
                         .font(.system(size: 26, weight: .light, design: .serif))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(BabyTownTheme.accentDeep)
                         .multilineTextAlignment(.center)
 
                     Text("We will set things up just right for you.")
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .foregroundStyle(BabyTownTheme.accent)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 32)
@@ -36,7 +36,7 @@ struct PathSelectorView: View {
 
                 VStack(spacing: 16) {
                     PathCard(
-                        icon: "envelope.heart.fill",
+                        icon: "envelope.open.fill",
                         title: "Prelude",
                         description: "There is someone special on your mind. Not official yet.",
                         action: selectPrelude
@@ -92,10 +92,10 @@ private struct PathCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(BabyTownTheme.accentDeep)
                     Text(description)
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
                         .lineSpacing(2)
                 }
@@ -104,17 +104,23 @@ private struct PathCard: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(.tertiaryLabel))
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.55))
             }
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
+                    .fill(
+                        LinearGradient(
+                            colors: [BabyTownTheme.cardTintLight, BabyTownTheme.cardTintDeep],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: BabyTownTheme.accent.opacity(0.12), radius: 12, y: 4)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(BabyTownTheme.accent.opacity(0.1), lineWidth: 1)
+                    .stroke(BabyTownTheme.accent.opacity(0.18), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

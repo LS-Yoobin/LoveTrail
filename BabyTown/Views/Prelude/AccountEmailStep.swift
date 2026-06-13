@@ -49,7 +49,7 @@ struct AccountEmailStep: View {
                         // Subtitle
                         Text("Your username is already set. Just add your email.")
                             .font(.system(size: 15))
-                            .foregroundStyle(BabyTownTheme.textSecondary)
+                            .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
                             .padding(.top, 8)
                             .padding(.horizontal, 32)
@@ -89,17 +89,19 @@ struct AccountEmailStep: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack {
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color(.systemGray6)))
-            }
-            .buttonStyle(.plain)
+        ZStack {
+            HStack {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.textSecondary)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color(.systemGray6)))
+                }
+                .buttonStyle(.plain)
 
-            Spacer()
+                Spacer()
+            }
 
             stepDots
         }
@@ -166,7 +168,7 @@ struct AccountEmailStep: View {
                 .padding(.vertical, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(.systemGray6))
+                        .fill(BabyTownTheme.blushSoft)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .stroke(

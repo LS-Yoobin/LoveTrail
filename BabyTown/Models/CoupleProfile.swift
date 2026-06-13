@@ -11,6 +11,8 @@ struct CoupleProfile: Codable, Equatable {
     var stickers: [ProfileSticker]
     /// Short note shown on the garden canvas below the profile photo stickers.
     var profileNote: String?
+    /// Optional mood stamp tinting the profile note.
+    var profileNoteMood: ProfileNoteMood?
     /// Normalized position of the note center on the sticker canvas (0…1).
     var profileNotePosition: NormalizedPoint?
     /// Normalized center of the vinyl record player on the scroll canvas (0…1).
@@ -37,6 +39,7 @@ struct CoupleProfile: Codable, Equatable {
         specialDates: [SpecialDate] = [],
         stickers: [ProfileSticker] = [],
         profileNote: String? = nil,
+        profileNoteMood: ProfileNoteMood? = nil,
         profileNotePosition: NormalizedPoint? = nil,
         recordPlayerPosition: NormalizedPoint? = nil,
         recordPlayerScale: CGFloat? = nil,
@@ -53,6 +56,7 @@ struct CoupleProfile: Codable, Equatable {
         self.specialDates = specialDates
         self.stickers = stickers
         self.profileNote = profileNote
+        self.profileNoteMood = profileNoteMood
         self.profileNotePosition = profileNotePosition
         self.recordPlayerPosition = recordPlayerPosition
         self.recordPlayerScale = recordPlayerScale
@@ -67,7 +71,7 @@ struct CoupleProfile: Codable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case displayName, specialDates, stickers, profileNote, profileNotePosition
+        case displayName, specialDates, stickers, profileNote, profileNoteMood, profileNotePosition
         case recordPlayerPosition, recordPlayerScale
         case watchTogetherTVPosition, watchTogetherTVScale
         case coupleId, breakupDate, archiveExpiryDate, hasSteppedOut
@@ -80,6 +84,7 @@ struct CoupleProfile: Codable, Equatable {
         specialDates = try c.decodeIfPresent([SpecialDate].self, forKey: .specialDates) ?? []
         stickers = try c.decodeIfPresent([ProfileSticker].self, forKey: .stickers) ?? []
         profileNote = try c.decodeIfPresent(String.self, forKey: .profileNote)
+        profileNoteMood = try c.decodeIfPresent(ProfileNoteMood.self, forKey: .profileNoteMood)
         profileNotePosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .profileNotePosition)
         recordPlayerPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .recordPlayerPosition)
         recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)

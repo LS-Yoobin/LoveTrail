@@ -211,6 +211,7 @@ enum ProfileGardenNoteLayout {
 struct FixedLineNoteTextEditor: UIViewRepresentable {
     @Binding var text: String
     let noteWidth: CGFloat
+    var mood: ProfileNoteMood? = nil
     var isFocused: FocusState<Bool>.Binding
 
     func makeCoordinator() -> Coordinator {
@@ -233,11 +234,20 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
         textView.textContainer.lineFragmentPadding = 0
         textView.textContainer.lineBreakMode = .byWordWrapping
         textView.textContainer.maximumNumberOfLines = ProfileGardenNoteLayout.maxTextLines
+        textView.layer.cornerRadius = 6
+        textView.layer.masksToBounds = true
         textView.delegate = context.coordinator
         return textView
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
+        let background = mood?.fieldBackgroundUIColor ?? .clear
+        if textView.backgroundColor != background {
+            UIView.animate(withDuration: 0.2) {
+                textView.backgroundColor = background
+            }
+        }
+
         if !textView.isFirstResponder {
             let clamped = ProfileGardenNoteLayout.clampedNoteText(text, noteWidth: noteWidth)
             if textView.text != clamped {
@@ -297,41 +307,63 @@ struct FixedLineNoteTextEditor: UIViewRepresentable {
     }
 }
 
-/// Scrapbook note PNG with optional centered text (read-only on the garden canvas).
-struct ProfileGardenNoteChrome: View {
+/// Mood icon followed by note caption text.
+struct ProfileNoteMoodCaption: View {
     let text: String
-    let noteWidth: CGFloat
-
-    private var noteHeight: CGFloat {
-        ProfileGardenNoteLayout.noteHeight(for: noteWidth)
-    }
+    var mood: ProfileNoteMood? = nil
+    var font: Font = .subheadline.weight(.medium)
+    var textColor: Color = Color(red: 0.38, green: 0.30, blue: 0.24)
+    var maxLines: Int = ProfileGardenNoteLayout.maxTextLines
+    var multilineAlignment: TextAlignment = .center
 
     private var trimmed: String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
-        ZStack {
-            noteArt
-                .resizable()
-                .scaledToFit()
-                .frame(width: noteWidth, height: noteHeight)
-
-            if !trimmed.isEmpty {
-                Text(trimmed)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color(red: 0.38, green: 0.30, blue: 0.24))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(ProfileGardenNoteLayout.maxTextLines)
-                    .lineSpacing(3)
-                    .padding(.horizontal, noteWidth * ProfileGardenNoteLayout.textHorizontalInsetFraction)
-                    .padding(.top, noteHeight * ProfileGardenNoteLayout.textTopInsetFraction)
-                    .padding(.bottom, noteHeight * ProfileGardenNoteLayout.textBottomInsetFraction)
-                    .frame(width: noteWidth, height: noteHeight, alignment: .top)
+        HStack(alignment: .top, spacing: 6) {
+            if let mood {
+                Image(systemName: mood.iconName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(mood.tintColor)
+                    .padding(.top, 2)
             }
+
+            Text(trimmed)
+                .font(font)
+                .foregroundStyle(textColor)
+                .multilineTextAlignment(multilineAlignment)
+                .lineLimit(maxLines)
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: mood == nil ? .center : .leading)
         }
-        .frame(width: noteWidth, height: noteHeight)
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 5)
+    }
+}
+
+/// Scrapbook note PNG with optional mood tint.
+struct ProfileGardenNoteArt: View {
+    let noteWidth: CGFloat
+    var mood: ProfileNoteMood? = nil
+
+    private var noteHeight: CGFloat {
+        ProfileGardenNoteLayout.noteHeight(for: noteWidth)
+    }
+
+    var body: some View {
+        noteImage
+            .overlay {
+                if let mood {
+                    mood.tintColor.opacity(0.22)
+                }
+            }
+            .frame(width: noteWidth, height: noteHeight)
+    }
+
+    private var noteImage: some View {
+        noteArt
+            .resizable()
+            .scaledToFit()
+            .frame(width: noteWidth, height: noteHeight)
     }
 
     private var noteArt: Image {
@@ -343,9 +375,121 @@ struct ProfileGardenNoteChrome: View {
     }
 }
 
+/// Horizontal scroll of mood chips for the note editor.
+struct ProfileNoteMoodPicker: View {
+    @Binding var selectedMood: ProfileNoteMood?
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(ProfileNoteMood.allCases, id: \.self) { mood in
+                        moodChip(mood)
+                            .id(mood)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+            }
+            .onChange(of: selectedMood) { _, mood in
+                guard let mood else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(mood, anchor: .center)
+                }
+            }
+        }
+    }
+
+    private func moodChip(_ mood: ProfileNoteMood) -> some View {
+        let isSelected = selectedMood == mood
+
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                selectedMood = isSelected ? nil : mood
+            }
+        } label: {
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: mood.iconName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(mood.tintColor)
+
+                    if isSelected {
+                        Circle()
+                            .stroke(mood.tintColor, lineWidth: 2)
+                            .frame(width: 40, height: 40)
+                    }
+                }
+
+                Text(mood.displayName)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(mood.tintColor.opacity(isSelected ? 0.95 : 0.72))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(width: 54)
+            .scaleEffect(isSelected ? 1.06 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mood.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Label + mood chips, pinned above the keyboard in note editors.
+struct ProfileNoteMoodPickerBar: View {
+    @Binding var selectedMood: ProfileNoteMood?
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("How are you feeling?")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.black)
+            ProfileNoteMoodPicker(selectedMood: $selectedMood)
+        }
+    }
+}
+
+/// Scrapbook note PNG with optional centered text (read-only on the garden canvas).
+struct ProfileGardenNoteChrome: View {
+    let text: String
+    let noteWidth: CGFloat
+    var mood: ProfileNoteMood? = nil
+
+    private var noteHeight: CGFloat {
+        ProfileGardenNoteLayout.noteHeight(for: noteWidth)
+    }
+
+    private var trimmed: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        ZStack {
+            ProfileGardenNoteArt(noteWidth: noteWidth, mood: mood)
+
+            if !trimmed.isEmpty {
+                ProfileNoteMoodCaption(text: trimmed, mood: mood)
+                    .padding(.horizontal, noteWidth * ProfileGardenNoteLayout.textHorizontalInsetFraction)
+                    .padding(.top, noteHeight * ProfileGardenNoteLayout.textTopInsetFraction)
+                    .padding(.bottom, noteHeight * ProfileGardenNoteLayout.textBottomInsetFraction)
+                    .frame(width: noteWidth, height: noteHeight, alignment: .top)
+            }
+        }
+        .frame(width: noteWidth, height: noteHeight)
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 5)
+    }
+}
+
 /// Draggable garden note on the sticker canvas.
 struct ProfileGardenNoteView: View {
     let text: String
+    var mood: ProfileNoteMood? = nil
     let position: NormalizedPoint?
     let stickers: [ProfileSticker]
     let canvasSize: CGSize
@@ -424,7 +568,7 @@ struct ProfileGardenNoteView: View {
     }
 
     private func noteBody(_ trimmed: String) -> some View {
-        ProfileGardenNoteChrome(text: trimmed, noteWidth: noteWidth)
+        ProfileGardenNoteChrome(text: trimmed, noteWidth: noteWidth, mood: mood)
             .customizeDottedOutline(showChrome && isSelected, cornerRadius: 8, padding: 4, lineWidth: 3)
     }
 
