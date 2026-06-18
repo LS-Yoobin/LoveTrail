@@ -119,6 +119,8 @@ final class DataPersistenceManager {
     private let colorThemeKey = "colorTheme"
     private let partnerEmailKey = "partnerEmail"
     private let userEmailKey = "userEmail"
+    private let isPartnerAccountKey = "isPartnerAccount"
+    private let inviterNameKey = "inviterName"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -388,6 +390,17 @@ final class DataPersistenceManager {
         userDefaults.string(forKey: userEmailKey)
     }
 
+    /// Whether the local user joined via the partner invite flow (not the inviter).
+    func setPartnerAccount(_ isPartner: Bool) {
+        userDefaults.set(isPartner, forKey: isPartnerAccountKey)
+    }
+
+    func isPartnerAccount() -> Bool {
+        if userDefaults.bool(forKey: isPartnerAccountKey) { return true }
+        // Invited partners persist email under partnerEmail; inviters use userEmail.
+        return loadPartnerEmail() != nil && loadUserEmail() == nil
+    }
+
     func savePartnerProfilePhoto(_ image: UIImage) {
         guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
         try? jpeg.write(to: partnerAvatarURL)
@@ -619,6 +632,19 @@ final class DataPersistenceManager {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// Inviter display name from the partner invite deep link (`?from=`).
+    func saveInviterName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: inviterNameKey)
+    }
+
+    func loadInviterName() -> String? {
+        guard let name = userDefaults.string(forKey: inviterNameKey) else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     func readInAppNotificationIDs() -> Set<String> {
         guard let ids = userDefaults.stringArray(forKey: readInAppNotificationIDsKey) else {
             return []
@@ -677,6 +703,8 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: colorThemeKey)
         userDefaults.removeObject(forKey: partnerEmailKey)
         userDefaults.removeObject(forKey: userEmailKey)
+        userDefaults.removeObject(forKey: isPartnerAccountKey)
+        userDefaults.removeObject(forKey: inviterNameKey)
         BackgroundMusicImporter.clearImportedSong()
         MomentVideoStore.shared.removeAll()
     }

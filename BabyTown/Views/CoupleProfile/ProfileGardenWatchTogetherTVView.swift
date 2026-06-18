@@ -44,13 +44,17 @@ struct ProfileGardenWatchTogetherTVView: View {
     }
 
     var body: some View {
-        WatchTogetherTVView(
-            state: .idle,
-            scale: effectiveScale,
-            onTap: isCustomizing ? nil : onTap,
-            onLongPress: isCustomizing ? nil : onLongPress
-        )
-        .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
+        VStack(spacing: 8) {
+            WatchTogetherTVView(
+                state: .idle,
+                scale: effectiveScale,
+                onTap: isCustomizing ? nil : onTap,
+                onLongPress: isCustomizing ? nil : onLongPress
+            )
+            .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
+
+            gardenLabel("Watch")
+        }
         .editGardenPulse(shouldPulse)
         .position(center)
         .gesture(isCustomizing && isSelected ? customizeGestures : nil)
@@ -109,5 +113,15 @@ struct ProfileGardenWatchTogetherTVView: View {
 
     private var customizeGestures: some Gesture {
         SimultaneousGesture(dragGesture, pinchGesture)
+    }
+
+    private func gardenLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.black, in: Capsule())
     }
 }

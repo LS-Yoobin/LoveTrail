@@ -22,6 +22,8 @@ struct CoupleProfileView: View {
     @State private var isNoteSelected = false
     @State private var isRecordPlayerSelected = false
     @State private var isWatchTogetherTVSelected = false
+    @State private var isPreludeBookSelected = false
+    @State private var showPreludeGiftBook = false
     @State private var showWatchTogetherSheet = false
     @State private var showWatchTogetherPaywall = false
     /// Sticker image files to delete from disk only when the user taps Save.
@@ -97,7 +99,14 @@ struct CoupleProfileView: View {
     }
 
     private var partnerSlotTitle: String {
-        store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+        if isPartnerAccount {
+            return dpm.loadInviterName() ?? "Justin"
+        }
+        return store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+    }
+
+    private var isPartnerAccount: Bool {
+        dpm.isPartnerAccount()
     }
 
     private var hasUserProfileSticker: Bool {
@@ -214,6 +223,8 @@ struct CoupleProfileView: View {
                                 isRecordPlayerPlaying: musicPlaybackState.isPlaying,
                                 watchTogetherTVPosition: profile.watchTogetherTVPosition,
                                 watchTogetherTVScale: profile.watchTogetherTVScale,
+                                preludeBookPosition: profile.preludeBookPosition,
+                                preludeBookScale: profile.preludeBookScale,
                                 userName: displayName,
                                 partnerTitle: partnerSlotTitle,
                                 isCustomizing: isCustomizing,
@@ -221,29 +232,41 @@ struct CoupleProfileView: View {
                                 isNoteSelected: isNoteSelected,
                                 isRecordPlayerSelected: isRecordPlayerSelected,
                                 isWatchTogetherTVSelected: isWatchTogetherTVSelected,
+                                isPreludeBookSelected: isPreludeBookSelected,
                                 onSelect: { id in
                                     selectedStickerID = id
                                     isNoteSelected = false
                                     isRecordPlayerSelected = false
                                     isWatchTogetherTVSelected = false
+                                    isPreludeBookSelected = false
                                 },
                                 onSelectNote: {
                                     isNoteSelected = true
                                     selectedStickerID = nil
                                     isRecordPlayerSelected = false
                                     isWatchTogetherTVSelected = false
+                                    isPreludeBookSelected = false
                                 },
                                 onSelectRecordPlayer: {
                                     isRecordPlayerSelected = true
                                     selectedStickerID = nil
                                     isNoteSelected = false
                                     isWatchTogetherTVSelected = false
+                                    isPreludeBookSelected = false
                                 },
                                 onSelectWatchTogetherTV: {
                                     isWatchTogetherTVSelected = true
                                     selectedStickerID = nil
                                     isNoteSelected = false
                                     isRecordPlayerSelected = false
+                                    isPreludeBookSelected = false
+                                },
+                                onSelectPreludeBook: {
+                                    isPreludeBookSelected = true
+                                    selectedStickerID = nil
+                                    isNoteSelected = false
+                                    isRecordPlayerSelected = false
+                                    isWatchTogetherTVSelected = false
                                 },
                                 onDelete: deleteSticker,
                                 onDeleteNote: deleteProfileNote,
@@ -252,6 +275,7 @@ struct CoupleProfileView: View {
                                 onTapNote: { showProfileNoteEditor = true },
                                 onTapRecordPlayer: { showOurSongSheet = true },
                                 onTapWatchTogetherTV: handleWatchTogetherTap,
+                                onTapPreludeBook: { showPreludeGiftBook = true },
                                 onLongPressWatchTogetherTV: { showWatchTogetherSheet = true },
                                 onTapPhotoSticker: handlePhotoStickerTap,
                                 onNotePositionChanged: updateProfileNotePosition,
@@ -259,6 +283,8 @@ struct CoupleProfileView: View {
                                 onRecordPlayerScaleChanged: updateRecordPlayerScale,
                                 onWatchTogetherTVPositionChanged: updateWatchTogetherTVPosition,
                                 onWatchTogetherTVScaleChanged: updateWatchTogetherTVScale,
+                                onPreludeBookPositionChanged: updatePreludeBookPosition,
+                                onPreludeBookScaleChanged: updatePreludeBookScale,
                                 onPositionChanged: updateStickerPosition,
                                 onScaleChanged: updateStickerScale,
                                 onRotationChanged: updateStickerRotation
@@ -306,6 +332,12 @@ struct CoupleProfileView: View {
         .sheet(isPresented: $showOurSongSheet) {
             OurSongSheet()
         }
+        .fullScreenCover(isPresented: $showPreludeGiftBook) {
+            PreludeGiftBookView(
+                onComplete: { showPreludeGiftBook = false },
+                completeButtonTitle: "Done"
+            )
+        }
         .sheet(isPresented: $showWatchTogetherSheet) {
             WatchTogetherEntryView()
         }
@@ -321,12 +353,19 @@ struct CoupleProfileView: View {
         }
         .sheet(isPresented: $showEditProfile) {
             ProfileEditorSheet(initialName: displayName, initialImage: userAvatar) { image, name in
-                dpm.saveUserAvatar(image)
-                profile.displayName = name
-                if image != nil {
-                    ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
+                if isPartnerAccount {
+                    if let image {
+                        dpm.savePartnerProfilePhoto(image)
+                    }
+                    dpm.saveUserNickname(name)
+                } else {
+                    dpm.saveUserAvatar(image)
+                    profile.displayName = name
+                    if image != nil {
+                        ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
+                    }
+                    dpm.saveCoupleProfile(profile)
                 }
-                dpm.saveCoupleProfile(profile)
                 userAvatar = image
                 refreshStickers()
             }
@@ -498,7 +537,7 @@ struct CoupleProfileView: View {
                     )
                 }
                 .buttonStyle(.plain)
-            } else {
+            } else if !isPartnerAccount {
                 Button(action: { showPartnerPaywall = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "person.badge.plus")
@@ -758,6 +797,7 @@ struct CoupleProfileView: View {
     }
 
     private func handlePartnerSlotTap() {
+        if isPartnerAccount { return }
         if store.isPartnerUnlocked {
             showInviteFlow = true
         } else {
@@ -766,7 +806,7 @@ struct CoupleProfileView: View {
     }
 
     private func handleWatchTogetherTap() {
-        if store.isPartnerUnlocked {
+        if isPartnerAccount || store.isPartnerUnlocked {
             showWatchTogetherSheet = true
         } else {
             showWatchTogetherPaywall = true
@@ -812,19 +852,28 @@ struct CoupleProfileView: View {
         profile.watchTogetherTVScale = max(scale, WatchTogetherTVView.gardenMinScale)
     }
 
+    private func updatePreludeBookPosition(_ position: NormalizedPoint) {
+        profile.preludeBookPosition = position
+    }
+
+    private func updatePreludeBookScale(_ scale: CGFloat) {
+        profile.preludeBookScale = max(scale, PreludeBookView.gardenMinScale)
+    }
+
     private func deleteProfileNote() {
         profile.profileNote = nil
         profile.profileNoteMood = nil
         profile.profileNotePosition = nil
         isNoteSelected = false
         isRecordPlayerSelected = false
+        isPreludeBookSelected = false
     }
 
     // MARK: Data
 
     private func load() {
         profile = dpm.loadCoupleProfile()
-        userAvatar = dpm.loadUserAvatar()
+        userAvatar = isPartnerAccount ? dpm.loadPartnerProfilePhoto() : dpm.loadUserAvatar()
         refreshStickers()
     }
 
@@ -881,6 +930,7 @@ struct CoupleProfileView: View {
         isNoteSelected = false
         isRecordPlayerSelected = false
         isWatchTogetherTVSelected = false
+        isPreludeBookSelected = false
         pendingImageDeletions.removeAll()
         load()
     }
@@ -891,6 +941,7 @@ struct CoupleProfileView: View {
         isNoteSelected = false
         isRecordPlayerSelected = false
         isWatchTogetherTVSelected = false
+        isPreludeBookSelected = false
         for id in pendingImageDeletions {
             dpm.deleteStickerImage(id: id)
         }

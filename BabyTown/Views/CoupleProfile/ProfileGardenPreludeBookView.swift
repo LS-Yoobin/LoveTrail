@@ -1,35 +1,33 @@
 import SwiftUI
 
-/// Vinyl record player on the garden scroll canvas; draggable in Edit Garden mode.
-struct ProfileGardenRecordPlayerView: View {
+/// Prelude gift book on the garden scroll canvas; draggable in Edit Garden mode.
+struct ProfileGardenPreludeBookView: View {
     let position: NormalizedPoint?
     let scale: CGFloat?
     let canvasSize: CGSize
     let isCustomizing: Bool
     var isSelected: Bool = false
-    let isPlaying: Bool
     let onPositionChanged: (NormalizedPoint) -> Void
     let onScaleChanged: (CGFloat) -> Void
     var onSelect: (() -> Void)?
     var onTap: (() -> Void)?
 
     @State private var dragOrigin: NormalizedPoint?
-    @State private var pinchBaseScale: CGFloat = VinylRecordPlayerView.gardenDefaultScale
+    @State private var pinchBaseScale: CGFloat = PreludeBookView.gardenDefaultScale
     @State private var pinchPreviewScale: CGFloat?
 
-    /// Lower = finer pinch control (matches `ProfileStickerView`).
     private static let pinchSensitivity: CGFloat = 0.22
 
     private var shouldPulse: Bool { isCustomizing && !isSelected }
 
     private var resolvedPosition: NormalizedPoint {
-        position ?? ProfileGardenLayout.defaultRecordPlayerPosition(canvasSize: canvasSize)
+        position ?? ProfileGardenLayout.defaultPreludeBookPosition(canvasSize: canvasSize)
     }
 
     private var resolvedScale: CGFloat {
         max(
-            scale ?? VinylRecordPlayerView.gardenDefaultScale,
-            VinylRecordPlayerView.gardenMinScale
+            scale ?? PreludeBookView.gardenDefaultScale,
+            PreludeBookView.gardenMinScale
         )
     }
 
@@ -45,14 +43,10 @@ struct ProfileGardenRecordPlayerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            VinylRecordPlayerView(isPlaying: isPlaying, scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
-                .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
-
-            gardenLabel("Our Song")
-        }
-        .editGardenPulse(shouldPulse)
-        .position(center)
+        PreludeBookView(scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
+            .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
+            .editGardenPulse(shouldPulse)
+            .position(center)
             .gesture(isCustomizing && isSelected ? customizeGestures : nil)
             .onTapGesture {
                 if isCustomizing {
@@ -62,8 +56,8 @@ struct ProfileGardenRecordPlayerView: View {
             .onAppear { pinchBaseScale = resolvedScale }
             .onChange(of: scale) { _, newScale in
                 pinchBaseScale = max(
-                    newScale ?? VinylRecordPlayerView.gardenDefaultScale,
-                    VinylRecordPlayerView.gardenMinScale
+                    newScale ?? PreludeBookView.gardenDefaultScale,
+                    PreludeBookView.gardenMinScale
                 )
                 pinchPreviewScale = nil
             }
@@ -71,7 +65,7 @@ struct ProfileGardenRecordPlayerView: View {
     }
 
     private var scaleLimits: (min: CGFloat, max: CGFloat) {
-        (VinylRecordPlayerView.gardenMinScale, VinylRecordPlayerView.gardenMaxScale)
+        (PreludeBookView.gardenMinScale, PreludeBookView.gardenMaxScale)
     }
 
     private var dragLimits: (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) {
@@ -121,15 +115,5 @@ struct ProfileGardenRecordPlayerView: View {
 
     private var customizeGestures: some Gesture {
         SimultaneousGesture(dragGesture, pinchGesture)
-    }
-
-    private func gardenLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Color.black, in: Capsule())
     }
 }

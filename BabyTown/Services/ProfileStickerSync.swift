@@ -61,6 +61,16 @@ enum ProfileStickerSync {
     /// Legacy default for user avatar stickers (customize mode only).
     static let canonicalUserAvatarPosition = NormalizedPoint(x: 0.19, y: 0.138)
 
+    /// Photo for the left (self) avatar slot — partner accounts store theirs under partner profile photo.
+    private static func loadUserSlotPhoto(dpm: DataPersistenceManager) -> UIImage? {
+        dpm.isPartnerAccount() ? dpm.loadPartnerProfilePhoto() : dpm.loadUserAvatar()
+    }
+
+    /// Photo for the right (partner) avatar slot — empty for partner viewership until sync lands.
+    private static func loadPartnerSlotPhoto(dpm: DataPersistenceManager) -> UIImage? {
+        dpm.isPartnerAccount() ? nil : dpm.loadPartnerProfilePhoto()
+    }
+
     /// Guarantees exactly one user-avatar sticker (placeholder when no photo).
     private static func ensureUserAvatarSticker(
         stickers: inout [ProfileSticker],
@@ -69,7 +79,7 @@ enum ProfileStickerSync {
     ) {
         let key = "userAvatar"
         if bySource[key] == nil {
-            let hasPhoto = dpm.loadUserAvatar() != nil
+            let hasPhoto = loadUserSlotPhoto(dpm: dpm) != nil
             var sticker = ProfileSticker(
                 kind: .userAvatar,
                 sourceKey: key,
@@ -77,7 +87,7 @@ enum ProfileStickerSync {
                 rotation: 0,
                 scale: userAvatarDefaultScale(hasPhoto: hasPhoto)
             )
-            if let image = dpm.loadUserAvatar() {
+            if let image = loadUserSlotPhoto(dpm: dpm) {
                 let processed = SubjectLiftService.stickerImage(from: image)
                 dpm.saveStickerImage(processed.image, id: sticker.id)
                 sticker.usedSubjectLift = processed.usedSubjectLift
@@ -88,7 +98,7 @@ enum ProfileStickerSync {
         }
 
         guard var sticker = bySource[key] else { return }
-        if let image = dpm.loadUserAvatar() {
+        if let image = loadUserSlotPhoto(dpm: dpm) {
             let processed = SubjectLiftService.stickerImage(from: image)
             dpm.saveStickerImage(processed.image, id: sticker.id)
             sticker.usedSubjectLift = processed.usedSubjectLift
@@ -131,7 +141,7 @@ enum ProfileStickerSync {
         profile.stickers.append(sticker)
     }
 
-    /// Guarantees exactly one persistent partner-invite sticker (heart placeholder).
+    /// Guarantees exactly one persistent partner-invite sticker, with photo if available.
     private static func ensurePartnerInviteSticker(
         stickers: inout [ProfileSticker],
         bySource: inout [String: ProfileSticker],
@@ -146,18 +156,50 @@ enum ProfileStickerSync {
             let keepID = existing.first!.id
             stickers.removeAll { $0.kind == .partnerInvite && $0.id != keepID }
         }
-        guard stickers.contains(where: { $0.kind == .partnerInvite }) else {
-            let sticker = ProfileSticker(
+
+        let key = "partnerInvite"
+        if bySource[key] == nil {
+            let hasPhoto = loadPartnerSlotPhoto(dpm: dpm) != nil
+            var sticker = ProfileSticker(
                 kind: .partnerInvite,
-                sourceKey: "partnerInvite",
+                sourceKey: key,
                 position: ProfileSticker.defaultPartnerPosition,
                 rotation: 0,
-                scale: ProfileSticker.profileAvatarScale
+                scale: partnerAvatarDefaultScale(hasPhoto: hasPhoto)
             )
+            if let image = loadPartnerSlotPhoto(dpm: dpm) {
+                let processed = SubjectLiftService.stickerImage(from: image)
+                dpm.saveStickerImage(processed.image, id: sticker.id)
+                sticker.usedSubjectLift = processed.usedSubjectLift
+            }
             stickers.append(sticker)
-            bySource[sticker.sourceKey] = sticker
+            bySource[key] = sticker
             return
         }
+
+        guard var sticker = bySource[key] else { return }
+        if let image = loadPartnerSlotPhoto(dpm: dpm) {
+            let processed = SubjectLiftService.stickerImage(from: image)
+            dpm.saveStickerImage(processed.image, id: sticker.id)
+            sticker.usedSubjectLift = processed.usedSubjectLift
+            if sticker.scale == ProfileSticker.profileAvatarScale {
+                sticker.scale = ProfileSticker.profileAvatarScaleWithPhoto
+            }
+        } else {
+            dpm.deleteStickerImage(id: sticker.id)
+            sticker.usedSubjectLift = false
+            if sticker.scale == ProfileSticker.profileAvatarScaleWithPhoto {
+                sticker.scale = ProfileSticker.profileAvatarScale
+            }
+        }
+        if let idx = stickers.firstIndex(where: { $0.id == sticker.id }) {
+            stickers[idx] = sticker
+        }
+        bySource[key] = sticker
+    }
+
+    private static func partnerAvatarDefaultScale(hasPhoto: Bool) -> CGFloat {
+        hasPhoto ? ProfileSticker.profileAvatarScaleWithPhoto : ProfileSticker.profileAvatarScale
     }
 
     /// Bumps profile avatars that still use the old 1.0 default; clamps below minimum.
@@ -165,7 +207,8 @@ enum ProfileStickerSync {
         stickers: inout [ProfileSticker],
         dpm: DataPersistenceManager
     ) {
-        let hasUserAvatarPhoto = dpm.loadUserAvatar() != nil
+        let hasUserAvatarPhoto = loadUserSlotPhoto(dpm: dpm) != nil
+        let hasPartnerPhoto = loadPartnerSlotPhoto(dpm: dpm) != nil
         for idx in stickers.indices {
             switch stickers[idx].kind {
             case .userAvatar:
@@ -181,7 +224,10 @@ enum ProfileStickerSync {
                 if stickers[idx].scale < ProfileSticker.profileAvatarMinScale {
                     stickers[idx].scale = ProfileSticker.profileAvatarMinScale
                 } else if stickers[idx].scale <= 1.0 {
-                    stickers[idx].scale = ProfileSticker.profileAvatarScale
+                    stickers[idx].scale = partnerAvatarDefaultScale(hasPhoto: hasPartnerPhoto)
+                } else if hasPartnerPhoto,
+                          stickers[idx].scale == ProfileSticker.profileAvatarScale {
+                    stickers[idx].scale = ProfileSticker.profileAvatarScaleWithPhoto
                 }
             case .moment, .specialDate, .pet:
                 if stickers[idx].scale < ProfileSticker.photoStickerMinScale {

@@ -1,0 +1,59 @@
+<h2>Implementation approach</h2>
+<p class="subtitle">Three ways to build the zoom animation + paginated capture reveal</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f4ff;padding:20px;font-family:monospace;font-size:12px;line-height:1.8;color:#333">
+      <div style="font-weight:700;color:#6366f1;margin-bottom:8px">APPROACH A — Inline animation on welcome step</div>
+      <div>WelcomeStep holds all animation state:</div>
+      <div style="color:#10b981">• bookScale: 1.0 → 8.0</div>
+      <div style="color:#10b981">• bookOffset: (0,0) → (-screenW/4, 0)</div>
+      <div style="color:#10b981">• capturesOpacity: 0 → 1</div>
+      <div>Book image scales + pans right page into</div>
+      <div>full screen, then captures fade in on top.</div>
+      <div>One "step" handles everything.</div>
+    </div>
+    <div class="card-body">
+      <h3>All in welcome step</h3>
+      <p>Simplest from a navigation standpoint — no new step enum cases. Welcome step grows to own the zoom + reveal. Downside: the step becomes complex.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f4ff;padding:20px;font-family:monospace;font-size:12px;line-height:1.8;color:#333">
+      <div style="font-weight:700;color:#6366f1;margin-bottom:8px">APPROACH B — New GiftRevealStep (recommended)</div>
+      <div>Step enum: .welcome → <span style="color:#10b981">.giftReveal</span> → .username</div>
+      <div>WelcomeStep stays simple — tapping</div>
+      <div>"Open it" just calls advance().</div>
+      <div>GiftRevealStep owns the animation:</div>
+      <div style="color:#10b981">• .onAppear: zoom + pan book image</div>
+      <div style="color:#10b981">• then: fade in capture content</div>
+      <div style="color:#10b981">• Prev / Next pagination</div>
+      <div style="color:#10b981">• "Open our space" → advance()</div>
+    </div>
+    <div class="card-body">
+      <h3>Separate GiftRevealStep</h3>
+      <p>Clean separation. WelcomeStep keeps its crossfade-out, GiftRevealStep owns the dramatic zoom. Easy to iterate on animation without touching welcome. My recommendation.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f4ff;padding:20px;font-family:monospace;font-size:12px;line-height:1.8;color:#333">
+      <div style="font-weight:700;color:#6366f1;margin-bottom:8px">APPROACH C — fullScreenCover overlay</div>
+      <div>Welcome presents a .fullScreenCover</div>
+      <div>that starts transparent and contains</div>
+      <div>a copy of the BookFlipView already</div>
+      <div>matched to the welcome book's position.</div>
+      <div style="color:#10b981">• Hero-style matched geometry</div>
+      <div style="color:#10b981">• Seamless positional continuity</div>
+      <div style="color:#888">• Complex coordinate math</div>
+      <div style="color:#888">• Harder to debug</div>
+    </div>
+    <div class="card-body">
+      <h3>Hero transition</h3>
+      <p>Most cinematic — the book image appears to travel continuously from its welcome position into the full-screen reveal. Much harder to get right in SwiftUI.</p>
+    </div>
+  </div>
+
+</div>

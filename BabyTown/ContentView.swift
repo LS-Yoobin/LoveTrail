@@ -339,6 +339,7 @@ struct ContentView: View {
                         }
                     },
                     onSimulatePartnerInvite: {
+                        DataPersistenceManager.shared.saveInviterName("Justin")
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .partnerOnboarding(inviterName: "Justin")
                         }
@@ -375,6 +376,8 @@ struct ContentView: View {
                         var profile = DataPersistenceManager.shared.loadCoupleProfile()
                         profile.relationshipStage = .officialCouple
                         DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        DataPersistenceManager.shared.saveInviterName(inviterName)
+                        DataPersistenceManager.shared.setPartnerAccount(true)
                         DataPersistenceManager.shared.setOnboardingCompleted(true)
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .home

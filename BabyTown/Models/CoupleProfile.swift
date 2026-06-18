@@ -23,6 +23,10 @@ struct CoupleProfile: Codable, Equatable {
     var watchTogetherTVPosition: NormalizedPoint?
     /// Garden canvas scale for the Watch Together TV; `nil` uses `WatchTogetherTVView.gardenDefaultScale`.
     var watchTogetherTVScale: CGFloat?
+    /// Normalized center of the prelude gift book on the scroll canvas (0…1).
+    var preludeBookPosition: NormalizedPoint?
+    /// Garden canvas scale for the prelude book; `nil` uses `PreludeBookView.gardenDefaultScale`.
+    var preludeBookScale: CGFloat?
     /// Shared couple identifier set by the backend when two users are linked.
     var coupleId: String?
     /// The date on which the couple broke up; `nil` when still together.
@@ -45,6 +49,8 @@ struct CoupleProfile: Codable, Equatable {
         recordPlayerScale: CGFloat? = nil,
         watchTogetherTVPosition: NormalizedPoint? = nil,
         watchTogetherTVScale: CGFloat? = nil,
+        preludeBookPosition: NormalizedPoint? = nil,
+        preludeBookScale: CGFloat? = nil,
         coupleId: String? = nil,
         breakupDate: Date? = nil,
         archiveExpiryDate: Date? = nil,
@@ -62,6 +68,8 @@ struct CoupleProfile: Codable, Equatable {
         self.recordPlayerScale = recordPlayerScale
         self.watchTogetherTVPosition = watchTogetherTVPosition
         self.watchTogetherTVScale = watchTogetherTVScale
+        self.preludeBookPosition = preludeBookPosition
+        self.preludeBookScale = preludeBookScale
         self.coupleId = coupleId
         self.breakupDate = breakupDate
         self.archiveExpiryDate = archiveExpiryDate
@@ -74,6 +82,7 @@ struct CoupleProfile: Codable, Equatable {
         case displayName, specialDates, stickers, profileNote, profileNoteMood, profileNotePosition
         case recordPlayerPosition, recordPlayerScale
         case watchTogetherTVPosition, watchTogetherTVScale
+        case preludeBookPosition, preludeBookScale
         case coupleId, breakupDate, archiveExpiryDate, hasSteppedOut
         case relationshipStage, inviteSent
     }
@@ -90,6 +99,8 @@ struct CoupleProfile: Codable, Equatable {
         recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)
         watchTogetherTVPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .watchTogetherTVPosition)
         watchTogetherTVScale = try c.decodeIfPresent(CGFloat.self, forKey: .watchTogetherTVScale)
+        preludeBookPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .preludeBookPosition)
+        preludeBookScale = try c.decodeIfPresent(CGFloat.self, forKey: .preludeBookScale)
         coupleId = try c.decodeIfPresent(String.self, forKey: .coupleId)
         breakupDate = try c.decodeIfPresent(Date.self, forKey: .breakupDate)
         archiveExpiryDate = try c.decodeIfPresent(Date.self, forKey: .archiveExpiryDate)

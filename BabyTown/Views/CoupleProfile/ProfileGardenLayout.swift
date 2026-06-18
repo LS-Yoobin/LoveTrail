@@ -35,6 +35,26 @@ enum ProfileGardenLayout {
         )
     }
 
+    /// Default prelude gift book center — centered between the TV (left) and vinyl player (right).
+    static func defaultPreludeBookPosition(canvasSize: CGSize) -> NormalizedPoint {
+        let totalH = max(
+            canvasSize.height,
+            contentTopPadding
+                + estimatedCardsHeight
+                + avatarBandTopGap
+                + avatarBandHeight
+                + stickerCanvasHeight
+        )
+        let avatarBandTopY = contentTopPadding + estimatedCardsHeight + avatarBandTopGap
+        let bookHalfHeight: CGFloat = 52
+        let gapAboveAvatars: CGFloat = 32
+        let centerY = avatarBandTopY - gapAboveAvatars - bookHalfHeight
+        return NormalizedPoint(
+            x: 0.50,
+            y: min(profileSlotNormalizedY - 0.06, max(0.10, centerY / totalH))
+        )
+    }
+
     /// Default vinyl player center — lower-right of the card stack, above the
     /// user / invite-partner avatar band (`profileSlotNormalizedY`).
     static func defaultRecordPlayerPosition(canvasSize: CGSize) -> NormalizedPoint {

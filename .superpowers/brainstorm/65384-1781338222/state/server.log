@@ -1,0 +1,13 @@
+{"type":"server-started","port":59745,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:59745","screen_dir":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content","state_dir":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/state"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/gift-reveal-placement.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/waiting-1.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/gift-reveal-layout.html"}
+{"source":"user-event","type":"click","text":"Page 2 of 5\n      \n      \n        📝\n        Note\n        \"I keep thinking about you.\"\n        March 14, 2026\n      \n      \n      \n        ← Prev Page\n        Next Page →\n      \n    \n    \n      Warm parchment \"book page\" feel\n      Cream/parchment background leans into the book metaphor. Content sits on the page itself. Next Page is the primary accent button.","choice":"b","id":null,"timestamp":1781338626956}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/waiting-2.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/zoom-transition.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/waiting-3.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/approaches.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/waiting-4.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/gift-reveal-screen.html"}
+{"type":"screen-added","file":"/Users/ybstudio/Desktop/Projects/Covela/.superpowers/brainstorm/65384-1781338222/content/waiting-5.html"}
+{"type":"server-stopped","reason":"owner process exited"}

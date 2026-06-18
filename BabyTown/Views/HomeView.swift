@@ -84,7 +84,11 @@ struct HomeView: View {
     }
 
     private var homePartnerSlotTitle: String {
-        store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+        let dpm = DataPersistenceManager.shared
+        if dpm.isPartnerAccount() {
+            return dpm.loadInviterName() ?? "Justin"
+        }
+        return store.isPartnerUnlocked ? "Send invite" : "Invite partner"
     }
 
 
@@ -636,7 +640,9 @@ struct HomeView: View {
     /// `viewModel.moments` so we don't re-read `moments.json` every frame.
     private func refreshCoupleSpaceCardMetadata() {
         let dpm = DataPersistenceManager.shared
-        coupleSpaceAvatar = dpm.loadUserAvatar()
+        coupleSpaceAvatar = dpm.isPartnerAccount()
+            ? dpm.loadPartnerProfilePhoto()
+            : dpm.loadUserAvatar()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
         let gardenContext = GardenActMapper.persistedContext(
