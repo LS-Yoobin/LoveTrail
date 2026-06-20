@@ -44,7 +44,6 @@ The first file every AI agent reads. It orients, maps, constrains, and steers.
 - SwiftUI (primary UI)
 - SpriteKit (pet/game layer)
 - MongoDB (backend database)
-- Firebase (if applicable — to be confirmed)
 - DataPersistenceManager (local persistence layer)
 
 **3. Feature Area → Files Map**
@@ -295,7 +294,7 @@ Everything a new intern needs to understand the codebase and start contributing.
 | Coin | In-app currency earned through engagement, spent in pet room |
 
 ### Environment Setup
-1. Open `Covela.xcodeproj` (or `BabyTown.xcodeproj`) in Xcode
+1. Open `BabyTown.xcodeproj` in Xcode
 2. Select a simulator or connected device
 3. Build and run — no additional dependencies should be needed for UI work
 4. MongoDB backend connection details are in the backend config (ask the team lead)
