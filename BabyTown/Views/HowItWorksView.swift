@@ -64,7 +64,7 @@ struct HowItWorksView: View {
                 .font(.system(size: 25, weight: .light, design: .serif))
                 .foregroundStyle(.white)
 
-            Text("Baby Town does the rest.")
+            Text("Covela does the rest.")
                 .font(.system(size: 25, weight: .light, design: .serif))
                 .foregroundStyle(BabyTownTheme.accent)
 
@@ -109,7 +109,7 @@ struct HowItWorksView: View {
 
     private var enterButton: some View {
         Button(action: onEnterHome) {
-            Text("Enter Baby Town")
+            Text("Enter Covela")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -134,6 +134,6 @@ struct HowItWorksView: View {
 
 #Preview {
     HowItWorksView(onBack: {}, onEnterHome: {
-        print("Enter Baby Town")
+        print("Enter Covela")
     })
 }

@@ -150,18 +150,7 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    Button {
-                        onReplayStory()
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Image(systemName: "play.circle")
-                                .font(.system(size: 16))
-                            Text("Replay Our Story")
-                                .font(.system(size: 16))
-                        }
-                    }
-
+                    // Temporarily hidden: Replay Our Story
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
@@ -197,7 +186,7 @@ struct SettingsSheet: View {
                             showAppIconViewer = true
                         }
 
-                    Text("BabyTown 2026")
+                    Text("Covela 2026")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
@@ -219,7 +208,7 @@ struct SettingsSheet: View {
                 CouplePlaylistEditorSheet(dismissOnSelect: false)
             }
             .confirmationDialog(
-                "Reset Baby Town?",
+                "Reset Covela?",
                 isPresented: $showResetConfirmation,
                 titleVisibility: .visible
             ) {

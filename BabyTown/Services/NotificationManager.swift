@@ -249,8 +249,8 @@ class NotificationManager: NSObject, ObservableObject {
         switch event {
         case let .joined(partnerName):
             id = "partner_joined"
-            content.title = "BabyTown"
-            content.body = "\(partnerName ?? "Your partner") just joined your BabyTown 💞"
+            content.title = "Covela"
+            content.body = "\(partnerName ?? "Your partner") just joined your Covela 💞"
         case let .loveLetterReceived(title, sentAt):
             id = "partner_love_letter"
             let f = DateFormatter()
@@ -260,11 +260,11 @@ class NotificationManager: NSObject, ObservableObject {
             content.body = "Sent \(f.string(from: sentAt))"
         case .partnerAddedMoment:
             id = "partner_added_moment"
-            content.title = "BabyTown"
+            content.title = "Covela"
             content.body = "A new moment was saved — check it out!"
         case .partnerAddedSpecialDate:
             id = "partner_added_date"
-            content.title = "BabyTown"
+            content.title = "Covela"
             content.body = "A new important date was added — take a look!"
         }
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
@@ -274,8 +274,8 @@ class NotificationManager: NSObject, ObservableObject {
 
     private func scheduleMorningNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "BabyTown"
-        content.body = "Good morning! Lets capture 5 photos today and add to our BabyTown!"
+        content.title = "Covela"
+        content.body = "Good morning! Lets capture 5 photos today and add to our Covela!"
         content.sound = .default
         
         var dateComponents = DateComponents()
@@ -302,7 +302,7 @@ class NotificationManager: NSObject, ObservableObject {
     private func scheduleEveningNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Daily Polaroids Available!"
-        content.body = "Your Daily Polaroids are now available to view in BabyTown!"
+        content.body = "Your Daily Polaroids are now available to view in Covela!"
         content.sound = .default
         
         var dateComponents = DateComponents()

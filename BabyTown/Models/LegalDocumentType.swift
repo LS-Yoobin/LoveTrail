@@ -31,7 +31,7 @@ enum LegalDocumentType: String, Identifiable {
             return [
                 LegalDocumentSection(
                     heading: "Overview",
-                    body: "BabyTown helps couples privately capture and revisit shared memories. This Privacy Policy explains what information we collect, how we use it, and the choices you have when using the app."
+                    body: "Covela helps couples privately capture and revisit shared memories. This Privacy Policy explains what information we collect, how we use it, and the choices you have when using the app."
                 ),
                 LegalDocumentSection(
                     heading: "Information We Collect",
@@ -43,7 +43,7 @@ enum LegalDocumentType: String, Identifiable {
                 ),
                 LegalDocumentSection(
                     heading: "Notifications & Permissions",
-                    body: "BabyTown requests permissions like photo library access and notifications only to power specific features. You can manage or revoke permissions anytime in your device settings."
+                    body: "Covela requests permissions like photo library access and notifications only to power specific features. You can manage or revoke permissions anytime in your device settings."
                 ),
                 LegalDocumentSection(
                     heading: "Subscriptions & Purchases",
@@ -55,11 +55,11 @@ enum LegalDocumentType: String, Identifiable {
                 ),
                 LegalDocumentSection(
                     heading: "Data Retention",
-                    body: "We keep information for as long as needed to provide BabyTown and meet legal obligations. If you reset the app or request deletion where available, related app data may be removed from our systems and/or your device storage, subject to technical and legal limits."
+                    body: "We keep information for as long as needed to provide Covela and meet legal obligations. If you reset the app or request deletion where available, related app data may be removed from our systems and/or your device storage, subject to technical and legal limits."
                 ),
                 LegalDocumentSection(
                     heading: "Children's Privacy",
-                    body: "BabyTown is not directed to children under 13, and we do not knowingly collect personal information from children under 13."
+                    body: "Covela is not directed to children under 13, and we do not knowingly collect personal information from children under 13."
                 ),
                 LegalDocumentSection(
                     heading: "Your Rights",
@@ -74,19 +74,19 @@ enum LegalDocumentType: String, Identifiable {
             return [
                 LegalDocumentSection(
                     heading: "Acceptance of Terms",
-                    body: "By downloading, accessing, or using BabyTown, you agree to these Terms of Service. If you do not agree, please do not use the app."
+                    body: "By downloading, accessing, or using Covela, you agree to these Terms of Service. If you do not agree, please do not use the app."
                 ),
                 LegalDocumentSection(
                     heading: "License to Use",
-                    body: "We grant you a limited, non-exclusive, non-transferable, revocable license to use BabyTown for your personal, non-commercial use, subject to these Terms and Apple's applicable platform rules."
+                    body: "We grant you a limited, non-exclusive, non-transferable, revocable license to use Covela for your personal, non-commercial use, subject to these Terms and Apple's applicable platform rules."
                 ),
                 LegalDocumentSection(
                     heading: "User Content",
-                    body: "You are responsible for content you add to BabyTown, including photos, text, and other media. You represent that you have the rights needed to upload or use this content."
+                    body: "You are responsible for content you add to Covela, including photos, text, and other media. You represent that you have the rights needed to upload or use this content."
                 ),
                 LegalDocumentSection(
                     heading: "Acceptable Use",
-                    body: "You agree not to misuse BabyTown, interfere with app operation, attempt unauthorized access, violate applicable laws, or infringe the rights of others."
+                    body: "You agree not to misuse Covela, interfere with app operation, attempt unauthorized access, violate applicable laws, or infringe the rights of others."
                 ),
                 LegalDocumentSection(
                     heading: "Subscriptions",
@@ -94,23 +94,23 @@ enum LegalDocumentType: String, Identifiable {
                 ),
                 LegalDocumentSection(
                     heading: "Termination",
-                    body: "We may suspend or terminate access to BabyTown if these Terms are violated, if required by law, or for security and operational reasons."
+                    body: "We may suspend or terminate access to Covela if these Terms are violated, if required by law, or for security and operational reasons."
                 ),
                 LegalDocumentSection(
                     heading: "Disclaimers",
-                    body: "BabyTown is provided on an 'as is' and 'as available' basis to the extent permitted by law. We do not guarantee uninterrupted availability or that all features will always be error-free."
+                    body: "Covela is provided on an 'as is' and 'as available' basis to the extent permitted by law. We do not guarantee uninterrupted availability or that all features will always be error-free."
                 ),
                 LegalDocumentSection(
                     heading: "Limitation of Liability",
-                    body: "To the maximum extent permitted by law, BabyTown and its operators are not liable for indirect, incidental, special, consequential, or punitive damages arising from your use of the app."
+                    body: "To the maximum extent permitted by law, Covela and its operators are not liable for indirect, incidental, special, consequential, or punitive damages arising from your use of the app."
                 ),
                 LegalDocumentSection(
                     heading: "Changes to Terms",
-                    body: "We may update these Terms from time to time. Continued use of BabyTown after updates means you accept the revised Terms."
+                    body: "We may update these Terms from time to time. Continued use of Covela after updates means you accept the revised Terms."
                 ),
                 LegalDocumentSection(
                     heading: "Contact",
-                    body: "If you have questions about these Terms, contact us using the support information listed in the App Store listing for BabyTown."
+                    body: "If you have questions about these Terms, contact us using the support information listed in the App Store listing for Covela."
                 )
             ]
         }

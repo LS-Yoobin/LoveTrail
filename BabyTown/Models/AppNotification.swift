@@ -26,7 +26,7 @@ struct AppNotification: Identifiable {
         return [
             AppNotification(
                 id: NotificationType.welcomeCard.rawValue,
-                title: "Welcome to BabyTown",
+                title: "Welcome to Covela",
                 bodyPreview: preview,
                 date: Date(),
                 type: .welcomeCard,

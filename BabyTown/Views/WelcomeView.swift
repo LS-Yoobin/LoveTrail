@@ -51,7 +51,7 @@ struct WelcomeView: View {
                     )
 
                 // Title
-                Text("Welcome to your BabyTown!")
+                Text("Welcome to your Covela!")
                     .font(.system(size: 28, weight: .bold, design: .serif))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)

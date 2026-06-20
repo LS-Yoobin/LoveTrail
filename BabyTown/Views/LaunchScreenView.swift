@@ -19,7 +19,7 @@ struct LaunchScreenView: View {
 
                 VStack(spacing: 16) {
                     PulsingDotsLoader()
-                    Text("Loading BabyTown...")
+                    Text("Loading Covela...")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(.gray.opacity(0.8))
                 }

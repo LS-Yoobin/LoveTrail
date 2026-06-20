@@ -84,7 +84,7 @@ struct BabyTownWelcomeCardDetailView: View {
     private var letterCard: some View {
         BabyTownLetterCardStyle.letterChrome(cornerRadius: 20, canvasWidth: BabyTownLetterCardStyle.referenceCanvasWidth) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Welcome to BabyTown")
+                Text("Welcome to Covela")
                     .font(.system(size: 22, weight: .bold, design: .serif))
                     .foregroundStyle(BabyTownTheme.textPrimary)
 

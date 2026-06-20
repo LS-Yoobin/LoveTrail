@@ -165,7 +165,7 @@ struct CameraCaptureView: View {
         Button {
             showReleaseConfirmation = true
         } label: {
-            Text("Add to Baby Town Now")
+            Text("Add to Covela Now")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)

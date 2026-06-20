@@ -13,7 +13,7 @@ struct PartnerInvite {
     }
 
     var messageText: String {
-        "Join me in Baby Town 💞 — our private space for just the two of us. Tap to join: \(link)"
+        "Join me in Covela 💞 — our private space for just the two of us. Tap to join: \(link)"
     }
 
     /// The current user's invite, creating + persisting a code on first use.

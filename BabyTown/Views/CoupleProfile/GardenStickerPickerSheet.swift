@@ -119,7 +119,7 @@ struct GardenStickerPickerSheet: View {
             Text("No moments yet")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text("Use Open Gallery to add photos to Baby Town")
+            Text("Use Open Gallery to add photos to Covela")
                 .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

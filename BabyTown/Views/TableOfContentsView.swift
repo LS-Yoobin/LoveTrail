@@ -32,7 +32,7 @@ struct TableOfContentsView: View {
                     VStack(alignment: .center, spacing: 32) {
                         // 1️⃣ Header
                         VStack(spacing: 8) {
-                            Text("BabyTown")
+                            Text("Covela")
                                 .font(.custom(serifFont, size: 18))
                                 .italic()
                                 .foregroundColor(BabyTownTheme.textPrimary)
