@@ -72,6 +72,21 @@ enum BabyTownTheme {
         isBlue ? Color(red: 0.30, green: 0.50, blue: 0.80) : Color(red: 0.84, green: 0.41, blue: 0.45)
     }
 
+    // MARK: - Invite Banner
+
+    static var inviteBannerFill: Color {
+        isBlue ? Color(red: 1.000, green: 0.953, blue: 0.839) : Color(red: 0.910, green: 0.871, blue: 1.000)
+    }
+    static var inviteBannerBorder: Color {
+        isBlue ? Color(red: 0.878, green: 0.690, blue: 0.376) : Color(red: 0.659, green: 0.533, blue: 0.816)
+    }
+    static var inviteBannerText: Color {
+        isBlue ? Color(red: 0.353, green: 0.220, blue: 0.000) : Color(red: 0.227, green: 0.157, blue: 0.376)
+    }
+    static var inviteBannerSubtext: Color {
+        isBlue ? Color(red: 0.478, green: 0.314, blue: 0.000) : Color(red: 0.353, green: 0.251, blue: 0.502)
+    }
+
     // MARK: - Buttons
 
     static var buttonGradient: LinearGradient {

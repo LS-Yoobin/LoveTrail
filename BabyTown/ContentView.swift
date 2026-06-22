@@ -9,9 +9,15 @@ import SwiftUI
 
 struct ContentView: View {
 
-    enum Screen {
-        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday, firstMemories, howItWorks, photoAccess, home, selectPhotos
+    enum Screen: Equatable {
+        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday
+        case pathSelector          // NEW — branch point after birthday
+        case firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
+        case prelude
+        case preludeOnboarding     // NEW — prelude intro screen
+        case archivedCouple
+        case partnerOnboarding(inviterName: String)
     }
 
     @State private var screen: Screen = .launch
@@ -29,10 +35,14 @@ struct ContentView: View {
         _screen = State(initialValue: .launch)
         
         if hasCompletedOnboarding {
-            // Check if user was last on the camera screen
             let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
+            let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
             if lastScreen == "selectPhotos" {
                 _targetScreen = State(initialValue: .selectPhotos)
+            } else if stage == .prelude {
+                _targetScreen = State(initialValue: .prelude)
+            } else if stage == .archivedCouple {
+                _targetScreen = State(initialValue: .archivedCouple)
             } else {
                 _targetScreen = State(initialValue: .home)
             }
@@ -136,7 +146,41 @@ struct ContentView: View {
                         let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
                         DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
                         withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .pathSelector
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .pathSelector:
+                PathSelectorView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .birthday
+                        }
+                    },
+                    onSelectPrelude: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .preludeOnboarding
+                        }
+                    },
+                    onSelectOfficial: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .firstMemories
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .preludeOnboarding:
+                PreludeOnboardingView(
+                    onBegin: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .prelude
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .prelude
                         }
                     }
                 )
@@ -146,7 +190,7 @@ struct ContentView: View {
                 FirstMemoriesView(
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .birthday
+                            screen = .pathSelector
                         }
                     },
                     onFinished: { firstMet, official, firstMetDate, officialDate in
@@ -277,6 +321,70 @@ struct ContentView: View {
                     withAnimation(.easeInOut(duration: 0.4)) { screen = .home }
                 })
                 .transition(.opacity)
+
+            case .prelude:
+                PreludeHomeView(
+                    onReturnToOnboarding: {
+                        DataPersistenceManager.shared.setOnboardingCompleted(false)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .welcome
+                        }
+                    },
+                    onSwitchToOfficial: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .officialCouple
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
+                    },
+                    onSimulatePartnerInvite: {
+                        DataPersistenceManager.shared.saveInviterName("Justin")
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .partnerOnboarding(inviterName: "Justin")
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .archivedCouple:
+                Group {
+                    if let bundle = DataPersistenceManager.shared.loadArchiveBundle() {
+                        ScrapbookHomeView(
+                            bundle: bundle,
+                            onStepOut: {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    screen = .prelude
+                                }
+                            },
+                            onReconnect: {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    screen = .home
+                                }
+                            }
+                        )
+                    } else {
+                        Color.clear.onAppear { screen = .home }
+                    }
+                }
+                .transition(.opacity)
+
+            case .partnerOnboarding(let inviterName):
+                PartnerOnboardingFlow(
+                    inviterName: inviterName,
+                    onComplete: {
+                        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+                        profile.relationshipStage = .officialCouple
+                        DataPersistenceManager.shared.saveCoupleProfile(profile)
+                        DataPersistenceManager.shared.saveInviterName(inviterName)
+                        DataPersistenceManager.shared.setPartnerAccount(true)
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .home
+                        }
+                    }
+                )
+                .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.openCameraNotificationName)) { _ in
@@ -284,6 +392,12 @@ struct ContentView: View {
                 screen = .selectPhotos
             } else if DataPersistenceManager.shared.hasCompletedOnboarding() {
                 screen = .selectPhotos
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AppDelegate.openScrapbookNotificationName)) { _ in
+            guard screen != .archivedCouple else { return }
+            withAnimation(.easeInOut(duration: 0.4)) {
+                screen = .archivedCouple
             }
         }
         .task {
@@ -295,6 +409,17 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 NotificationManager.shared.refresh()
+            }
+        }
+        .onOpenURL { url in
+            guard url.scheme == "babytown",
+                  url.host == "invite" else { return }
+            let name = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "from" })?
+                .value ?? "your partner"
+            withAnimation(.easeInOut(duration: 0.4)) {
+                screen = .partnerOnboarding(inviterName: name)
             }
         }
     }

@@ -111,7 +111,7 @@ struct ProfileStickerView: View {
     private func stickerBody(side: CGFloat) -> some View {
         Group {
             switch sticker.kind {
-            case .partnerInvite:
+            case .partnerInvite where image == nil:
                 partnerInviteBody(side: side)
             case .userAvatar where image == nil:
                 userAvatarPlaceholderBody(side: side)

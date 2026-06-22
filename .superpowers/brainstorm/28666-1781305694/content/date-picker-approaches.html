@@ -1,0 +1,232 @@
+<h2>Date Selection — 3 Approaches for "A First"</h2>
+<p class="subtitle">How should users set the date when recording a first? Each approach lives inside the existing "A First" editor sheet.</p>
+
+<style>
+  .phone-frame {
+    width: 280px;
+    min-height: 440px;
+    background: #f5f0eb;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    font-family: -apple-system, sans-serif;
+    flex-shrink: 0;
+  }
+  .nav-bar {
+    background: #f5f0eb;
+    padding: 14px 16px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .nav-cancel { color: #888; font-size: 13px; }
+  .nav-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .nav-save { color: #c47b5a; font-size: 13px; font-weight: 600; }
+  .editor-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .section-label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .text-field-dashed {
+    border: 1.5px dashed #1a1a1a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: rgba(0,0,0,0.4);
+    background: transparent;
+  }
+  .option-chip {
+    background: #ede9e3;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .option-chip.selected {
+    background: #fdf0ea;
+    color: #c47b5a;
+  }
+  .checkmark { color: #c47b5a; font-size: 13px; }
+  .divider-or {
+    text-align: center; font-size: 11px; color: #aaa;
+  }
+
+  /* Approach A - compact row */
+  .date-row-compact {
+    background: #ede9e3;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .date-row-compact .left { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #555; }
+  .date-row-compact .date-val { font-size: 13px; font-weight: 500; color: #c47b5a; background: #fdf0ea; padding: 4px 10px; border-radius: 8px; }
+
+  /* Approach B - segmented month/day/year */
+  .date-segments {
+    background: #ede9e3;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+  }
+  .seg-box {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #fdf0ea;
+    min-width: 52px;
+  }
+  .seg-box.sep { background: transparent; padding: 0 3px; font-size: 16px; color: #aaa; min-width: auto; }
+  .seg-label { font-size: 9px; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 1px; }
+  .seg-val { font-size: 16px; font-weight: 600; color: #c47b5a; }
+
+  /* Approach C - inline calendar strip */
+  .date-banner {
+    background: linear-gradient(135deg, #fdf0ea, #fce8de);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .date-banner .date-big { font-size: 20px; font-weight: 700; color: #c47b5a; }
+  .date-banner .date-year { font-size: 11px; color: #aaa; }
+  .date-banner .cal-icon { font-size: 22px; }
+
+  .cards { display: flex; flex-direction: row; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .card { flex: 0 0 auto; width: 300px; }
+  .card-image { display: flex; justify-content: center; padding: 20px 10px 10px; }
+  .card-body { padding: 0 10px 16px; }
+  .card-body h3 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+  .card-body p { margin: 0; font-size: 12px; color: #666; line-height: 1.5; }
+  .badge {
+    display: inline-block;
+    background: #c47b5a;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+
+<div class="cards">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-frame">
+        <div class="nav-bar">
+          <span class="nav-cancel">Cancel</span>
+          <span class="nav-title">A First</span>
+          <span class="nav-save">Save</span>
+        </div>
+        <div class="editor-body">
+          <div class="text-field-dashed">✏️ &nbsp;<span>Write your own first…</span></div>
+          <div class="divider-or">or</div>
+          <div class="option-chip selected">First date <span class="checkmark">✓</span></div>
+          <div class="option-chip">First time they made you laugh</div>
+
+          <div style="height: 6px;"></div>
+          <div class="section-label">📅 When was this?</div>
+          <div class="date-row-compact">
+            <div class="left">🗓 Date</div>
+            <div class="date-val">June 12, 2026 ▾</div>
+          </div>
+          <div style="font-size: 10px; color: #aaa; text-align: center;">Tap the date to pick a different one</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="badge">Recommended</div>
+      <h3>A — Compact Date Row</h3>
+      <p>A single tappable row shows the full date. Tapping opens iOS's native calendar popover. Minimal space, maximum clarity. Default = today.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-frame">
+        <div class="nav-bar">
+          <span class="nav-cancel">Cancel</span>
+          <span class="nav-title">A First</span>
+          <span class="nav-save">Save</span>
+        </div>
+        <div class="editor-body">
+          <div class="text-field-dashed">✏️ &nbsp;<span>Write your own first…</span></div>
+          <div class="divider-or">or</div>
+          <div class="option-chip selected">First date <span class="checkmark">✓</span></div>
+          <div class="option-chip">First time they made you laugh</div>
+
+          <div style="height: 6px;"></div>
+          <div class="section-label">📅 When was this?</div>
+          <div class="date-segments">
+            <div class="seg-box">
+              <div class="seg-label">Month</div>
+              <div class="seg-val">Jun</div>
+            </div>
+            <div class="seg-box sep">/</div>
+            <div class="seg-box">
+              <div class="seg-label">Day</div>
+              <div class="seg-val">12</div>
+            </div>
+            <div class="seg-box sep">/</div>
+            <div class="seg-box">
+              <div class="seg-label">Year</div>
+              <div class="seg-val">2026</div>
+            </div>
+          </div>
+          <div style="font-size: 10px; color: #aaa; text-align: center;">Tap any segment to change it</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Segmented Month / Day / Year</h3>
+      <p>Three tappable bubbles — each opens a small wheel picker for that part of the date. More explicit, feels custom-built. Slightly more taps.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-frame">
+        <div class="nav-bar">
+          <span class="nav-cancel">Cancel</span>
+          <span class="nav-title">A First</span>
+          <span class="nav-save">Save</span>
+        </div>
+        <div class="editor-body">
+          <div class="text-field-dashed">✏️ &nbsp;<span>Write your own first…</span></div>
+          <div class="divider-or">or</div>
+          <div class="option-chip selected">First date <span class="checkmark">✓</span></div>
+          <div class="option-chip">First time they made you laugh</div>
+
+          <div style="height: 6px;"></div>
+          <div class="section-label">📅 When was this?</div>
+          <div class="date-banner">
+            <div>
+              <div class="date-big">June 12</div>
+              <div class="date-year">2026 — tap to change year</div>
+            </div>
+            <div class="cal-icon">🗓</div>
+          </div>
+          <div style="font-size: 10px; color: #aaa; text-align: center;">Tap to open full calendar</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Warm Date Banner</h3>
+      <p>A styled card shows the date prominently with the month/day large and year smaller. Tapping opens the full calendar. Most on-brand, most prominent.</p>
+    </div>
+  </div>
+
+</div>

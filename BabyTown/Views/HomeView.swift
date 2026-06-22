@@ -66,6 +66,7 @@ struct HomeView: View {
     @State private var showScan = false
     @State private var showMapView = false
     @State private var showToC = false
+    @State private var showPinnedMemoriesFeed = false
     @State private var peakPullOffset: CGFloat = 0
     @State private var didCrossMapOpenThreshold = false
     @State private var mapThresholdHapticTick = 0
@@ -76,6 +77,19 @@ struct HomeView: View {
 
     private let mapOpenThreshold: CGFloat = 110
     private static let timelinePageSize = 15
+
+    private var homeDisplayName: String {
+        let profile = DataPersistenceManager.shared.loadCoupleProfile()
+        return profile.displayName ?? DataPersistenceManager.shared.loadUserNickname() ?? "You"
+    }
+
+    private var homePartnerSlotTitle: String {
+        let dpm = DataPersistenceManager.shared
+        if dpm.isPartnerAccount() {
+            return dpm.loadInviterName() ?? "Justin"
+        }
+        return store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+    }
 
 
     init(
@@ -549,6 +563,21 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $showVisitPet) {
                 visitPetOverlay
             }
+            .fullScreenCover(isPresented: $showPinnedMemoriesFeed) {
+                PinnedMemoriesFeedView(
+                    viewModel: viewModel,
+                    specialDates: pinnedHomeSpecialDates,
+                    userAvatar: coupleSpaceAvatar,
+                    userName: homeDisplayName,
+                    partnerSlotTitle: homePartnerSlotTitle,
+                    onBack: { showPinnedMemoriesFeed = false },
+                    onPartnerTap: { showPartnerPaywall = true },
+                    onShare: shareMemory,
+                    onEditSpecialDate: { beginEditHomeSpecialDate($0) },
+                    onDeleteSpecialDate: { deleteHomeSpecialDate($0) },
+                    onTogglePinSpecialDate: { toggleHomeSpecialDatePin($0) }
+                )
+            }
             .sheet(isPresented: $showToC) {
                 TableOfContentsView(viewModel: viewModel)
                     .presentationDetents([.medium, .large])
@@ -611,7 +640,9 @@ struct HomeView: View {
     /// `viewModel.moments` so we don't re-read `moments.json` every frame.
     private func refreshCoupleSpaceCardMetadata() {
         let dpm = DataPersistenceManager.shared
-        coupleSpaceAvatar = dpm.loadUserAvatar()
+        coupleSpaceAvatar = dpm.isPartnerAccount()
+            ? dpm.loadPartnerProfilePhoto()
+            : dpm.loadUserAvatar()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
         let gardenContext = GardenActMapper.persistedContext(
@@ -1218,7 +1249,7 @@ struct HomeView: View {
 
     private var pinnedSection: some View {
         VStack(spacing: 12) {
-            sectionLabel("Pinned Memories", icon: "pin.fill")
+            sectionLabel("Pinned Memories", icon: "pin.fill", seeMoreAction: { showPinnedMemoriesFeed = true })
                 .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1304,7 +1335,7 @@ struct HomeView: View {
 
     // MARK: - Section Helpers
 
-    private func sectionLabel(_ text: String, icon: String, showToCButton: Bool = false) -> some View {
+    private func sectionLabel(_ text: String, icon: String, showToCButton: Bool = false, seeMoreAction: (() -> Void)? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
@@ -1312,9 +1343,24 @@ struct HomeView: View {
             Text(text)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(nightModeManager.isNightMode ? .white : .black)
-            
+
             Spacer()
-            
+
+            if let seeMoreAction {
+                Button(action: seeMoreAction) {
+                    HStack(spacing: 4) {
+                        Text("See More")
+                            .font(.system(size: 14, weight: .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(
+                        nightModeManager.isNightMode ? .white.opacity(0.75) : BabyTownTheme.accent
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
             if showToCButton {
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()

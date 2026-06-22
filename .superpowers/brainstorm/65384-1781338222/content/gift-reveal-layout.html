@@ -1,0 +1,54 @@
+<h2>Gift reveal page layout</h2>
+<p class="subtitle">Each capture is a "page" — partner flips through with Prev / Next. Which layout feels right?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1040;min-height:340px;position:relative;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px 72px">
+      <!-- Page indicator -->
+      <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:1px;text-transform:uppercase">Page 2 of 5</div>
+      <!-- Capture card -->
+      <div style="background:rgba(255,255,255,0.95);border-radius:16px;padding:24px;text-align:center;width:100%;max-width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+        <div style="font-size:28px;margin-bottom:8px">📝</div>
+        <div style="font-size:10px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Note</div>
+        <div style="font-size:16px;font-weight:600;color:#1a1040;font-family:Georgia,serif;line-height:1.4">"I keep thinking about you."</div>
+        <div style="font-size:11px;color:#888;margin-top:12px">March 14, 2026</div>
+      </div>
+      <!-- Nav buttons -->
+      <div style="position:absolute;bottom:16px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px">
+        <button style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer">← Prev Page</button>
+        <button style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer">Next Page →</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Dark background, card centered</h3>
+      <p>Warm dark bg from the gradient, capture card floats in the center. Page counter at top. Prev/Next at bottom corners.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:linear-gradient(135deg,#fdf6ec,#fce8d5);min-height:340px;position:relative;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px 72px">
+      <!-- Book page feel -->
+      <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);color:rgba(0,0,0,0.35);font-size:11px;letter-spacing:1px;text-transform:uppercase">Page 2 of 5</div>
+      <!-- Capture — full bleed "page" style -->
+      <div style="text-align:center;width:100%;padding:0 16px">
+        <div style="font-size:32px;margin-bottom:10px">📝</div>
+        <div style="font-size:10px;font-weight:700;color:#c2642a;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Note</div>
+        <div style="font-size:18px;font-weight:500;color:#3d1f00;font-family:Georgia,serif;line-height:1.5">"I keep thinking about you."</div>
+        <div style="font-size:11px;color:#a07050;margin-top:16px">March 14, 2026</div>
+      </div>
+      <!-- Nav buttons -->
+      <div style="position:absolute;bottom:16px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px">
+        <button style="background:rgba(0,0,0,0.08);border:none;color:#3d1f00;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer">← Prev Page</button>
+        <button style="background:#c2642a;border:none;color:white;padding:8px 20px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer">Next Page →</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Warm parchment "book page" feel</h3>
+      <p>Cream/parchment background leans into the book metaphor. Content sits on the page itself. Next Page is the primary accent button.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:24px">Also: on the <strong>last page</strong>, should "Next Page" become a different CTA (e.g. "Continue" to advance to the username step)?</p>

@@ -6,29 +6,45 @@ struct ProfileStickersLayer: View {
     let stickers: [ProfileSticker]
     let images: [UUID: UIImage]
     let profileNote: String?
+    let profileNoteMood: ProfileNoteMood?
     let profileNotePosition: NormalizedPoint?
     let recordPlayerPosition: NormalizedPoint?
     let recordPlayerScale: CGFloat?
     let isRecordPlayerPlaying: Bool
+    let watchTogetherTVPosition: NormalizedPoint?
+    let watchTogetherTVScale: CGFloat?
+    let preludeBookPosition: NormalizedPoint?
+    let preludeBookScale: CGFloat?
     let userName: String
     let partnerTitle: String
     let isCustomizing: Bool
     let selectedID: UUID?
     let isNoteSelected: Bool
     var isRecordPlayerSelected: Bool = false
+    var isWatchTogetherTVSelected: Bool = false
+    var isPreludeBookSelected: Bool = false
     let onSelect: (UUID?) -> Void
     let onSelectNote: () -> Void
     var onSelectRecordPlayer: (() -> Void)?
+    var onSelectWatchTogetherTV: (() -> Void)?
+    var onSelectPreludeBook: (() -> Void)?
     let onDelete: (UUID) -> Void
     let onDeleteNote: () -> Void
     let onTapUser: () -> Void
     let onTapPartner: () -> Void
     var onTapNote: (() -> Void)?
     var onTapRecordPlayer: (() -> Void)?
+    var onTapWatchTogetherTV: (() -> Void)?
+    var onTapPreludeBook: (() -> Void)?
+    var onLongPressWatchTogetherTV: (() -> Void)?
     var onTapPhotoSticker: ((ProfileSticker) -> Void)?
     let onNotePositionChanged: (NormalizedPoint) -> Void
     let onRecordPlayerPositionChanged: (NormalizedPoint) -> Void
     let onRecordPlayerScaleChanged: (CGFloat) -> Void
+    let onWatchTogetherTVPositionChanged: (NormalizedPoint) -> Void
+    let onWatchTogetherTVScaleChanged: (CGFloat) -> Void
+    let onPreludeBookPositionChanged: (NormalizedPoint) -> Void
+    let onPreludeBookScaleChanged: (CGFloat) -> Void
     let onPositionChanged: (UUID, NormalizedPoint) -> Void
     let onScaleChanged: (UUID, CGFloat) -> Void
     let onRotationChanged: (UUID, Double) -> Void
@@ -58,6 +74,7 @@ struct ProfileStickersLayer: View {
                 if let profileNote {
                     ProfileGardenNoteView(
                         text: profileNote,
+                        mood: profileNoteMood,
                         position: profileNotePosition,
                         stickers: stickers,
                         canvasSize: geo.size,
@@ -86,6 +103,33 @@ struct ProfileStickersLayer: View {
                 )
                 .zIndex(recordPlayerZIndex)
 
+                ProfileGardenWatchTogetherTVView(
+                    position: watchTogetherTVPosition,
+                    scale: watchTogetherTVScale,
+                    canvasSize: geo.size,
+                    isCustomizing: isCustomizing,
+                    isSelected: isWatchTogetherTVSelected,
+                    onPositionChanged: onWatchTogetherTVPositionChanged,
+                    onScaleChanged: onWatchTogetherTVScaleChanged,
+                    onSelect: onSelectWatchTogetherTV,
+                    onTap: isCustomizing ? nil : onTapWatchTogetherTV,
+                    onLongPress: isCustomizing ? nil : onLongPressWatchTogetherTV
+                )
+                .zIndex(watchTogetherTVZIndex)
+
+                ProfileGardenPreludeBookView(
+                    position: preludeBookPosition,
+                    scale: preludeBookScale,
+                    canvasSize: geo.size,
+                    isCustomizing: isCustomizing,
+                    isSelected: isPreludeBookSelected,
+                    onPositionChanged: onPreludeBookPositionChanged,
+                    onScaleChanged: onPreludeBookScaleChanged,
+                    onSelect: onSelectPreludeBook,
+                    onTap: isCustomizing ? nil : onTapPreludeBook
+                )
+                .zIndex(preludeBookZIndex)
+
                 if isCustomizing {
                     editGardenDeleteButtons(canvasSize: geo.size)
                         .zIndex(30)
@@ -104,6 +148,14 @@ struct ProfileStickersLayer: View {
 
     private var recordPlayerZIndex: Double {
         isRecordPlayerSelected ? 25 : 20
+    }
+
+    private var watchTogetherTVZIndex: Double {
+        isWatchTogetherTVSelected ? 25 : 20
+    }
+
+    private var preludeBookZIndex: Double {
+        isPreludeBookSelected ? 25 : 20
     }
 
     private func stickerZIndex(for id: UUID) -> Double {

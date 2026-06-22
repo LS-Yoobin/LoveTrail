@@ -103,15 +103,7 @@ struct CaptionEditorSheet: View {
                 } else if !isEditingLocation {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(action: saveMemory) {
-                            Text("Save")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                Capsule()
-                                    .fill(BabyTownTheme.savePillFill)
-                                )
+                            SavePillLabel(title: "Save")
                         }
                         .buttonStyle(.plain)
                     }

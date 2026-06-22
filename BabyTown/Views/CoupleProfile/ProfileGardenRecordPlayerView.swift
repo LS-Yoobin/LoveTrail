@@ -45,10 +45,14 @@ struct ProfileGardenRecordPlayerView: View {
     }
 
     var body: some View {
-        VinylRecordPlayerView(isPlaying: isPlaying, scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
-            .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
-            .editGardenPulse(shouldPulse)
-            .position(center)
+        VStack(spacing: 8) {
+            VinylRecordPlayerView(isPlaying: isPlaying, scale: effectiveScale, onTap: isCustomizing ? nil : onTap)
+                .customizeDottedOutline(isCustomizing && isSelected, cornerRadius: 14, padding: 4)
+
+            gardenLabel("Our Song")
+        }
+        .editGardenPulse(shouldPulse)
+        .position(center)
             .gesture(isCustomizing && isSelected ? customizeGestures : nil)
             .onTapGesture {
                 if isCustomizing {
@@ -117,5 +121,15 @@ struct ProfileGardenRecordPlayerView: View {
 
     private var customizeGestures: some Gesture {
         SimultaneousGesture(dragGesture, pinchGesture)
+    }
+
+    private func gardenLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.black, in: Capsule())
     }
 }

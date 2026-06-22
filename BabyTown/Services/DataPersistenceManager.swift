@@ -55,8 +55,44 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("memory_canvases.json")
     }
 
+    private var preludeCapturesFileURL: URL {
+        documentsDirectory.appendingPathComponent("prelude_captures.json")
+    }
+
+    private var preludeChapterFileURL: URL {
+        documentsDirectory.appendingPathComponent("prelude_chapter.json")
+    }
+
+    private var archiveBundleFileURL: URL {
+        documentsDirectory.appendingPathComponent("archive_bundle.json")
+    }
+
+    private var reconnectInviteFileURL: URL {
+        documentsDirectory.appendingPathComponent("reconnect_invite.json")
+    }
+
+    private var preludeVoiceMemosDirectory: URL {
+        documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
+    }
+
+    private var preludePhotosDirectory: URL {
+        documentsDirectory.appendingPathComponent("PreludePhotos")
+    }
+
+    private func preludeVoiceMemoURL(fileId: String) -> URL {
+        preludeVoiceMemosDirectory.appendingPathComponent(fileId)
+    }
+
+    private func preludePhotoURL(photoId: UUID) -> URL {
+        preludePhotosDirectory.appendingPathComponent("\(photoId.uuidString).jpg")
+    }
+
     private var userAvatarURL: URL {
         pinnedPhotosDirectory.appendingPathComponent("couple_user_avatar.jpg")
+    }
+
+    private var partnerAvatarURL: URL {
+        pinnedPhotosDirectory.appendingPathComponent("partner_avatar.jpg")
     }
 
     private func specialDatePhotoURL(id: UUID) -> URL {
@@ -81,6 +117,10 @@ final class DataPersistenceManager {
     private let petNeedsNotifiedWhileLowKey = "petNeedsNotifiedWhileLow"
     private let petMissesYouNotifiedForInteractionAtKey = "petMissesYouNotifiedForInteractionAt"
     private let colorThemeKey = "colorTheme"
+    private let partnerEmailKey = "partnerEmail"
+    private let userEmailKey = "userEmail"
+    private let isPartnerAccountKey = "isPartnerAccount"
+    private let inviterNameKey = "inviterName"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -89,6 +129,12 @@ final class DataPersistenceManager {
     private func createDirectoriesIfNeeded() {
         if !fileManager.fileExists(atPath: pinnedPhotosDirectory.path) {
             try? fileManager.createDirectory(at: pinnedPhotosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: preludeVoiceMemosDirectory.path) {
+            try? fileManager.createDirectory(at: preludeVoiceMemosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: preludePhotosDirectory.path) {
+            try? fileManager.createDirectory(at: preludePhotosDirectory, withIntermediateDirectories: true)
         }
     }
     
@@ -324,6 +370,48 @@ final class DataPersistenceManager {
         return UIImage(data: data)
     }
 
+    func savePartnerEmail(_ email: String) {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: partnerEmailKey)
+    }
+
+    func loadPartnerEmail() -> String? {
+        userDefaults.string(forKey: partnerEmailKey)
+    }
+
+    func saveUserEmail(_ email: String) {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: userEmailKey)
+    }
+
+    func loadUserEmail() -> String? {
+        userDefaults.string(forKey: userEmailKey)
+    }
+
+    /// Whether the local user joined via the partner invite flow (not the inviter).
+    func setPartnerAccount(_ isPartner: Bool) {
+        userDefaults.set(isPartner, forKey: isPartnerAccountKey)
+    }
+
+    func isPartnerAccount() -> Bool {
+        if userDefaults.bool(forKey: isPartnerAccountKey) { return true }
+        // Invited partners persist email under partnerEmail; inviters use userEmail.
+        return loadPartnerEmail() != nil && loadUserEmail() == nil
+    }
+
+    func savePartnerProfilePhoto(_ image: UIImage) {
+        guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        try? jpeg.write(to: partnerAvatarURL)
+    }
+
+    func loadPartnerProfilePhoto() -> UIImage? {
+        guard fileManager.fileExists(atPath: partnerAvatarURL.path),
+              let data = try? Data(contentsOf: partnerAvatarURL) else { return nil }
+        return UIImage(data: data)
+    }
+
     func saveSpecialDatePhoto(_ image: UIImage?, id: UUID) {
         let url = specialDatePhotoURL(id: id)
         guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
@@ -376,6 +464,111 @@ final class DataPersistenceManager {
         let list = Array(all.values)
         guard let data = try? encoder.encode(list) else { return }
         try? data.write(to: memoryCanvasesFileURL)
+    }
+
+    // MARK: - Prelude
+
+    func savePreludeCaptures(_ captures: [PreludeCapture]) {
+        guard let data = try? encoder.encode(captures) else { return }
+        try? data.write(to: preludeCapturesFileURL)
+    }
+
+    func loadPreludeCaptures() -> [PreludeCapture] {
+        guard fileManager.fileExists(atPath: preludeCapturesFileURL.path),
+              let data = try? Data(contentsOf: preludeCapturesFileURL),
+              let captures = try? decoder.decode([PreludeCapture].self, from: data) else {
+            return []
+        }
+        return captures
+    }
+
+    func savePreludeChapter(_ chapter: PreludeChapter) {
+        guard let data = try? encoder.encode(chapter) else { return }
+        try? data.write(to: preludeChapterFileURL)
+    }
+
+    func loadPreludeChapter() -> PreludeChapter? {
+        guard fileManager.fileExists(atPath: preludeChapterFileURL.path),
+              let data = try? Data(contentsOf: preludeChapterFileURL),
+              let chapter = try? decoder.decode(PreludeChapter.self, from: data) else {
+            return nil
+        }
+        return chapter
+    }
+
+    func preludeVoiceMemoFileURL(fileId: String) -> URL {
+        preludeVoiceMemoURL(fileId: fileId)
+    }
+
+    func savePreludeVoiceMemo(data: Data, fileId: String) {
+        let url = preludeVoiceMemoURL(fileId: fileId)
+        try? data.write(to: url)
+    }
+
+    func loadPreludeVoiceMemoData(fileId: String) -> Data? {
+        let url = preludeVoiceMemoURL(fileId: fileId)
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    func deletePreludeVoiceMemo(fileId: String) {
+        try? fileManager.removeItem(at: preludeVoiceMemoURL(fileId: fileId))
+    }
+
+    func savePreludePhoto(_ image: UIImage, photoId: UUID) {
+        guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return }
+        try? jpegData.write(to: preludePhotoURL(photoId: photoId))
+    }
+
+    func loadPreludePhoto(photoId: UUID) -> UIImage? {
+        let url = preludePhotoURL(photoId: photoId)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return UIImage(data: data)
+    }
+
+    func deletePreludePhoto(photoId: UUID) {
+        try? fileManager.removeItem(at: preludePhotoURL(photoId: photoId))
+    }
+
+    // MARK: - Archive
+
+    func saveArchiveBundle(_ bundle: ArchiveBundle) {
+        guard let data = try? encoder.encode(bundle) else { return }
+        try? data.write(to: archiveBundleFileURL)
+    }
+
+    func loadArchiveBundle() -> ArchiveBundle? {
+        guard fileManager.fileExists(atPath: archiveBundleFileURL.path),
+              let data = try? Data(contentsOf: archiveBundleFileURL),
+              let bundle = try? decoder.decode(ArchiveBundle.self, from: data) else {
+            return nil
+        }
+        return bundle
+    }
+
+    func deleteArchiveBundle() {
+        try? fileManager.removeItem(at: archiveBundleFileURL)
+    }
+
+    func saveReconnectInvite(_ invite: BreakupReconnectInvite) {
+        guard let data = try? encoder.encode(invite) else { return }
+        try? data.write(to: reconnectInviteFileURL)
+    }
+
+    func loadReconnectInvite() -> BreakupReconnectInvite? {
+        guard fileManager.fileExists(atPath: reconnectInviteFileURL.path),
+              let data = try? Data(contentsOf: reconnectInviteFileURL),
+              let invite = try? decoder.decode(BreakupReconnectInvite.self, from: data) else {
+            return nil
+        }
+        return invite
+    }
+
+    func clearReconnectInvite() {
+        try? fileManager.removeItem(at: reconnectInviteFileURL)
     }
 
     func setOnboardingCompleted(_ completed: Bool) {
@@ -439,6 +632,19 @@ final class DataPersistenceManager {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// Inviter display name from the partner invite deep link (`?from=`).
+    func saveInviterName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: inviterNameKey)
+    }
+
+    func loadInviterName() -> String? {
+        guard let name = userDefaults.string(forKey: inviterNameKey) else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     func readInAppNotificationIDs() -> Set<String> {
         guard let ids = userDefaults.stringArray(forKey: readInAppNotificationIDsKey) else {
             return []
@@ -478,6 +684,13 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: coupleProfileFileURL)
         try? fileManager.removeItem(at: memoryCanvasesFileURL)
         try? fileManager.removeItem(at: userAvatarURL)
+        try? fileManager.removeItem(at: partnerAvatarURL)
+        try? fileManager.removeItem(at: preludeCapturesFileURL)
+        try? fileManager.removeItem(at: preludeChapterFileURL)
+        try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
+        try? fileManager.removeItem(at: preludePhotosDirectory)
+        try? fileManager.removeItem(at: archiveBundleFileURL)
+        try? fileManager.removeItem(at: reconnectInviteFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
         userDefaults.removeObject(forKey: lastActiveScreenKey)
         userDefaults.removeObject(forKey: userNicknameKey)
@@ -488,6 +701,10 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: foundingOfficialDateKey)
         userDefaults.removeObject(forKey: foundingFirstMetDateKey)
         userDefaults.removeObject(forKey: colorThemeKey)
+        userDefaults.removeObject(forKey: partnerEmailKey)
+        userDefaults.removeObject(forKey: userEmailKey)
+        userDefaults.removeObject(forKey: isPartnerAccountKey)
+        userDefaults.removeObject(forKey: inviterNameKey)
         BackgroundMusicImporter.clearImportedSong()
         MomentVideoStore.shared.removeAll()
     }

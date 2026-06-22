@@ -57,17 +57,13 @@ struct CoupleSongNameSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: confirm) {
-                        Text("SAVE")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                canConfirm
-                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
-                                    : AnyShapeStyle(Color.black.opacity(0.18)),
-                                in: Capsule()
-                            )
+                        SavePillLabel(
+                            title: "SAVE",
+                            isEnabled: canConfirm,
+                            font: .subheadline.weight(.bold),
+                            horizontalPadding: 16,
+                            verticalPadding: 8
+                        )
                     }
                     .buttonStyle(.plain)
                     .disabled(!canConfirm)

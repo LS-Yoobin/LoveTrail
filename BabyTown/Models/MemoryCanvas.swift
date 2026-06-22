@@ -14,6 +14,7 @@ struct MemoryPageNote: Codable, Equatable, Identifiable {
     var author: MemoryNoteAuthor
     var text: String
     var position: NormalizedPoint?
+    var mood: ProfileNoteMood?
 
     var id: MemoryNoteAuthor { author }
 
@@ -66,12 +67,13 @@ struct MemoryCanvas: Codable, Equatable {
     mutating func upsertNote(
         author: MemoryNoteAuthor,
         text: String?,
-        position: NormalizedPoint?
+        position: NormalizedPoint?,
+        mood: ProfileNoteMood? = nil
     ) {
         notes.removeAll { $0.author == author }
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !trimmed.isEmpty else { return }
-        notes.append(MemoryPageNote(author: author, text: trimmed, position: position))
+        notes.append(MemoryPageNote(author: author, text: trimmed, position: position, mood: mood))
         notes = Self.normalizedNotes(notes)
     }
 

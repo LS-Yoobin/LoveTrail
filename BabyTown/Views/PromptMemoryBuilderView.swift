@@ -298,16 +298,14 @@ struct PromptMemoryBuilderView: View {
         Button {
             saveMemory()
         } label: {
-            Text("Save Memory")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    Capsule()
-                        .fill(canSave ? BabyTownTheme.savePillFill : Color(.systemGray4))
-                        .shadow(color: canSave ? BabyTownTheme.savePillShadow : .clear, radius: 12, y: 6)
-                )
+            SavePillLabel(
+                title: "Save Memory",
+                isEnabled: canSave,
+                font: .system(size: 17, weight: .semibold),
+                verticalPadding: 16,
+                fillsWidth: true
+            )
+            .shadow(color: canSave ? BabyTownTheme.savePillShadow : .clear, radius: 12, y: 6)
         }
         .disabled(!canSave)
         .padding(.horizontal, 20)

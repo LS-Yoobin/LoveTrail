@@ -13,6 +13,7 @@ struct MemoryCanvasLayer: View {
     let isEditingStickers: Bool
     let selectedStickerID: UUID?
     @Binding var noteDraft: String
+    @Binding var noteDraftMood: ProfileNoteMood?
     var isNoteFocused: FocusState<Bool>.Binding
     let onSelectComposingNote: () -> Void
     let onDeselectComposingNote: () -> Void
@@ -77,6 +78,7 @@ struct MemoryCanvasLayer: View {
                     if isComposingNote, composingAuthor == note.author {
                         memoryPageNoteComposer(
                             text: $noteDraft,
+                            mood: $noteDraftMood,
                             author: note.author,
                             position: composingNotePosition ?? note.position,
                             canvasSize: geo.size,
@@ -85,6 +87,7 @@ struct MemoryCanvasLayer: View {
                     } else {
                         ProfileGardenNoteView(
                             text: note.text,
+                            mood: note.mood,
                             position: note.position.map(clampNote),
                             stickers: [],
                             canvasSize: geo.size,
@@ -106,6 +109,7 @@ struct MemoryCanvasLayer: View {
                    !notes.contains(where: { $0.author == .localUser && $0.hasContent }) {
                     memoryPageNoteComposer(
                         text: $noteDraft,
+                        mood: $noteDraftMood,
                         author: .localUser,
                         position: composingNotePosition,
                         canvasSize: geo.size,
@@ -139,6 +143,7 @@ struct MemoryCanvasLayer: View {
     @ViewBuilder
     private func memoryPageNoteComposer(
         text: Binding<String>,
+        mood: Binding<ProfileNoteMood?>,
         author: MemoryNoteAuthor,
         position: NormalizedPoint?,
         canvasSize: CGSize,
@@ -146,6 +151,7 @@ struct MemoryCanvasLayer: View {
     ) -> some View {
         MemoryPageNoteComposer(
             text: text,
+            mood: mood,
             position: position,
             canvasSize: canvasSize,
             metadataBottomY: metadataBottomY,
@@ -166,6 +172,7 @@ struct MemoryCanvasLayer: View {
 /// Inline note composer positioned on the memory page canvas.
 private struct MemoryPageNoteComposer: View {
     @Binding var text: String
+    @Binding var mood: ProfileNoteMood?
     let position: NormalizedPoint?
     let canvasSize: CGSize
     let metadataBottomY: CGFloat
@@ -223,14 +230,19 @@ private struct MemoryPageNoteComposer: View {
 
     var body: some View {
         ZStack {
-            noteArt
-                .resizable()
-                .scaledToFit()
-                .frame(width: noteWidth, height: noteHeight)
+            ProfileGardenNoteArt(noteWidth: noteWidth, mood: mood)
                 .shadow(color: .black.opacity(0.16), radius: 10, y: 5)
 
             ZStack(alignment: .topLeading) {
-                Text("Leave a note for your future self.")
+                VStack(spacing: 4) {
+                    if let mood {
+                        Image(systemName: mood.iconName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(mood.tintColor)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    Text("Leave a note for your future self.")
                     .font(.body)
                     .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
                     .multilineTextAlignment(.center)
@@ -238,13 +250,16 @@ private struct MemoryPageNoteComposer: View {
                     .padding(.top, ProfileGardenNoteLayout.editorTextTopOffset)
                     .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isFocused.wrappedValue ? 1 : 0)
                     .allowsHitTesting(false)
+                }
 
                 FixedLineNoteTextEditor(
                     text: $text,
                     noteWidth: noteWidth,
+                    mood: mood,
                     isFocused: isFocused
                 )
             }
+            .animation(.easeInOut(duration: 0.2), value: mood)
             .padding(.horizontal, noteWidth * ProfileGardenNoteLayout.textHorizontalInsetFraction)
             .padding(.top, noteHeight * ProfileGardenNoteLayout.textTopInsetFraction)
             .padding(.bottom, noteHeight * ProfileGardenNoteLayout.textBottomInsetFraction)
@@ -272,7 +287,7 @@ private struct MemoryPageNoteComposer: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(10)
-                        .background(Color.red, in: Circle())
+                        .background(Color(red: 0.94, green: 0.58, blue: 0.58), in: Circle())
                         .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                 }
                 .buttonStyle(.plain)
@@ -294,14 +309,6 @@ private struct MemoryPageNoteComposer: View {
         } else {
             isFocused.wrappedValue = true
         }
-    }
-
-    private var noteArt: Image {
-        if let uiImage = ProfileGardenNoteLayout.noteArtImage()
-            ?? UIImage(named: ProfileGardenNoteLayout.assetName) {
-            return Image(uiImage: uiImage)
-        }
-        return Image(ProfileGardenNoteLayout.assetName)
     }
 
     private var dragGesture: some Gesture {

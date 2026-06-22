@@ -1,0 +1,326 @@
+<h2>Invite Partner Banner — 3 Design Directions</h2>
+<p class="subtitle">Current: banner uses the same light blue card fill as all the capture row cards behind it, so it blends in. Pick a direction to explore.</p>
+
+<style>
+  /* Phone frame */
+  .phone-wrap {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 24px 0;
+  }
+  .phone {
+    width: 230px;
+    background: #fff;
+    border-radius: 36px;
+    border: 2px solid #e0e0e0;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-notch {
+    width: 70px;
+    height: 10px;
+    background: #d0d0d0;
+    border-radius: 0 0 8px 8px;
+    margin: 10px auto 0;
+  }
+  .phone-header {
+    background: #fff;
+    padding: 8px 14px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .phone-header .logo { font-size: 13px; font-weight: 700; color: #387AF5; letter-spacing: -0.3px; }
+  .phone-header .gear { font-size: 15px; color: #8E8E93; }
+  .scroll-area {
+    flex: 1;
+    padding: 10px 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 200px;
+  }
+  /* Same light-blue capture cards */
+  .capture-card {
+    background: #CCE0F5;
+    border-radius: 10px;
+    padding: 10px 10px 6px;
+  }
+  .capture-card .row { display: flex; align-items: center; gap: 7px; }
+  .capture-card .icon-bubble {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #387AF5;
+  }
+  .capture-card .meta { font-size: 9px; color: #387AF5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .capture-card .title { font-size: 11px; color: #444; margin-top: 3px; }
+  .capture-card .trash { font-size: 9px; color: #e09090; text-align: right; margin-top: 4px; }
+
+  /* Bottom chrome */
+  .bottom-chrome {
+    padding: 8px 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Quick add bar (same across all) */
+  .quick-add {
+    background: linear-gradient(90deg, #387AF5, #2357C7);
+    border-radius: 999px;
+    display: flex;
+    padding: 8px 0;
+    box-shadow: 0 4px 12px rgba(56,122,245,0.35);
+  }
+  .quick-add .btn {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+  }
+  .quick-add .btn-icon { font-size: 14px; }
+  .quick-add .btn-label { font-size: 8px; color: rgba(255,255,255,0.85); font-weight: 500; }
+
+  /* Label for each phone */
+  .phone-label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-top: 10px;
+  }
+  .phone-sublabel {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+    max-width: 230px;
+  }
+  .phone-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* === Option A: Material blur backdrop === */
+  .backdrop-chrome {
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255,255,255,0.6);
+  }
+  .banner-current {
+    background: #CCE0F5;
+    border-radius: 10px;
+    padding: 9px 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .banner-current .b-icon { font-size: 15px; color: #387AF5; }
+  .banner-current .b-text .b-title { font-size: 11px; font-weight: 600; color: #333; }
+  .banner-current .b-text .b-sub { font-size: 9px; color: #666; }
+  .banner-current .chevron { margin-left: auto; font-size: 10px; color: #8E8E93; }
+
+  /* === Option B: Warm neutral / cream === */
+  .banner-warm {
+    background: #FFF5EC;
+    border: 1.5px solid #F5C9A0;
+    border-radius: 10px;
+    padding: 9px 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .banner-warm .b-icon { font-size: 15px; color: #E07A30; }
+  .banner-warm .b-text .b-title { font-size: 11px; font-weight: 600; color: #333; }
+  .banner-warm .b-text .b-sub { font-size: 9px; color: #A06030; }
+  .banner-warm .chevron { margin-left: auto; font-size: 10px; color: #C08050; }
+
+  /* === Option C: Accent gradient CTA === */
+  .banner-cta {
+    background: linear-gradient(135deg, rgba(56,122,245,0.12) 0%, rgba(35,87,199,0.06) 100%);
+    border: 1.5px solid rgba(56,122,245,0.35);
+    border-radius: 10px;
+    padding: 9px 10px;
+    display: flex; align-items: center; gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .banner-cta::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #387AF5, #2357C7);
+    border-radius: 10px 0 0 10px;
+  }
+  .banner-cta .b-icon { font-size: 15px; color: #387AF5; }
+  .banner-cta .b-text .b-title { font-size: 11px; font-weight: 600; color: #387AF5; }
+  .banner-cta .b-text .b-sub { font-size: 9px; color: #2357C7; opacity: 0.75; }
+  .banner-cta .cta-badge {
+    margin-left: auto;
+    background: linear-gradient(90deg, #387AF5, #2357C7);
+    color: white;
+    font-size: 8px;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .current-badge {
+    background: #FFE0E0;
+    color: #C04040;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-bottom: 4px;
+    display: inline-block;
+  }
+  .direction-label {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+  }
+</style>
+
+<div class="cards">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-header"><span class="logo">Prelude</span><span class="gear">⚙</span></div>
+          <div class="scroll-area">
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">★</div><span class="meta">First · Jun 3</span></div>
+              <div class="title">First time cooking together</div>
+              <div class="trash">🗑</div>
+            </div>
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">♥</div><span class="meta">Reason · Jun 7</span></div>
+              <div class="title">Because you always know when to be quiet</div>
+              <div class="trash">🗑</div>
+            </div>
+          </div>
+          <div class="bottom-chrome backdrop-chrome">
+            <div class="banner-current">
+              <span class="b-icon">✉️</span>
+              <div class="b-text">
+                <div class="b-title">Invite them</div>
+                <div class="b-sub">Share your Prelude when ready</div>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+            <div class="quick-add">
+              <div class="btn"><span class="btn-icon">✏️</span><span class="btn-label">Note</span></div>
+              <div class="btn"><span class="btn-icon">★</span><span class="btn-label">First</span></div>
+              <div class="btn"><span class="btn-icon">🎤</span><span class="btn-label">Voice</span></div>
+              <div class="btn"><span class="btn-icon">♥</span><span class="btn-label">Reason</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Frosted backdrop</h3>
+      <p>Add a blurred material behind the entire bottom chrome. Visually lifts the chrome off the scroll layer. Banner card keeps its current light-blue fill, but the blur creates clear separation between the scrolling content and the actions below.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-header"><span class="logo">Prelude</span><span class="gear">⚙</span></div>
+          <div class="scroll-area">
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">★</div><span class="meta">First · Jun 3</span></div>
+              <div class="title">First time cooking together</div>
+              <div class="trash">🗑</div>
+            </div>
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">♥</div><span class="meta">Reason · Jun 7</span></div>
+              <div class="title">Because you always know when to be quiet</div>
+              <div class="trash">🗑</div>
+            </div>
+          </div>
+          <div class="bottom-chrome">
+            <div class="banner-warm">
+              <span class="b-icon">✉️</span>
+              <div class="b-text">
+                <div class="b-title">Invite them</div>
+                <div class="b-sub">Share your Prelude when ready</div>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+            <div class="quick-add">
+              <div class="btn"><span class="btn-icon">✏️</span><span class="btn-label">Note</span></div>
+              <div class="btn"><span class="btn-icon">★</span><span class="btn-label">First</span></div>
+              <div class="btn"><span class="btn-icon">🎤</span><span class="btn-label">Voice</span></div>
+              <div class="btn"><span class="btn-icon">♥</span><span class="btn-label">Reason</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Warm cream / amber</h3>
+      <p>Swap the banner fill to a warm cream with a soft amber border. Hue is completely different from the cool blue scroll cards, so it immediately reads as a separate element. Works without any blur — pure colour contrast.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-header"><span class="logo">Prelude</span><span class="gear">⚙</span></div>
+          <div class="scroll-area">
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">★</div><span class="meta">First · Jun 3</span></div>
+              <div class="title">First time cooking together</div>
+              <div class="trash">🗑</div>
+            </div>
+            <div class="capture-card">
+              <div class="row"><div class="icon-bubble">♥</div><span class="meta">Reason · Jun 7</span></div>
+              <div class="title">Because you always know when to be quiet</div>
+              <div class="trash">🗑</div>
+            </div>
+          </div>
+          <div class="bottom-chrome">
+            <div class="banner-cta">
+              <span class="b-icon">✉️</span>
+              <div class="b-text">
+                <div class="b-title">Invite them</div>
+                <div class="b-sub">Share your Prelude when ready</div>
+              </div>
+              <div class="cta-badge">Send invite</div>
+            </div>
+            <div class="quick-add">
+              <div class="btn"><span class="btn-icon">✏️</span><span class="btn-label">Note</span></div>
+              <div class="btn"><span class="btn-icon">★</span><span class="btn-label">First</span></div>
+              <div class="btn"><span class="btn-icon">🎤</span><span class="btn-label">Voice</span></div>
+              <div class="btn"><span class="btn-icon">♥</span><span class="btn-label">Reason</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Accent CTA</h3>
+      <p>Lean into the accent blue — light blue-tinted fill, accent border, left accent stripe, and a small pill badge ("Send invite"). Makes the banner feel like a call-to-action in the app's primary colour, clearly distinct from neutral content cards.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top: 16px; text-align:center;">These can also be combined — e.g. A+B (blur backdrop + warm banner) or A+C (blur + accent CTA). Click to select then let me know.</p>

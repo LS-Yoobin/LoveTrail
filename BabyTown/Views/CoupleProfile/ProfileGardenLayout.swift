@@ -12,8 +12,48 @@ enum ProfileGardenLayout {
     /// Open canvas below the avatar band for photo stickers.
     static let stickerCanvasHeight: CGFloat = 760
 
-    /// Typical height of Our History + Important Dates + Pinned Memories preview.
-    static let estimatedCardsHeight: CGFloat = 700
+    /// Typical height of Our History + Important Dates preview (Pinned Memories lives on Home).
+    static let estimatedCardsHeight: CGFloat = 450
+
+    /// Default Watch Together TV center — mirrors the record player on the left side.
+    static func defaultWatchTogetherTVPosition(canvasSize: CGSize) -> NormalizedPoint {
+        let totalH = max(
+            canvasSize.height,
+            contentTopPadding
+                + estimatedCardsHeight
+                + avatarBandTopGap
+                + avatarBandHeight
+                + stickerCanvasHeight
+        )
+        let avatarBandTopY = contentTopPadding + estimatedCardsHeight + avatarBandTopGap
+        let tvHalfHeight: CGFloat = 56
+        let gapAboveAvatars: CGFloat = 32
+        let centerY = avatarBandTopY - gapAboveAvatars - tvHalfHeight
+        return NormalizedPoint(
+            x: 0.14,
+            y: min(profileSlotNormalizedY - 0.06, max(0.10, centerY / totalH))
+        )
+    }
+
+    /// Default prelude gift book center — centered between the TV (left) and vinyl player (right).
+    static func defaultPreludeBookPosition(canvasSize: CGSize) -> NormalizedPoint {
+        let totalH = max(
+            canvasSize.height,
+            contentTopPadding
+                + estimatedCardsHeight
+                + avatarBandTopGap
+                + avatarBandHeight
+                + stickerCanvasHeight
+        )
+        let avatarBandTopY = contentTopPadding + estimatedCardsHeight + avatarBandTopGap
+        let bookHalfHeight: CGFloat = 52
+        let gapAboveAvatars: CGFloat = 32
+        let centerY = avatarBandTopY - gapAboveAvatars - bookHalfHeight
+        return NormalizedPoint(
+            x: 0.50,
+            y: min(profileSlotNormalizedY - 0.06, max(0.10, centerY / totalH))
+        )
+    }
 
     /// Default vinyl player center — lower-right of the card stack, above the
     /// user / invite-partner avatar band (`profileSlotNormalizedY`).

@@ -1,0 +1,308 @@
+<h2>Both themes — pick your tones</h2>
+<p class="subtitle">Blue mode gets warm cream + amber. Pink mode gets soft lavender. Click a tone variant to select it.</p>
+
+<style>
+  .phone {
+    width: 210px;
+    background: #fff;
+    border-radius: 34px;
+    border: 2px solid #e0e0e0;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-notch {
+    width: 60px; height: 9px;
+    background: #d0d0d0;
+    border-radius: 0 0 7px 7px;
+    margin: 9px auto 0;
+  }
+  .phone-header {
+    padding: 7px 12px 5px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .phone-header .logo { font-size: 12px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-blue { color: #387AF5; }
+  .logo-pink { color: #F56087; }
+  .phone-header .gear { font-size: 14px; color: #8E8E93; }
+
+  .scroll-area {
+    padding: 9px 9px 0;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .card-blue {
+    background: #CCE0F5;
+    border-radius: 9px; padding: 9px 9px 5px;
+  }
+  .card-pink {
+    background: #F5D0D9;
+    border-radius: 9px; padding: 9px 9px 5px;
+  }
+  .card-row { display: flex; align-items: center; gap: 6px; }
+  .icon-bubble-blue {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #387AF5;
+  }
+  .icon-bubble-pink {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #F56087;
+  }
+  .meta-blue { font-size: 8px; color: #387AF5; font-weight: 600; text-transform: uppercase; }
+  .meta-pink { font-size: 8px; color: #F56087; font-weight: 600; text-transform: uppercase; }
+  .card-title { font-size: 10px; color: #444; margin-top: 3px; }
+  .card-trash { font-size: 8px; color: #e09090; text-align: right; margin-top: 3px; }
+
+  .bottom-chrome {
+    padding: 7px 9px 12px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+
+  /* Quick add */
+  .quick-blue {
+    background: linear-gradient(90deg, #387AF5, #2357C7);
+    border-radius: 999px; display: flex; padding: 7px 0;
+    box-shadow: 0 3px 10px rgba(56,122,245,0.32);
+  }
+  .quick-pink {
+    background: linear-gradient(90deg, #F56087, #D03060);
+    border-radius: 999px; display: flex; padding: 7px 0;
+    box-shadow: 0 3px 10px rgba(245,96,135,0.32);
+  }
+  .qbtn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .qbtn-icon { font-size: 12px; }
+  .qbtn-label { font-size: 7px; color: rgba(255,255,255,0.85); font-weight: 500; }
+
+  /* Banner variants */
+  .banner {
+    border-radius: 9px; padding: 8px 9px;
+    display: flex; align-items: center; gap: 7px;
+    border: 1.5px solid transparent;
+  }
+  .b-icon { font-size: 14px; }
+  .b-texts .b-title { font-size: 10px; font-weight: 600; }
+  .b-texts .b-sub { font-size: 8px; margin-top: 1px; }
+  .b-chev { margin-left: auto; font-size: 9px; }
+
+  /* Blue theme banner variants */
+  .blue-cream-light  { background: #FFFDF7; border-color: #F0D9A0; }
+  .blue-cream-mid    { background: #FFF8E8; border-color: #E8C878; }
+  .blue-cream-warm   { background: #FFF3D6; border-color: #E0B060; }
+
+  /* Pink theme banner variants */
+  .pink-lav-soft   { background: #F5F0FF; border-color: #C8B8E8; }
+  .pink-lav-mid    { background: #EEE6FF; border-color: #B8A0DE; }
+  .pink-lav-rich   { background: #E8DEFF; border-color: #A888D0; }
+
+  /* Section headers */
+  .theme-section {
+    margin: 20px 0 12px;
+    font-size: 13px; font-weight: 700; color: #555;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .variant-row {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+  }
+  .variant-col {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .variant-tag {
+    font-size: 11px; font-weight: 600; color: #666;
+  }
+</style>
+
+<div class="theme-section" style="text-align:center">🔵 Blue theme — warm cream variants</div>
+<div class="variant-row">
+
+  <div class="variant-col">
+    <div class="card" data-choice="blue-a" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-blue">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">★</div><span class="meta-blue">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">♥</div><span class="meta-blue">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner blue-cream-light">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#7A5800">Invite them</div>
+              <div class="b-sub" style="color:#A07020">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#B08030">›</span>
+          </div>
+          <div class="quick-blue">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Lighter cream</div>
+  </div>
+
+  <div class="variant-col">
+    <div class="card" data-choice="blue-b" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-blue">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">★</div><span class="meta-blue">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">♥</div><span class="meta-blue">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner blue-cream-mid">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#6A4800">Invite them</div>
+              <div class="b-sub" style="color:#906010">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#A07020">›</span>
+          </div>
+          <div class="quick-blue">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Medium cream (rec)</div>
+  </div>
+
+  <div class="variant-col">
+    <div class="card" data-choice="blue-c" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-blue">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">★</div><span class="meta-blue">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-blue"><div class="card-row"><div class="icon-bubble-blue">♥</div><span class="meta-blue">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner blue-cream-warm">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#5A3800">Invite them</div>
+              <div class="b-sub" style="color:#7A5000">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#906020">›</span>
+          </div>
+          <div class="quick-blue">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Richer cream</div>
+  </div>
+
+</div>
+
+<div class="theme-section" style="text-align:center; margin-top:32px">🩷 Pink theme — lavender variants</div>
+<div class="variant-row">
+
+  <div class="variant-col">
+    <div class="card" data-choice="pink-a" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-pink">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">★</div><span class="meta-pink">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">♥</div><span class="meta-pink">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner pink-lav-soft">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#5B4880">Invite them</div>
+              <div class="b-sub" style="color:#7A60A0">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#9070B0">›</span>
+          </div>
+          <div class="quick-pink">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Soft lavender</div>
+  </div>
+
+  <div class="variant-col">
+    <div class="card" data-choice="pink-b" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-pink">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">★</div><span class="meta-pink">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">♥</div><span class="meta-pink">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner pink-lav-mid">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#4A3870">Invite them</div>
+              <div class="b-sub" style="color:#6A5090">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#8060A8">›</span>
+          </div>
+          <div class="quick-pink">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Medium lavender (rec)</div>
+  </div>
+
+  <div class="variant-col">
+    <div class="card" data-choice="pink-c" onclick="toggleSelect(this)" style="padding:12px; border-radius:16px;">
+      <div class="phone" style="width:180px">
+        <div class="phone-notch"></div>
+        <div class="phone-header"><span class="logo logo-pink">Prelude</span><span class="gear">⚙</span></div>
+        <div class="scroll-area">
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">★</div><span class="meta-pink">First</span></div><div class="card-title">First time cooking together</div><div class="card-trash">🗑</div></div>
+          <div class="card-pink"><div class="card-row"><div class="icon-bubble-pink">♥</div><span class="meta-pink">Reason</span></div><div class="card-title">You always know when to be quiet</div><div class="card-trash">🗑</div></div>
+        </div>
+        <div class="bottom-chrome">
+          <div class="banner pink-lav-rich">
+            <span class="b-icon">✉️</span>
+            <div class="b-texts">
+              <div class="b-title" style="color:#3A2860">Invite them</div>
+              <div class="b-sub" style="color:#5A4080">Share your Prelude when ready</div>
+            </div>
+            <span class="b-chev" style="color:#7050A0">›</span>
+          </div>
+          <div class="quick-pink">
+            <div class="qbtn"><span class="qbtn-icon">✏️</span><span class="qbtn-label">Note</span></div>
+            <div class="qbtn"><span class="qbtn-icon">★</span><span class="qbtn-label">First</span></div>
+            <div class="qbtn"><span class="qbtn-icon">🎤</span><span class="qbtn-label">Voice</span></div>
+            <div class="qbtn"><span class="qbtn-icon">♥</span><span class="qbtn-label">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-tag">Rich lavender</div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="text-align:center; margin-top:20px">Pick one from each row (or just confirm the recommended middle ones) — then we'll lock in the spec.</p>

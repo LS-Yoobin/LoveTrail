@@ -44,21 +44,23 @@ struct BabyTownHeader: View {
                     }
                 }
                 
-                Button {
-                    onNotificationsTap?()
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "envelope.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                if let onNotificationsTap = onNotificationsTap {
+                    Button {
+                        onNotificationsTap()
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
 
-                        if showsUnreadBadge {
-                            Circle()
-                                .fill(BabyTownTheme.accent)
-                                .frame(width: 8, height: 8)
-                                .offset(x: -8, y: 10)
+                            if showsUnreadBadge {
+                                Circle()
+                                    .fill(BabyTownTheme.accent)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: -8, y: 10)
+                            }
                         }
                     }
                 }

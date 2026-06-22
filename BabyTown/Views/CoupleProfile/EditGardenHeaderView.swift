@@ -24,12 +24,12 @@ struct EditGardenHeaderView: View {
             Spacer()
 
             Button(action: onSave) {
-                Text("Save")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(BabyTownTheme.savePillFill, in: Capsule())
+                SavePillLabel(
+                    title: "Save",
+                    font: .subheadline.weight(.semibold),
+                    horizontalPadding: 16,
+                    verticalPadding: 8
+                )
             }
             .buttonStyle(.plain)
         }
