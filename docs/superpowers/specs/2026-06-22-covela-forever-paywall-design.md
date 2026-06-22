@@ -167,6 +167,33 @@ Settings row tap → CovelaForeverPaywallView
 Secret Garden upgrade button tap → CovelaForeverPaywallView
 ```
 
+## Cloud Storage
+
+**Free tier:** No cloud storage. Moments and letters are stored on-device only. No partner photo sync.
+
+**Covela Forever:** 5GB per couple (shared between both partners).
+
+At this limit, storage costs ~$1.38/year per couple in AWS S3 (< 5% of $29.99 annual revenue), making it highly cost-effective at any realistic user count.
+
+### Media types and target sizes
+
+| Type | Compressed target | Notes |
+|---|---|---|
+| Photo | ~1.5MB | Resize to 2048px max, 85% JPEG quality |
+| 3-second video | ~750KB | 720p H.265, enforced server-side |
+
+**Mixed usage estimate:** A couple adding 2 photos + 2 video clips per day consumes ~6-8MB/day compressed. At that pace, 5GB lasts over 2 years.
+
+### Compression rules
+
+- **Photos:** Resize to 2048px on the longest edge, compress to 85% JPEG on upload. Originals are not stored.
+- **Videos:** Cap enforced at exactly 3 seconds server-side (not just UI-enforced — reject longer clips). Transcode to 720p H.265. Target 500KB-1MB per clip.
+- **Letters:** Text only, negligible storage. No compression needed.
+
+### Why 5GB
+
+5GB per couple holds approximately 3,300 photos, 6,600 video clips, or ~4,500 items mixed. The 3-second video cap is the key lever — it keeps clips at photo-comparable sizes and prevents storage costs from spiking. If storage usage trends higher than projected at scale, the per-couple limit can be tightened without changing the product experience for the vast majority of users.
+
 ## Out of Scope
 
 - Partner invite flow changes (separate spec — partner connection becomes free but the invite UX itself is not redesigned here)
