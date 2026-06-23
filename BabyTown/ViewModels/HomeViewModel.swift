@@ -371,6 +371,19 @@ final class HomeViewModel: ObservableObject {
         moments.filter { $0.isPinned }.sorted { ($0.pinnedAt ?? Date.distantPast) > ($1.pinnedAt ?? Date.distantPast) }
     }
 
+    /// Returns IDs of moments hidden behind the Forever paywall.
+    /// The 50 most recently added moments are always visible; the rest are vaulted.
+    /// Returns an empty set when the user is subscribed.
+    func vaultedMomentIDs(isForeverUnlocked: Bool) -> Set<UUID> {
+        guard !isForeverUnlocked else { return [] }
+        let freeLimit = 50
+        guard moments.count > freeLimit else { return [] }
+        let sorted = moments.sorted {
+            ($0.dateAddedToApp ?? $0.dateTaken) > ($1.dateAddedToApp ?? $1.dateTaken)
+        }
+        return Set(sorted.dropFirst(freeLimit).map(\.id))
+    }
+
     var pinnedItems: [PinnedItem] {
         var items: [PinnedItem] = []
         

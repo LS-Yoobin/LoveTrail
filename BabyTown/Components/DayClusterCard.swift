@@ -14,28 +14,48 @@ struct DayClusterCard: View {
     var onShare: ((MemorySharePayload) -> Void)? = nil
     var isLeftAligned: Bool = true
     var index: Int = 0
+    var isVaulted: Bool = false
     
     @State private var showCaptionEditor = false
     @State private var showMenu = false
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            headerRow
-            promptSection
-            ZStack(alignment: isLeftAligned ? .bottomTrailing : .bottomLeading) {
-                collageView
-                catDecoration
+        ZStack {
+            VStack(alignment: .leading, spacing: 10) {
+                headerRow
+                promptSection
+                ZStack(alignment: isLeftAligned ? .bottomTrailing : .bottomLeading) {
+                    collageView
+                    catDecoration
+                }
+                captionView
             }
-            captionView
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                    .fill(BabyTownTheme.cardBackground.opacity(0.75))
+                    .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
+            )
+            .transition(.scale(scale: 0.96).combined(with: .opacity))
+
+            if isVaulted {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        VStack(spacing: 8) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white)
+                            Text("This memory is in your vault")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                        }
+                    )
+                    .allowsHitTesting(false)
+            }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
-                .fill(BabyTownTheme.cardBackground.opacity(0.75))
-                .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
-        )
-        .transition(.scale(scale: 0.96).combined(with: .opacity))
     }
     
     private var catDecoration: some View {
@@ -199,6 +219,7 @@ struct DayClusterCard: View {
         let hasCaption = section.moments.first?.caption != nil && !(section.moments.first?.caption?.isEmpty ?? true)
         
         Button {
+            guard !isVaulted else { return }
             showCaptionEditor = true
         } label: {
             if hasCaption {
@@ -318,6 +339,7 @@ struct DayClusterCard: View {
 
     private func photoButton(_ moment: Moment) -> some View {
         Button {
+            guard !isVaulted else { return }
             if !moment.isLocked {
                 onOpenPhoto(moment, section.moments)
             }
