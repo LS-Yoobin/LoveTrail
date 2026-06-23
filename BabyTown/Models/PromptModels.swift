@@ -163,7 +163,8 @@ struct PromptMemory: Identifiable, Codable {
                 unlockTime: photo.unlockTime,
                 latitude: photo.latitude ?? latitude,
                 longitude: photo.longitude ?? longitude,
-                isPlaceNameUserSet: isPlaceNameUserSet
+                isPlaceNameUserSet: isPlaceNameUserSet,
+                dateAddedToApp: Date()
             )
         }
         return DaySection(date: date, placeName: placeName, moments: moments)

@@ -159,7 +159,8 @@ class ScanViewModel: ObservableObject {
                     isLocked: false,
                     unlockTime: nil,
                     latitude: asset.location?.coordinate.latitude,
-                    longitude: asset.location?.coordinate.longitude
+                    longitude: asset.location?.coordinate.longitude,
+                    dateAddedToApp: Date()
                 )
                 moments.append(moment)
             }

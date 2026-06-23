@@ -275,7 +275,8 @@ final class SelectPhotosViewModel: ObservableObject {
             moments.append(Moment(
                 id: UUID(),
                 dateTaken: Date(),
-                thumbnail: thumbnail
+                thumbnail: thumbnail,
+                dateAddedToApp: Date()
             ))
         }
         if prepareThumbnailsForPictureFrame {
@@ -302,7 +303,8 @@ final class SelectPhotosViewModel: ObservableObject {
             longitude: moment.longitude,
             isAddedFromOnThisDay: moment.isAddedFromOnThisDay,
             isPlaceNameUserSet: moment.isPlaceNameUserSet,
-            country: moment.country
+            country: moment.country,
+            dateAddedToApp: moment.dateAddedToApp
         )
     }
 

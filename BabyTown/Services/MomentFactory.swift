@@ -52,7 +52,8 @@ final class MomentFactory {
                 placeName: placeName,
                 latitude: latitude,
                 longitude: longitude,
-                country: country
+                country: country,
+                dateAddedToApp: Date()
             ))
         }
 

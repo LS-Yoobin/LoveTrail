@@ -151,7 +151,8 @@ final class MemoryMomentPhotoGalleryViewModel: ObservableObject {
                 latitude: template.latitude,
                 longitude: template.longitude,
                 isPlaceNameUserSet: template.isPlaceNameUserSet,
-                country: template.country
+                country: template.country,
+                dateAddedToApp: Date()
             )
             orphanMoments.append(moment)
             selectedOrphanMomentIds.insert(moment.id)
@@ -213,7 +214,8 @@ final class MemoryMomentPhotoGalleryViewModel: ObservableObject {
                     latitude: asset.location?.coordinate.latitude ?? template.latitude,
                     longitude: asset.location?.coordinate.longitude ?? template.longitude,
                     isPlaceNameUserSet: template.isPlaceNameUserSet,
-                    country: template.country
+                    country: template.country,
+                    dateAddedToApp: Date()
                 )
             )
         }

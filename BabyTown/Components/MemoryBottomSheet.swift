@@ -136,7 +136,8 @@ struct MemoryBottomSheet: View {
         id: UUID(),
         dateTaken: Date(),
         thumbnail: UIImage(systemName: "photo")!,
-        placeName: "Santa Cruz Beach"
+        placeName: "Santa Cruz Beach",
+        dateAddedToApp: Date()
     )
     
     let sampleSection = DaySection(

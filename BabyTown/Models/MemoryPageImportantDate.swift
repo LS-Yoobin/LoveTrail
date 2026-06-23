@@ -27,7 +27,8 @@ enum MemoryPageMomentFactory {
         Moment(
             id: stableMomentId(for: itemId),
             dateTaken: importantDate.date,
-            thumbnail: image
+            thumbnail: image,
+            dateAddedToApp: Date()
         )
     }
 

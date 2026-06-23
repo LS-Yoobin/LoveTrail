@@ -251,7 +251,8 @@ final class HomeViewModel: ObservableObject {
                     latitude: source.latitude,
                     longitude: source.longitude,
                     isAddedFromOnThisDay: source.isAddedFromOnThisDay,
-                    isPlaceNameUserSet: source.isPlaceNameUserSet
+                    isPlaceNameUserSet: source.isPlaceNameUserSet,
+                    dateAddedToApp: Date()
                 )
             )
             changed = true
@@ -348,7 +349,8 @@ final class HomeViewModel: ObservableObject {
             isPinned: true,
             pinnedAt: pinnedAt,
             latitude: sharedFields.latitude,
-            longitude: sharedFields.longitude
+            longitude: sharedFields.longitude,
+            dateAddedToApp: Date()
         )
         let unpinned = Moment(
             id: UUID(),
@@ -359,7 +361,8 @@ final class HomeViewModel: ObservableObject {
             isPinned: false,
             pinnedAt: nil,
             latitude: sharedFields.latitude,
-            longitude: sharedFields.longitude
+            longitude: sharedFields.longitude,
+            dateAddedToApp: Date()
         )
         addMoments([pinned, unpinned])
     }
@@ -778,7 +781,8 @@ final class HomeViewModel: ObservableObject {
                 isPinned: false,
                 pinnedAt: nil,
                 isLocked: false,
-                unlockTime: nil
+                unlockTime: nil,
+                dateAddedToApp: Date()
             )
         }
         
@@ -924,7 +928,8 @@ final class HomeViewModel: ObservableObject {
                     unlockTime: unlockTime,
                     latitude: entry.latitude,
                     longitude: entry.longitude,
-                    videoFileName: videoFileName
+                    videoFileName: videoFileName,
+                    dateAddedToApp: Date()
                 )
                 newMoments.append(moment)
             }
@@ -1172,7 +1177,8 @@ final class HomeViewModel: ObservableObject {
             isPinned: memory.isPinned,
             pinnedAt: memory.pinnedAt,
             latitude: memory.latitude,
-            longitude: memory.longitude
+            longitude: memory.longitude,
+            dateAddedToApp: Date()
         )
     }
 

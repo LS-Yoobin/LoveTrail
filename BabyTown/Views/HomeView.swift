@@ -473,7 +473,8 @@ struct HomeView: View {
                                 thumbnail: moment.thumbnail, placeName: moment.placeName, caption: moment.caption,
                                 voiceNotePath: moment.voiceNotePath, promptText: nil, isPinned: false,
                                 pinnedAt: nil, isLocked: false, unlockTime: nil,
-                                latitude: moment.latitude, longitude: moment.longitude, isAddedFromOnThisDay: true
+                                latitude: moment.latitude, longitude: moment.longitude, isAddedFromOnThisDay: true,
+                                dateAddedToApp: Date()
                             )
                             viewModel.addMoments([newMoment])
                         },
