@@ -35,7 +35,7 @@ struct HomeView: View {
     @State private var showHomeSpecialDateEditor = false
     @State private var editingHomeSpecialDate: SpecialDate?
     @State private var editingHomeSpecialDateImage: UIImage?
-    @State private var showPartnerPaywall = false
+    @State private var showInviteFlow = false
     @ObservedObject private var store = StoreManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
     @State private var memorySearchText = ""
@@ -88,7 +88,7 @@ struct HomeView: View {
         if dpm.isPartnerAccount() {
             return dpm.loadInviterName() ?? "Justin"
         }
-        return store.isForeverUnlocked ? "Send invite" : "Invite partner"
+        return "Invite partner"
     }
 
 
@@ -545,12 +545,8 @@ struct HomeView: View {
                     onDelete: editingHomeSpecialDate == nil ? nil : { deleteHomeSpecialDate($0) }
                 )
             }
-            .fullScreenCover(isPresented: $showPartnerPaywall) {
-                InvitePartnerPaywallView(
-                    store: store,
-                    onUnlock: { showPartnerPaywall = false },
-                    onDismiss: { showPartnerPaywall = false }
-                )
+            .sheet(isPresented: $showInviteFlow) {
+                InvitePartnerFlowView(onDone: { showInviteFlow = false })
             }
             .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshUnreadNotifications) {
                 NotificationCenterView(onNotificationRead: refreshUnreadNotifications)
@@ -572,7 +568,7 @@ struct HomeView: View {
                     userName: homeDisplayName,
                     partnerSlotTitle: homePartnerSlotTitle,
                     onBack: { showPinnedMemoriesFeed = false },
-                    onPartnerTap: { showPartnerPaywall = true },
+                    onPartnerTap: { showInviteFlow = true },
                     onShare: shareMemory,
                     onEditSpecialDate: { beginEditHomeSpecialDate($0) },
                     onDeleteSpecialDate: { deleteHomeSpecialDate($0) },

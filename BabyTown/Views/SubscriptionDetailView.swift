@@ -8,7 +8,6 @@ struct SubscriptionDetailView: View {
     @ObservedObject var store: StoreManager
 
     @State private var showManageSubscriptions = false
-    @State private var showPaywall = false
     @State private var showInvite = false
 
     private var accent: Color { BabyTownTheme.accentDeep }
@@ -27,38 +26,19 @@ struct SubscriptionDetailView: View {
             }
 
             Section {
-                PartnerPerksList(accent: accent)
-                    .padding(.vertical, 4)
-            } header: {
-                Text("What's included")
-            }
-
-            Section {
-                if store.isForeverUnlocked {
-                    Button {
-                        showInvite = true
-                    } label: {
-                        Label("Invite your partner", systemImage: "heart.fill")
-                            .foregroundStyle(accent)
+                Button {
+                    showInvite = true
+                } label: {
+                    Label("Invite your partner", systemImage: "heart.fill")
+                        .foregroundStyle(accent)
+                }
+                if store.activePlan?.isSubscription == true {
+                    Button("Manage Subscription") {
+                        showManageSubscriptions = true
                     }
-                    if store.activePlan?.isSubscription == true {
-                        Button("Manage Subscription") {
-                            showManageSubscriptions = true
-                        }
-                    }
-                    Button("Restore Purchases") {
-                        Task { await store.restore() }
-                    }
-                } else {
-                    Button {
-                        showPaywall = true
-                    } label: {
-                        Label("Invite your partner", systemImage: "heart.fill")
-                            .foregroundStyle(accent)
-                    }
-                    Button("Restore Purchases") {
-                        Task { await store.restore() }
-                    }
+                }
+                Button("Restore Purchases") {
+                    Task { await store.restore() }
                 }
             } footer: {
                 if store.activePlan?.isSubscription == true {
@@ -71,13 +51,6 @@ struct SubscriptionDetailView: View {
         .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-        .fullScreenCover(isPresented: $showPaywall) {
-            InvitePartnerPaywallView(
-                store: store,
-                onUnlock: { showPaywall = false },
-                onDismiss: { showPaywall = false }
-            )
-        }
         .fullScreenCover(isPresented: $showInvite) {
             InvitePartnerFlowView(onDone: { showInvite = false })
         }

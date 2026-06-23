@@ -11,7 +11,6 @@ struct CoupleProfileView: View {
 
     @ObservedObject private var store = StoreManager.shared
     @StateObject private var shareCoordinator = MemoryShareCoordinator()
-    @State private var showPartnerPaywall = false
     @State private var showInviteFlow = false
 
     @State private var profile = CoupleProfile()
@@ -102,7 +101,7 @@ struct CoupleProfileView: View {
         if isPartnerAccount {
             return dpm.loadInviterName() ?? "Justin"
         }
-        return store.isForeverUnlocked ? "Send invite" : "Invite partner"
+        return "Invite partner"
     }
 
     private var isPartnerAccount: Bool {
@@ -341,16 +340,6 @@ struct CoupleProfileView: View {
         .sheet(isPresented: $showWatchTogetherSheet) {
             WatchTogetherEntryView()
         }
-        .fullScreenCover(isPresented: $showWatchTogetherPaywall) {
-            InvitePartnerPaywallView(
-                store: store,
-                onUnlock: {
-                    showWatchTogetherPaywall = false
-                    showWatchTogetherSheet = true
-                },
-                onDismiss: { showWatchTogetherPaywall = false }
-            )
-        }
         .sheet(isPresented: $showEditProfile) {
             ProfileEditorSheet(initialName: displayName, initialImage: userAvatar) { image, name in
                 if isPartnerAccount {
@@ -463,16 +452,6 @@ struct CoupleProfileView: View {
                 officialPickerItem = nil
             }
         }
-        .fullScreenCover(isPresented: $showPartnerPaywall) {
-            InvitePartnerPaywallView(
-                store: store,
-                onUnlock: {
-                    showPartnerPaywall = false
-                    showInviteFlow = true
-                },
-                onDismiss: { showPartnerPaywall = false }
-            )
-        }
         .sheet(isPresented: $showInviteFlow) {
             InvitePartnerFlowView(onDone: { showInviteFlow = false })
         }
@@ -538,7 +517,7 @@ struct CoupleProfileView: View {
                 }
                 .buttonStyle(.plain)
             } else if !isPartnerAccount {
-                Button(action: { showPartnerPaywall = true }) {
+                Button(action: { showInviteFlow = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "person.badge.plus")
                             .font(.system(size: 14, weight: .semibold))
@@ -798,11 +777,7 @@ struct CoupleProfileView: View {
 
     private func handlePartnerSlotTap() {
         if isPartnerAccount { return }
-        if store.isForeverUnlocked {
-            showInviteFlow = true
-        } else {
-            showPartnerPaywall = true
-        }
+        showInviteFlow = true
     }
 
     private func handleWatchTogetherTap() {

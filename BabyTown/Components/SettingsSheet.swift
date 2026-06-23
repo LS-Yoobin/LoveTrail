@@ -15,7 +15,6 @@ struct SettingsSheet: View {
     
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
-    @State private var showPaywall = false
     @State private var showPlaylistEditor = false
     
     var body: some View {
@@ -24,8 +23,8 @@ struct SettingsSheet: View {
                 BackgroundMusicSettingsSection(onManagePlaylist: { showPlaylistEditor = true })
 
                 Section {
-                    Button {
-                        showPaywall = true
+                    NavigationLink {
+                        SubscriptionDetailView(store: store)
                     } label: {
                         HStack {
                             Image(systemName: "heart.circle")
@@ -196,13 +195,6 @@ struct SettingsSheet: View {
             }
             .fullScreenCover(isPresented: $showAppIconViewer) {
                 AppIconViewerOverlay()
-            }
-            .fullScreenCover(isPresented: $showPaywall) {
-                InvitePartnerPaywallView(
-                    store: store,
-                    onUnlock: { showPaywall = false },
-                    onDismiss: { showPaywall = false }
-                )
             }
             .sheet(isPresented: $showPlaylistEditor) {
                 CouplePlaylistEditorSheet(dismissOnSelect: false)

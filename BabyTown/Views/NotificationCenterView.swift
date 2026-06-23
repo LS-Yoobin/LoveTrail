@@ -9,8 +9,6 @@ struct NotificationCenterView: View {
     @State private var userLetters: [UserLetter] = []
     @State private var openedWelcomeCard = false
     @State private var showComposeLetter = false
-    @State private var showPartnerPaywall = false
-    @State private var isForeverUnlocked = DataPersistenceManager.shared.isForeverUnlocked()
 
     private var hasContent: Bool {
         !notifications.isEmpty || !userLetters.isEmpty
@@ -66,33 +64,15 @@ struct NotificationCenterView: View {
             .fullScreenCover(isPresented: $showComposeLetter, onDismiss: reloadContent) {
                 ComposeLetterView()
             }
-            .fullScreenCover(isPresented: $showPartnerPaywall) {
-                InvitePartnerPaywallView(
-                    store: StoreManager.shared,
-                    onUnlock: {
-                        isForeverUnlocked = true
-                        showPartnerPaywall = false
-                        showComposeLetter = true
-                    },
-                    onDismiss: {
-                        showPartnerPaywall = false
-                    }
-                )
-            }
             .onAppear {
                 reloadContent()
-                isForeverUnlocked = DataPersistenceManager.shared.isForeverUnlocked()
             }
         }
     }
 
     private var composeLetterButton: some View {
         Button {
-            if isForeverUnlocked {
-                showComposeLetter = true
-            } else {
-                showPartnerPaywall = true
-            }
+            showComposeLetter = true
         } label: {
             Image(systemName: "envelope.fill")
                 .font(.title2)
