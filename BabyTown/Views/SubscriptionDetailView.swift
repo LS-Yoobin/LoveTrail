@@ -34,7 +34,7 @@ struct SubscriptionDetailView: View {
             }
 
             Section {
-                if store.isPartnerUnlocked {
+                if store.isForeverUnlocked {
                     Button {
                         showInvite = true
                     } label: {
@@ -84,7 +84,7 @@ struct SubscriptionDetailView: View {
     }
 
     private var statusText: String {
-        guard store.isPartnerUnlocked else { return "Not subscribed" }
+        guard store.isForeverUnlocked else { return "Not subscribed" }
         return store.activePlan?.displayName ?? "Active"
     }
 }

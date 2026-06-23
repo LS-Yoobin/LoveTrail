@@ -593,11 +593,11 @@ final class DataPersistenceManager {
     /// Whether the paid "Invite Partner to Town" tier has been unlocked.
     /// NOTE: currently set by a stubbed purchase; replace with a real StoreKit
     /// entitlement check when billing is wired up.
-    func setPartnerUnlocked(_ unlocked: Bool) {
+    func setForeverUnlocked(_ unlocked: Bool) {
         userDefaults.set(unlocked, forKey: isPartnerUnlockedKey)
     }
 
-    func isPartnerUnlocked() -> Bool {
+    func isForeverUnlocked() -> Bool {
         return userDefaults.bool(forKey: isPartnerUnlockedKey)
     }
 

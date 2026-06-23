@@ -102,7 +102,7 @@ struct CoupleProfileView: View {
         if isPartnerAccount {
             return dpm.loadInviterName() ?? "Justin"
         }
-        return store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+        return store.isForeverUnlocked ? "Send invite" : "Invite partner"
     }
 
     private var isPartnerAccount: Bool {
@@ -798,7 +798,7 @@ struct CoupleProfileView: View {
 
     private func handlePartnerSlotTap() {
         if isPartnerAccount { return }
-        if store.isPartnerUnlocked {
+        if store.isForeverUnlocked {
             showInviteFlow = true
         } else {
             showPartnerPaywall = true
@@ -806,7 +806,7 @@ struct CoupleProfileView: View {
     }
 
     private func handleWatchTogetherTap() {
-        if isPartnerAccount || store.isPartnerUnlocked {
+        if isPartnerAccount || store.isForeverUnlocked {
             showWatchTogetherSheet = true
         } else {
             showWatchTogetherPaywall = true

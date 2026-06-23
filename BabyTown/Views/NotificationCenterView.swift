@@ -10,7 +10,7 @@ struct NotificationCenterView: View {
     @State private var openedWelcomeCard = false
     @State private var showComposeLetter = false
     @State private var showPartnerPaywall = false
-    @State private var isPartnerUnlocked = DataPersistenceManager.shared.isPartnerUnlocked()
+    @State private var isForeverUnlocked = DataPersistenceManager.shared.isForeverUnlocked()
 
     private var hasContent: Bool {
         !notifications.isEmpty || !userLetters.isEmpty
@@ -70,7 +70,7 @@ struct NotificationCenterView: View {
                 InvitePartnerPaywallView(
                     store: StoreManager.shared,
                     onUnlock: {
-                        isPartnerUnlocked = true
+                        isForeverUnlocked = true
                         showPartnerPaywall = false
                         showComposeLetter = true
                     },
@@ -81,14 +81,14 @@ struct NotificationCenterView: View {
             }
             .onAppear {
                 reloadContent()
-                isPartnerUnlocked = DataPersistenceManager.shared.isPartnerUnlocked()
+                isForeverUnlocked = DataPersistenceManager.shared.isForeverUnlocked()
             }
         }
     }
 
     private var composeLetterButton: some View {
         Button {
-            if isPartnerUnlocked {
+            if isForeverUnlocked {
                 showComposeLetter = true
             } else {
                 showPartnerPaywall = true

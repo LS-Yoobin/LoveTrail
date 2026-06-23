@@ -2,7 +2,7 @@ import Combine
 import StoreKit
 
 /// The paid "Invite Partner to Town" plans.
-enum PartnerPlan: String, CaseIterable {
+enum ForeverPlan: String, CaseIterable {
     case yearly = "LS.BabyTown.partner.yearly"
     case monthly = "LS.BabyTown.partner.monthly"
     case lifetime = "LS.BabyTown.partner.lifetime"
@@ -48,8 +48,8 @@ final class StoreManager: ObservableObject {
     static let shared = StoreManager()
 
     @Published private(set) var products: [Product] = []
-    @Published private(set) var isPartnerUnlocked: Bool
-    @Published private(set) var activePlan: PartnerPlan?
+    @Published private(set) var isForeverUnlocked: Bool
+    @Published private(set) var activePlan: ForeverPlan?
     @Published var isPurchasing = false
     @Published var purchaseError: String?
 
@@ -59,7 +59,7 @@ final class StoreManager: ObservableObject {
 
     private init() {
         // Seed from the cached flag so the UI is correct before StoreKit answers.
-        self.isPartnerUnlocked = DataPersistenceManager.shared.isPartnerUnlocked()
+        self.isForeverUnlocked = DataPersistenceManager.shared.isForeverUnlocked()
     }
 
     /// Call once at app launch.
@@ -75,21 +75,21 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Products
 
-    func product(for plan: PartnerPlan) -> Product? {
+    func product(for plan: ForeverPlan) -> Product? {
         products.first { $0.id == plan.rawValue }
     }
 
     /// Localized price for a plan, falling back to hardcoded text if products
     /// haven't loaded yet.
-    func displayPrice(for plan: PartnerPlan) -> String {
+    func displayPrice(for plan: ForeverPlan) -> String {
         product(for: plan)?.displayPrice ?? plan.fallbackPrice
     }
 
     func loadProducts() async {
         do {
-            let loaded = try await Product.products(for: PartnerPlan.allCases.map(\.rawValue))
+            let loaded = try await Product.products(for: ForeverPlan.allCases.map(\.rawValue))
             self.products = loaded.sorted { lhs, rhs in
-                (PartnerPlan(rawValue: lhs.id)?.order ?? 99) < (PartnerPlan(rawValue: rhs.id)?.order ?? 99)
+                (ForeverPlan(rawValue: lhs.id)?.order ?? 99) < (ForeverPlan(rawValue: rhs.id)?.order ?? 99)
             }
         } catch {
             self.purchaseError = "Couldn't load plans. Please check your connection and try again."
@@ -100,7 +100,7 @@ final class StoreManager: ObservableObject {
 
     /// Returns true if the purchase completed and the partner tier is unlocked.
     @discardableResult
-    func purchase(_ plan: PartnerPlan) async -> Bool {
+    func purchase(_ plan: ForeverPlan) async -> Bool {
         guard let product = product(for: plan) else {
             purchaseError = "That plan isn't available right now."
             return false
@@ -116,7 +116,7 @@ final class StoreManager: ObservableObject {
                 let transaction = try checkVerified(verification)
                 await transaction.finish()
                 await refreshEntitlements()
-                return isPartnerUnlocked
+                return isForeverUnlocked
             case .userCancelled:
                 return false
             case .pending:
@@ -140,12 +140,12 @@ final class StoreManager: ObservableObject {
 
     func refreshEntitlements() async {
         var unlocked = false
-        var plan: PartnerPlan?
+        var plan: ForeverPlan?
 
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? checkVerified(result) else { continue }
             guard transaction.revocationDate == nil else { continue }
-            guard let matched = PartnerPlan(rawValue: transaction.productID) else { continue }
+            guard let matched = ForeverPlan(rawValue: transaction.productID) else { continue }
             unlocked = true
             // Lifetime takes precedence as the "best" active plan.
             if matched == .lifetime || plan == nil {
@@ -153,18 +153,18 @@ final class StoreManager: ObservableObject {
             }
         }
 
-        self.isPartnerUnlocked = unlocked
+        self.isForeverUnlocked = unlocked
         self.activePlan = plan
-        DataPersistenceManager.shared.setPartnerUnlocked(unlocked)
+        DataPersistenceManager.shared.setForeverUnlocked(unlocked)
     }
 
     /// Clears the local unlock state so the banner/paywall return after Reset App
     /// for continued testing. Does not affect real StoreKit transactions — clear
     /// those in Xcode's Debug ▸ StoreKit ▸ Manage Transactions if needed.
     func resetForTesting() {
-        isPartnerUnlocked = false
+        isForeverUnlocked = false
         activePlan = nil
-        DataPersistenceManager.shared.setPartnerUnlocked(false)
+        DataPersistenceManager.shared.setForeverUnlocked(false)
     }
 
     // MARK: - Helpers

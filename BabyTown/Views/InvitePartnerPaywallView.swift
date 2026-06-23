@@ -113,7 +113,7 @@ struct InvitePartnerPaywallView: View {
 
     // MARK: - Purchase actions
 
-    private func buy(_ plan: PartnerPlan) {
+    private func buy(_ plan: ForeverPlan) {
         Task {
             let unlocked = await store.purchase(plan)
             if unlocked {
@@ -135,7 +135,7 @@ struct InvitePartnerPaywallView: View {
     private func restore() {
         Task {
             await store.restore()
-            if store.isPartnerUnlocked {
+            if store.isForeverUnlocked {
                 onUnlock()
             }
         }
@@ -301,7 +301,7 @@ private struct AllPlansSheet: View {
 
     let accent: Color
     @ObservedObject var store: StoreManager
-    var onPurchase: (PartnerPlan) -> Void
+    var onPurchase: (ForeverPlan) -> Void
 
     private let planCardHeight: CGFloat = 96
 
@@ -355,7 +355,7 @@ private struct AllPlansSheet: View {
     }
 
     private func planCard(
-        plan: PartnerPlan,
+        plan: ForeverPlan,
         title: String,
         primaryDetail: String,
         secondaryDetail: String,

@@ -88,7 +88,7 @@ struct HomeView: View {
         if dpm.isPartnerAccount() {
             return dpm.loadInviterName() ?? "Justin"
         }
-        return store.isPartnerUnlocked ? "Send invite" : "Invite partner"
+        return store.isForeverUnlocked ? "Send invite" : "Invite partner"
     }
 
 
@@ -200,7 +200,7 @@ struct HomeView: View {
                                         avatar: coupleSpaceAvatar,
                                         gardenThumbnail: coupleSpaceGardenThumbnail,
                                         bloomCount: coupleSpaceBloomCount,
-                                        isReadyToInvite: store.isPartnerUnlocked,
+                                        isReadyToInvite: store.isForeverUnlocked,
                                         onTap: {
                                             dismissMemorySearchKeyboard()
                                             withAnimation(.easeInOut(duration: 0.3)) {

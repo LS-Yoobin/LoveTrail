@@ -33,7 +33,7 @@ struct SettingsSheet: View {
                             Text("Subscription")
                                 .font(.system(size: 16))
                             Spacer()
-                            Text(store.isPartnerUnlocked ? (store.activePlan?.displayName ?? "Active") : "Free")
+                            Text(store.isForeverUnlocked ? (store.activePlan?.displayName ?? "Active") : "Free")
                                 .font(.system(size: 14))
                                 .foregroundStyle(.secondary)
                         }
