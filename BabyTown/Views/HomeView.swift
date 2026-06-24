@@ -74,9 +74,15 @@ struct HomeView: View {
     @State private var visibleRowCount = HomeView.timelinePageSize
     @State private var selectedTimelineYear = 0
     @State private var isYearFilterPinned = false
+    @State private var showVaultedPrompt = false
+    @State private var showForeverPaywall = false
 
     private let mapOpenThreshold: CGFloat = 110
     private static let timelinePageSize = 15
+
+    private var vaultedIDs: Set<UUID> {
+        viewModel.vaultedMomentIDs(isForeverUnlocked: store.isForeverUnlocked)
+    }
 
     private var homeDisplayName: String {
         let profile = DataPersistenceManager.shared.loadCoupleProfile()
@@ -579,6 +585,22 @@ struct HomeView: View {
                 TableOfContentsView(viewModel: viewModel)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showVaultedPrompt) {
+                VaultedMomentPrompt(
+                    isPresented: $showVaultedPrompt,
+                    onUnlockForever: { showForeverPaywall = true }
+                )
+                .presentationDetents([.height(340)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(BabyTownTheme.cardBackground)
+            }
+            .fullScreenCover(isPresented: $showForeverPaywall) {
+                CovelaForeverPaywallView(
+                    store: store,
+                    onUnlock: { showForeverPaywall = false },
+                    onDismiss: { showForeverPaywall = false }
+                )
             }
             .memorySharePresentation(coordinator: shareCoordinator)
             .onAppear { refreshCoupleSpaceCardMetadata() }
@@ -1530,14 +1552,19 @@ struct HomeView: View {
                             VStack(spacing: 16) {
                                 DayClusterCard(
                                     section: section,
+                                    isVaulted: section.moments.contains { vaultedIDs.contains($0.id) },
                                     onOpenPhoto: { moment, allMoments in
-                                        clearMemoryPageViewerContext()
-                                        viewerMoments = allMoments
-                                        if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                            viewerInitialIndex = idx
-                                        }
-                                        withAnimation(.easeInOut(duration: 0.25)) {
-                                            showingMomentViewer = true
+                                        if vaultedIDs.contains(moment.id) {
+                                            showVaultedPrompt = true
+                                        } else {
+                                            clearMemoryPageViewerContext()
+                                            viewerMoments = allMoments
+                                            if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                                viewerInitialIndex = idx
+                                            }
+                                            withAnimation(.easeInOut(duration: 0.25)) {
+                                                showingMomentViewer = true
+                                            }
                                         }
                                     },
                                     onEditCaption: { momentId, caption, voiceNotePath in
