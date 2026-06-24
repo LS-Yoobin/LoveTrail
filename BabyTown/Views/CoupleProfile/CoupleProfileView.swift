@@ -38,6 +38,8 @@ struct CoupleProfileView: View {
 
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
     @State private var activeSubpage: CoupleProfileSubpage?
+    @State private var showForeverPaywall = false
+    @State private var showDateCapSheet = false
 
     @State private var showingPinnedViewer: PinnedMemoryType?
     @State private var firstMetPickerItem: PhotosPickerItem?
@@ -467,6 +469,62 @@ struct CoupleProfileView: View {
             ) { note, mood in
                 saveProfileNote(note, mood: mood)
             }
+        }
+        .sheet(isPresented: $showDateCapSheet) {
+            VStack(spacing: 20) {
+                Capsule()
+                    .fill(Color.black.opacity(0.15))
+                    .frame(width: 36, height: 4)
+                    .padding(.top, 12)
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(.system(size: 32))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+                Text("You have reached your 10 important date limit")
+                    .font(.system(size: 16, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                Text("Upgrade to Covela Forever to save unlimited dates")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.black.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                Button {
+                    showDateCapSheet = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showForeverPaywall = true
+                    }
+                } label: {
+                    Text("Unlock Forever")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(Capsule().fill(LinearGradient(
+                            colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep],
+                            startPoint: .leading, endPoint: .trailing
+                        )))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                Button { showDateCapSheet = false } label: {
+                    Text("Maybe later")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.black.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 16)
+            }
+            .frame(maxWidth: .infinity)
+            .presentationDetents([.height(360)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(BabyTownTheme.cardBackground)
+        }
+        .fullScreenCover(isPresented: $showForeverPaywall) {
+            CovelaForeverPaywallView(
+                store: store,
+                onUnlock: { showForeverPaywall = false },
+                onDismiss: { showForeverPaywall = false }
+            )
         }
     }
 
@@ -1030,6 +1088,11 @@ struct CoupleProfileView: View {
     }
 
     private func saveSpecial(_ date: SpecialDate, image: UIImage?) {
+        let isNew = profile.specialDates.firstIndex(where: { $0.id == date.id }) == nil
+        if isNew && !store.isForeverUnlocked && profile.specialDates.count >= 10 {
+            showDateCapSheet = true
+            return
+        }
         if let idx = profile.specialDates.firstIndex(where: { $0.id == date.id }) {
             profile.specialDates[idx] = date
         } else {

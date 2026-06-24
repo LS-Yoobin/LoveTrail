@@ -76,6 +76,7 @@ struct HomeView: View {
     @State private var isYearFilterPinned = false
     @State private var showVaultedPrompt = false
     @State private var showForeverPaywall = false
+    @State private var showPinCapSheet = false
 
     private let mapOpenThreshold: CGFloat = 110
     private static let timelinePageSize = 15
@@ -595,6 +596,55 @@ struct HomeView: View {
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(BabyTownTheme.cardBackground)
             }
+            .sheet(isPresented: $showPinCapSheet) {
+                VStack(spacing: 20) {
+                    Capsule()
+                        .fill(Color.black.opacity(0.15))
+                        .frame(width: 36, height: 4)
+                        .padding(.top, 12)
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(BabyTownTheme.accentDeep)
+                    Text("You have reached your 10 pinned moment limit")
+                        .font(.system(size: 16, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                    Text("Upgrade to Covela Forever to pin unlimited moments")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                    Button {
+                        showPinCapSheet = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showForeverPaywall = true
+                        }
+                    } label: {
+                        Text("Unlock Forever")
+                            .font(.system(size: 16, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(Capsule().fill(LinearGradient(
+                                colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep],
+                                startPoint: .leading, endPoint: .trailing
+                            )))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 24)
+                    Button { showPinCapSheet = false } label: {
+                        Text("Maybe later")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.black.opacity(0.45))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 16)
+                }
+                .frame(maxWidth: .infinity)
+                .presentationDetents([.height(360)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(BabyTownTheme.cardBackground)
+            }
             .fullScreenCover(isPresented: $showForeverPaywall) {
                 CovelaForeverPaywallView(
                     store: store,
@@ -603,7 +653,10 @@ struct HomeView: View {
                 )
             }
             .memorySharePresentation(coordinator: shareCoordinator)
-            .onAppear { refreshCoupleSpaceCardMetadata() }
+            .onAppear {
+                viewModel.onPinCapReached = { showPinCapSheet = true }
+                refreshCoupleSpaceCardMetadata()
+            }
             .onChange(of: viewModel.moments.count) { _, _ in
                 refreshCoupleSpaceCardMetadata()
             }
@@ -1552,7 +1605,6 @@ struct HomeView: View {
                             VStack(spacing: 16) {
                                 DayClusterCard(
                                     section: section,
-                                    isVaulted: section.moments.contains { vaultedIDs.contains($0.id) },
                                     onOpenPhoto: { moment, allMoments in
                                         if vaultedIDs.contains(moment.id) {
                                             showVaultedPrompt = true
@@ -1608,7 +1660,8 @@ struct HomeView: View {
                                     },
                                     onShare: shareMemory,
                                     isLeftAligned: index.isMultiple(of: 2),
-                                    index: index
+                                    index: index,
+                                    isVaulted: section.moments.contains { vaultedIDs.contains($0.id) }
                                 )
                                 .padding(
                                     .leading,

@@ -852,12 +852,23 @@ final class HomeViewModel: ObservableObject {
         moments.removeAll { $0.id == momentId }
     }
     
+    /// Called when a pin attempt is blocked by the 10-pin free-tier limit.
+    var onPinCapReached: (() -> Void)?
+
     func togglePin(for section: DaySection) {
         guard !section.moments.isEmpty else { return }
         let sectionMomentIds = Set(section.moments.map(\.id))
         let shouldPin = !section.moments.contains(where: \.isPinned)
-        let pinTimestamp = Date()
 
+        if shouldPin {
+            let currentPinCount = moments.filter { $0.isPinned && !Self.isFoundingMoment($0) }.count
+            if currentPinCount >= 10 {
+                onPinCapReached?()
+                return
+            }
+        }
+
+        let pinTimestamp = Date()
         var newMoments = moments
         for index in newMoments.indices where sectionMomentIds.contains(newMoments[index].id) {
             newMoments[index].isPinned = shouldPin

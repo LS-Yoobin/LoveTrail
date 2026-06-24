@@ -88,7 +88,7 @@ struct PendingHomeView: View {
     }
 
     private var petTab: some View {
-        AdoptAPetRootView()
+        AdoptAPetRootView(onDismiss: {})
     }
 
     private var secretGardenTab: some View {
