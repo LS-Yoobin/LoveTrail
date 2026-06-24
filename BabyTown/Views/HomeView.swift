@@ -592,7 +592,7 @@ struct HomeView: View {
                     onUnlockForever: { showForeverPaywall = true }
                 )
                 .presentationDetents([.height(340)])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
                 .presentationBackground(BabyTownTheme.cardBackground)
             }
             .fullScreenCover(isPresented: $showForeverPaywall) {
