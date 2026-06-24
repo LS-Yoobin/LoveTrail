@@ -167,6 +167,13 @@ final class PetViewModel: ObservableObject {
     var coins: Int { state.coins }
     var foodServings: Int { state.foodServings }
 
+    var checkInStreak: Int { state.checkInStreak }
+
+    var checkedInToday: Bool {
+        guard let last = state.lastCheckInDate else { return false }
+        return pacificCalendar.isDate(last, inSameDayAs: Date())
+    }
+
     var hunger: Int { Int(state.hunger.current(decayPerHour: PetEconomy.hungerDecayPerHour).rounded()) }
     var thirst: Int { Int(state.thirst.current(decayPerHour: PetEconomy.thirstDecayPerHour).rounded()) }
     var litter: Int { Int(state.litter.current(decayPerHour: PetEconomy.litterDecayPerHour).rounded()) }
@@ -359,6 +366,37 @@ final class PetViewModel: ObservableObject {
     func registerPetInteraction() {
         state.lastPetInteractionAt = Date()   // persists via didSet
         NotificationManager.shared.refresh()
+    }
+
+    /// Awards coins for opening the pet room today. Idempotent — returns 0 if
+    /// already checked in today (Pacific time). Resets streak to 0 after day 7.
+    @discardableResult
+    func checkInForPetRoom(now: Date = Date()) -> Int {
+        let today = pacificCalendar.startOfDay(for: now)
+
+        if let last = state.lastCheckInDate,
+           pacificCalendar.startOfDay(for: last) == today {
+            return 0
+        }
+
+        if let last = state.lastCheckInDate,
+           let yesterday = pacificCalendar.date(byAdding: .day, value: -1, to: today),
+           pacificCalendar.startOfDay(for: last) == yesterday {
+            state.checkInStreak = min(state.checkInStreak + 1, 7)
+        } else {
+            state.checkInStreak = 1
+        }
+
+        state.lastCheckInDate = today
+        let coins = PetEconomy.checkInReward(forDay: state.checkInStreak)
+        state.coins += coins
+        lastAward = (coins, UUID())
+
+        if state.checkInStreak == 7 {
+            state.checkInStreak = 0
+        }
+
+        return coins
     }
 
     private func awardPlantWater(for key: String) -> CareResult {
