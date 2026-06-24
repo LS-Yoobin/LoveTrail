@@ -526,6 +526,16 @@ struct CoupleProfileView: View {
                 onDismiss: { showForeverPaywall = false }
             )
         }
+        .fullScreenCover(isPresented: $showWatchTogetherPaywall) {
+            CovelaForeverPaywallView(
+                store: store,
+                onUnlock: {
+                    showWatchTogetherPaywall = false
+                    showWatchTogetherSheet = true
+                },
+                onDismiss: { showWatchTogetherPaywall = false }
+            )
+        }
     }
 
     @ViewBuilder
@@ -575,20 +585,41 @@ struct CoupleProfileView: View {
                 }
                 .buttonStyle(.plain)
             } else if !isPartnerAccount {
-                Button(action: { showInviteFlow = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "person.badge.plus")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Invite")
-                            .font(.subheadline.weight(.semibold))
+                if store.isForeverUnlocked {
+                    Button {
+                        showInviteFlow = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Send invite")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(BabyTownTheme.buttonGradient, in: Capsule())
+                        .shadow(color: BabyTownTheme.buttonShadow, radius: 8, y: 3)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(BabyTownTheme.buttonGradient, in: Capsule())
-                    .shadow(color: BabyTownTheme.buttonShadow, radius: 8, y: 3)
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        showForeverPaywall = true
+                    } label: {
+                        Text("Upgrade to Forever")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(LinearGradient(
+                                    colors: [BabyTownTheme.accent, BabyTownTheme.accentDeep],
+                                    startPoint: .leading, endPoint: .trailing
+                                ))
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }

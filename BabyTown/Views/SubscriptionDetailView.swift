@@ -26,6 +26,21 @@ struct SubscriptionDetailView: View {
             }
 
             Section {
+                Label("Watch Together with your partner", systemImage: "tv.and.mediabox")
+                    .foregroundStyle(.primary)
+                Label("Unlimited important dates", systemImage: "calendar.badge.plus")
+                    .foregroundStyle(.primary)
+                Label("Invite your partner to your Cove", systemImage: "person.2.fill")
+                    .foregroundStyle(.primary)
+                Label("Unlock all pet skins and accessories", systemImage: "pawprint.fill")
+                    .foregroundStyle(.primary)
+                Label("Priority access to new features", systemImage: "sparkles")
+                    .foregroundStyle(.primary)
+            } header: {
+                Text("Covela Forever perks")
+            }
+
+            Section {
                 Button {
                     showInvite = true
                 } label: {

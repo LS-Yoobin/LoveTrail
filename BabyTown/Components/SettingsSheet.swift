@@ -16,6 +16,7 @@ struct SettingsSheet: View {
     @State private var showResetConfirmation = false
     @State private var showAppIconViewer = false
     @State private var showPlaylistEditor = false
+    @State private var showPaywall = false
     
     var body: some View {
         NavigationStack {
@@ -23,21 +24,35 @@ struct SettingsSheet: View {
                 BackgroundMusicSettingsSection(onManagePlaylist: { showPlaylistEditor = true })
 
                 Section {
-                    NavigationLink {
-                        SubscriptionDetailView(store: store)
+                    Button {
+                        showPaywall = true
                     } label: {
                         HStack {
-                            Image(systemName: "heart.circle")
-                                .font(.system(size: 16))
-                            Text("Subscription")
-                                .font(.system(size: 16))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Covela Forever")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.black.opacity(0.85))
+                                Text(store.isForeverUnlocked
+                                     ? (store.activePlan?.displayName ?? "Active")
+                                     : "Free plan")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.black.opacity(0.45))
+                            }
                             Spacer()
-                            Text(store.isForeverUnlocked ? (store.activePlan?.displayName ?? "Active") : "Free")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.secondary)
+                            if !store.isForeverUnlocked {
+                                Text("Upgrade")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(BabyTownTheme.accentDeep))
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(BabyTownTheme.accentDeep)
+                            }
                         }
                     }
-                    .foregroundStyle(.primary)
+                    .buttonStyle(.plain)
                 } header: {
                     Text("Subscription")
                 }
@@ -195,6 +210,13 @@ struct SettingsSheet: View {
             }
             .fullScreenCover(isPresented: $showAppIconViewer) {
                 AppIconViewerOverlay()
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                CovelaForeverPaywallView(
+                    store: store,
+                    onUnlock: { showPaywall = false },
+                    onDismiss: { showPaywall = false }
+                )
             }
             .sheet(isPresented: $showPlaylistEditor) {
                 CouplePlaylistEditorSheet(dismissOnSelect: false)
