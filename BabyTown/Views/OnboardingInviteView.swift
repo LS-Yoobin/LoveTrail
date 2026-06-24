@@ -67,11 +67,11 @@ struct OnboardingInviteView: View {
                 Text("Connect with your partner")
                     .font(.system(size: 30, weight: .bold, design: .serif))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
 
                 Text("Choose how you want to get started.")
                     .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                     .multilineTextAlignment(.center)
             }
 
@@ -105,20 +105,31 @@ struct OnboardingInviteView: View {
             VStack(spacing: 10) {
                 Text("Invitation sent")
                     .font(.system(size: 32, weight: .bold, design: .serif))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
 
                 Text("We will let you know the moment they join.")
                     .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                     .multilineTextAlignment(.center)
             }
+
+            Text(code)
+                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                .foregroundStyle(BabyTownTheme.accentDeep)
+                .tracking(4)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(.systemGray6))
+                )
 
             Button {
                 UIPasteboard.general.string = code
             } label: {
                 Text("Copy invite code")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.accent)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
             }
 
             Button {
@@ -127,7 +138,7 @@ struct OnboardingInviteView: View {
             } label: {
                 Text("Continue to your space")
                     .font(.system(size: 14))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.55))
             }
         }
     }
@@ -140,11 +151,11 @@ struct OnboardingInviteView: View {
                 Text("Enter your code")
                     .font(.system(size: 30, weight: .bold, design: .serif))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
 
                 Text("Enter the 6 character code from the invite email.")
                     .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                     .multilineTextAlignment(.center)
             }
 
@@ -153,12 +164,13 @@ struct OnboardingInviteView: View {
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
                     .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
                     .multilineTextAlignment(.center)
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white)
-                            .shadow(color: BabyTownTheme.accent.opacity(0.12), radius: 8, y: 4)
+                            .fill(Color(.systemGray6))
+                            .shadow(color: BabyTownTheme.accent.opacity(0.08), radius: 8, y: 4)
                     )
                     .focused($codeFocused)
                     .onChange(of: codeInput) { _, new in
@@ -276,15 +288,16 @@ private struct InviteActionCard: View {
                 Image(systemName: icon)
                     .font(.system(size: 22))
                     .foregroundStyle(BabyTownTheme.accent)
-                    .frame(width: 36)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(BabyTownTheme.accent.opacity(0.1)))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .foregroundStyle(BabyTownTheme.accentDeep)
                     Text(subtitle)
                         .font(.system(size: 13))
-                        .foregroundStyle(BabyTownTheme.textSecondary)
+                        .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                         .multilineTextAlignment(.leading)
                 }
 
@@ -292,13 +305,23 @@ private struct InviteActionCard: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.textSecondary.opacity(0.4))
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.55))
             }
             .padding(18)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-                    .shadow(color: BabyTownTheme.accent.opacity(0.1), radius: 10, y: 4)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [BabyTownTheme.cardTintLight, BabyTownTheme.cardTintDeep],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: BabyTownTheme.accent.opacity(0.12), radius: 10, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(BabyTownTheme.accent.opacity(0.18), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -313,7 +336,7 @@ private struct PulsingRingsView: View {
         ZStack {
             ForEach(0..<3) { i in
                 Circle()
-                    .stroke(BabyTownTheme.accent.opacity(animate ? 0.0 : [0.4, 0.25, 0.12][i]), lineWidth: 2)
+                    .stroke(BabyTownTheme.accentDeep.opacity(animate ? 0.0 : [0.35, 0.22, 0.10][i]), lineWidth: 2)
                     .scaleEffect(animate ? 1.6 + CGFloat(i) * 0.3 : 0.6)
                     .animation(
                         .easeOut(duration: 1.8)
@@ -325,7 +348,7 @@ private struct PulsingRingsView: View {
 
             Image(systemName: "heart.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(BabyTownTheme.accent)
+                .foregroundStyle(BabyTownTheme.accentDeep)
         }
         .onAppear { animate = true }
     }

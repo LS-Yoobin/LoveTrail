@@ -76,4 +76,9 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
         case .reason: return "heart.fill"
         }
     }
+
+    /// Date used for timeline ordering and display.
+    var timelineDate: Date {
+        type == .first ? (firstDate ?? createdAt) : createdAt
+    }
 }

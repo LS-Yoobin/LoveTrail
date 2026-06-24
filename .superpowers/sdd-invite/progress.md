@@ -14,7 +14,9 @@ Session start commit: 2b3c12c1834c167d8029631020004d7b5406c644
 - [x] Task 4: PartnerGiftRevealView (commits b4d1abb..8a55936, review clean)
 - [x] Task 5: JustPickPhotosView (commits 259a1db..542f7b8, review clean)
 - [x] Task 6: PendingHomeView (commits b1d2997..df66a52, review clean)
-- [ ] Task 7: ContentView — wire everything (DEFERRED — paywall agent also modifies ContentView)
+- [x] Task 7: ContentView — wire everything (commits 300de9e..7d773e6, fixed 7d773e6..67c7034)
+Final review fixes: setOnboardingCompleted before officialPending, read-before-clear in both polling paths, removed wrong partner name storage, removed hyphens from code-entry copy
+Remaining minor: officialPhoto fallback to SF Symbol heart; howItWorks back→firstMemories path; polling timer not scenePhase-aware; PendingHomeView Color(white:0.97) not a theme token
 
 ## Notes
 

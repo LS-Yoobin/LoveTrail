@@ -42,7 +42,7 @@ struct PreludeGiftBookView: View {
         .onAppear {
             captures = DataPersistenceManager.shared.loadPreludeCaptures()
                 .filter { $0.isIncludedInGift && !$0.isPartnerRetroactive }
-                .sorted { $0.createdAt < $1.createdAt }
+                .sorted { $0.timelineDate < $1.timelineDate }
             giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
             if giftSong != nil {
                 startGiftSongPlayback()

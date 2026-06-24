@@ -18,6 +18,7 @@ final class PreludeViewModel: ObservableObject {
 
     func load() {
         captures = dpm.loadPreludeCaptures()
+        sortCapturesForTimeline()
         let profile = dpm.loadCoupleProfile()
         stage = profile.relationshipStage
         inviteSent = profile.inviteSent
@@ -25,6 +26,15 @@ final class PreludeViewModel: ObservableObject {
 
     private func saveCaptures() {
         dpm.savePreludeCaptures(captures)
+    }
+
+    private func sortCapturesForTimeline() {
+        captures.sort {
+            let lhs = $0.timelineDate
+            let rhs = $1.timelineDate
+            if lhs != rhs { return lhs > rhs }
+            return $0.createdAt > $1.createdAt
+        }
     }
 
     private func saveStage() {
@@ -37,13 +47,15 @@ final class PreludeViewModel: ObservableObject {
     // MARK: - Capture CRUD
 
     func addCapture(_ capture: PreludeCapture) {
-        captures.insert(capture, at: 0)
+        captures.append(capture)
+        sortCapturesForTimeline()
         saveCaptures()
     }
 
     func updateCapture(_ capture: PreludeCapture) {
         guard let idx = captures.firstIndex(where: { $0.id == capture.id }) else { return }
         captures[idx] = capture
+        sortCapturesForTimeline()
         saveCaptures()
     }
 
@@ -78,7 +90,7 @@ final class PreludeViewModel: ObservableObject {
     }
 
     func transitionToOfficial(partnerUserId: String = "partner") {
-        let firstCaptureDate = captures.map(\.createdAt).min() ?? Date()
+        let firstCaptureDate = captures.map(\.timelineDate).min() ?? Date()
         let chapter = PreludeChapter(
             startDate: firstCaptureDate,
             officialDate: Date(),

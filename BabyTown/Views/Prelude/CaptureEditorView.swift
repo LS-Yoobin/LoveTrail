@@ -131,6 +131,7 @@ struct CaptureEditorView: View {
         }
         .onAppear {
             loadExisting()
+            guard type != .first else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isEditorFocused = true
             }

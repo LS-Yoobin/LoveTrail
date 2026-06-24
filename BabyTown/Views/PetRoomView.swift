@@ -42,6 +42,7 @@ struct PetRoomView: View {
     @State private var selectedCustomizePropKey: String?
     @State private var selectedPropActionAnchor: CGPoint?
     @State private var toiletPaperMessage: String?
+    @State private var showWelcomeTutorial = false
 
     @State private var isTrickMode = false
     @State private var showTrickBook = false
@@ -459,6 +460,9 @@ struct PetRoomView: View {
         .onChange(of: showOwnedItems) { _, _ in
             syncSceneSheetPause()
         }
+        .onChange(of: showWelcomeTutorial) { _, _ in
+            syncSceneSheetPause()
+        }
         .onChange(of: viewModel.selectedPlayToyID) { _, selectedToyID in
             guard isPlaying else { return }
             scene?.setPlayToySelection(selectedToyID)
@@ -471,6 +475,18 @@ struct PetRoomView: View {
             syncLitterBoxState()
             syncNeedThoughtBubble()
         }
+        .overlay {
+            if showWelcomeTutorial {
+                PetRoomWelcomeTutorialView(
+                    petName: petDisplayName,
+                    petPortraitAsset: activeSkin.profileSitAsset,
+                    onFinish: dismissWelcomeTutorial
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: showWelcomeTutorial)
+        .toolbar(showWelcomeTutorial ? .hidden : .visible, for: .navigationBar)
     }
 
     private var marketToolbarButton: some View {
@@ -1293,6 +1309,7 @@ struct PetRoomView: View {
                     geo: geo
                 )
             }
+            presentWelcomeTutorialIfNeeded()
         }
         .overlay {
             if isCustomizing,
@@ -1421,7 +1438,26 @@ struct PetRoomView: View {
     /// Keeps SpriteKit paused while market / owned-items sheets cover the room,
     /// then heals walk-animation desync when they close.
     private func syncSceneSheetPause() {
-        scene?.setSheetCoverActive(showMarket || showOwnedItems)
+        scene?.setSheetCoverActive(showMarket || showOwnedItems || showWelcomeTutorial)
+    }
+
+    private func presentWelcomeTutorialIfNeeded() {
+        guard viewModel.shouldShowPetRoomTutorial, !showWelcomeTutorial else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            guard viewModel.shouldShowPetRoomTutorial else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                showWelcomeTutorial = true
+            }
+            syncSceneSheetPause()
+        }
+    }
+
+    private func dismissWelcomeTutorial() {
+        viewModel.markPetRoomTutorialSeen()
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+            showWelcomeTutorial = false
+        }
+        syncSceneSheetPause()
     }
 
     private var pictureFramePickerSheet: some View {

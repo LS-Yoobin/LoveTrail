@@ -105,6 +105,7 @@ struct PetState: Codable {
         case toiletPaperMessByPet
         case trickTrainingByPet
         case trickTraining
+        case hasSeenPetRoomTutorial
     }
 
     var adoptedSkin: CatSkin?
@@ -138,6 +139,9 @@ struct PetState: Codable {
     /// Per-pet toilet-paper mess scheduler + active state.
     var toiletPaperMessByPet: [String: ToiletPaperMessState]
 
+    /// One-time pet room walkthrough shown after the user's first adoption.
+    var hasSeenPetRoomTutorial: Bool
+
     init(adoptedSkin: CatSkin? = nil, adoptedDate: Date? = nil) {
         self.adoptedSkin = adoptedSkin
         self.adoptedDate = adoptedDate
@@ -157,6 +161,7 @@ struct PetState: Codable {
         self.roomLayoutsByPet = [:]
         self.trickTrainingByPet = [:]
         self.toiletPaperMessByPet = [:]
+        self.hasSeenPetRoomTutorial = false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -178,6 +183,7 @@ struct PetState: Codable {
         try c.encode(roomLayoutsByPet, forKey: .roomLayoutsByPet)
         try c.encode(trickTrainingByPet, forKey: .trickTrainingByPet)
         try c.encode(toiletPaperMessByPet, forKey: .toiletPaperMessByPet)
+        try c.encode(hasSeenPetRoomTutorial, forKey: .hasSeenPetRoomTutorial)
     }
 
     init(from decoder: Decoder) throws {
@@ -214,6 +220,12 @@ struct PetState: Codable {
 
         trickTrainingByPet = try c.decodeIfPresent([String: PetTrickTrainingState].self, forKey: .trickTrainingByPet) ?? [:]
         toiletPaperMessByPet = try c.decodeIfPresent([String: ToiletPaperMessState].self, forKey: .toiletPaperMessByPet) ?? [:]
+        if let seen = try c.decodeIfPresent(Bool.self, forKey: .hasSeenPetRoomTutorial) {
+            hasSeenPetRoomTutorial = seen
+        } else {
+            // Existing adopters before this walkthrough shipped should not see it.
+            hasSeenPetRoomTutorial = !ownedSkins.isEmpty
+        }
         if trickTrainingByPet.isEmpty {
             let legacyTraining = try c.decodeIfPresent(PetTrickTrainingState.self, forKey: .trickTraining)
             if let adoptedSkin {

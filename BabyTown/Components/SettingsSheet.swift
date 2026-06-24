@@ -31,12 +31,12 @@ struct SettingsSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Covela Forever")
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(.black.opacity(0.85))
+                                    .foregroundStyle(.white)
                                 Text(store.isForeverUnlocked
                                      ? (store.activePlan?.displayName ?? "Active")
                                      : "Free plan")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.black.opacity(0.45))
+                                    .foregroundStyle(.white.opacity(0.85))
                             }
                             Spacer()
                             if !store.isForeverUnlocked {
@@ -48,11 +48,18 @@ struct SettingsSheet: View {
                                     .background(Capsule().fill(BabyTownTheme.accentDeep))
                             } else {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(BabyTownTheme.accentDeep)
+                                    .foregroundStyle(.white)
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(BabyTownTheme.accentGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius))
                     }
                     .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                 } header: {
                     Text("Subscription")
                 }

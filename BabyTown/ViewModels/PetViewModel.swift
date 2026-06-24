@@ -57,6 +57,11 @@ final class PetViewModel: ObservableObject {
     var ownedSkins: [CatSkin] { state.ownedSkins }
     var primaryOwnedSkin: CatSkin? { state.ownedSkins.first }
     var hasAnyOwnedPet: Bool { !state.ownedSkins.isEmpty }
+    var shouldShowPetRoomTutorial: Bool { !state.hasSeenPetRoomTutorial }
+
+    func markPetRoomTutorialSeen() {
+        state.hasSeenPetRoomTutorial = true
+    }
 
     func adopt(_ skin: CatSkin) {
         petRoomSkinBeforeSelection = nil

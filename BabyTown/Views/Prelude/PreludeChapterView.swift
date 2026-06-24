@@ -11,7 +11,7 @@ struct PreludeChapterView: View {
         let ids = Set(chapter.giftCaptureIds)
         return captures
             .filter { ids.contains($0.id) || $0.isPartnerRetroactive }
-            .sorted { $0.createdAt < $1.createdAt }
+            .sorted { $0.timelineDate < $1.timelineDate }
     }
 
     var body: some View {

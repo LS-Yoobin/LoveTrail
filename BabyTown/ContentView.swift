@@ -32,6 +32,25 @@ struct ContentView: View {
     @State private var shouldScrollToNewMemory = false
     @StateObject private var homeViewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
+
+    private func resetAppToWelcome() {
+        DataPersistenceManager.shared.clearAllData()
+        StoreManager.shared.resetForTesting()
+        ThemeManager.shared.setTheme(DataPersistenceManager.shared.loadColorTheme())
+        homeViewModel.moments = []
+        homeViewModel.promptMemories = []
+        homeViewModel.pinnedFirstMet = nil
+        homeViewModel.pinnedOfficial = UIImage(systemName: "heart.fill")!
+        homeViewModel.polaroidStore.reset()
+        firstMetPhoto = nil
+        officialPhoto = nil
+        selectedPrompt = nil
+        targetScreen = .welcome
+        withAnimation(.easeInOut(duration: 0.4)) {
+            screen = .welcome
+        }
+    }
+
     init() {
         let hasCompletedOnboarding = DataPersistenceManager.shared.hasCompletedOnboarding()
         
@@ -275,18 +294,7 @@ struct ContentView: View {
                         screen = .selectPhotos
                     },
                     onOpenPhotoViewer: { _, _ in },
-                    onResetApp: {
-                        DataPersistenceManager.shared.clearAllData()
-                        StoreManager.shared.resetForTesting()
-                        homeViewModel.moments = []
-                        homeViewModel.promptMemories = []
-                        homeViewModel.pinnedFirstMet = nil
-                        homeViewModel.pinnedOfficial = UIImage(systemName: "heart.fill")!
-                        homeViewModel.polaroidStore.reset()
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .welcome
-                        }
-                    },
+                    onResetApp: resetAppToWelcome,
                     onReplayStory: {
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .storyOnboarding
@@ -427,7 +435,8 @@ struct ContentView: View {
                                 screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
                             }
                         }
-                    }
+                    },
+                    onResetApp: resetAppToWelcome
                 )
                 .transition(.opacity)
                 .onAppear {

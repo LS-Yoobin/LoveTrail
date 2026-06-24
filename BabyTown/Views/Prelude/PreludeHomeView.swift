@@ -270,7 +270,7 @@ private struct CaptureRowCard: View {
     private static let lightTrashTint = Color(red: 0.94, green: 0.58, blue: 0.58)
 
     private var headerDate: Date {
-        capture.type == .first ? (capture.firstDate ?? capture.createdAt) : capture.createdAt
+        capture.timelineDate
     }
 
     private var cardBackground: Color {

@@ -15,12 +15,6 @@ struct CovelaForeverPaywallView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [.white, accent.opacity(0.10)],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
             LoopingVideoPlayer(videoName: "transparent_flowers")
                 .frame(height: 300)
                 .mask(
@@ -39,6 +33,9 @@ struct CovelaForeverPaywallView: View {
                 hero
                 benefitsList
                     .padding(.top, 18)
+
+                Spacer(minLength: 0)
+
                 bothBanner
                     .padding(.top, 18)
                 yearlyHeroCard
@@ -49,7 +46,6 @@ struct CovelaForeverPaywallView: View {
                     .padding(.top, 12)
                 finePrint
                     .padding(.top, 12)
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 28)
@@ -68,6 +64,9 @@ struct CovelaForeverPaywallView: View {
                             .fill(.ultraThinMaterial)
                     )
             }
+        }
+        .background {
+            backgroundGradient
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.45)) { appear = true }
@@ -111,6 +110,20 @@ struct CovelaForeverPaywallView: View {
 
     // MARK: - Sections
 
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                .white,
+                accent.opacity(0.06),
+                accent.opacity(0.14)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+    }
+
     private var closeRow: some View {
         HStack {
             Button(action: onDismiss) {
@@ -150,25 +163,55 @@ struct CovelaForeverPaywallView: View {
     }
 
     private var benefitsList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            benefitRow(icon: "photo.on.rectangle.angled", text: "Every moment, always. Your full timeline, no limits")
-            benefitRow(icon: "envelope.open.fill",       text: "Letters that last. Read and write beyond 30 days")
-            benefitRow(icon: "calendar.badge.plus",      text: "Unlimited important dates. Every milestone, saved forever")
-            benefitRow(icon: "pin.fill",                 text: "Unlimited pinned moments. Keep what matters most")
-            benefitRow(icon: "heart.fill",               text: "One purchase for both of you. Covers you and your partner")
+        VStack(alignment: .leading, spacing: 14) {
+            benefitRow(
+                icon: "clock.arrow.circlepath",
+                title: "Unlimited history",
+                subtitle: "Your full timeline, always within reach"
+            )
+            benefitRow(
+                icon: "photo.stack.fill",
+                title: "Multiple daily photos",
+                subtitle: "Capture more than one moment every day"
+            )
+            benefitRow(
+                icon: "square.stack.fill",
+                title: "Unlimited unpinned moments",
+                subtitle: "Every day on your feed, no cutoff"
+            )
+            benefitRow(
+                icon: "envelope.open.fill",
+                title: "Letters that last",
+                subtitle: "Read and write beyond 30 days"
+            )
+            benefitRow(
+                icon: "cat.fill",
+                title: "Unlock a black Bombay cat",
+                subtitle: "A sleek new companion for your town"
+            )
         }
     }
 
-    private func benefitRow(icon: String, text: String) -> some View {
+    private func benefitRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
                 .foregroundStyle(accent)
-                .frame(width: 20)
-            Text(text)
-                .font(.system(size: 13))
-                .foregroundStyle(.black.opacity(0.72))
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(accent.opacity(0.10))
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(.black.opacity(0.88))
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.black.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
