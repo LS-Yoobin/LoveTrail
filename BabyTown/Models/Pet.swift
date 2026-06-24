@@ -106,6 +106,7 @@ struct PetState: Codable {
         case trickTrainingByPet
         case trickTraining
         case hasSeenPetRoomTutorial
+        case lastCheckInDate, checkInStreak
     }
 
     var adoptedSkin: CatSkin?
@@ -142,6 +143,9 @@ struct PetState: Codable {
     /// One-time pet room walkthrough shown after the user's first adoption.
     var hasSeenPetRoomTutorial: Bool
 
+    var lastCheckInDate: Date?
+    var checkInStreak: Int
+
     init(adoptedSkin: CatSkin? = nil, adoptedDate: Date? = nil) {
         self.adoptedSkin = adoptedSkin
         self.adoptedDate = adoptedDate
@@ -162,6 +166,8 @@ struct PetState: Codable {
         self.trickTrainingByPet = [:]
         self.toiletPaperMessByPet = [:]
         self.hasSeenPetRoomTutorial = false
+        self.lastCheckInDate = nil
+        self.checkInStreak = 0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -184,6 +190,8 @@ struct PetState: Codable {
         try c.encode(trickTrainingByPet, forKey: .trickTrainingByPet)
         try c.encode(toiletPaperMessByPet, forKey: .toiletPaperMessByPet)
         try c.encode(hasSeenPetRoomTutorial, forKey: .hasSeenPetRoomTutorial)
+        try c.encodeIfPresent(lastCheckInDate, forKey: .lastCheckInDate)
+        try c.encode(checkInStreak, forKey: .checkInStreak)
     }
 
     init(from decoder: Decoder) throws {
@@ -226,6 +234,8 @@ struct PetState: Codable {
             // Existing adopters before this walkthrough shipped should not see it.
             hasSeenPetRoomTutorial = !ownedSkins.isEmpty
         }
+        lastCheckInDate = try c.decodeIfPresent(Date.self, forKey: .lastCheckInDate)
+        checkInStreak = try c.decodeIfPresent(Int.self, forKey: .checkInStreak) ?? 0
         if trickTrainingByPet.isEmpty {
             let legacyTraining = try c.decodeIfPresent(PetTrickTrainingState.self, forKey: .trickTraining)
             if let adoptedSkin {
