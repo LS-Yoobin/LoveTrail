@@ -1126,16 +1126,21 @@ struct HomeView: View {
 
                     switch row.item {
                     case .daySection(let section):
+                        let isSearchResultVaulted = section.moments.contains { vaultedIDs.contains($0.id) }
                         DayClusterCard(
                             section: section,
                             onOpenPhoto: { moment, allMoments in
-                                clearMemoryPageViewerContext()
-                                viewerMoments = allMoments
-                                if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                    viewerInitialIndex = idx
-                                }
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    showingMomentViewer = true
+                                if vaultedIDs.contains(moment.id) {
+                                    showVaultedPrompt = true
+                                } else {
+                                    clearMemoryPageViewerContext()
+                                    viewerMoments = allMoments
+                                    if let idx = allMoments.firstIndex(where: { $0.id == moment.id }) {
+                                        viewerInitialIndex = idx
+                                    }
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        showingMomentViewer = true
+                                    }
                                 }
                             },
                             onEditCaption: { momentId, caption, voiceNotePath in
@@ -1175,7 +1180,8 @@ struct HomeView: View {
                             },
                             onShare: shareMemory,
                             isLeftAligned: index.isMultiple(of: 2),
-                            index: index
+                            index: index,
+                            isVaulted: isSearchResultVaulted
                         )
                         .padding(
                             .leading,

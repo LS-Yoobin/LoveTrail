@@ -8,7 +8,6 @@ struct SubscriptionDetailView: View {
     @ObservedObject var store: StoreManager
 
     @State private var showManageSubscriptions = false
-    @State private var showInvite = false
 
     private var accent: Color { BabyTownTheme.accentDeep }
 
@@ -26,27 +25,21 @@ struct SubscriptionDetailView: View {
             }
 
             Section {
-                Label("Watch Together with your partner", systemImage: "tv.and.mediabox")
+                Label("Every moment, always. Your full timeline, no limits", systemImage: "photo.stack")
                     .foregroundStyle(.primary)
-                Label("Unlimited important dates", systemImage: "calendar.badge.plus")
+                Label("Letters that last. Read and write beyond 30 days", systemImage: "envelope.fill")
                     .foregroundStyle(.primary)
-                Label("Invite your partner to your Cove", systemImage: "person.2.fill")
+                Label("Unlimited important dates. Every milestone, saved forever", systemImage: "calendar")
                     .foregroundStyle(.primary)
-                Label("Unlock all pet skins and accessories", systemImage: "pawprint.fill")
+                Label("Unlimited pinned moments. Keep what matters most", systemImage: "pin.fill")
                     .foregroundStyle(.primary)
-                Label("Priority access to new features", systemImage: "sparkles")
+                Label("One purchase for both of you. Covers you and your partner", systemImage: "person.2.fill")
                     .foregroundStyle(.primary)
             } header: {
                 Text("Covela Forever perks")
             }
 
             Section {
-                Button {
-                    showInvite = true
-                } label: {
-                    Label("Invite your partner", systemImage: "heart.fill")
-                        .foregroundStyle(accent)
-                }
                 if store.activePlan?.isSubscription == true {
                     Button("Manage Subscription") {
                         showManageSubscriptions = true
@@ -59,16 +52,13 @@ struct SubscriptionDetailView: View {
                 if store.activePlan?.isSubscription == true {
                     Text("Cancel anytime from Manage Subscription. Cancellation is handled by the App Store.")
                 } else if store.activePlan == .lifetime {
-                    Text("You have lifetime access — there's nothing to cancel. 💞")
+                    Text("You have lifetime access. Nothing to cancel. 💞")
                 }
             }
         }
         .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-        .fullScreenCover(isPresented: $showInvite) {
-            InvitePartnerFlowView(onDone: { showInvite = false })
-        }
     }
 
     private var statusText: String {

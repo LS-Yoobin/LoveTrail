@@ -151,11 +151,11 @@ struct CovelaForeverPaywallView: View {
 
     private var benefitsList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            benefitRow(icon: "photo.on.rectangle.angled", text: "Every moment, always — your full timeline with no limits")
-            benefitRow(icon: "envelope.open.fill",       text: "Letters that last — read and write beyond 30 days")
-            benefitRow(icon: "calendar.badge.plus",      text: "Unlimited important dates — every milestone, saved forever")
-            benefitRow(icon: "pin.fill",                 text: "Unlimited pinned moments — keep what matters most")
-            benefitRow(icon: "heart.fill",               text: "One purchase for both of you — covers you and your partner")
+            benefitRow(icon: "photo.on.rectangle.angled", text: "Every moment, always. Your full timeline, no limits")
+            benefitRow(icon: "envelope.open.fill",       text: "Letters that last. Read and write beyond 30 days")
+            benefitRow(icon: "calendar.badge.plus",      text: "Unlimited important dates. Every milestone, saved forever")
+            benefitRow(icon: "pin.fill",                 text: "Unlimited pinned moments. Keep what matters most")
+            benefitRow(icon: "heart.fill",               text: "One purchase for both of you. Covers you and your partner")
         }
     }
 
