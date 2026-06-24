@@ -402,7 +402,9 @@ struct PetRoomView: View {
                                 viewModel.visit(newSkin)
                             }
                         },
-                        onAdoptMore: onChangePet
+                        onAdoptMore: onChangePet,
+                        checkInStreak: viewModel.checkInStreak,
+                        checkedInToday: viewModel.checkedInToday
                     )
                 }
             }
@@ -1302,6 +1304,10 @@ struct PetRoomView: View {
         }
         .onAppear {
             viewModel.registerPetInteraction()
+            let awarded = viewModel.checkInForPetRoom()
+            if awarded > 0 {
+                coinBurst = (amount: awarded, id: UUID())
+            }
             if scene == nil {
                 installScene(
                     makeConfiguredScene(skin: activeSkin, size: geo.size),

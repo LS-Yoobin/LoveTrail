@@ -263,6 +263,8 @@ struct PetHUDView: View {
     var onStatsTap: () -> Void = {}
     var onSelectPet: ((CatSkin) -> Void)?
     var onAdoptMore: (() -> Void)?
+    var checkInStreak: Int = 0
+    var checkedInToday: Bool = false
 
     private var showsPetSwitcher: Bool {
         currentSkin != nil && onSelectPet != nil && onAdoptMore != nil
@@ -289,6 +291,13 @@ struct PetHUDView: View {
                 .accessibilityLabel("My items")
                 .accessibilityValue("\(coins) coins")
                 .accessibilityHint("Opens décor you own for this room")
+
+                if currentSkin != nil {
+                    DailyCheckInStreakView(
+                        streak: checkInStreak,
+                        checkedInToday: checkedInToday
+                    )
+                }
 
                 if showsPetSwitcher,
                    let currentSkin,
