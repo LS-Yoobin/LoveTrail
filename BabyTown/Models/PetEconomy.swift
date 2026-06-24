@@ -75,6 +75,15 @@ enum PetEconomy {
     static let happinessFromFeed: Double = 5
     static let happinessFromWater: Double = 10
 
+    // MARK: Daily check-in streak
+
+    static let checkIn7DayReward = 100
+    static let checkInDailyReward = 14
+
+    static func checkInReward(forDay day: Int) -> Int {
+        day == 7 ? checkIn7DayReward : checkInDailyReward
+    }
+
     // MARK: Shop catalog
 
     /// One-time cosmetic rename — priced between basic cat food (8) and wall color (18).
