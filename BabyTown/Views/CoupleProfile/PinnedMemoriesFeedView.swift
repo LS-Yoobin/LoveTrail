@@ -19,6 +19,7 @@ struct PinnedMemoriesFeedView: View {
     let userAvatar: UIImage?
     let userName: String
     let partnerSlotTitle: String
+    let isForeverUnlocked: Bool
     let onBack: () -> Void
     let onPartnerTap: () -> Void
     let onShare: (MemorySharePayload) -> Void
@@ -252,7 +253,7 @@ struct PinnedMemoriesFeedView: View {
                         withAnimation { viewModel.removeMoments(from: section) }
                     },
                     onTogglePin: { section in
-                        withAnimation { viewModel.togglePin(for: section) }
+                        withAnimation { viewModel.togglePin(for: section, isForeverUnlocked: isForeverUnlocked) }
                     },
                     onAddPhotos: { section, images in
                         viewModel.addPhotosToMemory(section: section, images: images)

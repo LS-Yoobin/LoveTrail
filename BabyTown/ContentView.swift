@@ -352,6 +352,11 @@ struct ContentView: View {
                     if let bundle = DataPersistenceManager.shared.loadArchiveBundle() {
                         ScrapbookHomeView(
                             bundle: bundle,
+                            onClose: {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    screen = .prelude
+                                }
+                            },
                             onStepOut: {
                                 withAnimation(.easeInOut(duration: 0.4)) {
                                     screen = .prelude

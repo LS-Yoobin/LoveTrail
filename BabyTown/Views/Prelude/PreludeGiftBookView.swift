@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// Paged parchment reader for prelude gift captures — used in partner onboarding
@@ -8,6 +9,9 @@ struct PreludeGiftBookView: View {
 
     @State private var captures: [PreludeCapture] = []
     @State private var currentIndex = 0
+    @State private var giftSong: PreludeGiftSong?
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var isPlaying = false
 
     private static let parchmentGradient = LinearGradient(
         colors: [
@@ -29,10 +33,23 @@ struct PreludeGiftBookView: View {
                 parchmentPage()
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if giftSong != nil {
+                VinylRecordPlayerView(isPlaying: isPlaying, scale: 1.0)
+                    .padding(16)
+            }
+        }
         .onAppear {
             captures = DataPersistenceManager.shared.loadPreludeCaptures()
                 .filter { $0.isIncludedInGift && !$0.isPartnerRetroactive }
                 .sorted { $0.createdAt < $1.createdAt }
+            giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
+            if giftSong != nil {
+                startGiftSongPlayback()
+            }
+        }
+        .onDisappear {
+            stopGiftSongPlayback()
         }
     }
 
@@ -162,5 +179,26 @@ struct PreludeGiftBookView: View {
             }
         }
         .padding(.horizontal, 28)
+    }
+
+    private func startGiftSongPlayback() {
+        let url = DataPersistenceManager.shared.preludeGiftSongAudioURL()
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.numberOfLoops = -1
+            audioPlayer?.play()
+            isPlaying = true
+        } catch {
+            // silent failure — vinyl won't spin but scrapbook remains usable
+        }
+    }
+
+    private func stopGiftSongPlayback() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
     }
 }

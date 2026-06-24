@@ -79,6 +79,14 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("PreludePhotos")
     }
 
+    private var preludeGiftSongDirectory: URL {
+        documentsDirectory.appendingPathComponent("prelude_gift_song")
+    }
+
+    private var preludeGiftSongMetadataURL: URL {
+        preludeGiftSongDirectory.appendingPathComponent("metadata.json")
+    }
+
     private func preludeVoiceMemoURL(fileId: String) -> URL {
         preludeVoiceMemosDirectory.appendingPathComponent(fileId)
     }
@@ -121,6 +129,9 @@ final class DataPersistenceManager {
     private let userEmailKey = "userEmail"
     private let isPartnerAccountKey = "isPartnerAccount"
     private let inviterNameKey = "inviterName"
+    private let pendingPartnerInviteKey = "pendingPartnerInvite"
+    private let pendingInviteCodeKey = "pendingInviteCode"
+    private let pendingInvitePartnerNameKey = "pendingInvitePartnerName"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -135,6 +146,9 @@ final class DataPersistenceManager {
         }
         if !fileManager.fileExists(atPath: preludePhotosDirectory.path) {
             try? fileManager.createDirectory(at: preludePhotosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: preludeGiftSongDirectory.path) {
+            try? fileManager.createDirectory(at: preludeGiftSongDirectory, withIntermediateDirectories: true)
         }
     }
     
@@ -533,6 +547,37 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: preludePhotoURL(photoId: photoId))
     }
 
+    // MARK: - Prelude Gift Song
+
+    func savePreludeGiftSong(_ song: PreludeGiftSong, audioData: Data) {
+        try? fileManager.createDirectory(at: preludeGiftSongDirectory, withIntermediateDirectories: true)
+        guard let metadata = try? encoder.encode(song) else { return }
+        try? metadata.write(to: preludeGiftSongMetadataURL)
+        let audioURL = preludeGiftSongDirectory.appendingPathComponent(song.fileName)
+        try? audioData.write(to: audioURL)
+    }
+
+    func loadPreludeGiftSong() -> PreludeGiftSong? {
+        guard fileManager.fileExists(atPath: preludeGiftSongMetadataURL.path),
+              let data = try? Data(contentsOf: preludeGiftSongMetadataURL),
+              let song = try? decoder.decode(PreludeGiftSong.self, from: data) else {
+            return nil
+        }
+        return song
+    }
+
+    func deletePreludeGiftSong() {
+        try? fileManager.removeItem(at: preludeGiftSongDirectory)
+        try? fileManager.createDirectory(at: preludeGiftSongDirectory, withIntermediateDirectories: true)
+    }
+
+    func preludeGiftSongAudioURL() -> URL {
+        guard let song = loadPreludeGiftSong() else {
+            return preludeGiftSongDirectory.appendingPathComponent("audio.m4a")
+        }
+        return preludeGiftSongDirectory.appendingPathComponent(song.fileName)
+    }
+
     // MARK: - Archive
 
     func saveArchiveBundle(_ bundle: ArchiveBundle) {
@@ -569,6 +614,36 @@ final class DataPersistenceManager {
 
     func clearReconnectInvite() {
         try? fileManager.removeItem(at: reconnectInviteFileURL)
+    }
+
+    func setPendingPartnerInvite(_ pending: Bool) {
+        userDefaults.set(pending, forKey: pendingPartnerInviteKey)
+    }
+
+    func hasPendingPartnerInvite() -> Bool {
+        userDefaults.bool(forKey: pendingPartnerInviteKey)
+    }
+
+    func savePendingInviteCode(_ code: String) {
+        userDefaults.set(code, forKey: pendingInviteCodeKey)
+    }
+
+    func loadPendingInviteCode() -> String? {
+        userDefaults.string(forKey: pendingInviteCodeKey)
+    }
+
+    func savePendingInvitePartnerName(_ name: String) {
+        userDefaults.set(name, forKey: pendingInvitePartnerNameKey)
+    }
+
+    func loadPendingInvitePartnerName() -> String? {
+        userDefaults.string(forKey: pendingInvitePartnerNameKey)
+    }
+
+    func clearPendingInviteState() {
+        userDefaults.removeObject(forKey: pendingPartnerInviteKey)
+        userDefaults.removeObject(forKey: pendingInviteCodeKey)
+        userDefaults.removeObject(forKey: pendingInvitePartnerNameKey)
     }
 
     func setOnboardingCompleted(_ completed: Bool) {
@@ -689,6 +764,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: preludeChapterFileURL)
         try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
         try? fileManager.removeItem(at: preludePhotosDirectory)
+        try? fileManager.removeItem(at: preludeGiftSongDirectory)
         try? fileManager.removeItem(at: archiveBundleFileURL)
         try? fileManager.removeItem(at: reconnectInviteFileURL)
         userDefaults.removeObject(forKey: hasCompletedOnboardingKey)
@@ -705,6 +781,7 @@ final class DataPersistenceManager {
         userDefaults.removeObject(forKey: userEmailKey)
         userDefaults.removeObject(forKey: isPartnerAccountKey)
         userDefaults.removeObject(forKey: inviterNameKey)
+        clearPendingInviteState()
         BackgroundMusicImporter.clearImportedSong()
         MomentVideoStore.shared.removeAll()
     }

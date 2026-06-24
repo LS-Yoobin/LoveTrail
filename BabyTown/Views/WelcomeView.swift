@@ -28,14 +28,6 @@ struct WelcomeView: View {
 
             // Main content
             VStack(spacing: 0) {
-                // BabyTown Logo at top
-                Image("BabyTownLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 120)
-                    .padding(.top, 60)
-                    .opacity(textOpacity)
-                
                 Spacer()
 
                 // Center heart
@@ -52,7 +44,7 @@ struct WelcomeView: View {
 
                 // Title
                 Text("Welcome to your Covela!")
-                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .font(.system(size: 38, weight: .bold, design: .serif))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)

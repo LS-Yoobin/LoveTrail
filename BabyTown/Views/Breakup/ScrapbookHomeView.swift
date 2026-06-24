@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ScrapbookHomeView: View {
     var bundle: ArchiveBundle
+    var onClose: () -> Void
     var onStepOut: () -> Void
     var onReconnect: () -> Void
 
@@ -32,9 +33,17 @@ struct ScrapbookHomeView: View {
 
     private var retentionBar: some View {
         HStack {
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
             Text(expiryLabel(bundle.expiryDate))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.leading, 8)
             Spacer()
             Button("Export") { showExport = true }
                 .font(.caption.bold())

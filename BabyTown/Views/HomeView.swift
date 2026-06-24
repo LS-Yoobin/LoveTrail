@@ -574,6 +574,7 @@ struct HomeView: View {
                     userAvatar: coupleSpaceAvatar,
                     userName: homeDisplayName,
                     partnerSlotTitle: homePartnerSlotTitle,
+                    isForeverUnlocked: store.isForeverUnlocked,
                     onBack: { showPinnedMemoriesFeed = false },
                     onPartnerTap: { showInviteFlow = true },
                     onShare: shareMemory,
@@ -1155,7 +1156,7 @@ struct HomeView: View {
                                 withAnimation { viewModel.removeMoments(from: section) }
                             },
                             onTogglePin: { section in
-                                withAnimation { viewModel.togglePin(for: section) }
+                                withAnimation { viewModel.togglePin(for: section, isForeverUnlocked: store.isForeverUnlocked) }
                             },
                             onAddPhotos: { section, images in
                                 viewModel.addPhotosToMemory(section: section, images: images)
@@ -1640,7 +1641,7 @@ struct HomeView: View {
                                     },
                                     onTogglePin: { section in
                                         withAnimation {
-                                            viewModel.togglePin(for: section)
+                                            viewModel.togglePin(for: section, isForeverUnlocked: store.isForeverUnlocked)
                                         }
                                     },
                                     onAddPhotos: { section, images in
@@ -1839,7 +1840,7 @@ struct HomeView: View {
                                 },
                                 onTogglePin: { section in
                                     withAnimation {
-                                        viewModel.togglePin(for: section)
+                                        viewModel.togglePin(for: section, isForeverUnlocked: store.isForeverUnlocked)
                                     }
                                 },
                                 onAddPhotos: { section, images in

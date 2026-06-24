@@ -479,7 +479,7 @@ struct CoupleProfileView: View {
                 Image(systemName: "calendar.badge.exclamationmark")
                     .font(.system(size: 32))
                     .foregroundStyle(BabyTownTheme.accentDeep)
-                Text("You have reached your 10 important date limit")
+                Text("You have reached your limit of 10 important dates")
                     .font(.system(size: 16, weight: .bold))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)

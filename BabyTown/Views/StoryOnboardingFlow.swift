@@ -159,14 +159,17 @@ struct SceneContentView: View {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Text(scene.title)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 40, weight: .bold, design: .serif))
+                        .tracking(-0.5)
                         .foregroundColor(StoryOnboardingTheme.textDark)
                         .multilineTextAlignment(.center)
-                    
+
                     if let subtitle = scene.subtitle {
                         Text(subtitle)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(StoryOnboardingTheme.textDark.opacity(0.7))
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(2.5)
+                            .textCase(.uppercase)
+                            .foregroundColor(StoryOnboardingTheme.textDark.opacity(0.45))
                             .multilineTextAlignment(.center)
                     }
                 }

@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import AVFoundation
 
@@ -9,6 +10,8 @@ struct GiftCurationView: View {
     @State private var showPreview = false
     @State private var showInviteSent = false
     @State private var showAccountSetup = false
+    @State private var giftSong: PreludeGiftSong?
+    @StateObject private var importCoordinator = PreludeGiftSongImportCoordinator()
 
     var body: some View {
         NavigationStack {
@@ -19,12 +22,25 @@ struct GiftCurationView: View {
                     captureList
                 }
 
+                giftSongCard
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
                 sendButton
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
                     .padding(.top, 12)
             }
             .background(BabyTownTheme.background.ignoresSafeArea())
+            .onAppear {
+                giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
+                importCoordinator.onSongSaved = { song in giftSong = song }
+            }
+            .onChange(of: importCoordinator.pickerItem) { _, item in
+                guard let item else { return }
+                Task { await importCoordinator.importPickedVideo(item) }
+            }
             .navigationTitle("Your Gift")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -62,6 +78,36 @@ struct GiftCurationView: View {
                 onCancel: { showAccountSetup = false }
             )
         }
+        .sheet(item: $importCoordinator.draftAwaitingTrim) { draft in
+            CoupleSongTrimSheet(
+                draft: draft,
+                isSaving: importCoordinator.isTrimming,
+                onCancel: { importCoordinator.cancelTrim(draft: draft) },
+                onSave: { start, end in
+                    Task { await importCoordinator.confirmTrim(draft: draft, startSeconds: start, endSeconds: end) }
+                }
+            )
+        }
+        .sheet(item: $importCoordinator.trackAwaitingName) { draft in
+            CoupleSongNameSheet(
+                title: "Name your song",
+                subtitle: "Give this song a name.",
+                initialName: draft.initialName,
+                onCancel: { importCoordinator.dismissNamingPrompt() },
+                onConfirm: { name in importCoordinator.finishNamingTrack(displayName: name) }
+            )
+        }
+        .alert(
+            "Import failed",
+            isPresented: Binding(
+                get: { importCoordinator.statusMessage != nil },
+                set: { if !$0 { importCoordinator.statusMessage = nil } }
+            )
+        ) {
+            Button("OK") { importCoordinator.statusMessage = nil }
+        } message: {
+            Text(importCoordinator.statusMessage ?? "")
+        }
     }
 
     private var captureList: some View {
@@ -97,6 +143,51 @@ struct GiftCurationView: View {
             Spacer()
         }
         .padding(.horizontal, 32)
+    }
+
+    private var giftSongCard: some View {
+        Group {
+            if let song = giftSong {
+                HStack(spacing: 12) {
+                    VinylRecordPlayerView(isPlaying: true, scale: 0.5)
+                    Text(song.displayName)
+                        .font(.system(size: 15))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        DataPersistenceManager.shared.deletePreludeGiftSong()
+                        giftSong = nil
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15))
+                            .foregroundStyle(BabyTownTheme.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(BabyTownTheme.cardBackground)
+                )
+            } else {
+                PhotosPicker(selection: $importCoordinator.pickerItem, matching: .videos) {
+                    HStack(spacing: 12) {
+                        VinylRecordPlayerView(isPlaying: false, scale: 0.5)
+                        Text("Add a song")
+                            .font(.system(size: 15))
+                            .foregroundStyle(BabyTownTheme.textSecondary)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(BabyTownTheme.cardBackground)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var sendButton: some View {
