@@ -142,14 +142,14 @@ struct OnboardingInviteView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(BabyTownTheme.textPrimary)
 
-                Text("Enter the 6-character code from the invite email.")
+                Text("Enter the 6 character code from the invite email.")
                     .font(.system(size: 15))
                     .foregroundStyle(BabyTownTheme.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: 8) {
-                TextField("Enter your 6-character code", text: $codeInput)
+                TextField("Enter your 6 character code", text: $codeInput)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
                     .font(.system(size: 22, weight: .semibold, design: .monospaced))
@@ -207,7 +207,6 @@ struct OnboardingInviteView: View {
             let response = try await StubInviteAPIClient.shared.createInvite(inviterName: inviterName)
             DataPersistenceManager.shared.setPendingPartnerInvite(true)
             DataPersistenceManager.shared.savePendingInviteCode(response.code)
-            DataPersistenceManager.shared.savePendingInvitePartnerName(inviterName)
             withAnimation { state = .pending(code: response.code) }
             startPolling(code: response.code)
         } catch {
@@ -245,9 +244,10 @@ struct OnboardingInviteView: View {
         guard let status = try? await StubInviteAPIClient.shared.checkInviteStatus(code: code) else { return }
         if status.status == .accepted {
             stopPolling()
+            let revealerName = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
             // Stub returns empty captures — real backend will return gift payload
-            onPartnerJoined([], DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner")
+            onPartnerJoined([], revealerName)
         }
     }
 

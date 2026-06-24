@@ -400,6 +400,7 @@ struct ContentView: View {
             case .invitePartner:
                 OnboardingInviteView(
                     onSkip: {
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .officialPending
                         }

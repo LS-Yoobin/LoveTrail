@@ -210,8 +210,8 @@ struct PendingHomeView: View {
         if status.status == .accepted {
             stopPolling()
             withAnimation { bannerVisible = false }
-            DataPersistenceManager.shared.clearPendingInviteState()
             let name = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
+            DataPersistenceManager.shared.clearPendingInviteState()
             onPartnerJoined([], name)
         }
     }
