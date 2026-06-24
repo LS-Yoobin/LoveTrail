@@ -5,10 +5,16 @@ struct NotificationCenterView: View {
     var onNotificationRead: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var store: StoreManager = .shared
     @State private var notifications: [AppNotification] = []
     @State private var userLetters: [UserLetter] = []
     @State private var openedWelcomeCard = false
     @State private var showComposeLetter = false
+    @State private var showForeverPaywall = false
+
+    private var thirtyDaysAgo: Date {
+        Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    }
 
     private var hasContent: Bool {
         !notifications.isEmpty || !userLetters.isEmpty
@@ -24,7 +30,13 @@ struct NotificationCenterView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(userLetters.sorted { $0.sortDate > $1.sortDate }) { letter in
-                                UserLetterRow(letter: letter)
+                                if store.isForeverUnlocked || letter.createdAt >= thirtyDaysAgo {
+                                    UserLetterRow(letter: letter)
+                                } else {
+                                    VaultedLetterRow(letter: letter) {
+                                        showForeverPaywall = true
+                                    }
+                                }
                             }
 
                             ForEach(notifications) { notification in
@@ -63,6 +75,13 @@ struct NotificationCenterView: View {
             }
             .fullScreenCover(isPresented: $showComposeLetter, onDismiss: reloadContent) {
                 ComposeLetterView()
+            }
+            .fullScreenCover(isPresented: $showForeverPaywall) {
+                CovelaForeverPaywallView(
+                    store: store,
+                    onUnlock: { showForeverPaywall = false },
+                    onDismiss: { showForeverPaywall = false }
+                )
             }
             .onAppear {
                 reloadContent()
