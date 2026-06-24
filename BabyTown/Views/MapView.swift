@@ -10,11 +10,14 @@ struct POISelection: Identifiable {
 struct MapView: View {
 
     @ObservedObject var viewModel: HomeViewModel
+    @ObservedObject private var store: StoreManager = .shared
     let onOpenMemory: (DaySection) -> Void
     let onDismiss: () -> Void
     let onScanPhotos: () -> Void
 
     @State private var selectedYear: Int
+    @State private var showVaultedPrompt = false
+    @State private var showForeverPaywall = false
     @State private var availableYears: [Int] = []
     @State private var region: MKCoordinateRegion
     @State private var annotations: [MemoryMapAnnotation] = []
@@ -95,6 +98,22 @@ struct MapView: View {
         .sheet(item: $poiSelection) { selection in
             POIInfoSheet(placeName: selection.title, coordinate: selection.coordinate)
         }
+        .sheet(isPresented: $showVaultedPrompt) {
+            VaultedMomentPrompt(
+                isPresented: $showVaultedPrompt,
+                onUnlockForever: { showForeverPaywall = true }
+            )
+            .presentationDetents([.height(340)])
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(BabyTownTheme.cardBackground)
+        }
+        .fullScreenCover(isPresented: $showForeverPaywall) {
+            CovelaForeverPaywallView(
+                store: store,
+                onUnlock: { showForeverPaywall = false },
+                onDismiss: { showForeverPaywall = false }
+            )
+        }
     }
 
     // MARK: - Map (original full-screen experience)
@@ -105,7 +124,7 @@ struct MapView: View {
                 region: $region,
                 annotations: annotations,
                 onSelect: { section in
-                    onOpenMemory(section)
+                    handleAnnotationTap(section)
                 },
                 onSelectPOI: { title, coordinate in
                     poiSelection = POISelection(title: title, coordinate: coordinate)
@@ -390,6 +409,15 @@ struct MapView: View {
         onOpenMemory(section)
     }
 
+    private func handleAnnotationTap(_ section: DaySection) {
+        let vaulted = viewModel.vaultedMomentIDs(isForeverUnlocked: store.isForeverUnlocked)
+        if section.moments.contains(where: { vaulted.contains($0.id) }) {
+            showVaultedPrompt = true
+        } else {
+            onOpenMemory(section)
+        }
+    }
+
     private func mapCircleIcon(_ systemName: String, filled: Bool) -> some View {
         ZStack {
             Circle()
@@ -415,6 +443,7 @@ struct MapView: View {
 
         let sections = filteredSections
         let showsPhotoThumbnails = sections.count <= photoPinThumbnailLimit
+        let vaulted = viewModel.vaultedMomentIDs(isForeverUnlocked: store.isForeverUnlocked)
         var built: [MemoryMapAnnotation] = []
         built.reserveCapacity(sections.count)
 
@@ -426,7 +455,8 @@ struct MapView: View {
                 built.append(
                     MemoryMapAnnotation(
                         section: section,
-                        showsPhotoThumbnail: showsPhotoThumbnails
+                        showsPhotoThumbnail: showsPhotoThumbnails,
+                        isVaulted: section.moments.contains { vaulted.contains($0.id) }
                     )
                 )
             }
@@ -440,8 +470,13 @@ struct MapView: View {
     private func updateAnnotations() {
         let sections = filteredSections
         let showsPhotoThumbnails = sections.count <= photoPinThumbnailLimit
+        let vaulted = viewModel.vaultedMomentIDs(isForeverUnlocked: store.isForeverUnlocked)
         annotations = sections.map {
-            MemoryMapAnnotation(section: $0, showsPhotoThumbnail: showsPhotoThumbnails)
+            MemoryMapAnnotation(
+                section: $0,
+                showsPhotoThumbnail: showsPhotoThumbnails,
+                isVaulted: $0.moments.contains { vaulted.contains($0.id) }
+            )
         }
     }
 

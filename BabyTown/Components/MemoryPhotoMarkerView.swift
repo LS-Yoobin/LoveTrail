@@ -20,6 +20,8 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
     private let glyphView = UIImageView()
     private let placeNamePill = UIView()
     private let placeNameLabel = UILabel()
+    private let lockIconView = UIImageView()
+    private var blurView: UIVisualEffectView?
 
     override var annotation: MKAnnotation? {
         didSet { applyContent() }
@@ -83,6 +85,15 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
 
         placeNamePill.addSubview(placeNameLabel)
         addSubview(placeNamePill)
+
+        lockIconView.image = UIImage(
+            systemName: "lock.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        )
+        lockIconView.tintColor = .white
+        lockIconView.contentMode = .center
+        lockIconView.isHidden = true
+        addSubview(lockIconView)
     }
 
     private func applyContent() {
@@ -108,7 +119,29 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
         let text = memory.section.placeDisplay
         placeNameLabel.text = text
         placeNamePill.isHidden = text.isEmpty
+
+        applyVaultedStyle(memory.isVaulted)
         setNeedsLayout()
+    }
+
+    private func applyVaultedStyle(_ isVaulted: Bool) {
+        if isVaulted {
+            if blurView == nil {
+                let blur = UIVisualEffectView(effect: UIBlurEffect(style: .regular))
+                blur.frame = circleView.bounds
+                blur.layer.cornerRadius = Self.circleDiameter / 2
+                blur.layer.masksToBounds = true
+                blur.isUserInteractionEnabled = false
+                circleView.addSubview(blur)
+                blurView = blur
+            }
+            lockIconView.frame = circleView.frame
+            lockIconView.isHidden = false
+        } else {
+            blurView?.removeFromSuperview()
+            blurView = nil
+            lockIconView.isHidden = true
+        }
     }
 
     override func layoutSubviews() {
@@ -148,6 +181,7 @@ final class MemoryPhotoMarkerView: MKAnnotationView {
         imageView.image = nil
         placeNamePill.isHidden = true
         placeNameLabel.text = nil
+        applyVaultedStyle(false)
     }
 
     private static func pinImage(from source: UIImage, cacheKey: String) -> UIImage {

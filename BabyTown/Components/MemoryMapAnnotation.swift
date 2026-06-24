@@ -9,6 +9,7 @@ class MemoryMapAnnotation: NSObject, Identifiable, MKAnnotation {
     let coordinate: CLLocationCoordinate2D
     let section: DaySection
     let showsPhotoThumbnail: Bool
+    let isVaulted: Bool
     
     var title: String? {
         section.placeName ?? "Memory"
@@ -21,10 +22,11 @@ class MemoryMapAnnotation: NSObject, Identifiable, MKAnnotation {
         return formatter.string(from: section.date)
     }
     
-    init(section: DaySection, showsPhotoThumbnail: Bool = true) {
+    init(section: DaySection, showsPhotoThumbnail: Bool = true, isVaulted: Bool = false) {
         self.id = section.id
         self.section = section
         self.showsPhotoThumbnail = showsPhotoThumbnail
+        self.isVaulted = isVaulted
         
         // Use the first moment's location as the pin coordinate
         if let firstMoment = section.moments.first,
