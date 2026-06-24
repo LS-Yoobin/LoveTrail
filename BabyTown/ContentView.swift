@@ -18,6 +18,10 @@ struct ContentView: View {
         case preludeOnboarding     // NEW — prelude intro screen
         case archivedCouple
         case partnerOnboarding(inviterName: String)
+        case invitePartner
+        case officialPending
+        case partnerGiftReveal(captures: [GiftRevealCapture], revealerName: String)
+        case justPickPhotos
     }
 
     @State private var screen: Screen = .launch
@@ -37,7 +41,9 @@ struct ContentView: View {
         if hasCompletedOnboarding {
             let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
             let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
-            if lastScreen == "selectPhotos" {
+            if lastScreen == "officialPending" || DataPersistenceManager.shared.hasPendingPartnerInvite() {
+                _targetScreen = State(initialValue: .officialPending)
+            } else if lastScreen == "selectPhotos" {
                 _targetScreen = State(initialValue: .selectPhotos)
             } else if stage == .prelude {
                 _targetScreen = State(initialValue: .prelude)
@@ -225,7 +231,7 @@ struct ContentView: View {
                     }
 
                     withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .howItWorks
+                        screen = .invitePartner
                     }
                     }
                 )
@@ -386,6 +392,66 @@ struct ContentView: View {
                         DataPersistenceManager.shared.setOnboardingCompleted(true)
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .home
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .invitePartner:
+                OnboardingInviteView(
+                    onSkip: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .officialPending
+                        }
+                    },
+                    onPartnerJoined: { captures, revealerName in
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            if captures.isEmpty {
+                                screen = .justPickPhotos
+                            } else {
+                                screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
+                            }
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .officialPending:
+                PendingHomeView(
+                    onPartnerJoined: { captures, revealerName in
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            if captures.isEmpty {
+                                screen = .justPickPhotos
+                            } else {
+                                screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
+                            }
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .onAppear {
+                    DataPersistenceManager.shared.saveLastActiveScreen("officialPending")
+                }
+
+            case .partnerGiftReveal(let captures, let revealerName):
+                PartnerGiftRevealView(
+                    captures: captures,
+                    revealerName: revealerName,
+                    onContinue: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .justPickPhotos
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .justPickPhotos:
+                JustPickPhotosView(
+                    officialPhoto: officialPhoto ?? UIImage(systemName: "heart.fill")!,
+                    firstMetPhoto: firstMetPhoto,
+                    onContinue: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .howItWorks
                         }
                     }
                 )
