@@ -2,9 +2,13 @@ import SwiftUI
 
 struct PreludeOnboardingView: View {
 
+    var onBack: () -> Void
     var onBegin: () -> Void
 
     @State private var contentOpacity: Double = 0
+    @State private var rowOpacities: [Double] = [0, 0, 0, 0]
+
+    private var pageBackground: Color { BabyTownTheme.cardBackground }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,13 +28,19 @@ struct PreludeOnboardingView: View {
                 .padding(.horizontal, 40)
                 .padding(.top, 16)
                 .padding(.bottom, 52)
-                .background(Color(.systemBackground))
+                .background(pageBackground)
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background(pageBackground.ignoresSafeArea())
         .opacity(contentOpacity)
+        .onboardingBackButton(action: onBack)
         .onAppear {
             withAnimation(.easeOut(duration: 0.7).delay(0.15)) {
                 contentOpacity = 1.0
+            }
+            for i in 0..<4 {
+                withAnimation(.easeOut(duration: 0.45).delay(0.5 + Double(i) * 0.18)) {
+                    rowOpacities[i] = 1.0
+                }
             }
         }
     }
@@ -49,9 +59,15 @@ struct PreludeOnboardingView: View {
             )
 
             VStack(spacing: 12) {
+                Text("Covela")
+                    .font(.system(size: 38, weight: .semibold, design: .serif))
+                    .italic()
+                    .foregroundStyle(BabyTownTheme.accentGradient)
+                    .tracking(1.5)
+                    .padding(.top, 44)
+
                 Text("💌")
                     .font(.system(size: 54))
-                    .padding(.top, 44)
 
                 Text("Your space to fall in love, quietly.")
                     .font(.system(size: 22, weight: .bold, design: .serif))
@@ -78,26 +94,34 @@ struct PreludeOnboardingView: View {
                 title: "Notes & Reflections",
                 description: "Write how you feel whenever it hits you. Even the small stuff."
             )
+            .opacity(rowOpacities[0])
+            .offset(y: rowOpacities[0] == 0 ? 12 : 0)
             Divider().padding(.leading, 60)
             featureRow(
                 icon: "star.fill",
                 title: "Firsts",
                 description: "Every first has a story. Do not let a single one slip away."
             )
+            .opacity(rowOpacities[1])
+            .offset(y: rowOpacities[1] == 0 ? 12 : 0)
             Divider().padding(.leading, 60)
             featureRow(
                 icon: "mic.fill",
                 title: "Voice Memos",
                 description: "Speak your mind in the moment. Raw, real, and unfiltered."
             )
+            .opacity(rowOpacities[2])
+            .offset(y: rowOpacities[2] == 0 ? 12 : 0)
             Divider().padding(.leading, 60)
             featureRow(
                 icon: "heart.fill",
                 title: "Reasons",
                 description: "The little things you love about them, in your own words."
             )
+            .opacity(rowOpacities[3])
+            .offset(y: rowOpacities[3] == 0 ? 12 : 0)
         }
-        .background(Color(.systemBackground))
+        .background(pageBackground)
     }
 
     private func featureRow(icon: String, title: String, description: String) -> some View {
@@ -111,10 +135,10 @@ struct PreludeOnboardingView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
                 Text(description)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(.secondaryLabel))
+                    .foregroundStyle(Color.black.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
                     .lineSpacing(2)
             }
@@ -181,5 +205,5 @@ struct PreludeOnboardingView: View {
 }
 
 #Preview {
-    PreludeOnboardingView(onBegin: { print("begin") })
+    PreludeOnboardingView(onBack: { print("back") }, onBegin: { print("begin") })
 }

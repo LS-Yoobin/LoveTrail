@@ -82,7 +82,7 @@ struct DailyCheckInPopupView: View {
 
             Text("Come back each day to keep your streak")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.65))
                 .multilineTextAlignment(.center)
         }
     }

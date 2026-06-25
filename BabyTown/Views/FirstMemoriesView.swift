@@ -3,7 +3,7 @@ import PhotosUI
 
 struct FirstMemoriesView: View {
 
-    @StateObject private var viewModel = FirstMemoriesViewModel()
+    @ObservedObject var viewModel: FirstMemoriesViewModel
     @State private var hasFinished = false
 
     var onBack: () -> Void
@@ -157,7 +157,7 @@ struct FirstMemoriesView: View {
 }
 
 #Preview {
-    FirstMemoriesView(onBack: {}, onFinished: { firstMet, official, firstMetDate, officialDate in
+    FirstMemoriesView(viewModel: FirstMemoriesViewModel(), onBack: {}, onFinished: { firstMet, official, firstMetDate, officialDate in
         print("Done — firstMet: \(firstMet != nil), official: \(official)")
     })
 }

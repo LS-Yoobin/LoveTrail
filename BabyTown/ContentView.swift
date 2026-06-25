@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
 
     enum Screen: Equatable {
-        case launch, welcome, storyOnboarding, nickname, colorTheme, birthday
+        case launch, auth, welcome, storyOnboarding, nickname, colorTheme, birthday
         case pathSelector          // NEW — branch point after birthday
         case firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var selectedPrompt: PromptItem?
     @State private var shouldScrollToNewMemory = false
     @StateObject private var homeViewModel: HomeViewModel
+    @StateObject private var firstMemoriesViewModel = FirstMemoriesViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
     private func resetAppToWelcome() {
@@ -45,6 +46,7 @@ struct ContentView: View {
         firstMetPhoto = nil
         officialPhoto = nil
         selectedPrompt = nil
+        firstMemoriesViewModel.reset()
         targetScreen = .welcome
         withAnimation(.easeInOut(duration: 0.4)) {
             screen = .welcome
@@ -78,7 +80,7 @@ struct ContentView: View {
                 loadFromPersistence: true
             ))
         } else {
-            _targetScreen = State(initialValue: .welcome)
+            _targetScreen = State(initialValue: .auth)
             _homeViewModel = StateObject(wrappedValue: HomeViewModel(
                 pinnedFirstMet: nil,
                 pinnedOfficial: UIImage(systemName: "heart.fill")!,
@@ -102,6 +104,14 @@ struct ContentView: View {
                         }
                     }
             
+            case .auth:
+                CovelaAuthView(onAuthenticated: {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .welcome
+                    }
+                })
+                .transition(.opacity)
+
             case .welcome:
                 WelcomeView {
                     withAnimation(.easeInOut(duration: 0.4)) {
@@ -199,6 +209,11 @@ struct ContentView: View {
 
             case .preludeOnboarding:
                 PreludeOnboardingView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .pathSelector
+                        }
+                    },
                     onBegin: {
                         var profile = DataPersistenceManager.shared.loadCoupleProfile()
                         profile.relationshipStage = .prelude
@@ -213,6 +228,7 @@ struct ContentView: View {
 
             case .firstMemories:
                 FirstMemoriesView(
+                    viewModel: firstMemoriesViewModel,
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .pathSelector
@@ -353,9 +369,10 @@ struct ContentView: View {
                         }
                     },
                     onSimulatePartnerInvite: {
-                        DataPersistenceManager.shared.saveInviterName("Justin")
+                        let testName = "Alex"
+                        DataPersistenceManager.shared.saveInviterName(testName)
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .partnerOnboarding(inviterName: "Justin")
+                            screen = .partnerOnboarding(inviterName: testName)
                         }
                     }
                 )
@@ -407,6 +424,11 @@ struct ContentView: View {
 
             case .invitePartner:
                 OnboardingInviteView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .firstMemories
+                        }
+                    },
                     onSkip: {
                         DataPersistenceManager.shared.setOnboardingCompleted(true)
                         withAnimation(.easeInOut(duration: 0.4)) {

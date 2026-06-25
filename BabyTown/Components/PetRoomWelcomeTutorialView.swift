@@ -10,6 +10,7 @@ struct PetRoomWelcomeTutorialView: View {
     @State private var step = 0
     @State private var cardScale: CGFloat = 0.92
     @State private var cardOpacity: Double = 0
+    @State private var goingForward = true
 
     private let totalSteps = 3
 
@@ -71,8 +72,8 @@ struct PetRoomWelcomeTutorialView: View {
                 stepContent
                     .id(step)
                     .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
+                        insertion: .move(edge: goingForward ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: goingForward ? .leading : .trailing).combined(with: .opacity)
                     ))
 
                 stepIndicator
@@ -111,6 +112,16 @@ struct PetRoomWelcomeTutorialView: View {
         )
         .shadow(color: BabyTownTheme.accent.opacity(0.18), radius: 28, y: 14)
         .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { value in
+                    if value.translation.width < 0 {
+                        advance()
+                    } else if value.translation.width > 0 {
+                        retreat()
+                    }
+                }
+        )
     }
 
     @ViewBuilder
@@ -162,7 +173,7 @@ struct PetRoomWelcomeTutorialView: View {
 
                 Text("You adopted \(petName)! You and your partner can take care of them together in this cozy room.")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(.black)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
             }
@@ -175,7 +186,7 @@ struct PetRoomWelcomeTutorialView: View {
 
                 Text("Tap each item in the room when it needs attention. Clean the litter box, fill the food bowl, and refill the water bowl.")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(.black)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
             }
@@ -188,7 +199,7 @@ struct PetRoomWelcomeTutorialView: View {
 
                 Text("Every care task earns coins. Spend them in the Market to decorate your pet's room.")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(.black)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
             }
@@ -321,11 +332,20 @@ struct PetRoomWelcomeTutorialView: View {
 
     private func advance() {
         if step < totalSteps - 1 {
+            goingForward = true
             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                 step += 1
             }
         } else {
             onFinish()
+        }
+    }
+
+    private func retreat() {
+        guard step > 0 else { return }
+        goingForward = false
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            step -= 1
         }
     }
 }

@@ -51,10 +51,14 @@ struct PetOwnedItemsSheet: View {
                 }
             }
             .background(sheetBackground.ignoresSafeArea())
-            .navigationTitle("My Items")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("My Items")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.black)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Back") { dismiss() }
                         .font(.system(size: 16, weight: .semibold))

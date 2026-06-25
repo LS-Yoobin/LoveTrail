@@ -21,6 +21,16 @@ final class FirstMemoriesViewModel: ObservableObject {
         officialImage != nil
     }
 
+    func reset() {
+        firstMetImage = nil
+        officialImage = nil
+        heroImage = nil
+        firstMetDate = nil
+        officialDate = nil
+        firstMetItem = nil
+        officialItem = nil
+    }
+
     func handleFirstMetSelection() async {
         guard let item = firstMetItem else { return }
         guard let data = try? await item.loadTransferable(type: Data.self) else { return }

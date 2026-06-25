@@ -101,7 +101,7 @@ struct CoupleProfileView: View {
 
     private var partnerSlotTitle: String {
         if isPartnerAccount {
-            return dpm.loadInviterName() ?? "Justin"
+            return dpm.loadInviterName() ?? "your partner"
         }
         return "Invite partner"
     }

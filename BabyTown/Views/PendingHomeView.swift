@@ -1,4 +1,5 @@
 import SwiftUI
+import GardenCore
 
 struct PendingHomeView: View {
     var onPartnerJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
@@ -15,6 +16,8 @@ struct PendingHomeView: View {
     @State private var didCrossPetOpenThreshold = false
     @State private var petThresholdHapticTick = 0
     @State private var petOpenHapticTick = 0
+    @State private var officialMoment: Moment? = nil
+    @State private var firstMetMoment: Moment? = nil
 
     private let petOpenThreshold: CGFloat = 110
 
@@ -58,6 +61,15 @@ struct PendingHomeView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .padding(.bottom, 40)
             }
+
+            if showVisitPet {
+                NavigationStack {
+                    AdoptAPetRootView(onDismiss: { showVisitPet = false })
+                }
+                .background(Color.white.ignoresSafeArea())
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
@@ -76,16 +88,14 @@ struct PendingHomeView: View {
                 }
             )
         }
-        .fullScreenCover(isPresented: $showVisitPet) {
-            NavigationStack {
-                AdoptAPetRootView(onDismiss: { showVisitPet = false })
-            }
-            .background(Color.white.ignoresSafeArea())
-        }
+        .animation(.easeInOut(duration: 0.3), value: showVisitPet)
         .fullScreenCover(isPresented: $showWaitingGarden) {
             waitingGardenView
         }
-        .onAppear { startPolling() }
+        .onAppear {
+            startPolling()
+            loadFoundingMoments()
+        }
         .onDisappear { stopPolling() }
         .sensoryFeedback(.impact(weight: .medium), trigger: petThresholdHapticTick)
         .sensoryFeedback(.success, trigger: petOpenHapticTick)
@@ -138,7 +148,7 @@ struct PendingHomeView: View {
                     isNightMode: false
                 )
 
-                lockedMemoriesContent
+                pendingPreviewContent
             }
             .padding(.top, 8)
             .padding(.bottom, 100)
@@ -151,25 +161,181 @@ struct PendingHomeView: View {
         }
     }
 
-    private var lockedMemoriesContent: some View {
-        VStack(spacing: 16) {
-            Spacer(minLength: 120)
+    // MARK: Pending preview sections
 
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 36))
-                .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.25))
-
-            Text("Your memories will live here once your partner joins.")
-                .font(.system(size: 15))
+    private var pendingPreviewContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            Text("Here's a glimpse of your shared space")
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.55))
-                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, 40)
+                .padding(.top, 8)
 
-            Spacer(minLength: 120)
+            pendingGardenSection
+            pendingPinnedSection
+            pendingTimelineSection
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var pendingGardenSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            pendingSectionLabel("Secret Garden", icon: "leaf.fill")
+                .padding(.horizontal, 20)
+
+            ZStack(alignment: .topTrailing) {
+                GardenBackgroundView()
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(.horizontal, 20)
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { showWaitingGarden = true }
+                    .padding(.horizontal, 20)
+            }
+            .frame(height: 180)
+        }
+    }
+
+    private var pendingPinnedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            pendingSectionLabel("Pinned Memories", icon: "pin.fill")
+                .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    pendingPinnedCard(
+                        title: "When we became official",
+                        moment: officialMoment
+                    )
+                    .frame(width: 170)
+
+                    pendingPinnedCard(
+                        title: "When we first met",
+                        moment: firstMetMoment
+                    )
+                    .frame(width: 170)
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pendingPinnedCard(title: String, moment: Moment?) -> some View {
+        if let moment {
+            foundingPhotoCard(moment: moment, showsPinnedLabel: true)
+        } else {
+            FoundingPlaceholderCard(title: title, showsPinnedLabel: true) { showToast() }
+        }
+    }
+
+    private var pendingTimelineSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                HeartbeatIconView()
+                Text("The Beginning\u{2026}")
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.85))
+                Spacer()
+            }
+            .padding(.leading, 32)
+            .padding(.bottom, 4)
+
+            pendingTimelineSlot(
+                prompt: "When we became official",
+                moment: officialMoment
+            )
+            pendingTimelineSlot(
+                prompt: "When we first met",
+                moment: firstMetMoment
+            )
+        }
+        .padding(.bottom, 8)
+    }
+
+    private func pendingTimelineSlot(prompt: String, moment: Moment?) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let moment {
+                foundingPhotoCard(moment: moment, showsPinnedLabel: false)
+                    .padding(.horizontal, 20)
+            } else {
+                FoundingPlaceholderCard(title: prompt, showsPinnedLabel: false) { showToast() }
+                    .padding(.horizontal, 20)
+            }
+
+            HStack(spacing: 8) {
+                HeartbeatIconView()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(prompt)
+                        .font(.system(size: 15, weight: .medium, design: .serif))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.85))
+                    Text(moment == nil ? "Tap to add your photo" : "")
+                        .font(.system(size: 13, weight: .regular, design: .serif))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.5))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 32)
+        }
+        .padding(.top, 16)
+    }
+
+    private func foundingPhotoCard(moment: Moment, showsPinnedLabel: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(uiImage: moment.thumbnail)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if showsPinnedLabel {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(moment.promptText ?? "")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 8))
+                        Text("Pinned")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(BabyTownTheme.accent.opacity(0.7))
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .fill(BabyTownTheme.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius)
+                .strokeBorder(BabyTownTheme.accent.opacity(0.15), lineWidth: 1)
+        )
         .contentShape(Rectangle())
         .onTapGesture { showToast() }
+    }
+
+    private func pendingSectionLabel(_ text: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(.black.opacity(0.9))
+            Text(text)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
+            Spacer()
+        }
+    }
+
+    private func loadFoundingMoments() {
+        let moments = DataPersistenceManager.shared.loadMoments()
+        officialMoment = moments.first { $0.promptText == "When we became official" }
+        firstMetMoment = moments.first { $0.promptText == "When we first met" }
     }
 
     private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {

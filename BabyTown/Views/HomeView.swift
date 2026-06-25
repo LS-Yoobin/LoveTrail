@@ -30,6 +30,7 @@ struct HomeView: View {
     /// was reloading JSON from disk and tanking Home scroll performance.
     @State private var coupleSpaceBloomCount = 0
     @State private var coupleSpaceAvatar: UIImage?
+    @State private var coupleSpacePartnerAvatar: UIImage?
     @State private var coupleSpaceGardenThumbnail: UIImage?
     @State private var homeSpecialDates: [SpecialDate] = []
     @State private var showHomeSpecialDateEditor = false
@@ -93,7 +94,7 @@ struct HomeView: View {
     private var homePartnerSlotTitle: String {
         let dpm = DataPersistenceManager.shared
         if dpm.isPartnerAccount() {
-            return dpm.loadInviterName() ?? "Justin"
+            return dpm.loadInviterName() ?? "your partner"
         }
         return "Invite partner"
     }
@@ -205,6 +206,7 @@ struct HomeView: View {
                                 } else {
                                     CoupleSpaceCard(
                                         avatar: coupleSpaceAvatar,
+                                        partnerAvatar: coupleSpacePartnerAvatar,
                                         gardenThumbnail: coupleSpaceGardenThumbnail,
                                         bloomCount: coupleSpaceBloomCount,
                                         isReadyToInvite: store.isForeverUnlocked,
@@ -504,9 +506,17 @@ struct HomeView: View {
                         .zIndex(26)
                         .transition(.opacity)
                 }
+
+                if showVisitPet {
+                    visitPetOverlay
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .zIndex(30)
+                        .transition(.opacity)
+                }
             } // Close ZStack
             .animation(.easeInOut(duration: 0.3), value: showMapView)
             .animation(.easeInOut(duration: 0.3), value: showCoupleProfile)
+            .animation(.easeInOut(duration: 0.3), value: showVisitPet)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
             .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
             .sheet(isPresented: $showPromptSheet) {
@@ -563,9 +573,6 @@ struct HomeView: View {
                 ScanView(existingAssetIdentifiers: Set(viewModel.moments.compactMap { $0.assetIdentifier })) { moments in
                     viewModel.addMoments(moments)
                 }
-            }
-            .fullScreenCover(isPresented: $showVisitPet) {
-                visitPetOverlay
             }
             .fullScreenCover(isPresented: $showPinnedMemoriesFeed) {
                 PinnedMemoriesFeedView(
@@ -713,9 +720,8 @@ struct HomeView: View {
     /// `viewModel.moments` so we don't re-read `moments.json` every frame.
     private func refreshCoupleSpaceCardMetadata() {
         let dpm = DataPersistenceManager.shared
-        coupleSpaceAvatar = dpm.isPartnerAccount()
-            ? dpm.loadPartnerProfilePhoto()
-            : dpm.loadUserAvatar()
+        coupleSpaceAvatar = dpm.loadUserAvatar()
+        coupleSpacePartnerAvatar = dpm.loadPartnerProfilePhoto()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
         let gardenContext = GardenActMapper.persistedContext(

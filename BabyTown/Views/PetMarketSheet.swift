@@ -57,10 +57,14 @@ struct PetMarketSheet: View {
                     .animation(.easeInOut(duration: 0.25), value: category)
                 }
                 .background(marketBackground.ignoresSafeArea())
-                .navigationTitle("Market")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
                 .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Market")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.black)
+                    }
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Back") { dismiss() }
                             .font(.system(size: 16, weight: .semibold))

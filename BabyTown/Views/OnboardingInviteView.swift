@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct OnboardingInviteView: View {
+    var onBack: () -> Void
     var onSkip: () -> Void
     var onPartnerJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
 
@@ -23,12 +24,8 @@ struct OnboardingInviteView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [.white, BabyTownTheme.accent.opacity(0.06)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            BabyTownTheme.backgroundCream
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
@@ -77,7 +74,7 @@ struct OnboardingInviteView: View {
 
             VStack(spacing: 14) {
                 InviteActionCard(
-                    icon: "envelope.heart.fill",
+                    icon: "heart.circle.fill",
                     title: "Invite your partner",
                     subtitle: "Send them a link. They tap it and you are connected."
                 ) {
@@ -121,7 +118,7 @@ struct OnboardingInviteView: View {
                 .padding(.vertical, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(.systemGray6))
+                        .fill(BabyTownTheme.cardTintLight)
                 )
 
             Button {
@@ -129,7 +126,7 @@ struct OnboardingInviteView: View {
             } label: {
                 Text("Copy invite code")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
             }
 
             Button {
@@ -138,7 +135,7 @@ struct OnboardingInviteView: View {
             } label: {
                 Text("Continue to your space")
                     .font(.system(size: 14))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.55))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.65))
             }
         }
     }
@@ -169,7 +166,7 @@ struct OnboardingInviteView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(BabyTownTheme.cardTintLight)
                             .shadow(color: BabyTownTheme.accent.opacity(0.08), radius: 8, y: 4)
                     )
                     .focused($codeFocused)
@@ -266,7 +263,7 @@ struct OnboardingInviteView: View {
     private func handleBack() {
         switch state {
         case .choosingAction:
-            break // back button from ContentView handles navigation
+            onBack()
         case .pending, .enteringCode:
             stopPolling()
             withAnimation { state = .choosingAction }
@@ -355,9 +352,9 @@ private struct PulsingRingsView: View {
 }
 
 #Preview("Choose action") {
-    OnboardingInviteView(onSkip: {}, onPartnerJoined: { _, _ in })
+    OnboardingInviteView(onBack: {}, onSkip: {}, onPartnerJoined: { _, _ in })
 }
 
 #Preview("Pending") {
-    OnboardingInviteView(onSkip: {}, onPartnerJoined: { _, _ in })
+    OnboardingInviteView(onBack: {}, onSkip: {}, onPartnerJoined: { _, _ in })
 }

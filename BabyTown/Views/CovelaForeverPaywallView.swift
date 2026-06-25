@@ -15,6 +15,12 @@ struct CovelaForeverPaywallView: View {
 
     var body: some View {
         ZStack {
+            LinearGradient(
+                colors: [.white, accent.opacity(0.10)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
             LoopingVideoPlayer(videoName: "transparent_flowers")
                 .frame(height: 300)
                 .mask(
@@ -65,9 +71,6 @@ struct CovelaForeverPaywallView: View {
                     )
             }
         }
-        .background {
-            backgroundGradient
-        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.45)) { appear = true }
         }
@@ -109,20 +112,6 @@ struct CovelaForeverPaywallView: View {
     }
 
     // MARK: - Sections
-
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                .white,
-                accent.opacity(0.06),
-                accent.opacity(0.14)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea()
-    }
 
     private var closeRow: some View {
         HStack {

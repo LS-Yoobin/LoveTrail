@@ -11,6 +11,7 @@ enum BabyTownTheme {
     // MARK: - Backgrounds
 
     static let background = Color.white
+    static let backgroundCream = Color(red: 0.98, green: 0.95, blue: 0.88)
     static var blush: Color { isBlue ? Color.blue.opacity(0.15) : Color.pink.opacity(0.15) }
     static var backgroundGradient: LinearGradient {
         isBlue

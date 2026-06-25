@@ -507,7 +507,7 @@ struct PetRoomView: View {
             }
         }
         .animation(.spring(response: 0.42, dampingFraction: 0.86), value: showWelcomeTutorial)
-        .toolbar(showWelcomeTutorial || checkInPopup != nil ? .hidden : .visible, for: .navigationBar)
+        .toolbar(showWelcomeTutorial ? .hidden : .visible, for: .navigationBar)
     }
 
     private var marketToolbarButton: some View {

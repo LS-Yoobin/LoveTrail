@@ -57,9 +57,10 @@ final class StubInviteAPIClient: InviteAPIClientProtocol {
         // TODO: POST /create-invite with body { inviterName, gift_capture_ids }
         try await Task.sleep(nanoseconds: 600_000_000)
         let code = PartnerInvite.generateCode()
+        let encodedName = inviterName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? inviterName
         return InviteCreatedResponse(
             code: code,
-            link: "https://covela.app/invite/\(code)"
+            link: "https://covela.app/invite/\(code)?from=\(encodedName)"
         )
     }
 

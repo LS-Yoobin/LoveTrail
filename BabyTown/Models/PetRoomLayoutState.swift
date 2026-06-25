@@ -28,28 +28,30 @@ struct PetRoomLayoutState: Codable, Equatable {
     /// Most-recently-used play toys, newest first (`PetShopItem.id`).
     var playToyUsageOrder: [String]
 
-    private static let currentBuiltInLayoutVersion = 8
+    private static let currentBuiltInLayoutVersion = 10
 
     /// Canonical normalized anchors for built-in care props (pre pixel-offset nudge).
     static let canonicalBuiltInPropPositions: [String: NormalizedPoint] = [
-        // Middle-left, above the bowls (Artemis reference layout).
-        PetRoomPropKey.catTree: NormalizedPoint(x: 0.22, y: 0.30),
+        // Right side, behind the litter box.
+        PetRoomPropKey.catTree: NormalizedPoint(x: 0.79, y: 0.28),
         // Bottom-left bowls sit closer together, just above the Train pill.
         PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.15, y: 0.125),
         PetRoomPropKey.waterBowl: NormalizedPoint(x: 0.31, y: 0.125),
-        // Bottom-right above Play, clear of the CTA.
-        PetRoomPropKey.litterBox: NormalizedPoint(x: 0.81, y: 0.17)
+        // Bottom-right, same horizontal plane as the food and water bowls.
+        PetRoomPropKey.litterBox: NormalizedPoint(x: 0.81, y: 0.125)
     ]
 
     /// Prior shipped cat-tree anchors — used to refresh only untouched defaults on migrate.
     private static let legacyCatTreeDefaultPositions: [NormalizedPoint] = [
-        NormalizedPoint(x: 0.84, y: 0.30)
+        NormalizedPoint(x: 0.84, y: 0.30),
+        NormalizedPoint(x: 0.22, y: 0.30)
     ]
 
     /// Prior shipped litter anchors — used to refresh only untouched defaults on migrate.
     private static let legacyLitterDefaultPositions: [NormalizedPoint] = [
         NormalizedPoint(x: 0.90, y: 0.12),
-        NormalizedPoint(x: 0.93, y: 0.12)
+        NormalizedPoint(x: 0.93, y: 0.12),
+        NormalizedPoint(x: 0.81, y: 0.17)
     ]
 
     static func builtInDefaultPosition(for key: String) -> NormalizedPoint? {
@@ -151,7 +153,35 @@ struct PetRoomLayoutState: Codable, Equatable {
         if builtInLayoutVersion < 8 {
             migrateToBuiltInLayoutV8()
         }
+        if builtInLayoutVersion < 9 {
+            migrateToBuiltInLayoutV9()
+        }
+        if builtInLayoutVersion < 10 {
+            migrateToBuiltInLayoutV10()
+        }
         builtInLayoutVersion = Self.currentBuiltInLayoutVersion
+    }
+
+    /// v10: move the cat tree to the right side, behind the litter box.
+    private mutating func migrateToBuiltInLayoutV10() {
+        if let current = propPositions[PetRoomPropKey.catTree] {
+            if Self.isLegacyCatTreeDefaultPosition(current) {
+                applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+            }
+        } else {
+            applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+        }
+    }
+
+    /// v9: align litter box to the same y-plane as the food and water bowls.
+    private mutating func migrateToBuiltInLayoutV9() {
+        if let current = propPositions[PetRoomPropKey.litterBox] {
+            if Self.isLegacyLitterDefaultPosition(current) {
+                applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.litterBox])
+            }
+        } else {
+            applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.litterBox])
+        }
     }
 
     /// v8: move the cat tree to the middle-left (reference room layout).
