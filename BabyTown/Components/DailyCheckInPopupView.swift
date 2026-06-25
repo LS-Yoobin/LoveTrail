@@ -1,0 +1,240 @@
+import SwiftUI
+
+enum CheckInPopupMode: Equatable {
+    case claiming(coins: Int)
+    case reviewing
+}
+
+struct DailyCheckInPopupView: View {
+    let mode: CheckInPopupMode
+    let streak: Int
+    let checkedInToday: Bool
+    let onDismiss: () -> Void
+
+    @State private var revealed = false
+    @State private var cardScale: CGFloat = 0.92
+    @State private var cardOpacity: Double = 0
+    @State private var shimmerPulsed = false
+
+    private var todayIndex: Int {
+        if checkedInToday && streak == 0 { return 7 }
+        if checkedInToday { return streak }
+        return min(streak + 1, 7)
+    }
+
+    private var claimCoins: Int {
+        if case .claiming(let coins) = mode { return coins }
+        return 0
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.52)
+                .ignoresSafeArea()
+
+            card
+                .padding(.horizontal, 24)
+                .scaleEffect(cardScale)
+                .opacity(cardOpacity)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.52, dampingFraction: 0.82)) {
+                cardScale = 1
+                cardOpacity = 1
+            }
+        }
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private var card: some View {
+        VStack(spacing: 20) {
+            header
+            starRow
+            if case .claiming = mode {
+                rewardSlot
+            }
+            buttonArea
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 24)
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.85), BabyTownTheme.accent.opacity(0.28)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
+        )
+        .shadow(color: BabyTownTheme.accent.opacity(0.18), radius: 28, y: 14)
+        .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+    }
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            Text("Daily Check-in")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
+
+            Text("Come back each day to keep your streak")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var starRow: some View {
+        HStack(spacing: 10) {
+            ForEach(1...7, id: \.self) { index in
+                starView(for: index)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func starView(for index: Int) -> some View {
+        let size: CGFloat = index == 7 ? 34 : 28
+        if index < todayIndex {
+            Image(systemName: "star.fill")
+                .font(.system(size: size))
+                .foregroundStyle(BabyTownTheme.accent)
+        } else if index == todayIndex {
+            todayStar(size: size)
+        } else {
+            Image(systemName: "star")
+                .font(.system(size: size))
+                .foregroundStyle(Color.secondary.opacity(0.3))
+        }
+    }
+
+    @ViewBuilder
+    private func todayStar(size: CGFloat) -> some View {
+        switch mode {
+        case .claiming:
+            if revealed {
+                Image(systemName: "star.fill")
+                    .font(.system(size: size))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+            } else {
+                Image(systemName: "star.fill")
+                    .font(.system(size: size))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .scaleEffect(shimmerPulsed ? 1.0 : 1.22)
+                    .opacity(shimmerPulsed ? 1.0 : 0.72)
+                    .onAppear {
+                        withAnimation(
+                            .easeInOut(duration: 0.75)
+                            .repeatForever(autoreverses: true)
+                        ) {
+                            shimmerPulsed = true
+                        }
+                    }
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.38, dampingFraction: 0.7)) {
+                            revealed = true
+                        }
+                    }
+                    .accessibilityLabel("Tap to reveal your reward")
+                    .accessibilityAddTraits(.isButton)
+            }
+        case .reviewing:
+            Image(systemName: "star.fill")
+                .font(.system(size: size))
+                .foregroundStyle(BabyTownTheme.accent)
+        }
+    }
+
+    // Reserves vertical space so the card doesn't jump when the reward appears.
+    private var rewardSlot: some View {
+        ZStack {
+            Color.clear.frame(height: 44)
+            if revealed {
+                HStack(spacing: 8) {
+                    PetCoinIcon(size: 30)
+                    Text("+\(claimCoins)")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.accentDeep)
+                }
+                .transition(
+                    .opacity.combined(with: .scale(scale: 0.8))
+                )
+            }
+        }
+        .animation(.spring(response: 0.42, dampingFraction: 0.78), value: revealed)
+    }
+
+    @ViewBuilder
+    private var buttonArea: some View {
+        switch mode {
+        case .claiming:
+            if revealed {
+                dismissButton("Collect")
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+        case .reviewing:
+            dismissButton("Close")
+        }
+    }
+
+    private func dismissButton(_ title: String) -> some View {
+        Button(action: onDismiss) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(BabyTownTheme.buttonGradient)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: BabyTownTheme.buttonShadow, radius: 12, y: 5)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var cardBackground: some View {
+        LinearGradient(
+            colors: [BabyTownTheme.cardTintLight, BabyTownTheme.cardTintDeep.opacity(0.92)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+}
+
+#Preview("Claiming — Day 3, not yet tapped") {
+    DailyCheckInPopupView(
+        mode: .claiming(coins: 14),
+        streak: 3,
+        checkedInToday: true,
+        onDismiss: {}
+    )
+}
+
+#Preview("Claiming — Day 7 bonus") {
+    DailyCheckInPopupView(
+        mode: .claiming(coins: 100),
+        streak: 0,
+        checkedInToday: true,
+        onDismiss: {}
+    )
+}
+
+#Preview("Reviewing — Day 5 streak") {
+    DailyCheckInPopupView(
+        mode: .reviewing,
+        streak: 5,
+        checkedInToday: true,
+        onDismiss: {}
+    )
+}
+
+#Preview("Reviewing — not yet checked in today") {
+    DailyCheckInPopupView(
+        mode: .reviewing,
+        streak: 2,
+        checkedInToday: false,
+        onDismiss: {}
+    )
+}
