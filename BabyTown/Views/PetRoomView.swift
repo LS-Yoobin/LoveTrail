@@ -486,7 +486,10 @@ struct PetRoomView: View {
                     mode: mode,
                     streak: viewModel.checkInStreak,
                     checkedInToday: viewModel.checkedInToday,
-                    onDismiss: { withAnimation { checkInPopup = nil } }
+                    onDismiss: {
+                        withAnimation { checkInPopup = nil }
+                        presentWelcomeTutorialIfNeeded()
+                    }
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
@@ -504,7 +507,7 @@ struct PetRoomView: View {
             }
         }
         .animation(.spring(response: 0.42, dampingFraction: 0.86), value: showWelcomeTutorial)
-        .toolbar(showWelcomeTutorial ? .hidden : .visible, for: .navigationBar)
+        .toolbar(showWelcomeTutorial || checkInPopup != nil ? .hidden : .visible, for: .navigationBar)
     }
 
     private var marketToolbarButton: some View {
@@ -1467,6 +1470,7 @@ struct PetRoomView: View {
         guard viewModel.shouldShowPetRoomTutorial, !showWelcomeTutorial else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
             guard viewModel.shouldShowPetRoomTutorial else { return }
+            guard checkInPopup == nil else { return }
             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                 showWelcomeTutorial = true
             }
