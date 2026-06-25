@@ -265,6 +265,7 @@ struct PetHUDView: View {
     var onAdoptMore: (() -> Void)?
     var checkInStreak: Int = 0
     var checkedInToday: Bool = false
+    var onStreakTap: (() -> Void)? = nil
 
     private var showsPetSwitcher: Bool {
         currentSkin != nil && onSelectPet != nil && onAdoptMore != nil
@@ -295,7 +296,8 @@ struct PetHUDView: View {
                 if currentSkin != nil {
                     DailyCheckInStreakView(
                         streak: checkInStreak,
-                        checkedInToday: checkedInToday
+                        checkedInToday: checkedInToday,
+                        onTap: onStreakTap
                     )
                 }
 

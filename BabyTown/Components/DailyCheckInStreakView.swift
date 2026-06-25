@@ -3,6 +3,7 @@ import SwiftUI
 struct DailyCheckInStreakView: View {
     let streak: Int
     let checkedInToday: Bool
+    var onTap: (() -> Void)? = nil
 
     @State private var pulsed = false
 
@@ -13,12 +14,19 @@ struct DailyCheckInStreakView: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        let strip = HStack(spacing: 6) {
             ForEach(1...7, id: \.self) { index in
                 dot(for: index)
             }
         }
         .frame(height: 20)
+
+        if let onTap {
+            Button(action: onTap) { strip }
+                .buttonStyle(.plain)
+        } else {
+            strip
+        }
     }
 
     @ViewBuilder
