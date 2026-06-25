@@ -43,6 +43,7 @@ struct PetRoomView: View {
     @State private var selectedPropActionAnchor: CGPoint?
     @State private var toiletPaperMessage: String?
     @State private var showWelcomeTutorial = false
+    @State private var checkInPopup: CheckInPopupMode?
 
     @State private var isTrickMode = false
     @State private var showTrickBook = false
@@ -404,7 +405,8 @@ struct PetRoomView: View {
                         },
                         onAdoptMore: onChangePet,
                         checkInStreak: viewModel.checkInStreak,
-                        checkedInToday: viewModel.checkedInToday
+                        checkedInToday: viewModel.checkedInToday,
+                        onStreakTap: { checkInPopup = .reviewing }
                     )
                 }
             }
@@ -450,6 +452,7 @@ struct PetRoomView: View {
             }
         }
         .onChange(of: viewModel.lastAward?.id) { _, _ in
+            guard checkInPopup == nil else { return }
             if let award = viewModel.lastAward { triggerCoinBurst(award.amount) }
         }
         .onChange(of: viewModel.roomLayout) { _, _ in
@@ -477,6 +480,19 @@ struct PetRoomView: View {
             syncLitterBoxState()
             syncNeedThoughtBubble()
         }
+        .overlay {
+            if let mode = checkInPopup {
+                DailyCheckInPopupView(
+                    mode: mode,
+                    streak: viewModel.checkInStreak,
+                    checkedInToday: viewModel.checkedInToday,
+                    onDismiss: { withAnimation { checkInPopup = nil } }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: checkInPopup != nil)
+        .onChange(of: checkInPopup) { _, _ in syncSceneSheetPause() }
         .overlay {
             if showWelcomeTutorial {
                 PetRoomWelcomeTutorialView(
@@ -1306,7 +1322,7 @@ struct PetRoomView: View {
             viewModel.registerPetInteraction()
             let awarded = viewModel.checkInForPetRoom()
             if awarded > 0 {
-                coinBurst = (amount: awarded, id: UUID())
+                checkInPopup = .claiming(coins: awarded)
             }
             if scene == nil {
                 installScene(
@@ -1444,7 +1460,7 @@ struct PetRoomView: View {
     /// Keeps SpriteKit paused while market / owned-items sheets cover the room,
     /// then heals walk-animation desync when they close.
     private func syncSceneSheetPause() {
-        scene?.setSheetCoverActive(showMarket || showOwnedItems || showWelcomeTutorial)
+        scene?.setSheetCoverActive(showMarket || showOwnedItems || showWelcomeTutorial || checkInPopup != nil)
     }
 
     private func presentWelcomeTutorialIfNeeded() {
