@@ -18,6 +18,7 @@ struct HomeView: View {
     var onOpenPhotoViewer: (_ moment: Moment, _ allInDay: [Moment]) -> Void
     var onResetApp: (() -> Void)? = nil
     var onReplayStory: (() -> Void)? = nil
+    var onLogOut: (() -> Void)? = nil
     @Binding var selectedPrompt: PromptItem?
     var onMemoriesAdded: (() -> Void)? = nil
     
@@ -108,6 +109,7 @@ struct HomeView: View {
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void,
         onResetApp: (() -> Void)? = nil,
         onReplayStory: (() -> Void)? = nil,
+        onLogOut: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
@@ -119,6 +121,7 @@ struct HomeView: View {
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
         self.onReplayStory = onReplayStory
+        self.onLogOut = onLogOut
         _selectedPrompt = selectedPrompt
     }
 
@@ -128,6 +131,7 @@ struct HomeView: View {
         onOpenPhotoViewer: @escaping (Moment, [Moment]) -> Void = { _, _ in },
         onResetApp: (() -> Void)? = nil,
         onReplayStory: (() -> Void)? = nil,
+        onLogOut: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -135,6 +139,7 @@ struct HomeView: View {
         self.onOpenPhotoViewer = onOpenPhotoViewer
         self.onResetApp = onResetApp
         self.onReplayStory = onReplayStory
+        self.onLogOut = onLogOut
         _selectedPrompt = selectedPrompt
     }
 
@@ -551,7 +556,8 @@ struct HomeView: View {
                     onResetApp: { onResetApp?() },
                     onReplayStory: { onReplayStory?() },
                     onVisitPet: { showVisitPet = true },
-                    onOpenCoupleProfile: { showCoupleProfile = true }
+                    onOpenCoupleProfile: { showCoupleProfile = true },
+                    onLogOut: { onLogOut?() }
                 )
             }
             .sheet(isPresented: $showHomeSpecialDateEditor) {

@@ -4,6 +4,7 @@ import GardenCore
 struct PendingHomeView: View {
     var onPartnerJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
     var onResetApp: () -> Void = {}
+    var onLogOut: () -> Void = {}
 
     @State private var pollTimer: Timer? = nil
     @State private var showLockedToast = false
@@ -85,7 +86,8 @@ struct PendingHomeView: View {
                 onOpenCoupleProfile: {
                     showSettings = false
                     showWaitingGarden = true
-                }
+                },
+                onLogOut: { onLogOut() }
             )
         }
         .animation(.easeInOut(duration: 0.3), value: showVisitPet)
