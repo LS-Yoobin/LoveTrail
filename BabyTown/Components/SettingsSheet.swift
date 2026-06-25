@@ -289,6 +289,12 @@ struct SettingsSheet: View {
 }
 
 private struct AccountInfoView: View {
+    private static let birthdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
+        return f
+    }()
+
     private var email: String {
         DataPersistenceManager.shared.loadUserEmail()
             ?? AuthService.shared.currentUser?.email
@@ -304,9 +310,7 @@ private struct AccountInfoView: View {
         guard let entry = profile.specialDates.first(where: { $0.id == SpecialDate.localUserBirthdayID }) else {
             return "Not set"
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: entry.date)
+        return Self.birthdayFormatter.string(from: entry.date)
     }
 
     var body: some View {
@@ -335,6 +339,7 @@ private struct AccountInfoView: View {
                 }
             }
         }
+        .listStyle(.plain)
         .navigationTitle("Account Info")
         .navigationBarTitleDisplayMode(.inline)
     }
