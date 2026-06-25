@@ -316,6 +316,12 @@ struct ContentView: View {
                             screen = .storyOnboarding
                         }
                     },
+                    onLogOut: {
+                        AuthService.shared.signOut()
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .auth
+                        }
+                    },
                     selectedPrompt: $selectedPrompt
                 )
                 .transition(.identity)
@@ -458,7 +464,13 @@ struct ContentView: View {
                             }
                         }
                     },
-                    onResetApp: resetAppToWelcome
+                    onResetApp: resetAppToWelcome,
+                    onLogOut: {
+                        AuthService.shared.signOut()
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .auth
+                        }
+                    }
                 )
                 .transition(.opacity)
                 .onAppear {
