@@ -210,34 +210,11 @@ final class PetSpeechCommandRecognizer: ObservableObject {
         lastFiredTrick = trick
         lastFiredAt = now
         markTranscriptConsumed(text)
-        // #region agent log
-        AgentDebugLog.write(
-            location: "PetSpeechCommandRecognizer.handleTranscript",
-            message: "command fired",
-            hypothesisId: "D",
-            data: [
-                "trick": trick.displayName,
-                "isFinal": isFinal ? "yes" : "no",
-                "status": "\(status)",
-            ]
-        )
-        // #endregion
         onCommand?(trick)
     }
 
     /// Restart the recognition task only after an unexpected failure — not between commands.
     private func recoverRecognition(after error: Error) {
-        // #region agent log
-        AgentDebugLog.write(
-            location: "PetSpeechCommandRecognizer.recoverRecognition",
-            message: "attempting speech recovery",
-            hypothesisId: "D",
-            data: [
-                "status": "\(status)",
-                "error": "\(error.localizedDescription)",
-            ]
-        )
-        // #endregion
         guard status == .listening, let speechRecognizer else { return }
         recognitionTask?.cancel()
         recognitionTask = nil
@@ -253,14 +230,6 @@ final class PetSpeechCommandRecognizer: ObservableObject {
             try configureAudioSession()
             try startRecognition(with: speechRecognizer)
         } catch {
-            // #region agent log
-            AgentDebugLog.write(
-                location: "PetSpeechCommandRecognizer.recoverRecognition",
-                message: "speech recovery failed — listening stopped",
-                hypothesisId: "D",
-                data: ["status": "unavailable"]
-            )
-            // #endregion
             status = .unavailable("Listening stopped unexpectedly.")
             stop()
         }

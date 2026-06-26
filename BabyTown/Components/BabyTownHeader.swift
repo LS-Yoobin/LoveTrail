@@ -77,7 +77,7 @@ struct BabyTownHeader: View {
                     } label: {
                         Image(systemName: "line.3")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(iconForeground)
+                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : .black)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }

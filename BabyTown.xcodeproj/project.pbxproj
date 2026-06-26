@@ -349,7 +349,6 @@
 				DEVELOPMENT_TEAM = N3L5LBGNK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = BabyTown/AgentDebugLogging.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BabyTown uses your location to tag photos and suggest a starting area when you add a place to a memory.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone for Vibe photos and to hear trick commands when training your cat.";

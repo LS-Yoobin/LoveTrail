@@ -1917,20 +1917,6 @@ final class PetRoomScene: SKScene {
 
     /// Cancels locomotion so sit / sleep / groom poses stay in place.
     private func stopMovement() {
-        // #region agent log
-        if isTrickMode {
-            AgentDebugLog.write(
-                location: "PetRoomScene.stopMovement",
-                message: "stopMovement cancelling behavior",
-                hypothesisId: "F",
-                data: trickDebugState(extra: [
-                    "hadBehavior": cat.action(forKey: "behavior") != nil ? "yes" : "no",
-                    "hadTrick": cat.action(forKey: "trick") != nil ? "yes" : "no",
-                ]),
-                runId: "post-fix-v2"
-            )
-        }
-        // #endregion
         isHoldingPose = false
         // `goToBowl` only clears this in its `finish` action; cancelling the
         // behavior (customize, sheet pause, tap-to-interrupt) must reset it or
@@ -3158,18 +3144,7 @@ final class PetRoomScene: SKScene {
     /// Sends the cat to the middle of the floor band and sits it down. Cancelable
     /// via the shared "behavior" key, so a trick command or snack interrupts it.
     private func walkToCenterAndSit() {
-        guard !isSnackBeingEaten else {
-            // #region agent log
-            AgentDebugLog.write(
-                location: "PetRoomScene.walkToCenterAndSit",
-                message: "deferred — snack eat in progress",
-                hypothesisId: "F",
-                data: trickDebugState(),
-                runId: "post-fix-v2"
-            )
-            // #endregion
-            return
-        }
+        guard !isSnackBeingEaten else { return }
         stopMovement()
         catVisual.removeAction(forKey: "anim")
         isInteracting = false
@@ -3239,19 +3214,6 @@ final class PetRoomScene: SKScene {
     /// Drops the snack onto the floor; the cat walks over, eats, and the snack
     /// fades away after a couple of seconds.
     func dropSnack(atSceneX x: CGFloat, sceneY y: CGFloat) {
-        // #region agent log
-        if isTrickMode {
-            AgentDebugLog.write(
-                location: "PetRoomScene.dropSnack",
-                message: isTrickMode && snackNode != nil && !isSnackBeingEaten ? "dropSnack accepted" : "dropSnack rejected",
-                hypothesisId: "B,E",
-                data: trickDebugState(extra: [
-                    "hasSnackNode": snackNode != nil ? "yes" : "no",
-                    "accepted": (isTrickMode && snackNode != nil && !isSnackBeingEaten) ? "yes" : "no",
-                ])
-            )
-        }
-        // #endregion
         guard isTrickMode, let snack = snackNode, !isSnackBeingEaten else { return }
         if cat.action(forKey: "trick") != nil {
             // Reinforcement treat dropped while the success animation is still
@@ -3260,15 +3222,6 @@ final class PetRoomScene: SKScene {
             catVisual.removeAction(forKey: "anim")
             isInteracting = false
             isHoldingPose = false
-            // #region agent log
-            AgentDebugLog.write(
-                location: "PetRoomScene.dropSnack",
-                message: "interrupted trick animation for treat",
-                hypothesisId: "F",
-                data: trickDebugState(),
-                runId: "post-fix-v2"
-            )
-            // #endregion
         }
         isSnackBeingEaten = true
         stopMovement()   // cancel any post-trick walk-to-center so eat takes priority
@@ -3293,30 +3246,12 @@ final class PetRoomScene: SKScene {
     }
 
     private func clearSnack() {
-        // #region agent log
-        if isTrickMode {
-            AgentDebugLog.write(
-                location: "PetRoomScene.clearSnack",
-                message: "clearSnack removing snack",
-                hypothesisId: "A,B",
-                data: trickDebugState(extra: ["hadSnackNode": snackNode != nil ? "yes" : "no"])
-            )
-        }
-        // #endregion
         snackNode?.removeFromParent()
         snackNode = nil
         isSnackBeingEaten = false
     }
 
     private func eatSnack(_ snack: SKNode) {
-        // #region agent log
-        AgentDebugLog.write(
-            location: "PetRoomScene.eatSnack",
-            message: "eatSnack started goToBowl",
-            hypothesisId: "A,B",
-            data: trickDebugState()
-        )
-        // #endregion
         guard snack.parent != nil else {
             isSnackBeingEaten = false
             return
@@ -3324,14 +3259,6 @@ final class PetRoomScene: SKScene {
         isInteracting = true
         goToBowl(snack, pose: .snack, hold: 2.0) { [weak self] in
             guard let self else { return }
-            // #region agent log
-            AgentDebugLog.write(
-                location: "PetRoomScene.eatSnack.completion",
-                message: "eatSnack goToBowl finished",
-                hypothesisId: "A,B",
-                data: self.trickDebugState()
-            )
-            // #endregion
             snack.run(.sequence([.fadeOut(withDuration: 0.25), .removeFromParent()]))
             self.snackNode = nil
             self.isSnackBeingEaten = false
@@ -3355,17 +3282,6 @@ final class PetRoomScene: SKScene {
     /// Plays a trick animation. `succeeded` false shows the confused pose.
     func playTrick(_ trick: PetTrick, succeeded: Bool, completion: (() -> Void)? = nil) {
         guard isTrickMode else { completion?(); return }
-        // #region agent log
-        AgentDebugLog.write(
-            location: "PetRoomScene.playTrick",
-            message: "playTrick invoked",
-            hypothesisId: "A,C",
-            data: trickDebugState(extra: [
-                "trick": trick.rawValue,
-                "succeeded": succeeded ? "yes" : "no",
-            ])
-        )
-        // #endregion
         clearSnack()   // a command interrupts any in-progress snack eat
         stopMovement()
         cat.removeAction(forKey: "trick")
@@ -3377,25 +3293,8 @@ final class PetRoomScene: SKScene {
             let action = catAction(for: trick)
             startTrickAnimation(action, duration: trick == .spin ? 1.4 : 1.8) { [weak self] in
                 guard let self else { completion?(); return }
-                // #region agent log
-                AgentDebugLog.write(
-                    location: "PetRoomScene.playTrick.completion",
-                    message: "playTrick succeeded animation finished",
-                    hypothesisId: "C",
-                    data: self.trickDebugState(extra: ["trick": trick.rawValue])
-                )
-                // #endregion
                 self.isInteracting = false
                 if self.isSnackBeingEaten {
-                    // #region agent log
-                    AgentDebugLog.write(
-                        location: "PetRoomScene.playTrick.completion",
-                        message: "skipped walkToCenterAndSit — snack eat in progress",
-                        hypothesisId: "F",
-                        data: self.trickDebugState(extra: ["trick": trick.rawValue]),
-                        runId: "post-fix-v2"
-                    )
-                    // #endregion
                     completion?()
                     return
                 }
@@ -3405,31 +3304,11 @@ final class PetRoomScene: SKScene {
         } else {
             startTrickAnimation(.confused, duration: 1.5) { [weak self] in
                 guard let self else { completion?(); return }
-                // #region agent log
-                AgentDebugLog.write(
-                    location: "PetRoomScene.playTrick.completion",
-                    message: "playTrick failed animation finished",
-                    hypothesisId: "C",
-                    data: self.trickDebugState(extra: ["trick": trick.rawValue])
-                )
-                // #endregion
                 self.isInteracting = false
                 self.beginTrickModeAttentiveSit()
                 completion?()
             }
         }
-    }
-
-    private func trickDebugState(extra: [String: String] = [:]) -> [String: String] {
-        var state: [String: String] = [
-            "isInteracting": isInteracting ? "yes" : "no",
-            "isSnackBeingEaten": isSnackBeingEaten ? "yes" : "no",
-            "isHoldingPose": isHoldingPose ? "yes" : "no",
-            "isHoldingBowlInteraction": isHoldingBowlInteraction ? "yes" : "no",
-            "currentAction": "\(currentAction)",
-        ]
-        for (key, value) in extra { state[key] = value }
-        return state
     }
 
     private func catAction(for trick: PetTrick) -> CatAction {
