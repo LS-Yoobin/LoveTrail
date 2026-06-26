@@ -174,13 +174,13 @@ final class LoveGardenScene: SKScene {
     }
 
     private func addStaticClouds() {
-        for i in 0..<3 {
-            let cloud = SKShapeNode(ellipseOf: CGSize(width: 90 + CGFloat(i) * 18, height: 34))
-            cloud.fillColor = SKColor(white: 1, alpha: season == .blooming ? 0.55 : 0.38)
-            cloud.strokeColor = .clear
+        let alpha: CGFloat = season == .blooming ? 0.55 : 0.38
+        let color = SKColor(white: 1, alpha: alpha)
+        for i in 0..<4 {
+            let cloud = makeCloud(variant: i, color: color)
             cloud.position = CGPoint(
-                x: size.width * (0.2 + CGFloat(i) * 0.28),
-                y: size.height * (0.72 + CGFloat(i) * 0.04)
+                x: size.width * (0.15 + CGFloat(i) * 0.24),
+                y: size.height * (0.70 + CGFloat(i % 2) * 0.06)
             )
             cloud.zPosition = -2
             addChild(cloud)
@@ -188,22 +188,93 @@ final class LoveGardenScene: SKScene {
     }
 
     private func addDriftingClouds() {
-        for i in 0..<3 {
-            let cloud = SKShapeNode(ellipseOf: CGSize(width: 90 + CGFloat(i) * 18, height: 34))
-            cloud.fillColor = SKColor(white: 1, alpha: season == .blooming ? 0.55 : 0.38)
-            cloud.strokeColor = .clear
-            cloud.position = CGPoint(
-                x: size.width * (0.2 + CGFloat(i) * 0.28),
-                y: size.height * (0.72 + CGFloat(i) * 0.04)
-            )
-            cloud.zPosition = -2
-            addChild(cloud)
-            let travel = SKAction.repeatForever(.sequence([
-                .moveBy(x: 24, y: 0, duration: 18 + Double(i) * 4),
-                .moveBy(x: -24, y: 0, duration: 18 + Double(i) * 4),
+        let alpha: CGFloat = season == .blooming ? 0.62 : 0.42
+        let cloudColor = SKColor(white: 1, alpha: alpha)
+        let cloudCount = 7
+        let maxCloudWidth: CGFloat = 130
+
+        let ySlots: [CGFloat] = [0.62, 0.68, 0.74, 0.78, 0.65, 0.71, 0.76]
+        let speeds: [CGFloat] = [14, 19, 24, 17, 28, 21, 16]
+
+        for i in 0..<cloudCount {
+            // Outer node travels horizontally; inner node bobs vertically.
+            let traveler = SKNode()
+            let yPos = size.height * ySlots[i]
+            let startX = -maxCloudWidth + (size.width + maxCloudWidth) * CGFloat(i) / CGFloat(cloudCount - 1)
+            traveler.position = CGPoint(x: startX, y: yPos)
+            traveler.zPosition = (i % 2 == 0) ? -2 : -3
+            addChild(traveler)
+
+            let cloud = makeCloud(variant: i, color: cloudColor)
+            traveler.addChild(cloud)
+
+            // Horizontal loop: travel right until off-screen, jump back to left edge.
+            let speed = speeds[i]
+            let rightEdge = size.width + maxCloudWidth
+            let initialDist = rightEdge - startX
+            let fullDist = size.width + maxCloudWidth * 2
+
+            let moveInitial = SKAction.moveBy(x: initialDist, y: 0,
+                                              duration: TimeInterval(initialDist / speed))
+            let jumpLeft = SKAction.run { [weak traveler] in
+                traveler?.position.x = -maxCloudWidth
+            }
+            let moveFull = SKAction.moveBy(x: fullDist, y: 0,
+                                           duration: TimeInterval(fullDist / speed))
+            traveler.run(.sequence([moveInitial, .repeatForever(.sequence([jumpLeft, moveFull]))]))
+
+            // Vertical hover bob on the inner cloud node.
+            let bobAmps: [CGFloat] = [4, 6, 3, 7, 5, 4, 6]
+            let bobDurations: [Double] = [8, 11, 7, 10, 9, 12, 8]
+            let bob = SKAction.repeatForever(.sequence([
+                .moveBy(x: 0, y: bobAmps[i], duration: bobDurations[i]),
+                .moveBy(x: 0, y: -bobAmps[i], duration: bobDurations[i]),
             ]))
-            cloud.run(travel)
+            bob.timingMode = .easeInEaseOut
+            cloud.run(.sequence([.wait(forDuration: Double(i) * 1.3), bob]))
         }
+    }
+
+    // Builds a composite cloud from overlapping ellipses. Four distinct shapes.
+    private func makeCloud(variant: Int, color: SKColor) -> SKNode {
+        let container = SKNode()
+        let bumps: [(CGSize, CGPoint)]
+        switch variant % 4 {
+        case 0: // Puffy round
+            bumps = [
+                (CGSize(width: 72, height: 28), .zero),
+                (CGSize(width: 44, height: 36), CGPoint(x: -22, y: 10)),
+                (CGSize(width: 50, height: 40), CGPoint(x:  2, y: 14)),
+                (CGSize(width: 36, height: 28), CGPoint(x: 26, y:  8)),
+            ]
+        case 1: // Long wispy
+            bumps = [
+                (CGSize(width: 108, height: 22), .zero),
+                (CGSize(width: 42,  height: 30), CGPoint(x: -30, y:  8)),
+                (CGSize(width: 46,  height: 32), CGPoint(x:  24, y: 10)),
+            ]
+        case 2: // Tall builder
+            bumps = [
+                (CGSize(width: 62, height: 24), .zero),
+                (CGSize(width: 38, height: 34), CGPoint(x: -14, y: 12)),
+                (CGSize(width: 46, height: 42), CGPoint(x:   4, y: 18)),
+                (CGSize(width: 32, height: 26), CGPoint(x:  24, y:  8)),
+            ]
+        default: // Small wispy
+            bumps = [
+                (CGSize(width: 56, height: 18), .zero),
+                (CGSize(width: 36, height: 26), CGPoint(x: -10, y: 8)),
+                (CGSize(width: 30, height: 22), CGPoint(x:  16, y: 6)),
+            ]
+        }
+        for (bumpSize, offset) in bumps {
+            let ellipse = SKShapeNode(ellipseOf: bumpSize)
+            ellipse.fillColor = color
+            ellipse.strokeColor = .clear
+            ellipse.position = offset
+            container.addChild(ellipse)
+        }
+        return container
     }
 
     private func addFallingPetals() {
@@ -262,7 +333,7 @@ final class LoveGardenScene: SKScene {
     private func makeNode(for element: GardenElement) -> SKNode {
         switch element.kind {
         case .flower, .placeFlower, .birthdayFlower, .anniversaryFlower:
-            return makeFlower(
+            return Self.makeFlower(
                 chapter: element.chapter,
                 shape: element.shape,
                 season: season,
@@ -270,11 +341,11 @@ final class LoveGardenScene: SKScene {
                 isLegend: element.isLegend
             )
         case .tree:
-            return makeTree()
+            return Self.makeTree()
         }
     }
 
-    private func makeFlower(
+    internal static func makeFlower(
         chapter: BloomChapter,
         shape: BloomShape,
         season: GardenSeason,
@@ -291,13 +362,13 @@ final class LoveGardenScene: SKScene {
         let petalColor = Self.petalColor(chapter: chapter, season: season, cycle: cycle)
         let head = SKNode()
         head.position = CGPoint(x: 0, y: stemHeight + 4)
-        addPetals(to: head, shape: shape, color: petalColor, isLegend: isLegend)
-        addFlowerCenter(to: head, chapter: chapter, shape: shape)
+        Self.addPetals(to: head, shape: shape, color: petalColor, isLegend: isLegend)
+        Self.addFlowerCenter(to: head, chapter: chapter, shape: shape)
         container.addChild(head)
         return container
     }
 
-    private func addPetals(to head: SKNode, shape: BloomShape, color: SKColor, isLegend: Bool) {
+    private static func addPetals(to head: SKNode, shape: BloomShape, color: SKColor, isLegend: Bool) {
         switch shape {
         case .classic6:
             addRadialPetals(to: head, count: 6, size: CGSize(width: 12, height: 22), color: color, offsetY: 12)
@@ -344,7 +415,7 @@ final class LoveGardenScene: SKScene {
         }
     }
 
-    private func addRadialPetals(
+    private static func addRadialPetals(
         to head: SKNode,
         count: Int,
         size: CGSize,
@@ -364,7 +435,7 @@ final class LoveGardenScene: SKScene {
         }
     }
 
-    private func addFlowerCenter(to head: SKNode, chapter: BloomChapter, shape: BloomShape) {
+    private static func addFlowerCenter(to head: SKNode, chapter: BloomChapter, shape: BloomShape) {
         switch shape {
         case .place5:
             let pin = SKShapeNode(circleOfRadius: 5)
@@ -446,7 +517,7 @@ final class LoveGardenScene: SKScene {
         node.run(pulse)
     }
 
-    private func makeTree() -> SKNode {
+    internal static func makeTree() -> SKNode {
         let container = SKNode()
         let trunk = SKShapeNode(rect: CGRect(x: -5, y: 0, width: 10, height: 70))
         trunk.fillColor = SKColor(red: 0.45, green: 0.33, blue: 0.24, alpha: 1)
