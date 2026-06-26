@@ -83,13 +83,15 @@ class CustomCameraViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        InAppCameraAudioSession.enterCamera(needsMicCapture: false)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession?.startRunning()
         }
     }
-    
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        InAppCameraAudioSession.leaveCamera()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession?.stopRunning()
         }

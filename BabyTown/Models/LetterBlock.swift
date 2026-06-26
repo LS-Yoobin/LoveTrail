@@ -4,13 +4,13 @@ import CoreGraphics
 enum LetterPhotoLayout {
     static let baseWidth: CGFloat = 240
     static let chinHeight: CGFloat = 24
-    /// Default inline photo scale when composing a letter (15% larger than the original 1.0).
-    static let defaultScale: CGFloat = 1.15
+    /// Default inline photo scale when composing a letter (50% of the prior default).
+    static let defaultScale: CGFloat = 0.575
     static let minScale: CGFloat = 0.45
     static let maxScale: CGFloat = 1.35
     static let defaultRotation: Double = 0
-    /// Default sticker scale when composing a letter (matches garden photo stickers).
-    static let defaultStickerScale: CGFloat = ProfileSticker.newStickerScale
+    /// Default sticker scale when composing a letter (15% larger than garden photo stickers).
+    static let defaultStickerScale: CGFloat = ProfileSticker.newStickerScale * 1.15
 }
 
 enum LetterBlockType: String, Codable, CaseIterable {
@@ -47,6 +47,7 @@ struct LetterBlock: Identifiable, Codable, Equatable {
     let type: LetterBlockType
     var voiceMemoFileId: String?
     var photoImageId: UUID?
+    var photoPosition: NormalizedPoint?
     var photoRotation: Double?
     var photoScale: CGFloat?
     var stickerImageId: UUID?
@@ -60,6 +61,7 @@ struct LetterBlock: Identifiable, Codable, Equatable {
         type: LetterBlockType,
         voiceMemoFileId: String? = nil,
         photoImageId: UUID? = nil,
+        photoPosition: NormalizedPoint? = nil,
         photoRotation: Double? = nil,
         photoScale: CGFloat? = nil,
         stickerImageId: UUID? = nil,
@@ -72,6 +74,7 @@ struct LetterBlock: Identifiable, Codable, Equatable {
         self.type = type
         self.voiceMemoFileId = voiceMemoFileId
         self.photoImageId = photoImageId
+        self.photoPosition = photoPosition
         self.photoRotation = photoRotation
         self.photoScale = photoScale
         self.stickerImageId = stickerImageId

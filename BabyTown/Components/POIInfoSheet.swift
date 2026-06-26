@@ -1,6 +1,12 @@
 import SwiftUI
 import CoreLocation
 
+struct POISelection: Identifiable {
+    let id = UUID()
+    let title: String
+    let coordinate: CLLocationCoordinate2D
+}
+
 /// Pull-up sheet shown when a user taps an Apple Maps POI. Loads a Google search
 /// for the place name + reverse-geocoded city in an in-app web view.
 struct POIInfoSheet: View {

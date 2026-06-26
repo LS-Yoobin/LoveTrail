@@ -283,6 +283,14 @@ final class PetRoomScene: SKScene {
     private let catPickUpLongPressDuration: TimeInterval = 0.45
     /// Draw above floor props while the cat is being carried.
     private let catCarryZPosition: CGFloat = 55
+    /// Nap timer once the cat is holding a sleep pose (floor or bed).
+    private var sleepSessionEndsAt: TimeInterval?
+    private var sleepSessionBedKey: String?
+    /// Resume a bed nap after the player drops a sleeping cat they picked up.
+    private var resumeSleepBedKey: String?
+    private var resumeSleepRemaining: TimeInterval = 0
+    /// Resume a floor nap (no bed) at the drop point.
+    private var resumeFloorSleepRemaining: TimeInterval = 0
 
     /// Currently selected prop (shows the dotted outline in customize mode).
     private var selectedKey: String?
@@ -1657,6 +1665,37 @@ final class PetRoomScene: SKScene {
         }
     }
 
+    private func beginSleepSession(bedKey: String?, duration: TimeInterval) {
+        sleepSessionBedKey = bedKey
+        sleepSessionEndsAt = CACurrentMediaTime() + duration
+    }
+
+    private func clearSleepSession() {
+        sleepSessionEndsAt = nil
+        sleepSessionBedKey = nil
+    }
+
+    private func clearResumeSleepAfterDrop() {
+        resumeSleepBedKey = nil
+        resumeSleepRemaining = 0
+        resumeFloorSleepRemaining = 0
+    }
+
+    /// Snapshots remaining nap time before locomotion is cancelled for a pick-up.
+    private func captureInterruptedSleepForResume() {
+        guard let endsAt = sleepSessionEndsAt else { return }
+        let remaining = endsAt - CACurrentMediaTime()
+        let bedKey = sleepSessionBedKey
+        clearSleepSession()
+        guard remaining > 0.5 else { return }
+        if let bedKey, draggableNodes[bedKey] != nil {
+            resumeSleepBedKey = bedKey
+            resumeSleepRemaining = remaining
+        } else {
+            resumeFloorSleepRemaining = remaining
+        }
+    }
+
     /// Wakes the cat from a composite bed (occupied art hides the live sprite).
     private func wakeFromOccupiedBedIfNeeded() {
         guard let bedKey = occupiedBedKey, let bed = draggableNodes[bedKey] else { return }
@@ -1710,10 +1749,12 @@ final class PetRoomScene: SKScene {
                 self.startAnimation(.sleep)
             }
             self.cat.zPosition = self.catFloorDepthZ(for: self.cat.position.y)
+            self.beginSleepSession(bedKey: bedKey, duration: duration)
         }
         let finish = SKAction.run { [weak self] in
             guard let self else { return }
             let wasCompositeBed = self.cat.alpha < 0.01
+            self.clearSleepSession()
             self.clearOccupiedBedState(showCat: true)
             if wasCompositeBed {
                 self.cat.position = self.catBedWakePoint(near: bed)
@@ -1907,8 +1948,14 @@ final class PetRoomScene: SKScene {
         stopMovement()
         startAnimation(state)
         isHoldingPose = true
+        if state == .sleep {
+            beginSleepSession(bedKey: occupiedBedKey, duration: duration)
+        }
         runBehaviorAction(.wait(forDuration: duration)) { [weak self] in
             guard let self else { return }
+            if state == .sleep {
+                self.clearSleepSession()
+            }
             self.isHoldingPose = false
             self.startAnimation(.idle)
             self.runBehavior()
@@ -2251,7 +2298,15 @@ final class PetRoomScene: SKScene {
             && currentAction != .drink
             && currentAction != .confused
             && currentAction != .snack
-            && currentAction != .sleep
+    }
+
+    /// Composite beds hide the live cat sprite — long-press the occupied bed instead.
+    private func canBeginSleepingCatPickUp(at location: CGPoint) -> Bool {
+        guard canBeginCatPickUp() else { return false }
+        if let bedKey = occupiedBedKey, let bed = draggableNodes[bedKey] {
+            return propDragHitFrame(for: bedKey, node: bed).contains(location)
+        }
+        return currentAction == .sleep || isHoldingPose && sleepSessionEndsAt != nil
     }
 
     private func isCatHit(at location: CGPoint) -> Bool {
@@ -2359,8 +2414,11 @@ final class PetRoomScene: SKScene {
     }
 
     private func beginCarryingCat(at location: CGPoint) {
-        guard canBeginCatPickUp() else { return }
+        let sleepingInCompositeBed = occupiedBedKey != nil
+        guard canBeginCatPickUp() || sleepingInCompositeBed else { return }
         cancelCatPickUpCandidate()
+        captureInterruptedSleepForResume()
+        wakeFromOccupiedBedIfNeeded()
         stopMovement()
         catVisual.removeAllActions()
         isInteracting = true
@@ -2402,6 +2460,22 @@ final class PetRoomScene: SKScene {
         cat.setScale(depthPerspectiveScale(baseY: cat.position.y, backScale: activeCatDepthBackScale))
         updateCatFloorDepthLayering()
         isInteracting = false
+
+        if let bedKey = resumeSleepBedKey,
+           let bed = draggableNodes[bedKey],
+           resumeSleepRemaining > 0.5 {
+            let remaining = resumeSleepRemaining
+            clearResumeSleepAfterDrop()
+            goToBedAndSleep(bedKey: bedKey, bed: bed, duration: remaining)
+            return
+        }
+        if resumeFloorSleepRemaining > 0.5 {
+            let remaining = resumeFloorSleepRemaining
+            clearResumeSleepAfterDrop()
+            idleFor(state: .sleep, duration: remaining)
+            return
+        }
+        clearResumeSleepAfterDrop()
         runBehavior()
     }
 
@@ -2464,6 +2538,11 @@ final class PetRoomScene: SKScene {
                 beginCatPickUpCandidate(at: location)
                 return
             }
+            // Composite beds hide the cat — long-press the occupied bed to pick up.
+            if canBeginSleepingCatPickUp(at: location) {
+                beginCatPickUpCandidate(at: location)
+                return
+            }
             walkToFurnitureAndSit(key: furniture.key, node: furniture.node)
             return
         }
@@ -2474,6 +2553,11 @@ final class PetRoomScene: SKScene {
         }
 
         if canBeginCatPickUp(), isCatHit(at: location) {
+            beginCatPickUpCandidate(at: location)
+            return
+        }
+
+        if canBeginSleepingCatPickUp(at: location) {
             beginCatPickUpCandidate(at: location)
             return
         }
@@ -3705,8 +3789,14 @@ final class PetRoomScene: SKScene {
     }
 
     private func petCat() {
-        guard !isInteracting, !isSnackBeingEaten else { return }
+        guard !isSnackBeingEaten else { return }
+        // Welcome eat/drink and bowl care can set `isInteracting`; tapping the
+        // cat should interrupt those flows instead of leaving walk loops running
+        // in place after `playReaction` cancels the behavior action.
+        clearSleepSession()
+        clearResumeSleepAfterDrop()
         isInteracting = true
+        isHoldingBowlInteraction = false
         isHoldingPose = false
         stopMovement()
         cat.removeAction(forKey: "behavior")

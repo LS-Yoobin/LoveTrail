@@ -123,6 +123,21 @@ enum BabyTownTheme {
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
+    // MARK: - Date Planner
+
+    static let plannerStopStart = Color(red: 0.28, green: 0.76, blue: 0.45)
+    static let plannerStopStartDeep = Color(red: 0.16, green: 0.58, blue: 0.32)
+    static var plannerStopStartGradient: LinearGradient {
+        LinearGradient(colors: [plannerStopStart, plannerStopStartDeep],
+                       startPoint: .leading, endPoint: .trailing)
+    }
+    static let plannerStopEnd = Color(red: 1.0, green: 0.58, blue: 0.18)
+    static let plannerStopEndDeep = Color(red: 0.90, green: 0.42, blue: 0.08)
+    static var plannerStopEndGradient: LinearGradient {
+        LinearGradient(colors: [plannerStopEnd, plannerStopEndDeep],
+                       startPoint: .leading, endPoint: .trailing)
+    }
+
     // MARK: - Bridged colors (SpriteKit / UIKit)
 
     static var accentUIColor: UIColor { UIColor(accent) }

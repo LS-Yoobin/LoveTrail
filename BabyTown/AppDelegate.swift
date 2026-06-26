@@ -4,6 +4,7 @@ import UserNotifications
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     static let openScrapbookNotificationName = Notification.Name("OpenScrapbookNotification")
+    private static let appIconRefreshKey = "covela_app_icon_refresh_v1"
 
     func application(
         _ application: UIApplication,
@@ -18,7 +19,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         
         // Request permission on launch
         NotificationManager.shared.requestAuthorization()
-        
+        refreshNotificationsAfterAppIconUpdateIfNeeded()
+
         return true
     }
     
@@ -51,8 +53,35 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     DataPersistenceManager.shared.deleteArchiveBundle()
                 }
             }
+        } else if identifier.hasPrefix("watch_together_invite_") {
+            let userInfo = response.notification.request.content.userInfo
+            if let sessionIDString = userInfo["sessionID"] as? String,
+               let sessionID = UUID(uuidString: sessionIDString),
+               let videoURL = userInfo["videoURL"] as? String {
+                let hostName = userInfo["hostName"] as? String ?? "Your partner"
+                NotificationCenter.default.post(
+                    name: .watchTogetherInviteReceived,
+                    object: nil,
+                    userInfo: [
+                        "sessionID": sessionID,
+                        "videoURL": videoURL,
+                        "hostName": hostName
+                    ]
+                )
+            }
         }
 
         completionHandler()
+    }
+
+    /// Re-schedules local notifications once after the Covela book app icon ships so
+    /// pending requests are rebuilt against the updated bundle icon.
+    private func refreshNotificationsAfterAppIconUpdateIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.appIconRefreshKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.appIconRefreshKey)
+        Task { @MainActor in
+            NotificationManager.shared.scheduleDailyNotification()
+            NotificationManager.shared.refresh()
+        }
     }
 }

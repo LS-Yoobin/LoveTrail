@@ -50,7 +50,11 @@ struct ComposeLetterView: View {
     private let quickAddButtons: [QuickAddAction] = [.voice, .photo, .sticker]
 
     private var inlineBlocks: [LetterBlock] {
-        letterBlocks.filter { $0.type != .sticker }
+        letterBlocks.filter { $0.type == .voiceMemo }
+    }
+
+    private var photoBlocks: [LetterBlock] {
+        letterBlocks.filter { $0.type == .photo }
     }
 
     private var stickerBlocks: [LetterBlock] {
@@ -60,7 +64,6 @@ struct ComposeLetterView: View {
     private var hasLetterContent: Bool {
         !letterBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !inlineBlocks.isEmpty
-            || !stickerBlocks.isEmpty
     }
 
     private var letterContentWidth: CGFloat {
@@ -93,7 +96,7 @@ struct ComposeLetterView: View {
                     .onTapGesture { resignKeyboard() }
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .scrollDisabled(selectedPhotoID != nil || selectedStickerID != nil)
+                .scrollDisabled(selectedStickerID != nil || selectedPhotoID != nil)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -130,10 +133,22 @@ struct ComposeLetterView: View {
             }
         }
         .onChange(of: selectedStickerID) { _, newValue in
-            if newValue != nil { selectedPhotoID = nil }
+            if newValue != nil {
+                selectedPhotoID = nil
+                resignKeyboard()
+            }
         }
         .onChange(of: selectedPhotoID) { _, newValue in
-            if newValue != nil { selectedStickerID = nil }
+            if newValue != nil {
+                selectedStickerID = nil
+                resignKeyboard()
+            }
+        }
+        .onChange(of: focusedField) { _, newValue in
+            if newValue != nil {
+                selectedStickerID = nil
+                selectedPhotoID = nil
+            }
         }
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2)) {
@@ -211,12 +226,6 @@ struct ComposeLetterView: View {
             canvasWidth: BabyTownLetterCardStyle.referenceCanvasWidth
         ) {
             ZStack {
-                if selectedPhotoID != nil, stickerBlocks.isEmpty {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { clearSelection() }
-                }
-
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack(alignment: .leading) {
                         if letterTitle.isEmpty {
@@ -265,6 +274,20 @@ struct ComposeLetterView: View {
                 }
                 .padding(28)
 
+                if !photoBlocks.isEmpty {
+                    LetterPhotosOverlay(
+                        photoBlocks: photoBlocks,
+                        images: photoImages,
+                        contentWidth: letterContentWidth,
+                        isEditing: true,
+                        selectedID: $selectedPhotoID,
+                        onPositionChanged: updatePhotoPosition,
+                        onScaleChanged: updatePhotoScale,
+                        onRotationChanged: updatePhotoRotation,
+                        onDelete: removePhotoBlock
+                    )
+                }
+
                 if !stickerBlocks.isEmpty {
                     LetterStickersOverlay(
                         stickerBlocks: stickerBlocks,
@@ -274,8 +297,7 @@ struct ComposeLetterView: View {
                         onPositionChanged: updateStickerPosition,
                         onScaleChanged: updateStickerScale,
                         onRotationChanged: updateStickerRotation,
-                        onDelete: removeStickerBlock,
-                        onBackgroundTap: clearSelection
+                        onDelete: removeStickerBlock
                     )
                 }
             }
@@ -287,30 +309,12 @@ struct ComposeLetterView: View {
     @ViewBuilder
     private func inlineBlockView(_ block: LetterBlock, contentWidth: CGFloat) -> some View {
         switch block.type {
-        case .photo:
-            LetterInlinePhotoView(
-                image: photoImages[block.id],
-                rotation: block.photoRotation ?? LetterPhotoLayout.defaultRotation,
-                scale: block.photoScale ?? LetterPhotoLayout.defaultScale,
-                contentWidth: contentWidth,
-                isEditing: true,
-                isSelected: selectedPhotoID == block.id,
-                onSelect: {
-                    focusedField = nil
-                    selectedStickerID = nil
-                    selectedPhotoID = block.id
-                },
-                onDelete: { removePhotoBlock(block.id) },
-                onScaleChanged: { updatePhotoScale(id: block.id, scale: $0) },
-                onRotationChanged: { updatePhotoRotation(id: block.id, rotation: $0) }
-            )
-
         case .voiceMemo:
             LetterBlockPreviewCard(block: block) {
                 removeBlock(block)
             }
 
-        case .sticker:
+        case .photo, .sticker:
             EmptyView()
         }
     }
@@ -406,6 +410,10 @@ struct ComposeLetterView: View {
 
     private func clearSelection() {
         resignKeyboard()
+        deselectCanvasItems()
+    }
+
+    private func deselectCanvasItems() {
         selectedStickerID = nil
         selectedPhotoID = nil
     }
@@ -422,23 +430,13 @@ struct ComposeLetterView: View {
             id: blockID,
             type: .photo,
             photoImageId: imageID,
+            photoPosition: nextPhotoPosition(),
             photoRotation: Double.random(in: -4...4),
             photoScale: LetterPhotoLayout.defaultScale
         )
 
         letterBlocks.append(block)
         photoImages[blockID] = sourceImage
-        selectedPhotoID = blockID
-    }
-
-    private func updatePhotoScale(id: UUID, scale: CGFloat) {
-        guard let idx = letterBlocks.firstIndex(where: { $0.id == id }) else { return }
-        letterBlocks[idx].photoScale = scale
-    }
-
-    private func updatePhotoRotation(id: UUID, rotation: Double) {
-        guard let idx = letterBlocks.firstIndex(where: { $0.id == id }) else { return }
-        letterBlocks[idx].photoRotation = rotation
     }
 
     private func removePhotoBlock(_ id: UUID) {
@@ -449,6 +447,45 @@ struct ComposeLetterView: View {
         photoImages[id] = nil
         if selectedPhotoID == id { selectedPhotoID = nil }
         letterBlocks.removeAll { $0.id == id }
+    }
+
+    private func nextPhotoPosition() -> NormalizedPoint {
+        let existing = photoBlocks.compactMap(\.photoPosition)
+        let minDistance: CGFloat = 0.16
+        let candidates: [NormalizedPoint] = [
+            NormalizedPoint(x: 0.40, y: 0.58),
+            NormalizedPoint(x: 0.60, y: 0.62),
+            NormalizedPoint(x: 0.50, y: 0.70),
+            NormalizedPoint(x: 0.35, y: 0.68),
+            NormalizedPoint(x: 0.65, y: 0.55)
+        ]
+
+        for candidate in candidates {
+            let isClear = existing.allSatisfy {
+                hypot($0.x - candidate.x, $0.y - candidate.y) > minDistance
+            }
+            if isClear { return candidate }
+        }
+
+        return NormalizedPoint(
+            x: .random(in: 0.30...0.70),
+            y: .random(in: 0.50...0.78)
+        )
+    }
+
+    private func updatePhotoPosition(id: UUID, position: NormalizedPoint) {
+        guard let idx = letterBlocks.firstIndex(where: { $0.id == id }) else { return }
+        letterBlocks[idx].photoPosition = position
+    }
+
+    private func updatePhotoScale(id: UUID, scale: CGFloat) {
+        guard let idx = letterBlocks.firstIndex(where: { $0.id == id }) else { return }
+        letterBlocks[idx].photoScale = scale
+    }
+
+    private func updatePhotoRotation(id: UUID, rotation: Double) {
+        guard let idx = letterBlocks.firstIndex(where: { $0.id == id }) else { return }
+        letterBlocks[idx].photoRotation = rotation
     }
 
     // MARK: - Stickers
@@ -473,7 +510,6 @@ struct ComposeLetterView: View {
 
         letterBlocks.append(block)
         stickerImages[blockID] = processed.image
-        selectedStickerID = blockID
     }
 
     private func nextStickerPosition() -> NormalizedPoint {

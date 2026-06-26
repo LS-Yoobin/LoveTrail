@@ -4,6 +4,7 @@ struct StickyActionBar: View {
 
     var onSelectPhotos: () -> Void
     var onScan: (() -> Void)?
+    var onPlanner: (() -> Void)?
     var onPrompt: (() -> Void)?
     var onCapture: (() -> Void)?
     var isNightMode: Bool = false
@@ -24,6 +25,10 @@ struct StickyActionBar: View {
 
                 if let onScan {
                     secondaryPill(title: "Scan", systemImage: "viewfinder.circle", action: onScan)
+                }
+
+                if let onPlanner {
+                    secondaryPill(title: "Planner", systemImage: "calendar.badge.plus", action: onPlanner)
                 }
 
                 if let onPrompt {
@@ -48,7 +53,8 @@ struct StickyActionBar: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 0)
         }
     }
 

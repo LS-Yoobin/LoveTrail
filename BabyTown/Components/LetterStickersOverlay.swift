@@ -20,30 +20,20 @@ struct LetterStickersOverlay: View {
     )
 
     var body: some View {
-        GeometryReader { geo in
+        LetterCanvasSizeReader { canvasSize in
             ZStack {
-                if isEditing {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedID = nil
-                            onBackgroundTap?()
-                        }
-                }
-
                 ForEach(stickerBlocks) { block in
-                    stickerView(for: block, canvasSize: geo.size)
+                    stickerView(for: block, canvasSize: canvasSize)
                         .zIndex(selectedID == block.id ? 25 : 1)
                 }
 
                 if isEditing, let selectedID,
                    stickerBlocks.contains(where: { $0.id == selectedID }) {
-                    deleteButton(for: selectedID, canvasSize: geo.size)
+                    deleteButton(for: selectedID, canvasSize: canvasSize)
                         .zIndex(50)
                 }
             }
         }
-        .allowsHitTesting(isEditing)
     }
 
     @ViewBuilder

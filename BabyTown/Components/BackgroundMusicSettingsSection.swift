@@ -58,6 +58,9 @@ struct BackgroundMusicSettingsSection: View {
         .onAppear {
             importCoordinator.clearStatus()
             playbackState.refreshFromStore()
+            if CouplePlaylistStore.hasTracks, AudioManager.shared.gardenIsActive, !playbackState.isPlaying {
+                AudioManager.shared.resumeGardenMusic()
+            }
         }
         .onChange(of: importCoordinator.pickerItem) { _, newItem in
             guard let newItem else { return }

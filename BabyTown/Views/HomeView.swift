@@ -42,6 +42,7 @@ struct HomeView: View {
     @State private var showInviteFlow = false
     @ObservedObject private var store = StoreManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var watchTogetherInviteStore = WatchTogetherInviteStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var memorySearchText = ""
     @State private var cachedMemorySearchRows: [MemorySearchRow] = []
@@ -69,6 +70,9 @@ struct HomeView: View {
     @State private var onThisDayPhotos: [Moment] = []
     @State private var onThisDayStartIndex = 0
     @State private var showScan = false
+    @State private var showPlanner = false
+    @State private var plannerInitialPlanID: UUID?
+    @State private var upcomingPlans: [DatePlan] = []
     @State private var showMapView = false
     @State private var showToC = false
     @State private var showPinnedMemoriesFeed = false
@@ -81,6 +85,8 @@ struct HomeView: View {
     @State private var showPinCapSheet = false
 
     private static let timelinePageSize = 15
+    private static let homeSearchTopSpacing: CGFloat = 8
+    private static let homeFeedSectionSpacing: CGFloat = 28
 
     private var vaultedIDs: Set<UUID> {
         viewModel.vaultedMomentIDs(isForeverUnlocked: store.isForeverUnlocked)
@@ -97,6 +103,17 @@ struct HomeView: View {
             return dpm.loadInviterName() ?? "your partner"
         }
         return "Invite partner"
+    }
+
+    private var homeWatchTogetherPlayerBinding: Binding<Bool> {
+        Binding(
+            get: { watchTogetherInviteStore.showPlayerFromInvite && !showCoupleProfile },
+            set: { isPresented in
+                if !isPresented {
+                    watchTogetherInviteStore.tearDownPlayer()
+                }
+            }
+        )
     }
 
 
@@ -192,13 +209,23 @@ struct HomeView: View {
                     StickyActionBar(
                         onSelectPhotos: onSelectPhotos,
                         onScan: { showScan = true },
+                        onPlanner: { showPlanner = true },
                         onPrompt: { showPromptSheet = true },
                         isNightMode: nightModeManager.isNightMode
                     )
 
+                    if let invite = watchTogetherInviteStore.pendingInvite, !showCoupleProfile {
+                        WatchTogetherInviteBanner(
+                            hostName: invite.hostName,
+                            onJoin: { watchTogetherInviteStore.joinPending() }
+                        )
+                        .padding(.bottom, 4)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     if isSearchBarPinned {
                         memoryInlineSearchBar
-                            .padding(.top, 10)
+                            .padding(.top, Self.homeSearchTopSpacing)
                             .padding(.bottom, 14)
                     }
 
@@ -209,7 +236,7 @@ struct HomeView: View {
 
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(spacing: isMemorySearchActive ? 16 : 28) {
+                            VStack(spacing: isMemorySearchActive ? 16 : Self.homeFeedSectionSpacing) {
                                 Color.clear
                                     .frame(height: 0)
                                     .id("homeScrollTop")
@@ -255,6 +282,18 @@ struct HomeView: View {
                                         )
                                         .padding(.top, -94)
                                         .zIndex(1)
+
+                                        if !upcomingPlans.isEmpty {
+                                            UpcomingDateSection(
+                                                plans: upcomingPlans,
+                                                isNightMode: nightModeManager.isNightMode
+                                            ) { plan in
+                                                dismissMemorySearchKeyboard()
+                                                plannerInitialPlanID = plan.id
+                                                showPlanner = true
+                                            }
+                                            .padding(.top, 8)
+                                        }
                                     }
 
                                     // On This Day section (cached; never computed in body)
@@ -287,7 +326,7 @@ struct HomeView: View {
                                     }
                                 }
                             }
-                            .padding(.top, isSearchBarPinned ? (isMemorySearchActive ? 4 : 8) : 18)
+                            .padding(.top, isSearchBarPinned ? (isMemorySearchActive ? 4 : 8) : Self.homeSearchTopSpacing)
                             .padding(.bottom, 100)
                         }
                         .coordinateSpace(name: "homeScroll")
@@ -600,6 +639,20 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshGardenPatchState) {
                 NotificationCenterView(onNotificationRead: refreshGardenPatchState)
             }
+            .fullScreenCover(
+                isPresented: homeWatchTogetherPlayerBinding,
+                onDismiss: { watchTogetherInviteStore.tearDownPlayer() }
+            ) {
+                if let invite = watchTogetherInviteStore.activeInvite,
+                   let url = URL(string: invite.videoURL) {
+                    WatchTogetherPlayerView(
+                        videoURL: url,
+                        sessionID: invite.sessionID,
+                        isHost: false,
+                        hostName: invite.hostName
+                    )
+                }
+            }
             .onAppear(perform: refreshGardenPatchState)
             .onChange(of: showVisitPet) { _, isShowing in
                 if !isShowing { refreshGardenPatchState() }
@@ -695,11 +748,24 @@ struct HomeView: View {
                     onDismiss: { showForeverPaywall = false }
                 )
             }
+            .fullScreenCover(isPresented: $showPlanner, onDismiss: {
+                plannerInitialPlanID = nil
+                refreshUpcomingPlans()
+            }) {
+                DatePlannerHubView(
+                    initialPlanID: plannerInitialPlanID,
+                    onUnlockForever: {
+                        showPlanner = false
+                        showForeverPaywall = true
+                    }
+                )
+            }
             .memorySharePresentation(coordinator: shareCoordinator)
             .onAppear {
                 viewModel.onPinCapReached = { showPinCapSheet = true }
                 refreshCoupleSpaceCardMetadata()
                 refreshGardenPatchState()
+                refreshUpcomingPlans()
             }
             .onChange(of: viewModel.moments.count) { _, _ in
                 refreshCoupleSpaceCardMetadata()
@@ -906,6 +972,10 @@ struct HomeView: View {
         let dpm = DataPersistenceManager.shared
         hasPetAdopted = dpm.loadPetState().adoptedSkin != nil
         unreadLetterCount = AppNotification.unreadCount(userNickname: dpm.loadUserNickname())
+    }
+
+    private func refreshUpcomingPlans() {
+        upcomingPlans = DatePlanStore.shared.upcomingPlans()
     }
 
     private func openMap() {

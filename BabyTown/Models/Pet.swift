@@ -5,14 +5,24 @@ import SwiftUI
 enum CatSkin: String, Codable, CaseIterable, Identifiable {
     case calico   // Artemis
     case cowCat   // Arabella
+    case bombay   // Spunky
 
     var id: String { rawValue }
+
+    /// Premium pets require Covela Forever before adoption.
+    var requiresForeverUnlock: Bool {
+        switch self {
+        case .bombay: return true
+        case .calico, .cowCat: return false
+        }
+    }
 
     /// The cat's given name, shown in the UI.
     var petName: String {
         switch self {
         case .calico: return "Artemis"
         case .cowCat: return "Arabella"
+        case .bombay: return "Spunky"
         }
     }
 
@@ -21,6 +31,7 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return "Calico"
         case .cowCat: return "Cow Cat"
+        case .bombay: return "Bombay"
         }
     }
 
@@ -35,6 +46,10 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
             return """
             Arabella was still a tiny kitten when she first stepped into the world of people, all goofy ears, a silly little face, and far more confidence than one cat should have. You saw her and knew she belonged in your town right away. She has not slowed down since. Baby Town's resident troublemaker, happy to devour anything and everything in her path.
             """
+        case .bombay:
+            return """
+            Spunky was found on the side of the highway, tied inside a trash bag and left behind like her life did not matter. A passerby spotted the bag moving, cut her free, and rushed her to foster care that same night. Four months later, she has healed, she is playful again, and she is ready to meet a loving owner who will never let her go.
+            """
         }
     }
 
@@ -44,6 +59,7 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return "calico"
         case .cowCat: return "cowcat"
+        case .bombay: return "bombay"
         }
     }
 
@@ -52,6 +68,7 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return "portrait_calico"
         case .cowCat: return "portrait_cowcat"
+        case .bombay: return "portrait_bombay"
         }
     }
 
@@ -60,6 +77,7 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return "profile_calico_sit"
         case .cowCat: return "profile_cowcat_sit"
+        case .bombay: return "profile_bombay_sit"
         }
     }
 
@@ -68,6 +86,7 @@ enum CatSkin: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .calico: return Color(red: 0.95, green: 0.65, blue: 0.45) // warm calico orange
         case .cowCat: return Color(red: 0.30, green: 0.30, blue: 0.34) // cow-cat charcoal
+        case .bombay: return Color(red: 0.12, green: 0.10, blue: 0.14) // Bombay black
         }
     }
 }

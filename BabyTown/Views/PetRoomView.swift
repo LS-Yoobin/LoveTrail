@@ -44,6 +44,9 @@ struct PetRoomView: View {
     @State private var toiletPaperMessage: String?
     @State private var showWelcomeTutorial = false
     @State private var checkInPopup: CheckInPopupMode?
+    /// First cooldown pet per room visit shows the "points available again" toast;
+    /// later taps in the same visit still play the pet animation without repeating it.
+    @State private var hasShownPetCooldownMessageThisVisit = false
 
     @State private var isTrickMode = false
     @State private var showTrickBook = false
@@ -1323,6 +1326,7 @@ struct PetRoomView: View {
             }
         }
         .onAppear {
+            hasShownPetCooldownMessageThisVisit = false
             viewModel.registerPetInteraction()
             let awarded = viewModel.checkInForPetRoom()
             if awarded > 0 {
@@ -1714,8 +1718,7 @@ struct PetRoomView: View {
         if showingToiletPaperModal || isCleaningLitterBox || isRefillingFood || isWateringPlant { return }
         switch prop {
         case .cat:
-            present(viewModel.pet())
-            scene?.playReaction(.happy)
+            handleCatPet()
         case .foodBowl, .waterBowl, .litterBox, .smallPlant, .bigPlant:
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { inspect = prop }
         case .toiletPaperMess:
@@ -1724,6 +1727,20 @@ struct PetRoomView: View {
                 toiletPaperMessage = viewModel.randomToiletPaperMessComment(for: petDisplayName)
             }
         }
+    }
+
+    /// Pets the cat: always plays the reaction; coins only when off cooldown.
+    /// Cooldown copy is shown once per room visit, then suppressed until they leave and return.
+    private func handleCatPet() {
+        let result = viewModel.pet()
+        if let reason = result.blockedReason {
+            if !hasShownPetCooldownMessageThisVisit {
+                showToast(reason)
+                hasShownPetCooldownMessageThisVisit = true
+            }
+        }
+        syncNeedThoughtBubble()
+        scene?.playReaction(.happy)
     }
 
     private func performInspectAction(_ prop: PetRoomScene.RoomProp) {
@@ -1782,7 +1799,9 @@ struct PetRoomView: View {
         guard viewModel.ownedSkins.count == 1 else { return }
         let enabled = viewModel.toggleSecondPetAdoptionBypass()
         if enabled {
-            let lockedName = CatSkin.allCases.first { !viewModel.ownedSkins.contains($0) }?.petName ?? "second pet"
+            let lockedName = CatSkin.allCases
+                .first { !viewModel.ownedSkins.contains($0) && !$0.requiresForeverUnlock }?
+                .petName ?? "second pet"
             showToast("Secret mode: \(lockedName) unlocked. Long-press the level pill again to undo.")
         } else {
             showToast("Secret mode undone. Level \(PetEconomy.secondPetUnlockLevel) required again.")

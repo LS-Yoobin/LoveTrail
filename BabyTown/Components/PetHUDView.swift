@@ -144,36 +144,57 @@ struct PetRoomPetSwitcher: View {
     var onAdoptMore: () -> Void
 
     private let circleSize: CGFloat = 44
+    /// Visual circles stay 44pt; buttons expand to Apple's comfortable tap target.
+    private let minTapTarget: CGFloat = 52
 
     private var orderedOwnedSkins: [CatSkin] {
         CatSkin.allCases.filter { ownedSkins.contains($0) }
     }
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 8) {
             ForEach(orderedOwnedSkins) { skin in
-                Button {
-                    onSelectPet(skin)
-                } label: {
+                switcherButton(
+                    action: { onSelectPet(skin) },
+                    accessibilityLabel: skin.petName,
+                    accessibilityHint: skin == currentSkin ? "Current pet" : "Switch to this pet's room",
+                    isSelected: skin == currentSkin
+                ) {
                     PetRoomPetFaceCircle(
                         skin: skin,
                         style: skin == currentSkin ? .selected : .unselected,
                         size: circleSize
                     )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(skin.petName)
-                .accessibilityAddTraits(skin == currentSkin ? .isSelected : [])
-                .accessibilityHint(skin == currentSkin ? "Current pet" : "Switch to this pet's room")
             }
 
-            Button(action: onAdoptMore) {
+            switcherButton(
+                action: onAdoptMore,
+                accessibilityLabel: "Adopt another pet",
+                accessibilityHint: "Opens pet selection"
+            ) {
                 PetRoomPetFaceCircle(style: .add, size: circleSize)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Adopt another pet")
-            .accessibilityHint("Opens pet selection")
         }
+    }
+
+    private func switcherButton<Label: View>(
+        action: @escaping () -> Void,
+        accessibilityLabel: String,
+        accessibilityHint: String,
+        isSelected: Bool = false,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        Button(action: action) {
+            label()
+                .frame(width: circleSize, height: circleSize)
+        }
+        .buttonStyle(.plain)
+        .frame(width: minTapTarget, height: minTapTarget)
+        .contentShape(Rectangle())
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -220,6 +241,8 @@ struct PetRoomPetFaceCircle: View {
                     .strokeBorder(Color.white, lineWidth: 2)
             case .add:
                 Circle()
+                    .fill(Color.white.opacity(0.001))
+                Circle()
                     .strokeBorder(Color.white, lineWidth: 2)
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .semibold))
@@ -227,6 +250,7 @@ struct PetRoomPetFaceCircle: View {
             }
         }
         .frame(width: size, height: size)
+        .contentShape(Circle())
         .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
     }
 

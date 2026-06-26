@@ -6,6 +6,9 @@ import SwiftUI
 struct WatchTogetherEntryView: View {
     @Environment(\.dismiss) private var dismiss
 
+    var joinSessionID: UUID? = nil
+    var joinVideoURL: String? = nil
+
     // MARK: - State
 
     @State private var tvState: WatchTogetherTVState = .idle
@@ -16,6 +19,7 @@ struct WatchTogetherEntryView: View {
     @State private var orientationObserver: NSObjectProtocol?
     @State private var isLandscapeLocked = false
     @State private var showPlayer = false
+    @State private var sheetDetent: PresentationDetent = .medium
 
     // MARK: - Derived
 
@@ -41,11 +45,25 @@ struct WatchTogetherEntryView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $sheetDetent)
+        .presentationDragIndicator(.visible)
         .onDisappear { tearDownOrientation() }
+        .onAppear {
+            if let joinVideoURL, !joinVideoURL.isEmpty {
+                urlText = joinVideoURL
+                tvState = .input
+                sheetDetent = .large
+            } else {
+                advanceFromIdle()
+            }
+        }
         .fullScreenCover(isPresented: $showPlayer, onDismiss: onPlayerDismissed) {
             if let url = URL(string: urlText) {
-                WatchTogetherPlayerView(videoURL: url, onDismiss: onPlayerDismissed)
+                WatchTogetherPlayerView(
+                    videoURL: url,
+                    sessionID: joinSessionID,
+                    isHost: joinSessionID == nil
+                )
             }
         }
     }
@@ -62,7 +80,7 @@ struct WatchTogetherEntryView: View {
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
-                    Text(tvState == .idle ? "Watch together, feel closer" : "Paste a link to get started")
+                    Text(tvState == .idle ? "Watch together, feel closer" : "Add a link to get started")
                         .font(.title2.weight(.bold))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -113,7 +131,7 @@ struct WatchTogetherEntryView: View {
                 .foregroundStyle(.secondary)
                 .font(.system(size: 15))
 
-            TextField("", text: $urlText, prompt: Text("Paste YouTube link or video URL")
+            TextField("", text: $urlText, prompt: Text("YouTube link or video URL")
                 .foregroundColor(Color(.placeholderText)))
                 .foregroundStyle(.primary)
                 .font(.system(size: 15))
@@ -220,7 +238,10 @@ struct WatchTogetherEntryView: View {
     // MARK: - State machine
 
     private func advanceFromIdle() {
-        withAnimation(.easeInOut(duration: 0.25)) { tvState = .turningOn }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            tvState = .turningOn
+            sheetDetent = .large
+        }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1600))
             withAnimation(.easeInOut(duration: 0.3)) { tvState = .input }
@@ -276,13 +297,14 @@ struct WatchTogetherEntryView: View {
     }
 
     private func onPlayerDismissed() {
-        tearDownOrientation()
+        tearDownObserver()
+        OrientationManager.shared.setPortraitMaskOnly()
         dismiss()
     }
 
     private func tearDownOrientation() {
         tearDownObserver()
-        OrientationManager.shared.lockPortrait()
+        OrientationManager.shared.setPortraitMaskOnly()
     }
 
     private func tearDownObserver() {

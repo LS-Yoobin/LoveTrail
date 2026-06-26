@@ -59,6 +59,7 @@ struct PetProfileCard: View {
     var onClose: () -> Void
     var onRenameName: (() -> Void)? = nil
     var onLevelLongPress: (() -> Void)? = nil
+    var onCardLongPress: (() -> Void)? = nil
 
     private static let birthDateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -98,6 +99,9 @@ struct PetProfileCard: View {
         }
         .shadow(color: .black.opacity(0.14), radius: 28, y: 14)
         .padding(.horizontal, 24)
+        .onLongPressGesture(minimumDuration: 1.2) {
+            onCardLongPress?()
+        }
     }
 
     private var levelPill: some View {

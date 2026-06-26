@@ -7,29 +7,11 @@ struct LetterInlinePhotoView: View {
     var scale: CGFloat
     var contentWidth: CGFloat
     var isEditing: Bool
-    var isSelected: Bool
-    let onSelect: () -> Void
+    var usesOverlayLayout: Bool = false
     let onDelete: () -> Void
-    let onScaleChanged: (CGFloat) -> Void
-    let onRotationChanged: (Double) -> Void
-
-    @State private var pinchBaseScale: CGFloat = LetterPhotoLayout.defaultScale
-    @State private var pinchPreviewScale: CGFloat?
-    @State private var rotationBase: Double = LetterPhotoLayout.defaultRotation
-    @State private var rotationPreview: Double?
-
-    private static let pinchSensitivity: CGFloat = 0.22
-
-    private var effectiveScale: CGFloat {
-        pinchPreviewScale ?? scale
-    }
-
-    private var effectiveRotation: Double {
-        rotationPreview ?? rotation
-    }
 
     private var frameWidth: CGFloat {
-        min(contentWidth, LetterPhotoLayout.baseWidth) * effectiveScale
+        min(contentWidth, LetterPhotoLayout.baseWidth) * scale
     }
 
     private var imageHeight: CGFloat {
@@ -39,36 +21,23 @@ struct LetterInlinePhotoView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .topTrailing) {
             polaroidContent
-                .gesture(isEditing && isSelected ? customizeGestures : nil)
-                .onTapGesture {
-                    guard isEditing else { return }
-                    onSelect()
-                }
 
-            if isEditing, isSelected {
-                EditGardenTrashButton(action: onDelete)
-                    .offset(y: -44)
-                    .zIndex(10)
-                    .transition(.scale.combined(with: .opacity))
+            if isEditing {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 24))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color.black.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 8, y: -8)
+                .accessibilityLabel("Remove photo")
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .editGardenPulse(isEditing && !isSelected)
-        .onAppear {
-            pinchBaseScale = scale
-            rotationBase = rotation
-        }
-        .onChange(of: scale) { _, newScale in
-            pinchBaseScale = newScale
-            pinchPreviewScale = nil
-        }
-        .onChange(of: rotation) { _, newRotation in
-            rotationBase = newRotation
-            rotationPreview = nil
-        }
+        .frame(maxWidth: usesOverlayLayout ? nil : .infinity)
+        .padding(.vertical, usesOverlayLayout ? 0 : 8)
     }
 
     private var polaroidContent: some View {
@@ -97,47 +66,6 @@ struct LetterInlinePhotoView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .shadow(color: BabyTownTheme.cardShadow, radius: 10, y: 5)
         .shadow(color: .black.opacity(0.08), radius: 3, y: 2)
-        .rotationEffect(.degrees(effectiveRotation))
-        .customizeDottedOutline(isEditing && isSelected, cornerRadius: 8, padding: 6, lineWidth: 3)
-        .contentShape(Rectangle())
-    }
-
-    private var pinchGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { amount in
-                let damped = 1 + (amount - 1) * Self.pinchSensitivity
-                let proposed = pinchBaseScale * damped
-                pinchPreviewScale = min(
-                    max(proposed, LetterPhotoLayout.minScale),
-                    LetterPhotoLayout.maxScale
-                )
-            }
-            .onEnded { amount in
-                let damped = 1 + (amount - 1) * Self.pinchSensitivity
-                let final = min(
-                    max(pinchBaseScale * damped, LetterPhotoLayout.minScale),
-                    LetterPhotoLayout.maxScale
-                )
-                pinchBaseScale = final
-                pinchPreviewScale = nil
-                onScaleChanged(final)
-            }
-    }
-
-    private var rotationGesture: some Gesture {
-        RotationGesture()
-            .onChanged { angle in
-                rotationPreview = rotationBase + angle.degrees
-            }
-            .onEnded { angle in
-                let final = rotationBase + angle.degrees
-                rotationBase = final
-                rotationPreview = nil
-                onRotationChanged(final)
-            }
-    }
-
-    private var customizeGestures: some Gesture {
-        SimultaneousGesture(pinchGesture, rotationGesture)
+        .rotationEffect(.degrees(rotation))
     }
 }

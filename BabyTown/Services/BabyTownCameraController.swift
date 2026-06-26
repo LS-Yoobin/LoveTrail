@@ -94,7 +94,9 @@ final class BabyTownCameraController: NSObject, ObservableObject, AVCapturePhoto
                 self.session.commitConfiguration()
                 return
             }
-            self.ensureMovieOutputConfiguredLocked()
+            if self.hasMovieOutput {
+                self.ensureMovieOutputConfiguredLocked()
+            }
             self.session.commitConfiguration()
         }
     }
@@ -138,7 +140,9 @@ final class BabyTownCameraController: NSObject, ObservableObject, AVCapturePhoto
         if !session.outputs.contains(photoOutput), session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
         }
-        ensureMovieOutputConfiguredLocked()
+        if hasMovieOutput {
+            ensureMovieOutputConfiguredLocked()
+        }
         let presets = refreshZoomPresetsLocked(for: position)
         applyDisplayZoomLocked(1, cameraPosition: position, availablePresets: presets)
         DispatchQueue.main.async { self.position = position }
@@ -254,58 +258,133 @@ final class BabyTownCameraController: NSObject, ObservableObject, AVCapturePhoto
         session.startRunning()
     }
 
-    func recordMomentVideo(completion: @escaping (URL?) -> Void) {
-        AVAudioApplication.requestRecordPermission { _ in
-            self.recordMomentVideoAfterMicPermission(completion: completion)
+    /// Attaches the mic to the capture session when entering Reel mode or before the first reel.
+    func prepareMomentVideoAudioCapture() {
+        ensureMicrophoneAuthorized { [weak self] granted in
+            guard let self else { return }
+            self.sessionQueue.async {
+                guard granted else {
+                    self.syncHasAudioInputFromSessionLocked()
+                    return
+                }
+                self.ensureMovieOutputConfiguredLocked()
+            }
         }
     }
 
-    private func recordMomentVideoAfterMicPermission(completion: @escaping (URL?) -> Void) {
+    /// Drops movie output and mic input so Vibe (`AVAudioRecorder`) can own the microphone again.
+    func releaseMomentVideoCaptureConfiguration() {
         sessionQueue.async {
-            guard self.isConfigured, !self.movieOutput.isRecording, self.session.isRunning else {
+            guard self.hasMovieOutput else { return }
+            self.session.beginConfiguration()
+            if self.session.outputs.contains(self.movieOutput) {
+                self.session.removeOutput(self.movieOutput)
+            }
+            for input in self.session.inputs {
+                guard let deviceInput = input as? AVCaptureDeviceInput,
+                      deviceInput.device.hasMediaType(.audio) else { continue }
+                self.session.removeInput(input)
+            }
+            if self.session.canSetSessionPreset(.photo) {
+                self.session.sessionPreset = .photo
+            }
+            self.session.commitConfiguration()
+            self.hasMovieOutput = false
+            self.hasAudioInput = false
+        }
+    }
+
+    func recordMomentVideo(completion: @escaping (URL?) -> Void) {
+        ensureMicrophoneAuthorized { [weak self] _ in
+            guard let self else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
-            self.ensureMovieOutputConfiguredLocked()
-            guard self.hasMovieOutput else {
-                DispatchQueue.main.async { completion(nil) }
-                return
+            self.sessionQueue.async {
+                self.recordMomentVideoLocked(completion: completion)
             }
+        }
+    }
 
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("reel_\(UUID().uuidString).mov")
-            try? FileManager.default.removeItem(at: url)
+    private func recordMomentVideoLocked(completion: @escaping (URL?) -> Void) {
+        guard isConfigured, !movieOutput.isRecording, session.isRunning else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
 
-            self.momentVideoCompletion = completion
-            self.momentVideoStopWorkItem?.cancel()
-            let clipDuration = Self.momentVideoClipDuration
-            let stopMode = ReelStopMode.current
-            self.isManualStopMode = (stopMode == .manual)
+        activateAudioSessionForVideoRecording()
+        ensureMovieOutputConfiguredLocked()
+        syncHasAudioInputFromSessionLocked()
+        guard hasMovieOutput else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
 
-            if stopMode == .auto {
-                let stopWork = DispatchWorkItem { [weak self] in
-                    self?.stopMomentVideoRecordingLocked()
-                }
-                self.momentVideoStopWorkItem = stopWork
-                self.movieOutput.maxRecordedDuration = CMTime(seconds: clipDuration, preferredTimescale: 600)
-                self.sessionQueue.asyncAfter(deadline: .now() + clipDuration, execute: stopWork)
-            } else {
-                self.movieOutput.maxRecordedDuration = CMTime(seconds: 120, preferredTimescale: 600)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reel_\(UUID().uuidString).mov")
+        try? FileManager.default.removeItem(at: url)
+
+        momentVideoCompletion = completion
+        momentVideoStopWorkItem?.cancel()
+        let clipDuration = Self.momentVideoClipDuration
+        let stopMode = ReelStopMode.current
+        isManualStopMode = (stopMode == .manual)
+
+        if stopMode == .auto {
+            let stopWork = DispatchWorkItem { [weak self] in
+                self?.stopMomentVideoRecordingLocked()
             }
+            momentVideoStopWorkItem = stopWork
+            movieOutput.maxRecordedDuration = CMTime(seconds: clipDuration, preferredTimescale: 600)
+            sessionQueue.asyncAfter(deadline: .now() + clipDuration, execute: stopWork)
+        } else {
+            movieOutput.maxRecordedDuration = CMTime(seconds: 120, preferredTimescale: 600)
+        }
 
-            if let connection = self.movieOutput.connection(with: .video),
-               connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
-            if let audioConnection = self.movieOutput.connection(with: .audio) {
-                audioConnection.isEnabled = true
-            }
+        if let connection = movieOutput.connection(with: .video),
+           connection.isVideoRotationAngleSupported(90) {
+            connection.videoRotationAngle = 90
+        }
+        if let audioConnection = movieOutput.connection(with: .audio) {
+            audioConnection.isEnabled = hasAudioInput
+        }
 
-            DispatchQueue.main.async {
-                self.activateAudioSessionForVideoRecording()
-                self.isRecordingMomentVideo = true
+        DispatchQueue.main.async {
+            self.isRecordingMomentVideo = true
+        }
+        movieOutput.startRecording(to: url, recordingDelegate: self)
+    }
+
+    private func ensureMicrophoneAuthorized(completion: @escaping (Bool) -> Void) {
+        if #available(iOS 17.0, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted:
+                completion(true)
+            case .denied:
+                completion(false)
+            case .undetermined:
+                AVAudioApplication.requestRecordPermission { completion($0) }
+            @unknown default:
+                completion(false)
             }
-            self.movieOutput.startRecording(to: url, recordingDelegate: self)
+        } else {
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .granted:
+                completion(true)
+            case .denied:
+                completion(false)
+            case .undetermined:
+                AVAudioSession.sharedInstance().requestRecordPermission { completion($0) }
+            @unknown default:
+                completion(false)
+            }
+        }
+    }
+
+    private func syncHasAudioInputFromSessionLocked() {
+        hasAudioInput = session.inputs.contains { input in
+            guard let deviceInput = input as? AVCaptureDeviceInput else { return false }
+            return deviceInput.device.hasMediaType(.audio)
         }
     }
 
@@ -318,32 +397,60 @@ final class BabyTownCameraController: NSObject, ObservableObject, AVCapturePhoto
     }
 
     private func ensureMovieOutputConfiguredLocked() {
-        let audioAlreadyInSession = session.inputs.contains { input in
-            guard let deviceInput = input as? AVCaptureDeviceInput else { return false }
-            return deviceInput.device.hasMediaType(.audio)
-        }
+        activateAudioSessionForVideoRecording()
 
         session.beginConfiguration()
-        if !audioAlreadyInSession,
-           let audioDevice = AVCaptureDevice.default(for: .audio),
-           let audioInput = try? AVCaptureDeviceInput(device: audioDevice),
-           session.canAddInput(audioInput) {
-            session.addInput(audioInput)
-            hasAudioInput = true
-        } else if audioAlreadyInSession {
-            hasAudioInput = true
-        }
+        removeAudioCaptureInputsLocked()
+        attachAudioCaptureInputIfNeededLocked()
         if !hasMovieOutput, !session.outputs.contains(movieOutput), session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
             hasMovieOutput = true
         }
+        if hasMovieOutput {
+            movieOutput.maxRecordedDuration = CMTime(seconds: Self.momentVideoClipDuration, preferredTimescale: 600)
+        }
         if hasMovieOutput, session.canSetSessionPreset(.high) {
             session.sessionPreset = .high
+        }
+        syncHasAudioInputFromSessionLocked()
+        if hasMovieOutput, let audioConnection = movieOutput.connection(with: .audio) {
+            audioConnection.isEnabled = hasAudioInput
         }
         session.commitConfiguration()
     }
 
+    private func removeAudioCaptureInputsLocked() {
+        for input in session.inputs {
+            guard let deviceInput = input as? AVCaptureDeviceInput,
+                  deviceInput.device.hasMediaType(.audio) else { continue }
+            session.removeInput(input)
+        }
+        hasAudioInput = false
+    }
+
+    private func attachAudioCaptureInputIfNeededLocked() {
+        guard !hasAudioInput else { return }
+        guard let audioDevice = AVCaptureDevice.default(for: .audio),
+              let audioInput = try? AVCaptureDeviceInput(device: audioDevice),
+              session.canAddInput(audioInput) else {
+            hasAudioInput = false
+            return
+        }
+        session.addInput(audioInput)
+        hasAudioInput = true
+    }
+
     private func activateAudioSessionForVideoRecording() {
+        if Thread.isMainThread {
+            applyVideoRecordingAudioSession()
+        } else {
+            DispatchQueue.main.sync {
+                applyVideoRecordingAudioSession()
+            }
+        }
+    }
+
+    private func applyVideoRecordingAudioSession() {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(
             .playAndRecord,

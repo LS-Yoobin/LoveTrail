@@ -24,7 +24,7 @@ struct CoupleProfileView: View {
     @State private var isPreludeBookSelected = false
     @State private var showPreludeGiftBook = false
     @State private var showWatchTogetherSheet = false
-    @State private var showWatchTogetherPaywall = false
+    @ObservedObject private var watchTogetherInviteStore = WatchTogetherInviteStore.shared
     /// Sticker image files to delete from disk only when the user taps Save.
     @State private var pendingImageDeletions: Set<UUID> = []
     @State private var showEditProfile = false
@@ -351,6 +351,16 @@ struct CoupleProfileView: View {
             }
 
             pinnedMemoryOverlays
+
+            if let invite = watchTogetherInviteStore.pendingInvite {
+                VStack {
+                    WatchTogetherInviteBanner(
+                        hostName: invite.hostName,
+                        onJoin: { watchTogetherInviteStore.joinPending() }
+                    )
+                    Spacer()
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -372,6 +382,20 @@ struct CoupleProfileView: View {
         }
         .sheet(isPresented: $showWatchTogetherSheet) {
             WatchTogetherEntryView()
+        }
+        .fullScreenCover(
+            isPresented: $watchTogetherInviteStore.showPlayerFromInvite,
+            onDismiss: { watchTogetherInviteStore.tearDownPlayer() }
+        ) {
+            if let invite = watchTogetherInviteStore.activeInvite,
+               let url = URL(string: invite.videoURL) {
+                WatchTogetherPlayerView(
+                    videoURL: url,
+                    sessionID: invite.sessionID,
+                    isHost: false,
+                    hostName: invite.hostName
+                )
+            }
         }
         .sheet(isPresented: $showEditProfile) {
             ProfileEditorSheet(
@@ -563,16 +587,6 @@ struct CoupleProfileView: View {
                 onDismiss: { showForeverPaywall = false }
             )
         }
-        .fullScreenCover(isPresented: $showWatchTogetherPaywall) {
-            CovelaForeverPaywallView(
-                store: store,
-                onUnlock: {
-                    showWatchTogetherPaywall = false
-                    showWatchTogetherSheet = true
-                },
-                onDismiss: { showWatchTogetherPaywall = false }
-            )
-        }
     }
 
     @ViewBuilder
@@ -702,6 +716,38 @@ struct CoupleProfileView: View {
                 onDeleteMoment: { moment in
                     guard let homeViewModel else { return }
                     withAnimation { homeViewModel.deleteMoment(moment) }
+                },
+                onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                    homeViewModel?.updateMemory(
+                        section: section,
+                        primaryMomentId: momentId,
+                        caption: caption,
+                        placeName: placeName,
+                        latitude: latitude,
+                        longitude: longitude,
+                        isPlaceNameUserSet: isPlaceNameUserSet
+                    )
+                },
+                onEditCaption: { momentId, caption, voiceNotePath in
+                    homeViewModel?.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+                },
+                onAddPhotos: { section, images in
+                    homeViewModel?.addPhotosToMemory(section: section, images: images)
+                },
+                onRemovePhoto: { section, momentId in
+                    homeViewModel?.removePhotoFromMemory(section: section, momentId: momentId)
+                },
+                onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                    await homeViewModel?.syncMemoryPhotos(
+                        section: section,
+                        selectedAssetIds: assetIds,
+                        selectedOrphanMomentIds: orphanIds
+                    )
+                },
+                onReloadMemoryMoments: {
+                    guard let homeViewModel,
+                          let anchorId = viewerMoments.first?.id else { return viewerMoments }
+                    return homeViewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
                 },
                 memoryPagePromptText: viewerMemoryPagePromptText,
                 memoryPageImportantDate: viewerImportantDate,
@@ -907,11 +953,7 @@ struct CoupleProfileView: View {
     }
 
     private func handleWatchTogetherTap() {
-        if isPartnerAccount || store.isForeverUnlocked {
-            showWatchTogetherSheet = true
-        } else {
-            showWatchTogetherPaywall = true
-        }
+        showWatchTogetherSheet = true
     }
 
     private func saveProfileNote(_ note: String) {

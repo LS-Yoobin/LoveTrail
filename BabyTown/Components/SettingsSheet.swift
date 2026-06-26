@@ -15,6 +15,7 @@ struct SettingsSheet: View {
     var onLogOut: () -> Void = {}
 
     @State private var showResetConfirmation = false
+    @State private var showLogOutConfirmation = false
     @State private var showAppIconViewer = false
     @State private var showPlaylistEditor = false
     @State private var showPaywall = false
@@ -173,12 +174,25 @@ struct SettingsSheet: View {
 
                 Section {
                     NavigationLink {
-                        ProfileSettingsView(onLogOut: {
-                            onLogOut()
-                            dismiss()
-                        })
+                        ProfileSettingsView()
                     } label: {
-                        Text("Profile Settings")
+                        HStack {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 16))
+                            Text("Profile Settings")
+                                .font(.system(size: 16))
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        showLogOutConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 16))
+                            Text("Log Out")
+                                .font(.system(size: 16))
+                        }
                     }
 
                     // Temporarily hidden: Replay Our Story
@@ -195,6 +209,22 @@ struct SettingsSheet: View {
                 } header: {
                     Text("App")
                 }
+
+                #if DEBUG
+                Section {
+                    Button("Test Watch Together invite") {
+                        NotificationManager.shared.handlePartnerEvent(
+                            .watchTogetherInvite(
+                                hostName: "Alex",
+                                sessionID: UUID(),
+                                videoURL: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                            )
+                        )
+                    }
+                } header: {
+                    Text("Debug")
+                }
+                #endif
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -250,6 +280,19 @@ struct SettingsSheet: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will delete all your saved memories, photos, and data. You will start fresh from the welcome screen. This action cannot be undone.")
+            }
+            .confirmationDialog(
+                "Log out of Covela?",
+                isPresented: $showLogOutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Log Out", role: .destructive) {
+                    onLogOut()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your data stays on this device.")
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

@@ -16,6 +16,10 @@ enum CouplePlaylistStore {
     private static let shuffleEnabledKey = "couplePlaylistShuffleEnabled"
     private static let didMigrateLegacyKey = "couplePlaylistDidMigrateLegacy"
 
+    private static let defaultBundledResourceName = "one_love"
+    private static let defaultBundledResourceExtension = "mp3"
+    private static let defaultDisplayName = "One Love"
+
     private static var fileManager: FileManager { .default }
     private static var userDefaults: UserDefaults { .standard }
 
@@ -261,6 +265,52 @@ enum CouplePlaylistStore {
         }
     }
 
+    private static func installDefaultSongIfNeeded() {
+        guard readPlaylistFromDisk().isEmpty else { return }
+        guard let bundleURL = bundledDefaultSongURL() else { return }
+
+        ensureDirectories()
+        let id = UUID()
+        let fileName = "\(id.uuidString).\(defaultBundledResourceExtension)"
+        let destination = tracksDirectory.appendingPathComponent(fileName)
+
+        do {
+            if fileManager.fileExists(atPath: destination.path) {
+                try fileManager.removeItem(at: destination)
+            }
+            try fileManager.copyItem(at: bundleURL, to: destination)
+        } catch {
+            return
+        }
+
+        let track = CouplePlaylistTrack(
+            id: id,
+            displayName: defaultDisplayName,
+            fileName: fileName,
+            sortOrder: 0
+        )
+        savePlaylist([track])
+        nowPlayingID = id
+        if !repeatEnabled {
+            repeatEnabled = true
+        }
+        notifyChanged()
+    }
+
+    private static func bundledDefaultSongURL() -> URL? {
+        if let url = Bundle.main.url(
+            forResource: defaultBundledResourceName,
+            withExtension: defaultBundledResourceExtension
+        ) {
+            return url
+        }
+        return Bundle.main.url(
+            forResource: defaultBundledResourceName,
+            withExtension: defaultBundledResourceExtension,
+            subdirectory: "Songs"
+        )
+    }
+
     private static func readPlaylistFromDisk() -> [CouplePlaylistTrack] {
         guard fileManager.fileExists(atPath: playlistURL.path),
               let data = try? Data(contentsOf: playlistURL),
@@ -272,6 +322,7 @@ enum CouplePlaylistStore {
 
     private static func loadPlaylist() -> [CouplePlaylistTrack] {
         migrateLegacyIfNeeded()
+        installDefaultSongIfNeeded()
         return readPlaylistFromDisk()
     }
 

@@ -18,6 +18,7 @@ struct PolaroidCameraView: View {
 
     @State private var showNotification = false
     @State private var notificationMessage = ""
+    @State private var notificationSubtitle = "Take another photo if you'd like"
     @State private var showLogModal = false
     @State private var flashOpacity: Double = 0
     @State private var vibePulse = false
@@ -41,6 +42,7 @@ struct PolaroidCameraView: View {
 
     private var isVibeCaptureEnabled: Bool { captureMode == .vibe }
     private var isReelCaptureMode: Bool { captureMode == .reel }
+    private var isCameraAudioCaptureEnabled: Bool { isVibeCaptureEnabled || isReelCaptureMode }
 
     private var todaysCount: Int {
         polaroidStore.todaysCaptureCount()
@@ -82,7 +84,13 @@ struct PolaroidCameraView: View {
             if configured { cameraController.startRunning() }
         }
         .onAppear {
-            InAppCameraAudioSession.activateForCamera()
+            InAppCameraAudioSession.enterCamera(
+                needsMicCapture: isCameraAudioCaptureEnabled,
+                forVideoRecording: isReelCaptureMode
+            )
+            if isReelCaptureMode {
+                cameraController.prepareMomentVideoAudioCapture()
+            }
             cameraController.startRunning()
             if isVibeCaptureEnabled { vibeRecorder.start() }
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
@@ -93,9 +101,10 @@ struct PolaroidCameraView: View {
         .onDisappear {
             momentVideoTimer?.invalidate()
             cameraController.cancelMomentVideoRecording()
+            cameraController.releaseMomentVideoCaptureConfiguration()
             vibeRecorder.cancelAndDelete()
             cameraController.stopRunning()
-            InAppCameraAudioSession.deactivateAfterCamera()
+            InAppCameraAudioSession.leaveCamera()
             locationManager.stop()
         }
         .onChange(of: cameraController.isRecordingMomentVideo) { _, isRecording in
@@ -545,7 +554,7 @@ struct PolaroidCameraView: View {
                     .foregroundStyle(.white)
             }
 
-            Text("Take another photo if you'd like")
+            Text(notificationSubtitle)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.9))
         }
@@ -583,10 +592,21 @@ struct PolaroidCameraView: View {
 
     // MARK: - Capture logic
 
+    private func syncInAppCameraAudioSession() {
+        InAppCameraAudioSession.updateAudioSession(
+            needsMicCapture: isCameraAudioCaptureEnabled,
+            forVideoRecording: isReelCaptureMode
+        )
+        if isReelCaptureMode {
+            cameraController.prepareMomentVideoAudioCapture()
+        }
+    }
+
     private func setCaptureMode(_ mode: CameraCaptureMode) {
         guard mode != captureMode else { return }
         if mode != .reel {
             cameraController.cancelMomentVideoRecording()
+            cameraController.releaseMomentVideoCaptureConfiguration()
         }
         if mode == .vibe {
             vibeRecorder.start()
@@ -594,6 +614,7 @@ struct PolaroidCameraView: View {
             vibeRecorder.cancelAndDelete()
         }
         captureModeRaw = mode.rawValue
+        syncInAppCameraAudioSession()
     }
 
     private func performPhotoCapture() {
@@ -620,21 +641,61 @@ struct PolaroidCameraView: View {
     }
 
     private func startReelRecording() {
+        vibeRecorder.cancelAndDelete()
         cameraController.recordMomentVideo { videoURL in
             Task { @MainActor in
-                guard let videoURL else { return }
+                guard let videoURL else {
+                    notificationMessage = "Couldn't save reel. Try again."
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showNotification = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                        withAnimation { showNotification = false }
+                    }
+                    return
+                }
+
                 let thumbnail = await BabyTownCameraController.thumbnailImage(from: videoURL)
-                let image = thumbnail ?? UIImage()
+                    ?? Self.fallbackReelThumbnail()
                 lastCaptureWasVibe = false
-                await handleCapturedPhoto(image, videoSourceURL: videoURL)
+
+                await handleCapturedPhoto(thumbnail, videoSourceURL: videoURL)
+
                 if saveToPhotosEnabled {
                     saveVideoToPhotosLibrary(videoURL)
-                    if let thumbnail {
-                        saveImageToPhotosLibrary(thumbnail)
-                    }
+                    saveImageToPhotosLibrary(thumbnail)
                 }
             }
         }
+    }
+
+    private static func fallbackReelThumbnail() -> UIImage {
+        let size = CGSize(width: 120, height: 120)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            UIColor(white: 0.15, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
+    private func saveCapturedMoment(
+        _ image: UIImage,
+        vibeURL: URL? = nil,
+        videoSourceURL: URL? = nil
+    ) async -> Bool {
+        var placeName: String?
+        let location = locationManager.currentLocation
+        if let location {
+            placeName = await SmartPlaceResolver.shared.resolvePlaceName(for: location)
+        }
+
+        return polaroidStore.savePhoto(
+            image,
+            placeName: placeName,
+            location: location,
+            vibeSourceURL: vibeURL,
+            videoSourceURL: videoSourceURL
+        ) != nil
     }
 
     private func handleCapturedPhoto(
@@ -642,21 +703,14 @@ struct PolaroidCameraView: View {
         vibeURL: URL? = nil,
         videoSourceURL: URL? = nil
     ) async {
-        var placeName: String?
-        let location = locationManager.currentLocation
-        if let location {
-            placeName = await SmartPlaceResolver.shared.resolvePlaceName(for: location)
-        }
+        guard await saveCapturedMoment(image, vibeURL: vibeURL, videoSourceURL: videoSourceURL) else { return }
 
-        guard polaroidStore.savePhoto(
-            image,
-            placeName: placeName,
-            location: location,
-            vibeSourceURL: vibeURL,
-            videoSourceURL: videoSourceURL
-        ) != nil else { return }
-
-        notificationMessage = "This photo will be available later"
+        notificationMessage = videoSourceURL != nil
+            ? "This video will be available later"
+            : "This photo will be available later"
+        notificationSubtitle = videoSourceURL != nil
+            ? "Record another reel if you'd like"
+            : "Take another photo if you'd like"
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             showNotification = true

@@ -27,6 +27,8 @@ final class PetViewModel: ObservableObject {
     @Published private(set) var marketUnlockAllActive = false
     /// Hidden adoption easter egg: bypasses the level gate for adopting a second pet.
     @Published private(set) var secondPetAdoptionBypassActive = false
+    /// Hidden easter egg: bypasses Covela Forever for adopting Spunky (Bombay).
+    @Published private(set) var premiumPetBypassActive = false
 
     /// Room the user left via "Choose a different pet"; restored when they back out of selection.
     private var petRoomSkinBeforeSelection: CatSkin?
@@ -113,8 +115,16 @@ final class PetViewModel: ObservableObject {
         return .none
     }
 
-    func canAdopt(_ skin: CatSkin) -> (allowed: Bool, reason: String?) {
+    func canAdopt(_ skin: CatSkin, isForeverUnlocked: Bool) -> (allowed: Bool, reason: String?) {
         if state.ownedSkins.contains(skin) { return (true, nil) }
+
+        if skin.requiresForeverUnlock {
+            guard isForeverUnlocked || premiumPetBypassActive else {
+                return (false, nil)
+            }
+            return (true, nil)
+        }
+
         guard let primarySkin = primaryOwnedSkin else { return (true, nil) }
         if primarySkin == skin { return (true, nil) }
         if secondPetAdoptionBypassActive { return (true, nil) }
@@ -126,6 +136,13 @@ final class PetViewModel: ObservableObject {
             )
         }
         return (true, nil)
+    }
+
+    func isPremiumPetLocked(_ skin: CatSkin, isForeverUnlocked: Bool) -> Bool {
+        skin.requiresForeverUnlock
+            && !state.ownedSkins.contains(skin)
+            && !isForeverUnlocked
+            && !premiumPetBypassActive
     }
 
     func smartLevel(for skin: CatSkin) -> Int {
@@ -429,6 +446,11 @@ final class PetViewModel: ObservableObject {
     func toggleSecondPetAdoptionBypass() -> Bool {
         secondPetAdoptionBypassActive.toggle()
         return secondPetAdoptionBypassActive
+    }
+
+    func togglePremiumPetBypass() -> Bool {
+        premiumPetBypassActive.toggle()
+        return premiumPetBypassActive
     }
 
     /// Long-press easter egg in Market:

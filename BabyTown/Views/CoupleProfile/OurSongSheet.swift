@@ -129,6 +129,9 @@ struct OurSongSheet: View {
                 shuffleEnabled = CouplePlaylistStore.shuffleEnabled
                 reloadTracks()
                 playbackState.refreshFromStore()
+                if CouplePlaylistStore.hasTracks, AudioManager.shared.gardenIsActive, !playbackState.isPlaying {
+                    AudioManager.shared.resumeGardenMusic()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .backgroundMusicPreferenceChanged)) { _ in
                 reloadTracks()

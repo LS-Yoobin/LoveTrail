@@ -1,12 +1,6 @@
 import SwiftUI
 import MapKit
 
-struct POISelection: Identifiable {
-    let id = UUID()
-    let title: String
-    let coordinate: CLLocationCoordinate2D
-}
-
 struct MapView: View {
 
     @ObservedObject var viewModel: HomeViewModel

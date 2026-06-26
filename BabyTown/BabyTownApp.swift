@@ -13,6 +13,13 @@ struct BabyTownApp: App {
 
     init() {
         _ = DataPersistenceManager.shared.loadOrCreateAppJoinedDate()
+        _ = CouplePlaylistStore.tracks
+        Task { @MainActor in
+            CoupleMusicPlaybackState.shared.refreshFromStore()
+            if CouplePlaylistStore.hasTracks, AudioManager.shared.gardenIsActive {
+                AudioManager.shared.reloadGardenMusic()
+            }
+        }
     }
 
     var body: some Scene {

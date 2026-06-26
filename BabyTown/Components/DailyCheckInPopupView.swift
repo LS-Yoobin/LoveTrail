@@ -88,16 +88,58 @@ struct DailyCheckInPopupView: View {
     }
 
     private var starRow: some View {
-        HStack(spacing: 10) {
-            ForEach(1...7, id: \.self) { index in
-                starView(for: index)
+        VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                ForEach(1...3, id: \.self) { index in
+                    starCell(for: index)
+                }
+            }
+            HStack(spacing: 14) {
+                ForEach(4...6, id: \.self) { index in
+                    starCell(for: index)
+                }
+            }
+            starCell(for: 7)
+        }
+    }
+
+    private func starSize(for index: Int) -> CGFloat {
+        index == 7 ? 42 : 26
+    }
+
+    private var showsTapHint: Bool {
+        if case .claiming = mode, !revealed { return true }
+        return false
+    }
+
+    private func starCell(for index: Int) -> some View {
+        VStack(spacing: 4) {
+            starView(for: index)
+            if index == todayIndex, showsTapHint {
+                Text("Tap")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.9))
+            } else {
+                Color.clear.frame(height: 14)
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard index == todayIndex, showsTapHint else { return }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.7)) {
+                revealed = true
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(index == todayIndex && showsTapHint ? .isButton : [])
+        .accessibilityLabel(
+            index == todayIndex && showsTapHint ? "Tap to reveal your reward" : "Day \(index) check-in star"
+        )
     }
 
     @ViewBuilder
     private func starView(for index: Int) -> some View {
-        let size: CGFloat = index == 7 ? 34 : 28
+        let size = starSize(for: index)
         if index < todayIndex {
             Image(systemName: "star.fill")
                 .font(.system(size: size))
@@ -107,7 +149,7 @@ struct DailyCheckInPopupView: View {
         } else {
             Image(systemName: "star")
                 .font(.system(size: size))
-                .foregroundStyle(Color.secondary.opacity(0.3))
+                .foregroundStyle(BabyTownTheme.accent.opacity(0.28))
         }
     }
 
@@ -133,13 +175,6 @@ struct DailyCheckInPopupView: View {
                             shimmerPulsed = true
                         }
                     }
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.7)) {
-                            revealed = true
-                        }
-                    }
-                    .accessibilityLabel("Tap to reveal your reward")
-                    .accessibilityAddTraits(.isButton)
             }
         case .reviewing:
             Image(systemName: "star.fill")

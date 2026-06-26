@@ -21,10 +21,12 @@
 		7A4561122F3F2EC900443248 /* dragon-studio-car-engine-372477.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7A4561102F3F2EC900443248 /* dragon-studio-car-engine-372477.mp3 */; };
 		7A4561132F3F2EC900443248 /* dragon-studio-open-car-door-372469.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7A4561112F3F2EC900443248 /* dragon-studio-open-car-door-372469.mp3 */; };
 		7A4561152F3F304000443248 /* freesound_community-yipee-45360.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7A4561142F3F304000443248 /* freesound_community-yipee-45360.mp3 */; };
+		7A4561172F3F304100443248 /* one_love.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7A4561162F3F304100443248 /* one_love.mp3 */; };
 		7A9F6B202F3E7AC900664BD9 /* transparent flowers gif.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */; };
 		7A9F6B222F3E7AE100664BD9 /* heart.gif in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B212F3E7AE100664BD9 /* heart.gif */; };
 		7A9F6B2A2F3E8C3300664BD9 /* babytown font.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F6B292F3E8C3300664BD9 /* babytown font.png */; };
 		AAAA0000000000000000AA03 /* GardenCore in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA0000000000000000AA02 /* GardenCore */; };
+		BBBB0000000000000000BB03 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = BBBB0000000000000000BB02 /* WebRTC */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +44,7 @@
 		7A4561102F3F2EC900443248 /* dragon-studio-car-engine-372477.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "dragon-studio-car-engine-372477.mp3"; sourceTree = "<group>"; };
 		7A4561112F3F2EC900443248 /* dragon-studio-open-car-door-372469.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "dragon-studio-open-car-door-372469.mp3"; sourceTree = "<group>"; };
 		7A4561142F3F304000443248 /* freesound_community-yipee-45360.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "freesound_community-yipee-45360.mp3"; sourceTree = "<group>"; };
+		7A4561162F3F304100443248 /* one_love.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = one_love.mp3; sourceTree = "<group>"; };
 		7A9F69342F3E5CE500664BD9 /* BabyTown.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabyTown.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A9F6B1F2F3E7AC900664BD9 /* transparent flowers gif.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "transparent flowers gif.gif"; sourceTree = "<group>"; };
 		7A9F6B212F3E7AE100664BD9 /* heart.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = heart.gif; sourceTree = "<group>"; };
@@ -62,6 +65,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AAAA0000000000000000AA03 /* GardenCore in Frameworks */,
+				BBBB0000000000000000BB03 /* WebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +75,7 @@
 		7A4561052F3F23A900443248 /* Songs */ = {
 			isa = PBXGroup;
 			children = (
+				7A4561162F3F304100443248 /* one_love.mp3 */,
 				7A4561142F3F304000443248 /* freesound_community-yipee-45360.mp3 */,
 				7A4561102F3F2EC900443248 /* dragon-studio-car-engine-372477.mp3 */,
 				7A4561112F3F2EC900443248 /* dragon-studio-open-car-door-372469.mp3 */,
@@ -138,6 +143,7 @@
 			name = BabyTown;
 			packageProductDependencies = (
 				AAAA0000000000000000AA02 /* GardenCore */,
+				BBBB0000000000000000BB02 /* WebRTC */,
 			);
 			productName = BabyTown;
 			productReference = 7A9F69342F3E5CE500664BD9 /* BabyTown.app */;
@@ -169,6 +175,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AAAA0000000000000000AA01 /* XCLocalSwiftPackageReference "GardenCore" */,
+				BBBB0000000000000000BB01 /* XCRemoteSwiftPackageReference "WebRTC" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7A9F69352F3E5CE500664BD9 /* Products */;
@@ -193,6 +200,7 @@
 				7A4560FF2F3F1D8F00443248 /* Cat 2.png in Resources */,
 				7A4561002F3F1D8F00443248 /* Cat 4.png in Resources */,
 				7A4561152F3F304000443248 /* freesound_community-yipee-45360.mp3 in Resources */,
+				7A4561172F3F304100443248 /* one_love.mp3 in Resources */,
 				7A4561012F3F1D8F00443248 /* Cat 5.png in Resources */,
 				7A4561092F3F278C00443248 /* The Weeknd - The Abyss (Audio).mp3 in Resources */,
 				7A4561122F3F2EC900443248 /* dragon-studio-car-engine-372477.mp3 in Resources */,
@@ -349,9 +357,9 @@
 				DEVELOPMENT_TEAM = N3L5LBGNK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BabyTown uses your location to tag photos and suggest a starting area when you add a place to a memory.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone for Vibe photos and to hear trick commands when training your cat.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone for Vibe photos and to hear trick commands when training your cat. Covela uses your microphone so you and your partner can talk while watching together.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to help you build your love timeline with precious memories.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BabyTown listens for spoken trick commands like Paw, Spin, and High-Five while you train your cat.";
@@ -387,9 +395,9 @@
 				DEVELOPMENT_TEAM = N3L5LBGNK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BabyTown uses your location to tag photos and suggest a starting area when you add a place to a memory.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone for Vibe photos and to hear trick commands when training your cat.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BabyTown uses the microphone for Vibe photos and to hear trick commands when training your cat. Covela uses your microphone so you and your partner can talk while watching together.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to help you build your love timeline with precious memories.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BabyTown listens for spoken trick commands like Paw, Spin, and High-Five while you train your cat.";
@@ -445,10 +453,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		BBBB0000000000000000BB01 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stasel/WebRTC.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 124.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		AAAA0000000000000000AA02 /* GardenCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GardenCore;
+		};
+		BBBB0000000000000000BB02 /* WebRTC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BBBB0000000000000000BB01 /* XCRemoteSwiftPackageReference "WebRTC" */;
+			productName = WebRTC;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

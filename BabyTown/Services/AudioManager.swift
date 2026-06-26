@@ -118,6 +118,7 @@ class AudioManager: NSObject {
     func resumeGardenMusic() {
         guard isGardenActive, CouplePlaylistStore.hasTracks else { return }
         isUserPaused = false
+        activatePlaybackSession()
         if let player = homeAudioPlayer {
             player.play()
             updatePlaybackState(isPlaying: true, track: resolvedNowPlayingTrack())

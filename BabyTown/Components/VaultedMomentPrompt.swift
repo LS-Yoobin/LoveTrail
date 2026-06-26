@@ -22,7 +22,7 @@ struct VaultedMomentPrompt: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(BabyTownTheme.accentGradient)
             }
-            .padding(.top, 8)
+            .padding(.top, 24)
             .padding(.bottom, 20)
 
             VStack(spacing: 10) {

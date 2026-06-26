@@ -7,6 +7,10 @@ enum WatchTogetherURLKind {
 }
 
 enum WatchTogetherURLValidator {
+    /// Distinct parent origin for the WKWebView HTML wrapper. Must NOT be youtube.com
+    /// (same-origin parent causes YouTube error 152-4).
+    static let embedParentOrigin = "https://covela.app"
+
     static func classify(_ raw: String) -> WatchTogetherURLKind {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -54,11 +58,30 @@ enum WatchTogetherURLValidator {
                       idx + 1 < url.pathComponents.count {
                 videoID = url.pathComponents[idx + 1]
             } else if url.pathComponents.contains("embed") {
-                return url
+                return youTubeEmbedURL(videoID: extractYouTubeVideoID(from: url))
             }
         }
 
         guard let id = videoID else { return url }
-        return URL(string: "https://www.youtube.com/embed/\(id)?autoplay=1&playsinline=1")
+        return youTubeEmbedURL(videoID: id)
+    }
+
+    private static func extractYouTubeVideoID(from url: URL) -> String? {
+        let pathID = url.pathComponents.last
+        if let pathID, !pathID.isEmpty, pathID != "embed" { return pathID }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        return components?.queryItems?.first(where: { $0.name == "v" })?.value
+    }
+
+    private static func youTubeEmbedURL(videoID: String?) -> URL? {
+        guard let videoID, !videoID.isEmpty else { return nil }
+        var components = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")
+        components?.queryItems = [
+            URLQueryItem(name: "autoplay", value: "1"),
+            URLQueryItem(name: "playsinline", value: "1"),
+            URLQueryItem(name: "enablejsapi", value: "1"),
+            URLQueryItem(name: "origin", value: embedParentOrigin),
+        ]
+        return components?.url
     }
 }

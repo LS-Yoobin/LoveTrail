@@ -2,11 +2,13 @@ import SwiftUI
 
 struct CatSelectionView: View {
     @ObservedObject var viewModel: PetViewModel
+    @ObservedObject private var store = StoreManager.shared
     var onDismiss: () -> Void
     var onEnterPet: (CatSkin) -> Void
 
     @State private var selected: CatSkin = .calico
     @State private var showingProfile = false
+    @State private var showForeverPaywall = false
     @State private var blockedMessage: String?
     @State private var toast: String?
 
@@ -15,7 +17,16 @@ struct CatSelectionView: View {
     }
 
     var body: some View {
-        ScrollView {
+        selectionContent
+            .background(BabyTownTheme.background.ignoresSafeArea())
+            .toolbar { toolbarContent }
+            .overlay { profileOverlay }
+            .overlay(alignment: .bottom) { toastOverlay }
+            .fullScreenCover(isPresented: $showForeverPaywall) { foreverPaywall }
+    }
+
+    private var selectionContent: some View {
+        ScrollView(showsIndicators: false) {
             VStack(spacing: 24) {
                 VStack(spacing: 6) {
                     Text("Select One")
@@ -29,98 +40,119 @@ struct CatSelectionView: View {
                 }
                 .padding(.top, 12)
 
-                HStack(spacing: 16) {
-                    ForEach(CatSkin.allCases) { skin in
-                        CatChoiceCard(
-                            skin: skin,
-                            isSelected: showingProfile && skin == selected,
-                            isOwned: viewModel.ownedSkins.contains(skin)
-                        )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selected = skin
-                                    blockedMessage = nil
-                                    showingProfile = true
-                                }
-                            }
+                VStack(spacing: 16) {
+                    HStack(spacing: 16) {
+                        ForEach([CatSkin.calico, .cowCat]) { skin in
+                            catChoiceCard(for: skin)
+                        }
+                    }
+                    HStack {
+                        Spacer(minLength: 0)
+                        catChoiceCard(for: .bombay)
+                        Spacer(minLength: 0)
                     }
                 }
                 .padding(.horizontal, 16)
             }
             .padding(.bottom, 32)
         }
-        .background(BabyTownTheme.background.ignoresSafeArea())
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: close) {
-                    Label("Back", systemImage: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-            }
-        }
-        .overlay {
-            if showingProfile {
-                ZStack {
-                    Color.black.opacity(0.25).ignoresSafeArea()
-                        .onTapGesture { showingProfile = false }
-                    VStack(spacing: 12) {
-                        PetProfileCard(
-                            skin: selected,
-                            displayName: viewModel.displayName(for: selected),
-                            birthDate: DataPersistenceManager.shared.loadOrCreateAppJoinedDate(),
-                            smartnessLevel: viewModel.smartLevel(for: selected),
-                            knownTricks: viewModel.unlockedTricks(for: selected),
-                            showsBirthDate: !isFirstTimeVariant,
-                            showsTrainingDetails: !isFirstTimeVariant,
-                            onClose: { showingProfile = false },
-                            onRenameName: nil,
-                            onLevelLongPress: toggleSecondPetAdoptionBypassIfNeeded
-                        )
+    }
 
-                        Button(action: tapProfileCTA) {
-                            Text(profileCTATitle)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(BabyTownTheme.buttonGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius))
-                                .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
-                        }
-                        .padding(.horizontal, 24)
-
-                        if let blockedMessage {
-                            Text(blockedMessage)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 24)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                }
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if let toast {
-                Text(toast)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(
-                        Capsule()
-                            .fill(BabyTownTheme.accentGradient)
-                            .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
-                    )
-                    .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(action: close) {
+                Label("Back", systemImage: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
             }
         }
     }
 
+    @ViewBuilder
+    private var profileOverlay: some View {
+        if showingProfile {
+            ZStack {
+                Color.black.opacity(0.25).ignoresSafeArea()
+                    .onTapGesture { showingProfile = false }
+                VStack(spacing: 12) {
+                    PetProfileCard(
+                        skin: selected,
+                        displayName: viewModel.displayName(for: selected),
+                        birthDate: DataPersistenceManager.shared.loadOrCreateAppJoinedDate(),
+                        smartnessLevel: viewModel.smartLevel(for: selected),
+                        knownTricks: viewModel.unlockedTricks(for: selected),
+                        showsBirthDate: !isFirstTimeVariant,
+                        showsTrainingDetails: !isFirstTimeVariant,
+                        onClose: { showingProfile = false },
+                        onRenameName: nil,
+                        onLevelLongPress: toggleSecondPetAdoptionBypassIfNeeded,
+                        onCardLongPress: premiumPetBypassHandler
+                    )
+
+                    Button(action: tapProfileCTA) {
+                        Text(profileCTATitle)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(BabyTownTheme.buttonGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius))
+                            .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
+                    }
+                    .padding(.horizontal, 24)
+
+                    if let blockedMessage {
+                        Text(blockedMessage)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast {
+            Text(toast)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(
+                    Capsule()
+                        .fill(BabyTownTheme.accentGradient)
+                        .shadow(color: BabyTownTheme.buttonShadow, radius: 10, y: 4)
+                )
+                .padding(.bottom, 24)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    private var foreverPaywall: some View {
+        CovelaForeverPaywallView(
+            store: store,
+            onUnlock: { showForeverPaywall = false },
+            onDismiss: { showForeverPaywall = false }
+        )
+    }
+
+    private var premiumPetBypassHandler: (() -> Void)? {
+        guard selected == .bombay else { return nil }
+        return togglePremiumPetBypassIfNeeded
+    }
+
     private var profileCTATitle: String {
+        if viewModel.ownedSkins.contains(selected) {
+            return "Visit \(selected.petName)"
+        }
+        if viewModel.isPremiumPetLocked(selected, isForeverUnlocked: store.isForeverUnlocked) {
+            return "Unlock"
+        }
         if isFirstTimeVariant { return "Adopt" }
-        return viewModel.ownedSkins.contains(selected) ? "Visit \(selected.petName)" : "Adopt"
+        return "Adopt"
     }
 
     private var selectionSubtitle: String {
@@ -135,7 +167,12 @@ struct CatSelectionView: View {
     }
 
     private func tapProfileCTA() {
-        let gate = viewModel.canAdopt(selected)
+        if viewModel.isPremiumPetLocked(selected, isForeverUnlocked: store.isForeverUnlocked) {
+            showForeverPaywall = true
+            return
+        }
+
+        let gate = viewModel.canAdopt(selected, isForeverUnlocked: store.isForeverUnlocked)
         guard gate.allowed else {
             blockedMessage = gate.reason
             return
@@ -152,17 +189,30 @@ struct CatSelectionView: View {
 
     private func toggleSecondPetAdoptionBypassIfNeeded() {
         guard viewModel.ownedSkins.count == 1, let owned = viewModel.ownedSkins.first else { return }
-        let viewingUnownedSecond = !viewModel.ownedSkins.contains(selected)
+        let viewingUnownedFreeSecond = !viewModel.ownedSkins.contains(selected) && !selected.requiresForeverUnlock
         let viewingOwnedOnlyPet = selected == owned
-        guard viewingUnownedSecond || viewingOwnedOnlyPet else { return }
+        guard viewingUnownedFreeSecond || viewingOwnedOnlyPet else { return }
 
         let enabled = viewModel.toggleSecondPetAdoptionBypass()
         blockedMessage = nil
         if enabled {
-            let lockedName = CatSkin.allCases.first { !viewModel.ownedSkins.contains($0) }?.petName ?? "second pet"
+            let lockedName = CatSkin.allCases
+                .first { !viewModel.ownedSkins.contains($0) && !$0.requiresForeverUnlock }?
+                .petName ?? "second pet"
             showToast("Secret mode: \(lockedName) unlocked. Long-press the level pill again to undo.")
         } else {
             showToast("Secret mode undone. Level \(PetEconomy.secondPetUnlockLevel) required again.")
+        }
+    }
+
+    private func togglePremiumPetBypassIfNeeded() {
+        guard selected == .bombay else { return }
+        let enabled = viewModel.togglePremiumPetBypass()
+        blockedMessage = nil
+        if enabled {
+            showToast("Secret mode: Spunky unlocked. Long-press the profile card again to undo.")
+        } else {
+            showToast("Secret mode undone. Covela Forever required again.")
         }
     }
 
@@ -172,20 +222,48 @@ struct CatSelectionView: View {
             if toast == message { withAnimation { toast = nil } }
         }
     }
+
+    private func catChoiceCard(for skin: CatSkin) -> some View {
+        CatChoiceCard(
+            skin: skin,
+            isSelected: showingProfile && skin == selected,
+            isOwned: viewModel.ownedSkins.contains(skin),
+            isLocked: viewModel.isPremiumPetLocked(skin, isForeverUnlocked: store.isForeverUnlocked)
+        )
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selected = skin
+                blockedMessage = nil
+                showingProfile = true
+            }
+        }
+    }
 }
 
 private struct CatChoiceCard: View {
     let skin: CatSkin
     let isSelected: Bool
     let isOwned: Bool
+    let isLocked: Bool
 
     var body: some View {
         VStack(spacing: 12) {
-            portrait
-                .frame(height: 140)
-                .frame(maxWidth: .infinity)
-                .background(BabyTownTheme.accentSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            ZStack(alignment: .topTrailing) {
+                portrait
+                    .frame(height: 140)
+                    .frame(maxWidth: .infinity)
+                    .background(BabyTownTheme.accentSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(7)
+                        .background(BabyTownTheme.accentDeep.opacity(0.92), in: Circle())
+                        .padding(8)
+                }
+            }
 
             VStack(spacing: 2) {
                 Text(skin.petName)
@@ -194,11 +272,12 @@ private struct CatChoiceCard: View {
                 Text(skin.breedName)
                     .font(.system(size: 13))
                     .foregroundStyle(Color(red: 0.35, green: 0.35, blue: 0.38))
-                Text(isOwned ? "Owned" : "Available to adopt")
+                Text(statusLabel)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(isLocked ? Color(red: 0.45, green: 0.45, blue: 0.48) : BabyTownTheme.accentDeep)
             }
         }
+        .frame(width: 148)
         .padding(12)
         .background(BabyTownTheme.background)
         .clipShape(RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius))
@@ -209,18 +288,23 @@ private struct CatChoiceCard: View {
         )
         .shadow(color: BabyTownTheme.cardShadow, radius: 6, y: 3)
         .scaleEffect(isSelected ? 1.0 : 0.97)
+        .opacity(isLocked ? 0.92 : 1)
+    }
+
+    private var statusLabel: String {
+        if isOwned { return "Owned" }
+        if isLocked { return "Locked" }
+        return "Available to adopt"
     }
 
     @ViewBuilder
     private var portrait: some View {
-        // Reuse the same sitting photo asset as the profile card hero.
         if UIImage(named: skin.profileSitAsset) != nil {
             Image(skin.profileSitAsset)
                 .resizable()
                 .scaledToFit()
                 .padding(8)
         } else {
-            // Placeholder until real portraits are added.
             Image(systemName: "cat.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(skin.placeholderColor)

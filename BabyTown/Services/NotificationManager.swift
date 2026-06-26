@@ -242,6 +242,7 @@ class NotificationManager: NSObject, ObservableObject {
         case loveLetterReceived(title: String, sentAt: Date)
         case partnerAddedMoment
         case partnerAddedSpecialDate
+        case watchTogetherInvite(hostName: String, sessionID: UUID, videoURL: String)
     }
 
     func handlePartnerEvent(_ event: PartnerEvent) {
@@ -268,6 +269,24 @@ class NotificationManager: NSObject, ObservableObject {
             id = "partner_added_date"
             content.title = "Covela"
             content.body = "A new important date was added — take a look!"
+        case let .watchTogetherInvite(hostName, sessionID, videoURL):
+            id = "watch_together_invite_\(sessionID.uuidString)"
+            content.title = "\(hostName) wants to watch together"
+            content.body = "Tap to join and watch"
+            content.userInfo = [
+                "sessionID": sessionID.uuidString,
+                "videoURL": videoURL,
+                "hostName": hostName
+            ]
+            NotificationCenter.default.post(
+                name: .watchTogetherInviteReceived,
+                object: nil,
+                userInfo: [
+                    "sessionID": sessionID,
+                    "videoURL": videoURL,
+                    "hostName": hostName
+                ]
+            )
         }
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         UNUserNotificationCenter.current().add(

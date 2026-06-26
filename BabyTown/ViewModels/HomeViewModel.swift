@@ -752,7 +752,23 @@ final class HomeViewModel: ObservableObject {
     
     func addPhotosToMemory(section: DaySection, images: [UIImage]) {
         guard let firstMoment = section.moments.first else { return }
-        
+
+        if Self.isFoundingMoment(firstMoment),
+           let promptText = firstMoment.promptText,
+           let image = images.last {
+            upsertFoundingMoment(
+                promptText: promptText,
+                image: image,
+                dateTaken: firstMoment.dateTaken,
+                assetIdentifier: nil,
+                latitude: firstMoment.latitude,
+                longitude: firstMoment.longitude,
+                pinnedAt: firstMoment.pinnedAt ?? Date()
+            )
+            applyFoundingTemplateMetadata(promptText: promptText, template: firstMoment)
+            return
+        }
+
         let newMoments = images.map { image in
             Moment(
                 id: UUID(),
@@ -770,7 +786,7 @@ final class HomeViewModel: ObservableObject {
                 dateAddedToApp: Date()
             )
         }
-        
+
         addMoments(newMoments)
     }
 
@@ -780,6 +796,17 @@ final class HomeViewModel: ObservableObject {
         selectedOrphanMomentIds: Set<UUID>
     ) async {
         guard let firstMoment = section.moments.first else { return }
+
+        if Self.isFoundingMoment(firstMoment), let promptText = firstMoment.promptText {
+            await syncFoundingMemoryPhotos(
+                promptText: promptText,
+                section: section,
+                selectedAssetIds: selectedAssetIds,
+                selectedOrphanMomentIds: selectedOrphanMomentIds,
+                template: firstMoment
+            )
+            return
+        }
 
         let existingAssetIds = Set(section.moments.compactMap(\.assetIdentifier))
 
@@ -818,7 +845,94 @@ final class HomeViewModel: ObservableObject {
         }
         addMoments(enriched)
     }
-    
+
+    private func syncFoundingMemoryPhotos(
+        promptText: String,
+        section: DaySection,
+        selectedAssetIds: Set<String>,
+        selectedOrphanMomentIds: Set<UUID>,
+        template: Moment
+    ) async {
+        let pinnedAt = template.pinnedAt ?? Date()
+        let existingAssetIds = Set(section.moments.compactMap(\.assetIdentifier))
+        let newAssetIds = selectedAssetIds.subtracting(existingAssetIds)
+
+        if let newAssetId = newAssetIds.first {
+            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [newAssetId], options: nil)
+            guard let asset = fetched.firstObject else { return }
+            let created = await MomentFactory().createMoments(from: [asset])
+            guard let base = created.first else { return }
+            upsertFoundingMoment(
+                promptText: promptText,
+                image: base.thumbnail,
+                dateTaken: base.dateTaken,
+                assetIdentifier: asset.localIdentifier,
+                latitude: base.latitude ?? template.latitude,
+                longitude: base.longitude ?? template.longitude,
+                pinnedAt: pinnedAt
+            )
+            applyFoundingTemplateMetadata(promptText: promptText, template: template)
+            return
+        }
+
+        if let keptAssetId = selectedAssetIds.first(where: { existingAssetIds.contains($0) }),
+           let kept = section.moments.first(where: { $0.assetIdentifier == keptAssetId }) {
+            upsertFoundingMoment(
+                promptText: promptText,
+                image: kept.thumbnail,
+                dateTaken: kept.dateTaken,
+                assetIdentifier: kept.assetIdentifier,
+                latitude: kept.latitude,
+                longitude: kept.longitude,
+                pinnedAt: pinnedAt
+            )
+            applyFoundingTemplateMetadata(promptText: promptText, template: template)
+            return
+        }
+
+        if let orphanId = selectedOrphanMomentIds.first,
+           let orphan = moments.first(where: { $0.id == orphanId }) {
+            upsertFoundingMoment(
+                promptText: promptText,
+                image: orphan.thumbnail,
+                dateTaken: orphan.dateTaken,
+                assetIdentifier: nil,
+                latitude: orphan.latitude,
+                longitude: orphan.longitude,
+                pinnedAt: pinnedAt
+            )
+            applyFoundingTemplateMetadata(promptText: promptText, template: template)
+            return
+        }
+
+        if let recent = moments
+            .filter({ $0.promptText == promptText })
+            .max(by: { ($0.dateAddedToApp ?? .distantPast) < ($1.dateAddedToApp ?? .distantPast) }) {
+            upsertFoundingMoment(
+                promptText: promptText,
+                image: recent.thumbnail,
+                dateTaken: recent.dateTaken,
+                assetIdentifier: recent.assetIdentifier,
+                latitude: recent.latitude,
+                longitude: recent.longitude,
+                pinnedAt: pinnedAt
+            )
+            applyFoundingTemplateMetadata(promptText: promptText, template: template)
+        }
+    }
+
+    private func applyFoundingTemplateMetadata(promptText: String, template: Moment) {
+        guard let index = moments.firstIndex(where: { $0.promptText == promptText }) else { return }
+        var updated = moments
+        updated[index].caption = template.caption
+        updated[index].voiceNotePath = template.voiceNotePath
+        updated[index].placeName = template.placeName
+        updated[index].latitude = template.latitude
+        updated[index].longitude = template.longitude
+        updated[index].isPlaceNameUserSet = template.isPlaceNameUserSet
+        moments = updated
+    }
+
     func removePhotoFromMemory(section: DaySection, momentId: UUID) {
         guard section.moments.count > 1 else { return }
         moments.removeAll { $0.id == momentId }

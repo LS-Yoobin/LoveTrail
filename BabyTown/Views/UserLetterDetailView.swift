@@ -127,7 +127,13 @@ struct UserLetterDetailView: View {
     }
 
     private var inlineBlocks: [LetterBlock] {
-        letter.blocks.filter { $0.type != .sticker }
+        letter.blocks.filter {
+            $0.type == .voiceMemo || ($0.type == .photo && $0.photoPosition == nil)
+        }
+    }
+
+    private var photoBlocks: [LetterBlock] {
+        letter.blocks.filter { $0.type == .photo && $0.photoPosition != nil }
     }
 
     private var stickerBlocks: [LetterBlock] {
@@ -174,6 +180,20 @@ struct UserLetterDetailView: View {
                 }
                 .padding(28)
 
+                if !photoBlocks.isEmpty {
+                    LetterPhotosOverlay(
+                        photoBlocks: photoBlocks,
+                        images: photoImages,
+                        contentWidth: letterContentWidth,
+                        isEditing: false,
+                        selectedID: .constant(nil),
+                        onPositionChanged: { _, _ in },
+                        onScaleChanged: { _, _ in },
+                        onRotationChanged: { _, _ in },
+                        onDelete: { _ in }
+                    )
+                }
+
                 if !stickerBlocks.isEmpty {
                     LetterStickersOverlay(
                         stickerBlocks: stickerBlocks,
@@ -202,11 +222,7 @@ struct UserLetterDetailView: View {
                 scale: block.photoScale ?? LetterPhotoLayout.defaultScale,
                 contentWidth: letterContentWidth,
                 isEditing: false,
-                isSelected: false,
-                onSelect: {},
-                onDelete: {},
-                onScaleChanged: { _ in },
-                onRotationChanged: { _ in }
+                onDelete: {}
             )
 
         case .voiceMemo:
