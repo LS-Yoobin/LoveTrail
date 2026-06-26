@@ -10,7 +10,7 @@ final class BloomImageRenderer {
     func render(entry: BloomCatalogEntry) async -> UIImage? {
         if let cached = cache[entry.cacheKey] { return cached }
 
-        let size = CGSize(width: 100, height: 130)
+        let size = BloomSnapshotScene.sceneSize(for: entry)
         let view = SKView(frame: CGRect(origin: .zero, size: size))
         view.allowsTransparency = true
 

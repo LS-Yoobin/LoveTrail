@@ -4,6 +4,7 @@ import AVFoundation
 struct VoiceMemoRecorderView: View {
 
     let existingFileId: String?
+    var storage: VoiceMemoStorage = .prelude
     var onSaved: (String) -> Void
 
     @StateObject private var recorder = VoiceRecorder()
@@ -49,7 +50,7 @@ struct VoiceMemoRecorderView: View {
         .onAppear {
             checkMicPermission()
             if let fileId = existingFileId,
-               let data = DataPersistenceManager.shared.loadPreludeVoiceMemoData(fileId: fileId) {
+               let data = storage.load(fileId: fileId) {
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileId)
                 try? data.write(to: tempURL)
                 recorder.loadRecording(from: tempURL.path)
@@ -120,7 +121,7 @@ struct VoiceMemoRecorderView: View {
             } else {
                 if hasMicPermission {
                     if let old = savedFileId {
-                        DataPersistenceManager.shared.deletePreludeVoiceMemo(fileId: old)
+                        storage.delete(fileId: old)
                         savedFileId = nil
                         recorder.deleteRecording()
                     }
@@ -209,7 +210,7 @@ struct VoiceMemoRecorderView: View {
 
             Button("Re-record") {
                 if let old = savedFileId {
-                    DataPersistenceManager.shared.deletePreludeVoiceMemo(fileId: old)
+                    storage.delete(fileId: old)
                 }
                 savedFileId = nil
                 recorder.deleteRecording()
@@ -229,7 +230,7 @@ struct VoiceMemoRecorderView: View {
         let tempURL = URL(fileURLWithPath: tempPath)
         guard let data = try? Data(contentsOf: tempURL) else { return }
         try? FileManager.default.removeItem(at: tempURL)
-        DataPersistenceManager.shared.savePreludeVoiceMemo(data: data, fileId: fileId)
+        storage.save(data: data, fileId: fileId)
         savedFileId = fileId
         onSaved(fileId)
     }

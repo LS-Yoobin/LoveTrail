@@ -75,6 +75,9 @@ final class LoveGardenScene: SKScene {
             }
             if isStaticSnapshot {
                 node.setScale(depthScale)
+                if animateClouds {
+                    addSway(to: node, seed: element.position.x)
+                }
             } else {
                 animateGrowth(node, targetScale: depthScale, delay: Double(index) * 0.03)
                 addSway(to: node, seed: element.position.x)
@@ -128,7 +131,7 @@ final class LoveGardenScene: SKScene {
     }
 
     /// Matches `GardenComposer` planting band — lower on screen reads closer/larger.
-    private func bloomDepthScale(normalizedY: CGFloat) -> CGFloat {
+    static func bloomDepthScale(normalizedY: CGFloat) -> CGFloat {
         let bandLow: CGFloat = 0.08
         let bandHigh: CGFloat = 0.42
         let span = max(bandHigh - bandLow, 0.001)
@@ -136,6 +139,93 @@ final class LoveGardenScene: SKScene {
         let frontScale: CGFloat = 1.24
         let backScale: CGFloat = 0.76
         return frontScale + (backScale - frontScale) * t
+    }
+
+    static func displayScale(for element: GardenElement) -> CGFloat {
+        var depthScale = bloomDepthScale(normalizedY: CGFloat(element.position.y))
+        if element.isLegend {
+            depthScale *= 1.35
+        } else if element.kind == .flower && element.shape == .daisy12 {
+            depthScale *= 1.22
+        }
+        return depthScale
+    }
+
+    static func stemHeight(for element: GardenElement) -> CGFloat {
+        element.isLegend ? 52 : 46
+    }
+
+    /// Normalized tap center on the flower head (not the stem base).
+    static func normalizedBloomHeadCenter(
+        for element: GardenElement,
+        sceneHeight: CGFloat
+    ) -> GardenPoint {
+        guard element.kind != .tree else { return element.position }
+        let scale = displayScale(for: element)
+        let headOffsetYNormalized = Double((stemHeight(for: element) + 4) * scale / sceneHeight)
+        return GardenPoint(
+            x: element.position.x,
+            y: element.position.y + headOffsetYNormalized
+        )
+    }
+
+    /// Normalized hit radius around the flower head.
+    static func normalizedBloomHeadHitRadius(
+        for element: GardenElement,
+        sceneHeight: CGFloat
+    ) -> Double {
+        guard element.kind != .tree else { return 0.06 }
+        let scale = displayScale(for: element)
+        let baseRadius: CGFloat
+        if element.isLegend {
+            baseRadius = 34
+        } else if element.shape == .daisy12 {
+            baseRadius = 30
+        } else {
+            baseRadius = 26
+        }
+        return Double(baseRadius * scale / sceneHeight)
+    }
+
+    func bloomHeadCenter(for element: GardenElement) -> CGPoint {
+        let base = screenPosition(for: element.position)
+        guard element.kind != .tree else { return base }
+        let scale = Self.displayScale(for: element)
+        let offsetY = (Self.stemHeight(for: element) + 4) * scale
+        return CGPoint(x: base.x, y: base.y + offsetY)
+    }
+
+    func bloomHeadHitRadius(for element: GardenElement) -> CGFloat {
+        guard element.kind != .tree else { return 40 }
+        let scale = Self.displayScale(for: element)
+        let baseRadius: CGFloat
+        if element.isLegend {
+            baseRadius = 34
+        } else if element.shape == .daisy12 {
+            baseRadius = 30
+        } else {
+            baseRadius = 26
+        }
+        return baseRadius * scale
+    }
+
+    /// Returns the nearest bloom whose flower head contains `location`.
+    func bloomID(at location: CGPoint) -> UUID? {
+        var best: (UUID, CGFloat)?
+        for element in elements where element.kind != .tree {
+            let center = bloomHeadCenter(for: element)
+            let radius = bloomHeadHitRadius(for: element)
+            let distance = hypot(location.x - center.x, location.y - center.y)
+            guard distance <= radius else { continue }
+            if best == nil || distance < best!.1 {
+                best = (element.sourceID, distance)
+            }
+        }
+        return best?.0
+    }
+
+    private func bloomDepthScale(normalizedY: CGFloat) -> CGFloat {
+        Self.bloomDepthScale(normalizedY: normalizedY)
     }
 
     private func drawGround() {
@@ -259,27 +349,32 @@ final class LoveGardenScene: SKScene {
 
     /// Gentle ping-pong drift for compact widgets — clouds stay inside the clipped card.
     private func addBoundedDriftingClouds() {
-        let alpha: CGFloat = season == .blooming ? 0.55 : 0.38
+        let alpha: CGFloat = season == .blooming ? 0.58 : 0.40
         let cloudColor = SKColor(white: 1, alpha: alpha)
-        let cloudCount = 4
-        let marginX = size.width * 0.10
-        let skyMinY = size.height * 0.52
-        let skyMaxY = size.height * 0.86
+        let cloudCount = 7
+        let marginX = size.width * 0.06
+
+        let scales: [CGFloat] = [0.40, 0.55, 0.68, 0.48, 0.62, 0.82, 0.52]
+        let xSlots: [CGFloat] = [0.10, 0.26, 0.44, 0.60, 0.76, 0.34, 0.52]
+        let yHeights: [CGFloat] = [0.58, 0.72, 0.64, 0.80, 0.68, 0.55, 0.75]
+        let driftXFactors: [CGFloat] = [0.07, 0.09, 0.06, 0.11, 0.08, 0.10, 0.075]
+        let driftYAmps: [CGFloat] = [5, 7, 4, 8, 6, 5, 7]
+        let driftXDurations: [Double] = [7, 9, 6, 8, 10, 7, 9]
+        let driftYDurations: [Double] = [4, 5, 3.5, 6, 4.5, 5, 4]
 
         for i in 0..<cloudCount {
             let cloud = makeCloud(variant: i, color: cloudColor)
-            let slot = CGFloat(i + 1) / CGFloat(cloudCount + 1)
-            let x = marginX + (size.width - marginX * 2) * slot
-            let y = skyMinY + (skyMaxY - skyMinY) * CGFloat(i % 3) / 2.0
+            let x = marginX + (size.width - marginX * 2) * xSlots[i]
+            let y = size.height * yHeights[i]
             cloud.position = CGPoint(x: x, y: y)
-            cloud.zPosition = (i % 2 == 0) ? -2 : -3
-            cloud.setScale(0.50 + CGFloat(i % 3) * 0.07)
+            cloud.zPosition = (i % 3 == 0) ? -3 : -2
+            cloud.setScale(scales[i])
             addChild(cloud)
 
-            let driftX = size.width * (0.035 + CGFloat(i % 3) * 0.018)
-            let driftY: CGFloat = 2.5 + CGFloat(i % 2) * 2
-            let durX = TimeInterval(11 + i * 2)
-            let durY = TimeInterval(6 + i * 2)
+            let driftX = size.width * driftXFactors[i]
+            let driftY = driftYAmps[i]
+            let durX = driftXDurations[i]
+            let durY = driftYDurations[i]
 
             let horizontal = SKAction.repeatForever(.sequence([
                 .moveBy(x: driftX, y: 0, duration: durX),
@@ -293,8 +388,8 @@ final class LoveGardenScene: SKScene {
             ]))
             vertical.timingMode = .easeInEaseOut
 
-            cloud.run(.sequence([.wait(forDuration: Double(i) * 0.8), horizontal]))
-            cloud.run(.sequence([.wait(forDuration: Double(i) * 1.0), vertical]))
+            cloud.run(.sequence([.wait(forDuration: Double(i) * 0.55), horizontal]))
+            cloud.run(.sequence([.wait(forDuration: Double(i) * 0.7), vertical]))
         }
     }
 
@@ -672,19 +767,33 @@ final class LoveGardenScene: SKScene {
         guard allowsBloomInteraction else { return }
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
-        // Walk up from the hit node to find the element container we named.
+
+        if let id = bloomID(at: location) {
+            bumpBloom(id: id)
+            onTapElement?(id)
+            return
+        }
+
+        // Letter trees still use node-name hit testing on the canopy.
         var node: SKNode? = atPoint(location)
         while let current = node {
             if let name = current.name, let id = UUID(uuidString: name) {
-                let rest = current.xScale
-                let bump = SKAction.sequence([.scale(to: rest * 1.18, duration: 0.08),
-                                              .scale(to: rest, duration: 0.12)])
-                current.run(bump)
+                bumpBloom(id: id)
                 onTapElement?(id)
                 return
             }
             node = current.parent
         }
+    }
+
+    private func bumpBloom(id: UUID) {
+        guard let node = elementNodes[id] else { return }
+        let rest = node.xScale
+        let bump = SKAction.sequence([
+            .scale(to: rest * 1.18, duration: 0.08),
+            .scale(to: rest, duration: 0.12),
+        ])
+        node.run(bump)
     }
 
     /// A small soft circle texture used for particles, generated in code.

@@ -35,6 +35,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private func resetAppToWelcome() {
+        AudioManager.shared.setGardenActive(false)
         DataPersistenceManager.shared.clearAllData()
         StoreManager.shared.resetForTesting()
         ThemeManager.shared.setTheme(DataPersistenceManager.shared.loadColorTheme())
@@ -51,6 +52,17 @@ struct ContentView: View {
         withAnimation(.easeInOut(duration: 0.4)) {
             screen = .welcome
         }
+    }
+
+    private func syncBackgroundMusic(for screen: Screen) {
+        let shouldPlay: Bool
+        switch screen {
+        case .home, .selectPhotos, .officialPending, .loveGarden:
+            shouldPlay = true
+        default:
+            shouldPlay = false
+        }
+        AudioManager.shared.setGardenActive(shouldPlay)
     }
 
     init() {
@@ -101,6 +113,7 @@ struct ContentView: View {
                             withAnimation(.easeInOut(duration: 0.5)) {
                                 screen = targetScreen
                             }
+                            syncBackgroundMusic(for: targetScreen)
                         }
                     }
             
@@ -525,6 +538,9 @@ struct ContentView: View {
             if newPhase == .background {
                 NotificationManager.shared.refresh()
             }
+        }
+        .onChange(of: screen) { _, newScreen in
+            syncBackgroundMusic(for: newScreen)
         }
         .onOpenURL { url in
             guard url.scheme == "babytown",

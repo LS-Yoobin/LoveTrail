@@ -6,6 +6,7 @@ struct BloomCatalogEntry: Identifiable {
     let subtitle: String
     let unlockCondition: String
     let isEarned: Bool
+    let ownedCount: Int
     let chapter: BloomChapter?
     let shape: BloomShape?
     let isLegend: Bool
@@ -25,6 +26,11 @@ enum BloomCatalogBuilder {
                 $0.chapter == chapter && $0.shape == shape && $0.isLegend == isLegend
             }
         }
+        let bloomCount = { (chapter: BloomChapter, shape: BloomShape, isLegend: Bool) -> Int in
+            elements.filter {
+                $0.chapter == chapter && $0.shape == shape && $0.isLegend == isLegend
+            }.count
+        }
         return [
             BloomCatalogEntry(
                 id: "white-daisy12",
@@ -32,6 +38,7 @@ enum BloomCatalogBuilder {
                 subtitle: "10 memories planted together",
                 unlockCondition: "Reach 10 moments",
                 isEarned: hasBloom(.white, .daisy12, false),
+                ownedCount: bloomCount(.white, .daisy12, false),
                 chapter: .white, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -40,6 +47,7 @@ enum BloomCatalogBuilder {
                 subtitle: "20 memories planted together",
                 unlockCondition: "Reach 20 moments",
                 isEarned: hasBloom(.yellow, .daisy12, false),
+                ownedCount: bloomCount(.yellow, .daisy12, false),
                 chapter: .yellow, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -48,6 +56,7 @@ enum BloomCatalogBuilder {
                 subtitle: "30 memories planted together",
                 unlockCondition: "Reach 30 moments",
                 isEarned: hasBloom(.red, .daisy12, false),
+                ownedCount: bloomCount(.red, .daisy12, false),
                 chapter: .red, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -56,6 +65,7 @@ enum BloomCatalogBuilder {
                 subtitle: "40 memories planted together",
                 unlockCondition: "Reach 40 moments",
                 isEarned: hasBloom(.blue, .daisy12, false),
+                ownedCount: bloomCount(.blue, .daisy12, false),
                 chapter: .blue, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -64,6 +74,7 @@ enum BloomCatalogBuilder {
                 subtitle: "50 memories planted together",
                 unlockCondition: "Reach 50 moments",
                 isEarned: hasBloom(.purple, .daisy12, false),
+                ownedCount: bloomCount(.purple, .daisy12, false),
                 chapter: .purple, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -72,6 +83,7 @@ enum BloomCatalogBuilder {
                 subtitle: "Fifty memories in — your garden is truly thriving",
                 unlockCondition: "50 memories together",
                 isEarned: hasBloom(.purple, .tulip3, true),
+                ownedCount: bloomCount(.purple, .tulip3, true),
                 chapter: .purple, shape: .tulip3, isLegend: true
             ),
             BloomCatalogEntry(
@@ -80,6 +92,7 @@ enum BloomCatalogBuilder {
                 subtitle: "One hundred blooms of us. Legendary",
                 unlockCondition: "100 memories together",
                 isEarned: hasBloom(.black, .lotus8, true),
+                ownedCount: bloomCount(.black, .lotus8, true),
                 chapter: .black, shape: .lotus8, isLegend: true
             ),
             BloomCatalogEntry(
@@ -88,6 +101,7 @@ enum BloomCatalogBuilder {
                 subtitle: "Another candle, another flower",
                 unlockCondition: "Add a birthday",
                 isEarned: elements.contains { $0.kind == .birthdayFlower },
+                ownedCount: elements.filter { $0.kind == .birthdayFlower }.count,
                 chapter: .birthday, shape: .daisy12, isLegend: false
             ),
             BloomCatalogEntry(
@@ -96,6 +110,7 @@ enum BloomCatalogBuilder {
                 subtitle: "Another year of us, planted in the garden",
                 unlockCondition: "Add your anniversary",
                 isEarned: elements.contains { $0.kind == .anniversaryFlower },
+                ownedCount: elements.filter { $0.kind == .anniversaryFlower }.count,
                 chapter: .anniversary, shape: .lotus8, isLegend: false
             ),
             BloomCatalogEntry(
@@ -104,6 +119,7 @@ enum BloomCatalogBuilder {
                 subtitle: "A love letter, rooted forever",
                 unlockCondition: "Write a love letter",
                 isEarned: elements.contains { $0.kind == .tree },
+                ownedCount: elements.filter { $0.kind == .tree }.count,
                 chapter: nil, shape: nil, isLegend: false
             ),
         ]

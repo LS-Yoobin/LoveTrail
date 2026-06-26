@@ -17,6 +17,25 @@ struct CaptureEditorPresentation: Identifiable {
     }
 }
 
+struct LetterBlockEditorPresentation: Identifiable {
+    let id: UUID
+    let type: LetterBlockType
+
+    static func new(_ type: LetterBlockType) -> LetterBlockEditorPresentation {
+        LetterBlockEditorPresentation(id: UUID(), type: type)
+    }
+}
+
+enum CaptureEditorDestination {
+    case prelude(PreludeViewModel)
+    case letter(onSave: (LetterBlock) -> Void)
+
+    var isLetterMode: Bool {
+        if case .letter = self { return true }
+        return false
+    }
+}
+
 struct CaptureEditorView: View {
 
     private enum FirstEditorStep {
@@ -26,7 +45,7 @@ struct CaptureEditorView: View {
 
     let type: PreludeCapture.CaptureType
     let existing: PreludeCapture?
-    @ObservedObject var viewModel: PreludeViewModel
+    let destination: CaptureEditorDestination
     var onSave: () -> Void
     var onCancel: () -> Void
 
@@ -56,6 +75,30 @@ struct CaptureEditorView: View {
         return pages[firstOptionsPage % pages.count]
     }
 
+    private var showsGiftToggle: Bool {
+        !destination.isLetterMode && existing != nil
+    }
+
+    private var voiceMemoStorage: VoiceMemoStorage {
+        destination.isLetterMode ? .letter : .prelude
+    }
+
+    private var saveButtonTitle: String {
+        destination.isLetterMode ? "Add" : "Save"
+    }
+
+    private var notePrompts: [String] {
+        PreludeViewModel.notePrompts
+    }
+
+    private var voicePrompts: [String] {
+        destination.isLetterMode ? LetterPrompts.voicePrompts : PreludeViewModel.voicePrompts
+    }
+
+    private var reasonPrompt: String {
+        PreludeViewModel.reasonPrompt
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -69,7 +112,7 @@ struct CaptureEditorView: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 20) {
-                            if existing != nil {
+                            if showsGiftToggle {
                                 giftToggle
                             }
                             editorContent
@@ -104,7 +147,7 @@ struct CaptureEditorView: View {
                         .disabled(!canAdvanceFirstStep)
                     } else {
                         Button(action: save) {
-                            SavePillLabel(title: "Save", isEnabled: canSave)
+                            SavePillLabel(title: saveButtonTitle, isEnabled: canSave)
                         }
                         .buttonStyle(.plain)
                         .disabled(!canSave)
@@ -180,7 +223,7 @@ struct CaptureEditorView: View {
         VStack(spacing: 0) {
             // Fixed zone
             VStack(alignment: .leading, spacing: 12) {
-                if existing != nil {
+                if showsGiftToggle {
                     giftToggle
                         .padding(.bottom, 4)
                 }
@@ -376,7 +419,7 @@ struct CaptureEditorView: View {
     private var firstPhotoEditor: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
-                if existing != nil {
+                if showsGiftToggle {
                     giftToggle
                 }
 
@@ -523,7 +566,7 @@ struct CaptureEditorView: View {
     // MARK: - Other Editors
 
     private var currentNotePrompt: String {
-        PreludeViewModel.notePrompts[promptIndex % PreludeViewModel.notePrompts.count]
+        notePrompts[promptIndex % notePrompts.count]
     }
 
     private var noteEditor: some View {
@@ -572,17 +615,27 @@ struct CaptureEditorView: View {
     }
 
     private var currentVoicePrompt: String {
-        PreludeViewModel.voicePrompts[voicePromptIndex % PreludeViewModel.voicePrompts.count]
+        voicePrompts[voicePromptIndex % voicePrompts.count]
+    }
+
+    private var voiceMemoHeadline: String {
+        destination.isLetterMode ? "Say it out loud" : "Say what you can't write"
+    }
+
+    private var voiceMemoDescription: String {
+        destination.isLetterMode
+            ? "Your voice carries warmth and meaning that text sometimes can't. Record a message they'll hear in your own words."
+            : "Your voice carries what text sometimes can't — the pause, the laugh, the way you mean it. Speak freely. They'll hear you, not just your words."
     }
 
     private var voiceMemoEditor: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Say what you can't write")
+                Text(voiceMemoHeadline)
                     .font(.system(size: 22, weight: .semibold, design: .serif))
                     .foregroundStyle(BabyTownTheme.textPrimary)
 
-                Text("Your voice carries what text sometimes can't — the pause, the laugh, the way you mean it. Speak freely. They'll hear you, not just your words.")
+                Text(voiceMemoDescription)
                     .font(.system(size: 15))
                     .foregroundStyle(.black)
                     .fixedSize(horizontal: false, vertical: true)
@@ -605,6 +658,7 @@ struct CaptureEditorView: View {
 
             VoiceMemoRecorderView(
                 existingFileId: existing?.voiceMemoFileId,
+                storage: voiceMemoStorage,
                 onSaved: { fileId in
                     savedVoiceMemoFileId = fileId
                 }
@@ -613,13 +667,17 @@ struct CaptureEditorView: View {
         .animation(.easeInOut(duration: 0.2), value: showVoicePrompt)
     }
 
+    private var reasonPlaceholder: String {
+        destination.isLetterMode ? "One reason I love you…" : "One reason I'm falling for you…"
+    }
+
     private var reasonEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            promptChip(PreludeViewModel.reasonPrompt)
+            promptChip(reasonPrompt)
 
             TextField(
                 "", text: $reasonText,
-                prompt: Text("One reason I'm falling for you…").foregroundStyle(Color(uiColor: .darkGray).opacity(0.55)),
+                prompt: Text(reasonPlaceholder).foregroundStyle(Color(uiColor: .darkGray).opacity(0.55)),
                 axis: .vertical
             )
             .foregroundStyle(.black)
@@ -686,6 +744,26 @@ struct CaptureEditorView: View {
     }
 
     private func save() {
+        switch destination {
+        case .prelude(let viewModel):
+            saveToPrelude(viewModel: viewModel)
+        case .letter(let onSave):
+            saveToLetter(onSave: onSave)
+        }
+        onSave()
+    }
+
+    private func saveToLetter(onSave: (LetterBlock) -> Void) {
+        guard type == .voiceMemo else { return }
+
+        let block = LetterBlock(
+            type: .voiceMemo,
+            voiceMemoFileId: savedVoiceMemoFileId
+        )
+        onSave(block)
+    }
+
+    private func saveToPrelude(viewModel: PreludeViewModel) {
         let resolvedFileId: String?
         switch type {
         case .voiceMemo:
@@ -722,7 +800,6 @@ struct CaptureEditorView: View {
         } else {
             viewModel.addCapture(capture)
         }
-        onSave()
     }
 }
 
@@ -730,7 +807,7 @@ struct CaptureEditorView: View {
     CaptureEditorView(
         type: .first,
         existing: nil,
-        viewModel: PreludeViewModel(),
+        destination: .prelude(PreludeViewModel()),
         onSave: {},
         onCancel: {}
     )

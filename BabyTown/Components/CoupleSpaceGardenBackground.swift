@@ -2,7 +2,7 @@ import SwiftUI
 import SpriteKit
 import GardenCore
 
-/// Live garden backdrop for the Home "Our Garden" card — blooms stay still while
+/// Live garden backdrop for the Home "Our Garden" card — blooms sway gently while
 /// clouds drift inside the clipped card bounds.
 struct CoupleSpaceGardenBackground: View {
     let elements: [GardenElement]

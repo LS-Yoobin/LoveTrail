@@ -35,6 +35,7 @@ struct CoupleProfileView: View {
 
     @ObservedObject private var musicPlaybackState = CoupleMusicPlaybackState.shared
     @StateObject private var nightModeManager = NightModeManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var dateEditorPresentation: SpecialDateEditorPresentation?
     @State private var activeSubpage: CoupleProfileSubpage?
@@ -354,10 +355,11 @@ struct CoupleProfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             load()
-            AudioManager.shared.setGardenActive(true)
         }
-        .onDisappear {
-            AudioManager.shared.setGardenActive(false)
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                load()
+            }
         }
         .sheet(isPresented: $showOurSongSheet) {
             OurSongSheet()
@@ -382,7 +384,7 @@ struct CoupleProfileView: View {
                         dpm.savePartnerProfilePhoto(image)
                     }
                     dpm.saveUserNickname(name)
-                    profile.gardenMood = mood
+                    profile.setGardenMood(mood)
                     dpm.saveCoupleProfile(profile)
                 } else {
                     dpm.saveUserAvatar(image)
@@ -390,7 +392,7 @@ struct CoupleProfileView: View {
                     if image != nil {
                         ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
                     }
-                    profile.gardenMood = mood
+                    profile.setGardenMood(mood)
                     dpm.saveCoupleProfile(profile)
                 }
                 userAvatar = image

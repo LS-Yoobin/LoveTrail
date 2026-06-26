@@ -54,7 +54,7 @@ struct PreludeHomeView: View {
             CaptureEditorView(
                 type: presentation.type,
                 existing: presentation.existing,
-                viewModel: viewModel,
+                destination: .prelude(viewModel),
                 onSave: { editorPresentation = nil },
                 onCancel: { editorPresentation = nil }
             )

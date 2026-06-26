@@ -188,9 +188,8 @@ struct ProfileStickersLayer: View {
                 x: CGFloat(sticker.position.x) * canvasSize.width,
                 y: CGFloat(sticker.position.y) * canvasSize.height
             )
-            let contentHeight = stickerContentHeight(sticker)
             EditGardenTrashButton(action: { onDelete(selectedID) })
-                .position(x: center.x, y: center.y - contentHeight / 2 - Self.trashLift)
+                .position(x: center.x, y: trashButtonY(for: sticker, centerY: center.y))
         }
     }
 
@@ -216,6 +215,16 @@ struct ProfileStickersLayer: View {
             image: images[sticker.id],
             showsMoodPill: showsMoodPill
         )
+    }
+
+    private func trashButtonY(for sticker: ProfileSticker, centerY: CGFloat) -> CGFloat {
+        let side = ProfileSticker.renderedSize(scale: sticker.scale)
+        switch sticker.kind {
+        case .userAvatar, .partnerInvite:
+            return centerY - side / 2 - Self.trashLift
+        case .moment, .specialDate, .pet:
+            return centerY - stickerContentHeight(sticker) / 2 - Self.trashLift
+        }
     }
 
     private var profileStickers: [ProfileSticker] {

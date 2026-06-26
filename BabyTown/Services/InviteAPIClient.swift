@@ -41,6 +41,8 @@ struct InviteAcceptedResponse {
 protocol InviteAPIClientProtocol {
     /// POST /create-invite
     func createInvite(inviterName: String) async throws -> InviteCreatedResponse
+    /// POST /send-invite-email
+    func sendInviteEmail(partnerEmail: String, inviterName: String, code: String) async throws
     /// GET /invite/:code — polls for partner acceptance
     func checkInviteStatus(code: String) async throws -> InviteStatusResponse
     /// POST /accept-invite — called when user enters a referral code
@@ -62,6 +64,11 @@ final class StubInviteAPIClient: InviteAPIClientProtocol {
             code: code,
             link: "https://covela.app/invite/\(code)?from=\(encodedName)"
         )
+    }
+
+    func sendInviteEmail(partnerEmail: String, inviterName: String, code: String) async throws {
+        // TODO: POST /send-invite-email with body { partner_email, inviter_name, code }
+        try await Task.sleep(nanoseconds: 400_000_000)
     }
 
     func checkInviteStatus(code: String) async throws -> InviteStatusResponse {

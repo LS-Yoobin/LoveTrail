@@ -10,6 +10,8 @@ struct CoupleSpaceCard: View {
     var partnerAvatar: UIImage? = nil
     var gardenElements: [GardenElement] = []
     var gardenSeason: GardenSeason = .blooming
+    var gardenMood: ProfileNoteMood? = nil
+    var userName: String = "You"
     var bloomCount: Int
     var isReadyToInvite: Bool
     var onTap: () -> Void
@@ -19,7 +21,18 @@ struct CoupleSpaceCard: View {
             ZStack {
                 gardenBackground
 
+                if let gardenMood {
+                    GardenMoodRainOverlay(mood: gardenMood)
+                }
+
                 Color.black.opacity(0.25)
+
+                if let gardenMood {
+                    gardenMoodStatus(mood: gardenMood)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
 
                 HStack(alignment: .center, spacing: 0) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -49,6 +62,18 @@ struct CoupleSpaceCard: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
+    }
+
+    private func gardenMoodStatus(mood: ProfileNoteMood) -> some View {
+        HStack(spacing: 5) {
+            Text("\(userName) is feeling")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.92))
+
+            ProfileGardenMoodPill(mood: mood)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 
     private var gardenBackground: some View {
@@ -113,6 +138,8 @@ struct CoupleSpaceCard: View {
         partnerAvatar: nil,
         gardenElements: [],
         gardenSeason: .blooming,
+        gardenMood: .smitten,
+        userName: "Alex",
         bloomCount: 8,
         isReadyToInvite: false,
         onTap: {}

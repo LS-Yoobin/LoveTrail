@@ -75,6 +75,18 @@ final class DataPersistenceManager {
         documentsDirectory.appendingPathComponent("PreludeVoiceMemos")
     }
 
+    private var letterVoiceMemosDirectory: URL {
+        documentsDirectory.appendingPathComponent("letter_voice_memos")
+    }
+
+    private var letterStickersDirectory: URL {
+        documentsDirectory.appendingPathComponent("letter_stickers")
+    }
+
+    private var letterPhotosDirectory: URL {
+        documentsDirectory.appendingPathComponent("letter_photos")
+    }
+
     private var preludePhotosDirectory: URL {
         documentsDirectory.appendingPathComponent("PreludePhotos")
     }
@@ -89,6 +101,18 @@ final class DataPersistenceManager {
 
     private func preludeVoiceMemoURL(fileId: String) -> URL {
         preludeVoiceMemosDirectory.appendingPathComponent(fileId)
+    }
+
+    private func letterVoiceMemoURL(fileId: String) -> URL {
+        letterVoiceMemosDirectory.appendingPathComponent(fileId)
+    }
+
+    private func letterStickerImageURL(id: UUID) -> URL {
+        letterStickersDirectory.appendingPathComponent("\(id.uuidString).png")
+    }
+
+    private func letterPhotoImageURL(id: UUID) -> URL {
+        letterPhotosDirectory.appendingPathComponent("\(id.uuidString).jpg")
     }
 
     private func preludePhotoURL(photoId: UUID) -> URL {
@@ -144,6 +168,9 @@ final class DataPersistenceManager {
         }
         if !fileManager.fileExists(atPath: preludeVoiceMemosDirectory.path) {
             try? fileManager.createDirectory(at: preludeVoiceMemosDirectory, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: letterVoiceMemosDirectory.path) {
+            try? fileManager.createDirectory(at: letterVoiceMemosDirectory, withIntermediateDirectories: true)
         }
         if !fileManager.fileExists(atPath: preludePhotosDirectory.path) {
             try? fileManager.createDirectory(at: preludePhotosDirectory, withIntermediateDirectories: true)
@@ -375,6 +402,9 @@ final class DataPersistenceManager {
         if SpecialDate.migrateBirthdayEntries(in: &profile) {
             saveCoupleProfile(profile)
         }
+        if profile.pruneExpiredGardenMood() {
+            saveCoupleProfile(profile)
+        }
         return profile
     }
 
@@ -535,6 +565,57 @@ final class DataPersistenceManager {
 
     func deletePreludeVoiceMemo(fileId: String) {
         try? fileManager.removeItem(at: preludeVoiceMemoURL(fileId: fileId))
+    }
+
+    func saveLetterVoiceMemo(data: Data, fileId: String) {
+        let url = letterVoiceMemoURL(fileId: fileId)
+        try? data.write(to: url)
+    }
+
+    func loadLetterVoiceMemoData(fileId: String) -> Data? {
+        let url = letterVoiceMemoURL(fileId: fileId)
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    func deleteLetterVoiceMemo(fileId: String) {
+        try? fileManager.removeItem(at: letterVoiceMemoURL(fileId: fileId))
+    }
+
+    func saveLetterStickerImage(_ image: UIImage, id: UUID) {
+        try? fileManager.createDirectory(at: letterStickersDirectory, withIntermediateDirectories: true)
+        let url = letterStickerImageURL(id: id)
+        guard let png = image.pngData() else { return }
+        try? png.write(to: url)
+    }
+
+    func loadLetterStickerImage(id: UUID) -> UIImage? {
+        let url = letterStickerImageURL(id: id)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func deleteLetterStickerImage(id: UUID) {
+        try? fileManager.removeItem(at: letterStickerImageURL(id: id))
+    }
+
+    func saveLetterPhotoImage(_ image: UIImage, id: UUID) {
+        try? fileManager.createDirectory(at: letterPhotosDirectory, withIntermediateDirectories: true)
+        let url = letterPhotoImageURL(id: id)
+        guard let jpeg = image.jpegData(compressionQuality: 0.88) else { return }
+        try? jpeg.write(to: url)
+    }
+
+    func loadLetterPhotoImage(id: UUID) -> UIImage? {
+        let url = letterPhotoImageURL(id: id)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func deleteLetterPhotoImage(id: UUID) {
+        try? fileManager.removeItem(at: letterPhotoImageURL(id: id))
     }
 
     func savePreludePhoto(_ image: UIImage, photoId: UUID) {

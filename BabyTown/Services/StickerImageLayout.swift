@@ -52,12 +52,40 @@ enum StickerImageLayout {
         image: UIImage?,
         showsMoodPill: Bool = false
     ) -> CGFloat {
-        let contentBottom = image.map { visibleContentBottom(inSquareSide: side, image: $0) } ?? side
-        var height = contentBottom + labelGap + labelPillHeight
+        side + labelStackExtentBelowSquare(
+            squareSide: side,
+            image: image,
+            showsMoodPill: showsMoodPill
+        )
+    }
+
+    /// Label column height below the sticker square's bottom edge (name pill + optional mood pill).
+    static func labelStackExtentBelowSquare(
+        squareSide side: CGFloat,
+        image: UIImage?,
+        showsMoodPill: Bool
+    ) -> CGFloat {
+        let labelOffset = labelVerticalOffset(inSquareSide: side, image: image) + labelGap
+        var extent = labelOffset + labelPillHeight
         if showsMoodPill {
-            height += moodPillGap + moodPillHeight
+            extent += moodPillGap + moodPillHeight
         }
-        return height
+        return extent
+    }
+
+    /// Shifts a `.position` anchor so the sticker square center stays fixed while labels grow below.
+    static func labelAnchorYOffset(
+        squareSide side: CGFloat,
+        image: UIImage?,
+        showsLabel: Bool,
+        showsMoodPill: Bool
+    ) -> CGFloat {
+        guard showsLabel else { return 0 }
+        return labelStackExtentBelowSquare(
+            squareSide: side,
+            image: image,
+            showsMoodPill: showsMoodPill
+        ) / 2
     }
 
     private static func cacheKey(for image: UIImage) -> NSString {

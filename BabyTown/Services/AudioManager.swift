@@ -31,11 +31,15 @@ class AudioManager: NSObject {
     }
 
     func setGardenActive(_ active: Bool) {
-        isGardenActive = active
         if active {
-            isUserPaused = false
-            playGardenMusic()
+            let wasActive = isGardenActive
+            isGardenActive = true
+            if !wasActive {
+                isUserPaused = false
+                playGardenMusic()
+            }
         } else {
+            isGardenActive = false
             stopGardenMusic()
             isUserPaused = false
         }

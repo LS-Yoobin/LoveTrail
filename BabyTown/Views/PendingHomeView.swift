@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import Photos
 import GardenCore
 
 struct PendingHomeView: View {
@@ -6,14 +8,32 @@ struct PendingHomeView: View {
     var onResetApp: () -> Void = {}
     var onLogOut: () -> Void = {}
 
+    @StateObject private var viewModel = HomeViewModel(
+        pinnedFirstMet: nil,
+        pinnedOfficial: UIImage(),
+        loadFromPersistence: true
+    )
+
     @State private var pollTimer: Timer? = nil
     @State private var showLockedToast = false
     @State private var bannerVisible = true
     @State private var showSettings = false
     @State private var showVisitPet = false
     @State private var showWaitingGarden = false
-    @State private var officialMoment: Moment? = nil
-    @State private var firstMetMoment: Moment? = nil
+    @State private var showingPinnedViewer: PinnedMemoryType?
+    @State private var firstMetPickerItem: PhotosPickerItem?
+    @State private var officialPickerItem: PhotosPickerItem?
+    @State private var showingMomentViewer = false
+    @State private var viewerMoments: [Moment] = []
+    @State private var viewerInitialIndex = 0
+
+    private var officialMoment: Moment? {
+        viewModel.canonicalFoundingMoment(for: "When we became official")
+    }
+
+    private var firstMetMoment: Moment? {
+        viewModel.canonicalFoundingMoment(for: "When we first met")
+    }
 
     private var partnerName: String {
         DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "your partner"
@@ -63,7 +83,31 @@ struct PendingHomeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
             }
+
+            if let viewerType = showingPinnedViewer {
+                FullScreenPinnedMemoryViewer(
+                    title: viewerType == .firstMet ? "First Photo Taken Together" : "First Photo As Official Jinkies",
+                    date: "Pinned",
+                    image: viewerType == .firstMet ? viewModel.pinnedFirstMet : viewModel.pinnedOfficial,
+                    pickerItem: viewerType == .firstMet ? $firstMetPickerItem : $officialPickerItem,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingPinnedViewer = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(20)
+            }
+
+            if showingMomentViewer {
+                momentPhotoViewerOverlay
+                    .transition(.opacity)
+                    .zIndex(21)
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
+        .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
                 onResetApp: {
@@ -86,11 +130,68 @@ struct PendingHomeView: View {
         .fullScreenCover(isPresented: $showWaitingGarden) {
             waitingGardenView
         }
-        .onAppear {
-            startPolling()
-            loadFoundingMoments()
-        }
+        .onAppear { startPolling() }
         .onDisappear { stopPolling() }
+        .onChange(of: firstMetPickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    var creationDate = Date()
+                    var latitude: Double? = nil
+                    var longitude: Double? = nil
+                    if let identifier = newItem.itemIdentifier {
+                        let result = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+                        if let asset = result.firstObject {
+                            creationDate = asset.creationDate ?? Date()
+                            latitude = asset.location?.coordinate.latitude
+                            longitude = asset.location?.coordinate.longitude
+                        }
+                    }
+                    viewModel.pinnedFirstMet = image
+                    viewModel.upsertFoundingMoment(
+                        promptText: "When we first met",
+                        image: image,
+                        dateTaken: creationDate,
+                        assetIdentifier: newItem.itemIdentifier,
+                        latitude: latitude,
+                        longitude: longitude,
+                        pinnedAt: Date().addingTimeInterval(-1)
+                    )
+                }
+                firstMetPickerItem = nil
+            }
+        }
+        .onChange(of: officialPickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    var creationDate = Date()
+                    var latitude: Double? = nil
+                    var longitude: Double? = nil
+                    if let identifier = newItem.itemIdentifier {
+                        let result = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+                        if let asset = result.firstObject {
+                            creationDate = asset.creationDate ?? Date()
+                            latitude = asset.location?.coordinate.latitude
+                            longitude = asset.location?.coordinate.longitude
+                        }
+                    }
+                    viewModel.pinnedOfficial = image
+                    viewModel.upsertFoundingMoment(
+                        promptText: "When we became official",
+                        image: image,
+                        dateTaken: creationDate,
+                        assetIdentifier: newItem.itemIdentifier,
+                        latitude: latitude,
+                        longitude: longitude,
+                        pinnedAt: Date()
+                    )
+                }
+                officialPickerItem = nil
+            }
+        }
     }
 
     // MARK: Waiting banner
@@ -206,9 +307,13 @@ struct PendingHomeView: View {
     @ViewBuilder
     private func pendingPinnedCard(title: String, moment: Moment?) -> some View {
         if let moment {
-            foundingPhotoCard(moment: moment, showsPinnedLabel: true)
+            foundingPhotoCard(moment: moment, showsPinnedLabel: true) {
+                openFoundingMoment(moment)
+            }
         } else {
-            FoundingPlaceholderCard(title: title, showsPinnedLabel: true) { showToast() }
+            FoundingPlaceholderCard(title: title, showsPinnedLabel: true) {
+                openFoundingPhotoPicker(for: title)
+            }
         }
     }
 
@@ -239,11 +344,15 @@ struct PendingHomeView: View {
     private func pendingTimelineSlot(prompt: String, moment: Moment?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let moment {
-                foundingPhotoCard(moment: moment, showsPinnedLabel: false)
-                    .padding(.horizontal, 20)
+                foundingPhotoCard(moment: moment, showsPinnedLabel: false) {
+                    openFoundingMoment(moment)
+                }
+                .padding(.horizontal, 20)
             } else {
-                FoundingPlaceholderCard(title: prompt, showsPinnedLabel: false) { showToast() }
-                    .padding(.horizontal, 20)
+                FoundingPlaceholderCard(title: prompt, showsPinnedLabel: false) {
+                    openFoundingPhotoPicker(for: prompt)
+                }
+                .padding(.horizontal, 20)
             }
 
             HStack(spacing: 8) {
@@ -252,7 +361,7 @@ struct PendingHomeView: View {
                     Text(prompt)
                         .font(.system(size: 15, weight: .medium, design: .serif))
                         .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.85))
-                    Text(moment == nil ? "Tap to add your photo" : "")
+                    Text(moment == nil ? "Tap to add your photo" : "Tap to edit")
                         .font(.system(size: 13, weight: .regular, design: .serif))
                         .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.5))
                 }
@@ -263,7 +372,11 @@ struct PendingHomeView: View {
         .padding(.top, 16)
     }
 
-    private func foundingPhotoCard(moment: Moment, showsPinnedLabel: Bool) -> some View {
+    private func foundingPhotoCard(
+        moment: Moment,
+        showsPinnedLabel: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(uiImage: moment.thumbnail)
                 .resizable()
@@ -298,7 +411,82 @@ struct PendingHomeView: View {
                 .strokeBorder(BabyTownTheme.accent.opacity(0.15), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture { showToast() }
+        .onTapGesture(perform: onTap)
+    }
+
+    private var momentPhotoViewerOverlay: some View {
+        MomentPhotoViewer(
+            moments: viewerMoments,
+            initialIndex: viewerInitialIndex,
+            onDismiss: {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showingMomentViewer = false
+                }
+            },
+            onUpdateMoments: { updatedMoments in
+                var newMoments = viewModel.moments
+                for moment in updatedMoments {
+                    if let index = newMoments.firstIndex(where: { $0.id == moment.id }) {
+                        newMoments[index] = moment
+                    }
+                }
+                viewModel.moments = newMoments
+            },
+            onDeleteMoment: { moment in
+                withAnimation {
+                    viewModel.deleteMoment(moment)
+                }
+            },
+            onEditMemory: { section, momentId, caption, placeName, latitude, longitude, isPlaceNameUserSet in
+                viewModel.updateMemory(
+                    section: section,
+                    primaryMomentId: momentId,
+                    caption: caption,
+                    placeName: placeName,
+                    latitude: latitude,
+                    longitude: longitude,
+                    isPlaceNameUserSet: isPlaceNameUserSet
+                )
+            },
+            onEditCaption: { momentId, caption, voiceNotePath in
+                viewModel.updateCaption(for: momentId, caption: caption, voiceNotePath: voiceNotePath)
+            },
+            onAddPhotos: { section, images in
+                viewModel.addPhotosToMemory(section: section, images: images)
+            },
+            onRemovePhoto: { section, momentId in
+                viewModel.removePhotoFromMemory(section: section, momentId: momentId)
+            },
+            onSyncMemoryPhotos: { section, assetIds, orphanIds in
+                await viewModel.syncMemoryPhotos(
+                    section: section,
+                    selectedAssetIds: assetIds,
+                    selectedOrphanMomentIds: orphanIds
+                )
+            },
+            onReloadMemoryMoments: {
+                guard let anchorId = viewerMoments.first?.id else { return viewerMoments }
+                return viewModel.flattenedPhotosForMemory(containingMomentId: anchorId)
+            }
+        )
+    }
+
+    private func openFoundingPhotoPicker(for promptText: String) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if promptText == "When we became official" {
+                showingPinnedViewer = .official
+            } else {
+                showingPinnedViewer = .firstMet
+            }
+        }
+    }
+
+    private func openFoundingMoment(_ moment: Moment) {
+        viewerMoments = viewModel.foundingMomentsForViewer(containing: moment)
+        viewerInitialIndex = 0
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMomentViewer = true
+        }
     }
 
     private func pendingSectionLabel(_ text: String, icon: String) -> some View {
@@ -311,12 +499,6 @@ struct PendingHomeView: View {
                 .foregroundStyle(.black)
             Spacer()
         }
-    }
-
-    private func loadFoundingMoments() {
-        let moments = DataPersistenceManager.shared.loadMoments()
-        officialMoment = moments.first { $0.promptText == "When we became official" }
-        firstMetMoment = moments.first { $0.promptText == "When we first met" }
     }
 
     private var waitingGardenView: some View {

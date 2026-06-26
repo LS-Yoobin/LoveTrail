@@ -7,16 +7,20 @@ struct OnboardingInviteView: View {
 
     private enum InviteState {
         case choosingAction
-        case pending(code: String)
+        case enteringPartnerEmail
+        case pending(code: String, partnerEmail: String)
         case enteringCode
     }
 
     @State private var state: InviteState = .choosingAction
+    @State private var partnerEmailInput = ""
     @State private var codeInput = ""
     @State private var isLoading = false
     @State private var codeError: String? = nil
+    @State private var emailError: String? = nil
     @State private var pollTimer: Timer? = nil
     @FocusState private var codeFocused: Bool
+    @FocusState private var partnerEmailFocused: Bool
 
     private var inviterName: String {
         DataPersistenceManager.shared.loadUserNickname() ?? "You"
@@ -33,8 +37,10 @@ struct OnboardingInviteView: View {
                 switch state {
                 case .choosingAction:
                     choosingActionContent
-                case .pending(let code):
-                    pendingContent(code: code)
+                case .enteringPartnerEmail:
+                    enteringPartnerEmailContent
+                case .pending(let code, let partnerEmail):
+                    pendingContent(code: code, partnerEmail: partnerEmail)
                 case .enteringCode:
                     enteringCodeContent
                 }
@@ -51,9 +57,18 @@ struct OnboardingInviteView: View {
     private var stateTag: Int {
         switch state {
         case .choosingAction: return 0
-        case .pending: return 1
-        case .enteringCode: return 2
+        case .enteringPartnerEmail: return 1
+        case .pending: return 2
+        case .enteringCode: return 3
         }
+    }
+
+    private var trimmedPartnerEmail: String {
+        partnerEmailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isPartnerEmailValid: Bool {
+        AuthService.shared.isValidEmail(trimmedPartnerEmail)
     }
 
     // MARK: State A — Choose action
@@ -74,11 +89,13 @@ struct OnboardingInviteView: View {
 
             VStack(spacing: 14) {
                 InviteActionCard(
-                    icon: "heart.circle.fill",
+                    icon: "envelope.heart.fill",
                     title: "Invite your partner",
                     subtitle: "Send them a link. They tap it and you are connected."
                 ) {
-                    Task { await sendInvite() }
+                    partnerEmailInput = DataPersistenceManager.shared.loadPartnerEmail() ?? ""
+                    emailError = nil
+                    withAnimation { state = .enteringPartnerEmail }
                 }
 
                 InviteActionCard(
@@ -92,9 +109,87 @@ struct OnboardingInviteView: View {
         }
     }
 
-    // MARK: State B — Pending
+    // MARK: State B — Partner email
 
-    private func pendingContent(code: String) -> some View {
+    private var enteringPartnerEmailContent: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 8) {
+                Text("Where should we send the invite?")
+                    .font(.system(size: 30, weight: .bold, design: .serif))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+
+                Text("Your partner will get an email with a link to download Covela.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(spacing: 8) {
+                TextField("partner@email.com", text: $partnerEmailInput)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.send)
+                    .font(.system(size: 17))
+                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(BabyTownTheme.cardTintLight)
+                            .shadow(color: BabyTownTheme.accent.opacity(0.08), radius: 8, y: 4)
+                    )
+                    .focused($partnerEmailFocused)
+                    .onChange(of: partnerEmailInput) { _, _ in
+                        emailError = nil
+                    }
+                    .onSubmit {
+                        if isPartnerEmailValid {
+                            Task { await sendInvite(partnerEmail: trimmedPartnerEmail) }
+                        }
+                    }
+                    .onAppear { partnerEmailFocused = true }
+
+                if let err = emailError {
+                    Text(err)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.red.opacity(0.8))
+                }
+            }
+
+            Button {
+                Task { await sendInvite(partnerEmail: trimmedPartnerEmail) }
+            } label: {
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Send")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    Capsule()
+                        .fill(isPartnerEmailValid ? BabyTownTheme.accentGradient : LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing))
+                )
+            }
+            .disabled(!isPartnerEmailValid || isLoading)
+
+            Text("We only use this to send the invite. Nothing else.")
+                .font(.system(size: 13))
+                .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.55))
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    // MARK: State C — Pending
+
+    private func pendingContent(code: String, partnerEmail: String) -> some View {
         VStack(spacing: 28) {
             PulsingRingsView()
                 .frame(width: 160, height: 160)
@@ -104,7 +199,7 @@ struct OnboardingInviteView: View {
                     .font(.system(size: 32, weight: .bold, design: .serif))
                     .foregroundStyle(BabyTownTheme.accentDeep)
 
-                Text("We will let you know the moment they join.")
+                Text("We sent an invite to \(partnerEmail). We will let you know the moment they join.")
                     .font(.system(size: 15))
                     .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
                     .multilineTextAlignment(.center)
@@ -140,7 +235,7 @@ struct OnboardingInviteView: View {
         }
     }
 
-    // MARK: State C — Enter code
+    // MARK: State D — Enter code
 
     private var enteringCodeContent: some View {
         VStack(spacing: 24) {
@@ -209,17 +304,27 @@ struct OnboardingInviteView: View {
 
     // MARK: Actions
 
-    private func sendInvite() async {
-        guard !isLoading else { return }
+    private func sendInvite(partnerEmail: String) async {
+        guard isPartnerEmailValid, !isLoading else { return }
         isLoading = true
         do {
             let response = try await StubInviteAPIClient.shared.createInvite(inviterName: inviterName)
+            do {
+                try await StubInviteAPIClient.shared.sendInviteEmail(
+                    partnerEmail: partnerEmail,
+                    inviterName: inviterName,
+                    code: response.code
+                )
+            } catch {
+                // Email delivery failed — user can still share the code manually.
+            }
+            DataPersistenceManager.shared.savePartnerEmail(partnerEmail)
             DataPersistenceManager.shared.setPendingPartnerInvite(true)
             DataPersistenceManager.shared.savePendingInviteCode(response.code)
-            withAnimation { state = .pending(code: response.code) }
+            withAnimation { state = .pending(code: response.code, partnerEmail: partnerEmail) }
             startPolling(code: response.code)
         } catch {
-            // Remain on choosingAction — user can retry
+            emailError = "Something went wrong. Please try again."
         }
         isLoading = false
     }
@@ -264,8 +369,10 @@ struct OnboardingInviteView: View {
         switch state {
         case .choosingAction:
             onBack()
-        case .pending, .enteringCode:
+        case .pending:
             stopPolling()
+            withAnimation { state = .choosingAction }
+        case .enteringPartnerEmail, .enteringCode:
             withAnimation { state = .choosingAction }
         }
     }

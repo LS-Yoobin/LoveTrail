@@ -141,8 +141,6 @@ struct GardenBackgroundView: View {
 
     /// Bottom band reserved for footer chrome — taps here never open bloom sheets.
     private static let footerTapExclusion: CGFloat = 120
-    /// Max normalized distance from a bloom center to count as a hit (tighter than before).
-    private static let bloomTapThreshold: CGFloat = 0.06
 
     private func handleExternalBloomTap(at globalPoint: CGPoint) {
         guard allowsBloomTaps else { return }
@@ -152,13 +150,42 @@ struct GardenBackgroundView: View {
         guard globalPoint.y < sceneSize.height - Self.footerTapExclusion else { return }
         let normX = Double(globalPoint.x / sceneSize.width)
         let normY = 1.0 - Double(globalPoint.y / sceneSize.height)
+
         guard let element = gardenElements.min(by: { a, b in
-            hypot(a.position.x - normX, a.position.y - normY) <
-            hypot(b.position.x - normX, b.position.y - normY)
+            let aTarget = tapTarget(for: a, sceneHeight: sceneSize.height)
+            let bTarget = tapTarget(for: b, sceneHeight: sceneSize.height)
+            return hypot(aTarget.x - normX, aTarget.y - normY) <
+                hypot(bTarget.x - normX, bTarget.y - normY)
         }) else { return }
-        let dist = hypot(element.position.x - normX, element.position.y - normY)
-        guard dist < Self.bloomTapThreshold else { return }
+
+        let target = tapTarget(for: element, sceneHeight: sceneSize.height)
+        let dist = hypot(target.x - normX, target.y - normY)
+        guard dist < tapThreshold(for: element, sceneHeight: sceneSize.height) else { return }
         handleBloomTap(id: element.sourceID)
+    }
+
+    private func tapTarget(for element: GardenElement, sceneHeight: CGFloat) -> GardenPoint {
+        switch element.kind {
+        case .tree:
+            return element.position
+        default:
+            return LoveGardenScene.normalizedBloomHeadCenter(
+                for: element,
+                sceneHeight: sceneHeight
+            )
+        }
+    }
+
+    private func tapThreshold(for element: GardenElement, sceneHeight: CGFloat) -> Double {
+        switch element.kind {
+        case .tree:
+            return 0.06
+        default:
+            return LoveGardenScene.normalizedBloomHeadHitRadius(
+                for: element,
+                sceneHeight: sceneHeight
+            )
+        }
     }
 
     private func handleBloomTap(id: UUID) {

@@ -88,7 +88,10 @@ struct ProfileStickerView: View {
             }
         }
         .editGardenPulse(shouldPulse)
-        .position(center)
+        .position(
+            x: center.x,
+            y: center.y + labelAnchorYOffset(forSquareSide: side)
+        )
         .allowsHitTesting(isCustomizing || onTap != nil)
         .onAppear {
             pinchBaseScale = sticker.scale
@@ -118,6 +121,15 @@ struct ProfileStickerView: View {
     private func labelVerticalOffset(forSquareSide side: CGFloat) -> CGFloat {
         StickerImageLayout.labelVerticalOffset(inSquareSide: side, image: image)
             + StickerImageLayout.labelGap
+    }
+
+    private func labelAnchorYOffset(forSquareSide side: CGFloat) -> CGFloat {
+        StickerImageLayout.labelAnchorYOffset(
+            squareSide: side,
+            image: image,
+            showsLabel: label != nil,
+            showsMoodPill: moodBadge != nil
+        )
     }
 
     @ViewBuilder

@@ -15,6 +15,8 @@ struct CoupleProfile: Codable, Equatable {
     var profileNoteMood: ProfileNoteMood?
     /// Ambient mood for the secret garden (icon rain + tint).
     var gardenMood: ProfileNoteMood?
+    /// When `gardenMood` was last chosen; cleared when mood is cleared or expires.
+    var gardenMoodSelectedAt: Date?
     /// Normalized position of the note center on the sticker canvas (0…1).
     var profileNotePosition: NormalizedPoint?
     /// Normalized center of the vinyl record player on the scroll canvas (0…1).
@@ -47,6 +49,7 @@ struct CoupleProfile: Codable, Equatable {
         profileNote: String? = nil,
         profileNoteMood: ProfileNoteMood? = nil,
         gardenMood: ProfileNoteMood? = nil,
+        gardenMoodSelectedAt: Date? = nil,
         profileNotePosition: NormalizedPoint? = nil,
         recordPlayerPosition: NormalizedPoint? = nil,
         recordPlayerScale: CGFloat? = nil,
@@ -67,6 +70,7 @@ struct CoupleProfile: Codable, Equatable {
         self.profileNote = profileNote
         self.profileNoteMood = profileNoteMood
         self.gardenMood = gardenMood
+        self.gardenMoodSelectedAt = gardenMoodSelectedAt
         self.profileNotePosition = profileNotePosition
         self.recordPlayerPosition = recordPlayerPosition
         self.recordPlayerScale = recordPlayerScale
@@ -83,7 +87,7 @@ struct CoupleProfile: Codable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case displayName, specialDates, stickers, profileNote, profileNoteMood, gardenMood, profileNotePosition
+        case displayName, specialDates, stickers, profileNote, profileNoteMood, gardenMood, gardenMoodSelectedAt, profileNotePosition
         case recordPlayerPosition, recordPlayerScale
         case watchTogetherTVPosition, watchTogetherTVScale
         case preludeBookPosition, preludeBookScale
@@ -99,6 +103,7 @@ struct CoupleProfile: Codable, Equatable {
         profileNote = try c.decodeIfPresent(String.self, forKey: .profileNote)
         profileNoteMood = try c.decodeIfPresent(ProfileNoteMood.self, forKey: .profileNoteMood)
         gardenMood = try c.decodeIfPresent(ProfileNoteMood.self, forKey: .gardenMood)
+        gardenMoodSelectedAt = try c.decodeIfPresent(Date.self, forKey: .gardenMoodSelectedAt)
         profileNotePosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .profileNotePosition)
         recordPlayerPosition = try c.decodeIfPresent(NormalizedPoint.self, forKey: .recordPlayerPosition)
         recordPlayerScale = try c.decodeIfPresent(CGFloat.self, forKey: .recordPlayerScale)
@@ -112,5 +117,25 @@ struct CoupleProfile: Codable, Equatable {
         hasSteppedOut = try c.decodeIfPresent(Bool.self, forKey: .hasSteppedOut) ?? false
         relationshipStage = try c.decodeIfPresent(RelationshipStage.self, forKey: .relationshipStage) ?? .prelude
         inviteSent = try c.decodeIfPresent(Bool.self, forKey: .inviteSent) ?? false
+    }
+
+    static let gardenMoodLifetime: TimeInterval = 24 * 60 * 60
+
+    mutating func setGardenMood(_ mood: ProfileNoteMood?, selectedAt: Date = Date()) {
+        gardenMood = mood
+        gardenMoodSelectedAt = mood != nil ? selectedAt : nil
+    }
+
+    /// Clears garden mood when it has been active for 24 hours or lacks a selection timestamp.
+    /// Returns `true` when the profile was changed.
+    mutating func pruneExpiredGardenMood(now: Date = Date()) -> Bool {
+        guard gardenMood != nil else { return false }
+        let isExpired = gardenMoodSelectedAt.map {
+            now.timeIntervalSince($0) >= Self.gardenMoodLifetime
+        } ?? true
+        guard isExpired else { return false }
+        gardenMood = nil
+        gardenMoodSelectedAt = nil
+        return true
     }
 }

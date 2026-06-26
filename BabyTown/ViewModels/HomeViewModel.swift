@@ -164,10 +164,7 @@ final class HomeViewModel: ObservableObject {
 
     var foundingMoments: [Moment] {
         let order = ["When we became official", "When we first met"]
-        return order.compactMap { prompt in
-            let matches = moments.filter { $0.promptText == prompt }
-            return matches.first(where: { !$0.isPinned }) ?? matches.first
-        }
+        return order.compactMap { canonicalFoundingMoment(for: $0) }
     }
 
     var foundingDaySections: [DaySection] {
@@ -183,8 +180,7 @@ final class HomeViewModel: ObservableObject {
     /// Every founding slot in timeline order — moment + section when present, nil when missing (shows placeholder).
     var foundingTimelineSlots: [(promptText: String, moment: Moment?, section: DaySection?)] {
         Self.foundingTimelineOrder.map { prompt in
-            let matches = moments.filter { $0.promptText == prompt }
-            guard let moment = matches.first(where: { !$0.isPinned }) ?? matches.first else {
+            guard let moment = canonicalFoundingMoment(for: prompt) else {
                 return (prompt, nil, nil)
             }
             let section = DaySection(date: moment.dateTaken, placeName: moment.placeName, moments: [moment])
@@ -197,24 +193,17 @@ final class HomeViewModel: ObservableObject {
         return foundingPrompts.contains(prompt)
     }
 
-    /// Older onboarding appended founding rows instead of replacing them — keep one pinned + one unpinned.
+    /// Older onboarding appended duplicate founding rows — collapse to one moment per prompt.
     private func repairDuplicateFoundingMoments() {
         var updated = moments
         var changed = false
 
         for prompt in Self.foundingPrompts {
             let matches = updated.filter { $0.promptText == prompt }
-            let pinnedMatches = matches.filter(\.isPinned)
-            let unpinnedMatches = matches.filter { !$0.isPinned }
-            guard pinnedMatches.count > 1 || unpinnedMatches.count > 1 else { continue }
-
-            let pinned = pinnedMatches
-                .max(by: { ($0.pinnedAt ?? .distantPast) < ($1.pinnedAt ?? .distantPast) })
-            let unpinned = unpinnedMatches.first
+            guard matches.count > 1 else { continue }
 
             updated.removeAll { $0.promptText == prompt }
-            if let pinned { updated.append(pinned) }
-            if let unpinned { updated.append(unpinned) }
+            updated.append(selectCanonicalFoundingMoment(from: matches))
             changed = true
         }
 
@@ -223,44 +212,49 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    /// Timeline cards use unpinned founding rows; repair data that only has a pinned copy.
-    private func ensureFoundingTimelineMoments() {
-        var updated = moments
-        var changed = false
+    private func selectCanonicalFoundingMoment(from matches: [Moment]) -> Moment {
+        let bestCaption = matches
+            .compactMap(\.caption)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
 
-        for prompt in Self.foundingPrompts {
-            let matches = updated.filter { $0.promptText == prompt }
-            guard !matches.isEmpty else { continue }
-            guard !matches.contains(where: { !$0.isPinned }) else { continue }
-            guard let source = matches.first(where: \.isPinned) ?? matches.first else { continue }
-
-            updated.append(
-                Moment(
-                    id: UUID(),
-                    dateTaken: source.dateTaken,
-                    assetIdentifier: source.assetIdentifier,
-                    thumbnail: source.thumbnail,
-                    placeName: source.placeName,
-                    caption: source.caption,
-                    voiceNotePath: source.voiceNotePath,
-                    promptText: prompt,
-                    isPinned: false,
-                    pinnedAt: nil,
-                    isLocked: source.isLocked,
-                    unlockTime: source.unlockTime,
-                    latitude: source.latitude,
-                    longitude: source.longitude,
-                    isAddedFromOnThisDay: source.isAddedFromOnThisDay,
-                    isPlaceNameUserSet: source.isPlaceNameUserSet,
-                    dateAddedToApp: Date()
-                )
-            )
-            changed = true
+        if let pinned = matches.filter(\.isPinned).max(by: {
+            ($0.pinnedAt ?? .distantPast) < ($1.pinnedAt ?? .distantPast)
+        }) {
+            var merged = pinned
+            if let bestCaption, merged.caption?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                merged.caption = bestCaption
+            }
+            return merged
         }
 
-        if changed {
-            moments = updated
+        var keeper = matches[0]
+        if let withCaption = matches.first(where: {
+            guard let caption = $0.caption?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+            return !caption.isEmpty
+        }) {
+            keeper = withCaption
         }
+        keeper.isPinned = true
+        keeper.pinnedAt = keeper.pinnedAt ?? Date()
+        if let bestCaption, keeper.caption?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+            keeper.caption = bestCaption
+        }
+        return keeper
+    }
+
+    func canonicalFoundingMoment(for promptText: String) -> Moment? {
+        let matches = moments.filter { $0.promptText == promptText }
+        guard !matches.isEmpty else { return nil }
+        if matches.count == 1 { return matches[0] }
+        return selectCanonicalFoundingMoment(from: matches)
+    }
+
+    func foundingMomentsForViewer(containing moment: Moment) -> [Moment] {
+        guard let prompt = moment.promptText, Self.foundingPrompts.contains(prompt) else {
+            return [moment]
+        }
+        return [canonicalFoundingMoment(for: prompt) ?? moment]
     }
 
     /// Recreates founding timeline rows from persisted pinned JPEGs when moments were deleted.
@@ -331,40 +325,19 @@ final class HomeViewModel: ObservableObject {
 
         moments.removeAll { $0.promptText == promptText }
 
-        let sharedFields = (
+        let moment = Moment(
+            id: UUID(),
             dateTaken: dateTaken,
             assetIdentifier: assetIdentifier,
             thumbnail: image,
             promptText: promptText,
-            latitude: latitude,
-            longitude: longitude
-        )
-
-        let pinned = Moment(
-            id: UUID(),
-            dateTaken: sharedFields.dateTaken,
-            assetIdentifier: sharedFields.assetIdentifier,
-            thumbnail: sharedFields.thumbnail,
-            promptText: sharedFields.promptText,
             isPinned: true,
             pinnedAt: pinnedAt,
-            latitude: sharedFields.latitude,
-            longitude: sharedFields.longitude,
+            latitude: latitude,
+            longitude: longitude,
             dateAddedToApp: Date()
         )
-        let unpinned = Moment(
-            id: UUID(),
-            dateTaken: sharedFields.dateTaken,
-            assetIdentifier: sharedFields.assetIdentifier,
-            thumbnail: sharedFields.thumbnail,
-            promptText: sharedFields.promptText,
-            isPinned: false,
-            pinnedAt: nil,
-            latitude: sharedFields.latitude,
-            longitude: sharedFields.longitude,
-            dateAddedToApp: Date()
-        )
-        addMoments([pinned, unpinned])
+        addMoments([moment])
     }
     
     var pinnedMoments: [Moment] {
@@ -456,7 +429,6 @@ final class HomeViewModel: ObservableObject {
         
         isInitializing = false
         repairDuplicateFoundingMoments()
-        ensureFoundingTimelineMoments()
         ensureFoundingMomentsFromPinnedPhotos()
         refreshDaySections()
         refreshOnThisDay()
@@ -879,12 +851,19 @@ final class HomeViewModel: ObservableObject {
     
     func unpinMoment(_ moment: Moment) {
         guard let index = moments.firstIndex(where: { $0.id == moment.id }) else { return }
-        
+
         var newMoments = moments
         let hasUnpinnedSibling = newMoments.enumerated().contains { pair in
             let (otherIndex, other) = pair
             guard otherIndex != index else { return false }
             guard !other.isPinned else { return false }
+
+            if let prompt = moment.promptText,
+               Self.foundingPrompts.contains(prompt),
+               other.promptText == prompt {
+                return true
+            }
+
             guard Calendar.current.isDate(other.dateTaken, inSameDayAs: moment.dateTaken) else { return false }
             return other.assetIdentifier == moment.assetIdentifier && (other.placeName ?? "") == (moment.placeName ?? "")
         }
@@ -1083,6 +1062,11 @@ final class HomeViewModel: ObservableObject {
         }
         if let memory = promptMemories.first(where: { $0.photos.contains(where: { $0.id == momentId }) }) {
             return memory.sortedViewerMoments
+        }
+        if let moment = moments.first(where: { $0.id == momentId }),
+           let prompt = moment.promptText,
+           Self.foundingPrompts.contains(prompt) {
+            return foundingMomentsForViewer(containing: moment)
         }
         if let moment = moments.first(where: { $0.id == momentId }) {
             return [moment]
@@ -1286,12 +1270,12 @@ final class HomeViewModel: ObservableObject {
         var milestones: [Moment] = []
         
         // Find "When We First Met"
-        if let firstMet = moments.first(where: { $0.promptText == "When we first met" }) {
+        if let firstMet = canonicalFoundingMoment(for: "When we first met") {
             milestones.append(firstMet)
         }
-        
+
         // Find "When We Became Official"
-        if let official = moments.first(where: { $0.promptText == "When we became official" }) {
+        if let official = canonicalFoundingMoment(for: "When we became official") {
             milestones.append(official)
         }
         

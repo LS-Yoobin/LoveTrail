@@ -34,6 +34,7 @@ struct HomeView: View {
     @State private var coupleSpacePartnerAvatar: UIImage?
     @State private var coupleSpaceGardenElements: [GardenElement] = []
     @State private var coupleSpaceGardenSeason: GardenSeason = .blooming
+    @State private var coupleSpaceGardenMood: ProfileNoteMood?
     @State private var homeSpecialDates: [SpecialDate] = []
     @State private var showHomeSpecialDateEditor = false
     @State private var editingHomeSpecialDate: SpecialDate?
@@ -41,6 +42,7 @@ struct HomeView: View {
     @State private var showInviteFlow = false
     @ObservedObject private var store = StoreManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var memorySearchText = ""
     @State private var cachedMemorySearchRows: [MemorySearchRow] = []
     @FocusState private var isMemorySearchFocused: Bool
@@ -225,6 +227,8 @@ struct HomeView: View {
                                             partnerAvatar: coupleSpacePartnerAvatar,
                                             gardenElements: coupleSpaceGardenElements,
                                             gardenSeason: coupleSpaceGardenSeason,
+                                            gardenMood: coupleSpaceGardenMood,
+                                            userName: homeDisplayName,
                                             bloomCount: coupleSpaceBloomCount,
                                             isReadyToInvite: store.isForeverUnlocked,
                                             onTap: {
@@ -703,6 +707,11 @@ struct HomeView: View {
             .onChange(of: showCoupleProfile) { _, isShowing in
                 if !isShowing { refreshCoupleSpaceCardMetadata() }
             }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    refreshCoupleSpaceCardMetadata()
+                }
+            }
         }
     }
 
@@ -765,6 +774,7 @@ struct HomeView: View {
         coupleSpaceBloomCount = elements.count
         coupleSpaceGardenElements = elements
         coupleSpaceGardenSeason = dpm.loadGardenState().season(now: Date())
+        coupleSpaceGardenMood = dpm.loadCoupleProfile().gardenMood
     }
 
     private func openHomeSpecialDate(_ special: SpecialDate) {
@@ -1791,12 +1801,10 @@ struct HomeView: View {
                         VStack(spacing: 12) {
                             DayClusterCard(
                                 section: section,
-                                onOpenPhoto: { moment, allMoments in
+                                onOpenPhoto: { moment, _ in
                                     clearMemoryPageViewerContext()
-                                    viewerMoments = allMoments
-                                    if let i = allMoments.firstIndex(where: { $0.id == moment.id }) {
-                                        viewerInitialIndex = i
-                                    }
+                                    viewerMoments = viewModel.foundingMomentsForViewer(containing: moment)
+                                    viewerInitialIndex = 0
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         showingMomentViewer = true
                                     }
