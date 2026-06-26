@@ -13,7 +13,7 @@ struct WatchTogetherInviteBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(hostName) started Watch Together")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(.white)
             }
 
             Spacer(minLength: 8)

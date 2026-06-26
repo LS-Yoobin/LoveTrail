@@ -14,6 +14,10 @@ struct WatchTogetherPlayerView: View {
     @State private var showConnectionFailedToast = false
     @State private var isYouTubeChromeActive = false
     @State private var youtubeChromeDismissTask: Task<Void, Never>?
+    @State private var callOverlayGlobalFrame: CGRect = .zero
+    @State private var audioSessionGeneration = 0
+
+    private static let youtubeControlsBandFraction: CGFloat = 0.18
 
     private static let youtubeControlsFadeDelay: Duration = .seconds(2)
 
@@ -55,10 +59,13 @@ struct WatchTogetherPlayerView: View {
             Color.black.ignoresSafeArea()
         }
         .onAppear {
-            WatchTogetherAudioSession.enterPlayer()
+            audioSessionGeneration = WatchTogetherAudioSession.enterPlayer()
             viewModel.startNetworkGate()
+            if viewModel.isCameraEligible {
+                WatchTogetherAudioSession.configureForCall()
+            }
             Task {
-                await viewModel.enableCamera()
+                await activateCameraWhenReady()
             }
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(300))
@@ -67,13 +74,22 @@ struct WatchTogetherPlayerView: View {
         }
         .onDisappear {
             youtubeChromeDismissTask?.cancel()
+            let generation = audioSessionGeneration
             Task {
                 await viewModel.teardown()
-                WatchTogetherAudioSession.leavePlayer()
+                WatchTogetherAudioSession.leavePlayer(generation: generation)
             }
         }
         .onChange(of: viewModel.callController.isConnected) { _, isConnected in
             viewModel.handleConnectionChange(isConnected: isConnected)
+        }
+        .onChange(of: verticalSizeClass) { _, sizeClass in
+            guard sizeClass == .compact, viewModel.isCameraModeEnabled else { return }
+            Task { await refreshCameraAfterLayoutSettles() }
+        }
+        .onChange(of: viewModel.isCameraModeEnabled) { _, enabled in
+            guard enabled else { return }
+            Task { await refreshCameraAfterLayoutSettles() }
         }
         .alert(
             "Camera and microphone needed",
@@ -94,7 +110,12 @@ struct WatchTogetherPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            WatchTogetherWebPlayer(url: embedURL, onUserInteraction: noteYouTubeInteraction)
+            WatchTogetherWebPlayer(
+                url: embedURL,
+                excludedInteractionFrame: callOverlayGlobalFrame,
+                controlsBandFraction: Self.youtubeControlsBandFraction,
+                onYouTubeControlsInteraction: noteYouTubeControlsInteraction
+            )
                 .ignoresSafeArea()
                 .overlay { landscapeChromeOverlay.zIndex(1) }
         }
@@ -118,7 +139,12 @@ struct WatchTogetherPlayerView: View {
                 .animation(.easeInOut(duration: 0.22), value: isYouTubeChromeActive)
             }
 
-            WatchTogetherWebPlayer(url: embedURL, onUserInteraction: noteYouTubeInteraction)
+            WatchTogetherWebPlayer(
+                url: embedURL,
+                excludedInteractionFrame: callOverlayGlobalFrame,
+                controlsBandFraction: Self.youtubeControlsBandFraction,
+                onYouTubeControlsInteraction: noteYouTubeControlsInteraction
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             playerToasts
@@ -139,7 +165,6 @@ struct WatchTogetherPlayerView: View {
                 HStack {
                     callOverlay
                         .padding(.leading, 20)
-                        .allowsHitTesting(!isYouTubeChromeActive)
                     Spacer()
                         .allowsHitTesting(false)
                 }
@@ -171,7 +196,15 @@ struct WatchTogetherPlayerView: View {
             onToggleMic: { viewModel.toggleMic() },
             onToggleCamera: { viewModel.toggleCamera() }
         )
-        .allowsHitTesting(!isYouTubeChromeActive)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: CallOverlayFrameKey.self,
+                    value: proxy.frame(in: .global)
+                )
+            }
+        }
+        .onPreferenceChange(CallOverlayFrameKey.self) { callOverlayGlobalFrame = $0 }
     }
 
     @ViewBuilder
@@ -196,7 +229,6 @@ struct WatchTogetherPlayerView: View {
         Button {
             Task {
                 await viewModel.teardown()
-                WatchTogetherAudioSession.leavePlayer()
                 OrientationManager.shared.exitToPortrait {
                     dismiss()
                 }
@@ -242,7 +274,7 @@ struct WatchTogetherPlayerView: View {
             .padding(.horizontal, 24)
     }
 
-    private func noteYouTubeInteraction() {
+    private func noteYouTubeControlsInteraction() {
         if !isYouTubeChromeActive {
             withAnimation(.easeInOut(duration: 0.22)) {
                 isYouTubeChromeActive = true
@@ -257,19 +289,56 @@ struct WatchTogetherPlayerView: View {
             }
         }
     }
+
+    private func activateCameraWhenReady() async {
+        await waitForLandscapeOrientation()
+        try? await Task.sleep(for: .milliseconds(250))
+        await viewModel.enableCamera()
+        await refreshCameraAfterLayoutSettles()
+    }
+
+    private func refreshCameraAfterLayoutSettles() async {
+        guard viewModel.isCameraModeEnabled else { return }
+        for delayMs in [200, 600] {
+            try? await Task.sleep(for: .milliseconds(delayMs))
+            guard viewModel.isCameraModeEnabled else { return }
+            viewModel.callController.ensureCameraCaptureActive()
+        }
+    }
+
+    private func waitForLandscapeOrientation() async {
+        for _ in 0..<80 {
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               scene.interfaceOrientation.isLandscape {
+                try? await Task.sleep(for: .milliseconds(100))
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+}
+
+private struct CallOverlayFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
 }
 
 /// WKWebView wired for inline autoplay — required for YouTube embeds.
 private struct WatchTogetherWebPlayer: UIViewRepresentable {
     let url: URL
-    var onUserInteraction: () -> Void
+    var excludedInteractionFrame: CGRect = .zero
+    var controlsBandFraction: CGFloat = 0.18
+    var onYouTubeControlsInteraction: () -> Void
 
     private static let parentBaseURL = URL(string: "\(WatchTogetherURLValidator.embedParentOrigin)/")!
     private static let safariUserAgent =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onUserInteraction: onUserInteraction)
+        Coordinator(onYouTubeControlsInteraction: onYouTubeControlsInteraction)
     }
 
     func makeUIView(context: Context) -> WatchTogetherWebPlayerContainer {
@@ -299,32 +368,42 @@ private struct WatchTogetherWebPlayer: UIViewRepresentable {
         """
         webView.loadHTMLString(html, baseURL: Self.parentBaseURL)
 
-        let container = WatchTogetherWebPlayerContainer(webView: webView)
-        container.onUserInteraction = { context.coordinator.notifyInteraction() }
+        let container = WatchTogetherWebPlayerContainer(
+            webView: webView,
+            controlsBandFraction: controlsBandFraction
+        )
+        container.excludedInteractionFrame = excludedInteractionFrame
+        container.onYouTubeControlsInteraction = { context.coordinator.notifyControlsInteraction() }
         return container
     }
 
-    func updateUIView(_: WatchTogetherWebPlayerContainer, context: Context) {}
+    func updateUIView(_ uiView: WatchTogetherWebPlayerContainer, context: Context) {
+        uiView.excludedInteractionFrame = excludedInteractionFrame
+        uiView.controlsBandFraction = controlsBandFraction
+    }
 
     final class Coordinator {
-        private let onUserInteraction: () -> Void
+        private let onYouTubeControlsInteraction: () -> Void
 
-        init(onUserInteraction: @escaping () -> Void) {
-            self.onUserInteraction = onUserInteraction
+        init(onYouTubeControlsInteraction: @escaping () -> Void) {
+            self.onYouTubeControlsInteraction = onYouTubeControlsInteraction
         }
 
-        func notifyInteraction() {
-            Task { @MainActor in onUserInteraction() }
+        func notifyControlsInteraction() {
+            Task { @MainActor in onYouTubeControlsInteraction() }
         }
     }
 }
 
 private final class WatchTogetherWebPlayerContainer: UIView {
     let webView: WKWebView
-    var onUserInteraction: (() -> Void)?
+    var excludedInteractionFrame: CGRect = .zero
+    var controlsBandFraction: CGFloat = 0.18
+    var onYouTubeControlsInteraction: (() -> Void)?
 
-    init(webView: WKWebView) {
+    init(webView: WKWebView, controlsBandFraction: CGFloat = 0.18) {
         self.webView = webView
+        self.controlsBandFraction = controlsBandFraction
         super.init(frame: .zero)
         backgroundColor = .black
         addSubview(webView)
@@ -342,9 +421,19 @@ private final class WatchTogetherWebPlayerContainer: UIView {
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
-        if hit != nil {
-            onUserInteraction?()
+        if hit != nil, shouldReportYouTubeControlsInteraction(at: point) {
+            onYouTubeControlsInteraction?()
         }
         return hit
+    }
+
+    private func shouldReportYouTubeControlsInteraction(at point: CGPoint) -> Bool {
+        let globalPoint = convert(point, to: nil)
+        if excludedInteractionFrame != .zero,
+           excludedInteractionFrame.insetBy(dx: -8, dy: -8).contains(globalPoint) {
+            return false
+        }
+        let controlsMinY = bounds.height * (1 - controlsBandFraction)
+        return point.y >= controlsMinY
     }
 }

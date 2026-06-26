@@ -119,6 +119,7 @@ struct WatchTogetherEntryView: View {
             VStack(spacing: 12) {
                 urlField
                 errorLabel
+                pasteButton
                 playButton
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -173,6 +174,28 @@ struct WatchTogetherEntryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .transition(.opacity.combined(with: .move(edge: .top)))
         }
+    }
+
+    private var pasteButton: some View {
+        Button(action: pasteFromClipboard) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.on.clipboard")
+                Text("Paste").fontWeight(.semibold)
+            }
+            .font(.system(size: 16))
+            .foregroundStyle(BabyTownTheme.accent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(BabyTownTheme.accentSoft)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(BabyTownTheme.accent.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var playButton: some View {
@@ -246,6 +269,14 @@ struct WatchTogetherEntryView: View {
             try? await Task.sleep(for: .milliseconds(1600))
             withAnimation(.easeInOut(duration: 0.3)) { tvState = .input }
         }
+    }
+
+    private func pasteFromClipboard() {
+        guard let pasted = UIPasteboard.general.string?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !pasted.isEmpty else { return }
+        urlText = pasted
+        validateURL()
     }
 
     private func validateURL() {

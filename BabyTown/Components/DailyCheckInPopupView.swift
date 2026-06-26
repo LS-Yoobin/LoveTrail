@@ -87,24 +87,40 @@ struct DailyCheckInPopupView: View {
         }
     }
 
+    private let starCellWidth: CGFloat = 44
+    private let starRowSpacing: CGFloat = 14
+
+    private var starRowWidth: CGFloat {
+        starCellWidth * 3 + starRowSpacing * 2
+    }
+
     private var starRow: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 14) {
+            HStack(spacing: starRowSpacing) {
                 ForEach(1...3, id: \.self) { index in
                     starCell(for: index)
                 }
             }
-            HStack(spacing: 14) {
+            .frame(width: starRowWidth)
+
+            HStack(spacing: starRowSpacing) {
                 ForEach(4...6, id: \.self) { index in
                     starCell(for: index)
                 }
             }
+            .frame(width: starRowWidth)
+
             starCell(for: 7)
+                .frame(width: starRowWidth)
         }
     }
 
     private func starSize(for index: Int) -> CGFloat {
         index == 7 ? 42 : 26
+    }
+
+    private func starSlotHeight(for index: Int) -> CGFloat {
+        starSize(for: index) + 4
     }
 
     private var showsTapHint: Bool {
@@ -115,14 +131,20 @@ struct DailyCheckInPopupView: View {
     private func starCell(for index: Int) -> some View {
         VStack(spacing: 4) {
             starView(for: index)
-            if index == todayIndex, showsTapHint {
-                Text("Tap")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.9))
-            } else {
-                Color.clear.frame(height: 14)
+                .frame(width: starCellWidth, height: starSlotHeight(for: index))
+
+            Group {
+                if index == todayIndex, showsTapHint {
+                    Text("Tap")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.9))
+                } else {
+                    Color.clear
+                }
             }
+            .frame(width: starCellWidth, height: 14)
         }
+        .frame(width: starCellWidth)
         .contentShape(Rectangle())
         .onTapGesture {
             guard index == todayIndex, showsTapHint else { return }
@@ -167,6 +189,7 @@ struct DailyCheckInPopupView: View {
                     .foregroundStyle(BabyTownTheme.accentDeep)
                     .scaleEffect(shimmerPulsed ? 1.0 : 1.22)
                     .opacity(shimmerPulsed ? 1.0 : 0.72)
+                    .frame(width: size, height: size)
                     .onAppear {
                         withAnimation(
                             .easeInOut(duration: 0.75)

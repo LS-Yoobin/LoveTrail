@@ -1217,6 +1217,7 @@ struct PetRoomView: View {
             isTrickMode = true
         }
         scene?.setTrickMode(true)
+        PetTrickTrainingAudioSession.enter()
         speechRecognizer.start()
     }
 
@@ -1230,6 +1231,7 @@ struct PetRoomView: View {
             showTrickBook = false
         }
         scene?.setTrickMode(false)
+        PetTrickTrainingAudioSession.leave()
     }
 
     private func showVoiceTrickCompleted(_ trick: PetTrick) {

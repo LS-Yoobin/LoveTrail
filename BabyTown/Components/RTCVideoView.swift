@@ -7,6 +7,7 @@ struct RTCVideoView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> RTCMTLVideoView {
         let view = RTCMTLVideoView(frame: .zero)
+        view.isUserInteractionEnabled = true
         view.videoContentMode = .scaleAspectFill
         view.delegate = context.coordinator
         applyMirror(to: view)
@@ -32,10 +33,11 @@ struct RTCVideoView: UIViewRepresentable {
         private weak var currentView: RTCMTLVideoView?
 
         func attach(_ track: RTCVideoTrack?, to view: RTCMTLVideoView) {
-            if currentTrack === track, currentView === view { return }
-            if let currentTrack, let currentView {
+            let needsRebind = currentTrack !== track || currentView !== view
+            if needsRebind, let currentTrack, let currentView {
                 currentTrack.remove(currentView)
             }
+            guard needsRebind else { return }
             currentTrack = track
             currentView = view
             track?.add(view)

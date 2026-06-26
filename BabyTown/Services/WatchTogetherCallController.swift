@@ -8,9 +8,10 @@ final class WatchTogetherCallController: NSObject, ObservableObject {
     @Published private(set) var isConnected = false
     @Published private(set) var isMicMuted = false
     @Published private(set) var isCameraOff = false
-
-    private(set) var localVideoTrack: RTCVideoTrack?
-    private(set) var remoteVideoTrack: RTCVideoTrack?
+    @Published private(set) var localVideoTrack: RTCVideoTrack?
+    @Published private(set) var remoteVideoTrack: RTCVideoTrack?
+    /// Bumped when the local camera restarts so SwiftUI rebuilds RTC renderers.
+    @Published private(set) var videoRendererNonce = 0
 
     private static let factory: RTCPeerConnectionFactory = {
         RTCInitializeSSL()
@@ -68,6 +69,7 @@ final class WatchTogetherCallController: NSObject, ObservableObject {
             CMVideoFormatDescriptionGetDimensions($0.formatDescription).width <= 640
         } ?? formats.first
         guard let format = target else { return }
+        capturer.stopCapture()
         capturer.startCapture(with: front, format: format, fps: 24)
     }
 
@@ -134,12 +136,20 @@ final class WatchTogetherCallController: NSObject, ObservableObject {
         }
     }
 
+    /// Restarts the front camera capture when the session is active but preview is blank.
+    func ensureCameraCaptureActive() {
+        guard !isCameraOff else { return }
+        startFrontCamera()
+        videoRendererNonce += 1
+    }
+
     func endCall() {
         videoCapturer?.stopCapture()
         tearDownPeerConnection()
         isConnected = false
         isMicMuted = false
         isCameraOff = false
+        videoRendererNonce = 0
     }
 
     private func tearDownPeerConnection() {

@@ -73,6 +73,7 @@ struct WatchTogetherCallOverlay: View {
                 selfAvatarFull
             } else {
                 RTCVideoView(track: callController.localVideoTrack, mirroredHorizontally: true)
+                    .id("local-main-\(callController.videoRendererNonce)")
             }
 
             if !callController.isConnected {
@@ -88,6 +89,7 @@ struct WatchTogetherCallOverlay: View {
                 selfAvatarInset
             } else {
                 RTCVideoView(track: callController.localVideoTrack, mirroredHorizontally: true)
+                    .id("local-inset-\(callController.videoRendererNonce)")
                     .frame(width: insetWidth, height: insetHeight)
                     .clipShape(RoundedRectangle(cornerRadius: insetCornerRadius))
             }

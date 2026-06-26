@@ -59,15 +59,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                let sessionID = UUID(uuidString: sessionIDString),
                let videoURL = userInfo["videoURL"] as? String {
                 let hostName = userInfo["hostName"] as? String ?? "Your partner"
-                NotificationCenter.default.post(
-                    name: .watchTogetherInviteReceived,
-                    object: nil,
-                    userInfo: [
-                        "sessionID": sessionID,
-                        "videoURL": videoURL,
-                        "hostName": hostName
-                    ]
-                )
+                Task { @MainActor in
+                    WatchTogetherInviteStore.shared.acceptAndJoinFromNotification(
+                        sessionID: sessionID,
+                        videoURL: videoURL,
+                        hostName: hostName
+                    )
+                }
             }
         }
 

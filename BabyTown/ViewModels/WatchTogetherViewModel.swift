@@ -76,6 +76,8 @@ final class WatchTogetherViewModel: ObservableObject {
             return
         }
 
+        WatchTogetherAudioSession.configureForCall()
+
         do {
             if isHost {
                 try await sessionService.startHosting(videoURL: videoURLString)
@@ -84,6 +86,7 @@ final class WatchTogetherViewModel: ObservableObject {
             }
             isCameraModeEnabled = true
             observeConnection()
+            callController.ensureCameraCaptureActive()
         } catch {
             print("WatchTogether enableCamera error: \(error.localizedDescription)")
         }

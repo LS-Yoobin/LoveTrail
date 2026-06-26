@@ -115,7 +115,7 @@ extension VibeRecorder: AVAudioRecorderDelegate {
     }
 }
 
-private enum GardenMusicSuppression {
+enum GardenMusicSuppression {
     static func pauseIfPlaying(into didPause: inout Bool) {
         guard AudioManager.shared.gardenIsActive else { return }
         guard !didPause else { return }
@@ -205,20 +205,57 @@ enum InAppCameraAudioSession {
     }
 }
 
-enum WatchTogetherAudioSession {
+enum PetTrickTrainingAudioSession {
     private static var didPauseHomeMusic = false
-    private static var isPlayerOpen = false
+    private static var isActive = false
 
-    /// Call when the Watch Together player appears. Pauses OUR SONG if it was playing.
-    static func enterPlayer() {
-        guard !isPlayerOpen else { return }
-        isPlayerOpen = true
+    /// Call when Trick Training mode starts. Pauses OUR SONG if it was playing.
+    static func enter() {
+        guard !isActive else { return }
+        isActive = true
         GardenMusicSuppression.pauseIfPlaying(into: &didPauseHomeMusic)
     }
 
+    /// Call when Trick Training mode ends. Resumes OUR SONG if we paused it.
+    static func leave() {
+        guard isActive else { return }
+        isActive = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        GardenMusicSuppression.restorePlaybackAudioSession()
+        GardenMusicSuppression.resumeIfPaused(&didPauseHomeMusic)
+    }
+}
+
+enum WatchTogetherAudioSession {
+    private static var didPauseHomeMusic = false
+    private static var isPlayerOpen = false
+    private static var activeGeneration = 0
+
+    /// Configures AVAudioSession for WebRTC camera + mic before tracks start.
+    static func configureForCall() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(
+            .playAndRecord,
+            mode: .videoChat,
+            options: [.defaultToSpeaker, .allowBluetoothHFP]
+        )
+        try? session.setActive(true)
+    }
+
+    /// Call when the Watch Together player appears. Pauses OUR SONG if it was playing.
+    @discardableResult
+    static func enterPlayer() -> Int {
+        activeGeneration += 1
+        if !isPlayerOpen {
+            isPlayerOpen = true
+            GardenMusicSuppression.pauseIfPlaying(into: &didPauseHomeMusic)
+        }
+        return activeGeneration
+    }
+
     /// Call when the Watch Together player is dismissed. Resumes OUR SONG if we paused it.
-    static func leavePlayer() {
-        guard isPlayerOpen else { return }
+    static func leavePlayer(generation: Int) {
+        guard generation == activeGeneration, isPlayerOpen else { return }
         isPlayerOpen = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         GardenMusicSuppression.restorePlaybackAudioSession()
