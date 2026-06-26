@@ -20,6 +20,13 @@ struct GardenBackgroundView: View {
     var petSkins: [CatSkin] = []
     /// Matches home night mode (9 PM–6 AM LA); sky is transparent so `HomeBackgroundView` shows through.
     var isNightMode: Bool = false
+    /// When false, bloom taps are ignored (e.g. Edit Garden mode).
+    var allowsBloomTaps: Bool = true
+    /// Incremented by the parent each time a tap should be tested against garden elements.
+    /// Use alongside `externalTapPoint` (global UIKit coordinates) because the UIScrollView
+    /// above this view consumes UIKit touches before SpriteKit can see them.
+    var externalTapCounter: Int = 0
+    var externalTapPoint: CGPoint = .zero
 
     @State private var gardenScene: LoveGardenScene?
     @State private var gardenElements: [GardenElement] = []
@@ -58,6 +65,7 @@ struct GardenBackgroundView: View {
                 if let gardenScene {
                     SpriteView(scene: gardenScene)
                         .ignoresSafeArea()
+                        .allowsHitTesting(allowsBloomTaps)
                 }
 
                 if showsLivePet {
@@ -92,6 +100,11 @@ struct GardenBackgroundView: View {
             .onChange(of: showsLivePet) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: isNightMode) { _, _ in updateScenes(size: geo.size) }
             .onChange(of: gardenRebuildToken) { _, _ in updateScenes(size: geo.size) }
+            .onChange(of: allowsBloomTaps) { _, allowed in
+                gardenScene?.allowsBloomInteraction = allowed
+                gardenScene?.onTapElement = allowed ? { id in handleBloomTap(id: id) } : nil
+            }
+            .onChange(of: externalTapCounter) { _, _ in handleExternalBloomTap(at: externalTapPoint) }
         }
     }
 
@@ -113,7 +126,8 @@ struct GardenBackgroundView: View {
                 season: season,
                 isNightMode: isNightMode
             )
-            newScene.onTapElement = { id in handleBloomTap(id: id) }
+            newScene.allowsBloomInteraction = allowsBloomTaps
+            newScene.onTapElement = allowsBloomTaps ? { id in handleBloomTap(id: id) } : nil
             gardenScene = newScene
             builtGardenToken = token
             builtIsNightMode = isNightMode
@@ -125,7 +139,30 @@ struct GardenBackgroundView: View {
         linkPetsToGarden()
     }
 
+    /// Bottom band reserved for footer chrome — taps here never open bloom sheets.
+    private static let footerTapExclusion: CGFloat = 120
+    /// Max normalized distance from a bloom center to count as a hit (tighter than before).
+    private static let bloomTapThreshold: CGFloat = 0.06
+
+    private func handleExternalBloomTap(at globalPoint: CGPoint) {
+        guard allowsBloomTaps else { return }
+        guard let sceneSize = gardenScene?.size,
+              sceneSize.width > 0, sceneSize.height > 0,
+              !gardenElements.isEmpty else { return }
+        guard globalPoint.y < sceneSize.height - Self.footerTapExclusion else { return }
+        let normX = Double(globalPoint.x / sceneSize.width)
+        let normY = 1.0 - Double(globalPoint.y / sceneSize.height)
+        guard let element = gardenElements.min(by: { a, b in
+            hypot(a.position.x - normX, a.position.y - normY) <
+            hypot(b.position.x - normX, b.position.y - normY)
+        }) else { return }
+        let dist = hypot(element.position.x - normX, element.position.y - normY)
+        guard dist < Self.bloomTapThreshold else { return }
+        handleBloomTap(id: element.sourceID)
+    }
+
     private func handleBloomTap(id: UUID) {
+        guard allowsBloomTaps else { return }
         guard let element = gardenElements.first(where: { $0.sourceID == id }) else { return }
         let sourceContext = moments.first(where: { $0.id == id }).map {
             FlowerSourceContext(placeName: $0.placeName, date: $0.dateTaken)

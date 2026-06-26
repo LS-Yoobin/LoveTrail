@@ -40,6 +40,8 @@ struct CoupleProfileView: View {
     @State private var activeSubpage: CoupleProfileSubpage?
     @State private var showForeverPaywall = false
     @State private var showDateCapSheet = false
+    @State private var gardenTapCounter: Int = 0
+    @State private var gardenTapPoint: CGPoint = .zero
 
     @State private var showingPinnedViewer: PinnedMemoryType?
     @State private var firstMetPickerItem: PhotosPickerItem?
@@ -152,6 +154,23 @@ struct CoupleProfileView: View {
             || showingMomentViewer
     }
 
+    /// Matches `GardenBackgroundView` — taps in the footer band never reach bloom hit testing.
+    private static let gardenFooterTapExclusion: CGFloat = 120
+
+    private var gardenBloomTapGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onEnded { value in
+                guard !isCustomizing else { return }
+                guard value.location.y < UIScreen.main.bounds.height - Self.gardenFooterTapExclusion else {
+                    return
+                }
+                let moved = hypot(value.translation.width, value.translation.height)
+                guard moved < 12 else { return }
+                gardenTapPoint = value.location
+                gardenTapCounter += 1
+            }
+    }
+
     var body: some View {
         NavigationStack {
             profileGardenBody
@@ -184,7 +203,10 @@ struct CoupleProfileView: View {
                 firstMetDate: dpm.loadFoundingPhotoDate(promptText: "When we first met"),
                 showsLivePet: true,
                 petSkins: gardenPetSkins,
-                isNightMode: nightModeManager.isNightMode
+                isNightMode: nightModeManager.isNightMode,
+                allowsBloomTaps: !isCustomizing,
+                externalTapCounter: gardenTapCounter,
+                externalTapPoint: gardenTapPoint
             )
             .ignoresSafeArea()
 
@@ -295,6 +317,7 @@ struct CoupleProfileView: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .simultaneousGesture(gardenBloomTapGesture)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if isCustomizing {
                         EditGardenFooterBar(

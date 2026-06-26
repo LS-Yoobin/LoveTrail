@@ -57,7 +57,7 @@ struct ProfileStickerView: View {
             y: sticker.position.y * canvasSize.height
         )
 
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             stickerBody(side: side)
 
             if let label {
@@ -68,6 +68,7 @@ struct ProfileStickerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .background(Color.black, in: Capsule())
+                    .offset(y: labelVerticalOffset(forSquareSide: side))
             }
         }
         .contentShape(Rectangle())
@@ -105,6 +106,11 @@ struct ProfileStickerView: View {
                 onTap?()
             }
         }
+    }
+
+    private func labelVerticalOffset(forSquareSide side: CGFloat) -> CGFloat {
+        StickerImageLayout.labelVerticalOffset(inSquareSide: side, image: image)
+            + StickerImageLayout.labelGap
     }
 
     @ViewBuilder

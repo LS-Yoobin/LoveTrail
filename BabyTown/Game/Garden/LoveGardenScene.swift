@@ -9,6 +9,8 @@ final class LoveGardenScene: SKScene {
     /// Reports the source act id of a tapped bloom so the SwiftUI layer can
     /// surface that memory.
     var onTapElement: ((UUID) -> Void)?
+    /// When false, bloom nodes ignore touches (Edit Garden and other overlay modes).
+    var allowsBloomInteraction = true
 
     private let elements: [GardenElement]
     private let season: GardenSeason
@@ -606,6 +608,7 @@ final class LoveGardenScene: SKScene {
     // tree (letter-sourced) reports its id, but the host has no letter card yet —
     // intentional scope gap; the letter card arrives in a later slice.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard allowsBloomInteraction else { return }
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
         // Walk up from the hit node to find the element container we named.

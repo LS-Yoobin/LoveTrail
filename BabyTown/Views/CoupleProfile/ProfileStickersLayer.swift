@@ -207,10 +207,9 @@ struct ProfileStickersLayer: View {
 
     private func stickerContentHeight(_ sticker: ProfileSticker) -> CGFloat {
         let side = ProfileSticker.renderedSize(scale: sticker.scale)
-        let labelBlock: CGFloat = (
-            sticker.kind == .userAvatar || sticker.kind == .partnerInvite
-        ) ? 46 : 0
-        return side + labelBlock
+        let hasLabel = sticker.kind == .userAvatar || sticker.kind == .partnerInvite
+        guard hasLabel else { return side }
+        return StickerImageLayout.labeledStackHeight(squareSide: side, image: images[sticker.id])
     }
 
     private var profileStickers: [ProfileSticker] {

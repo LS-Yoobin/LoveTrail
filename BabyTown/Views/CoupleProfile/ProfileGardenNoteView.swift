@@ -140,9 +140,10 @@ enum ProfileGardenNoteLayout {
     ) -> NormalizedRect {
         let side = ProfileSticker.renderedSize(scale: sticker.scale)
         let includesLabel = stickerIncludesLabel(sticker)
-        let labelBlock: CGFloat = includesLabel ? 46 : 0
         let width = includesLabel ? max(side, 120) : side
-        let totalHeight = side + labelBlock
+        let totalHeight = includesLabel
+            ? StickerImageLayout.labeledStackHeight(squareSide: side, image: nil)
+            : side
         return NormalizedRect(
             centerX: CGFloat(sticker.position.x),
             centerY: CGFloat(sticker.position.y),
