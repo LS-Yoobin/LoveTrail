@@ -22,6 +22,8 @@ struct GardenBackgroundView: View {
     var isNightMode: Bool = false
 
     @State private var gardenScene: LoveGardenScene?
+    @State private var gardenElements: [GardenElement] = []
+    @State private var tapPresentation: GardenTapPresentation?
     @State private var petScenes: [CatSkin: PetRoomScene] = [:]
     @State private var builtPetSkins: [CatSkin] = []
     @State private var builtGardenToken: GardenRebuildToken?
@@ -68,6 +70,17 @@ struct GardenBackgroundView: View {
                     }
                 }
             }
+            .sheet(item: $tapPresentation) { presentation in
+                switch presentation {
+                case .flower(let element, let elements, let context):
+                    FlowerAchievementSheet(
+                        tappedElement: element,
+                        gardenElements: elements,
+                        sourceContext: context
+                    )
+                    .presentationDetents([.large])
+                }
+            }
             .onAppear { updateScenes(size: geo.size) }
             .onChange(of: geo.size) { _, newSize in updateScenes(size: newSize) }
             .onChange(of: petSkins) { _, _ in updateScenes(size: geo.size) }
@@ -92,13 +105,16 @@ struct GardenBackgroundView: View {
         if gardenNeedsBuild {
             detachPetsFromGarden()
             let elements = GardenActMapper.composeElements(context: gardenContext)
+            gardenElements = elements
             let season = DataPersistenceManager.shared.loadGardenState().season(now: Date())
-            gardenScene = LoveGardenScene(
+            let newScene = LoveGardenScene(
                 size: size,
                 elements: elements,
                 season: season,
                 isNightMode: isNightMode
             )
+            newScene.onTapElement = { id in handleBloomTap(id: id) }
+            gardenScene = newScene
             builtGardenToken = token
             builtIsNightMode = isNightMode
         } else if let gardenScene, gardenScene.size != size {
@@ -107,6 +123,14 @@ struct GardenBackgroundView: View {
 
         updatePetScenes(size: size)
         linkPetsToGarden()
+    }
+
+    private func handleBloomTap(id: UUID) {
+        guard let element = gardenElements.first(where: { $0.sourceID == id }) else { return }
+        let sourceContext = moments.first(where: { $0.id == id }).map {
+            FlowerSourceContext(placeName: $0.placeName, date: $0.dateTaken)
+        }
+        tapPresentation = .flower(element, gardenElements, sourceContext)
     }
 
     private func detachPetsFromGarden() {
@@ -153,6 +177,16 @@ struct GardenBackgroundView: View {
                     scene.size = size
                 }
             }
+        }
+    }
+}
+
+private enum GardenTapPresentation: Identifiable {
+    case flower(GardenElement, [GardenElement], FlowerSourceContext?)
+
+    var id: String {
+        switch self {
+        case .flower(let element, _, _): return "flower-\(element.sourceID.uuidString)"
         }
     }
 }
