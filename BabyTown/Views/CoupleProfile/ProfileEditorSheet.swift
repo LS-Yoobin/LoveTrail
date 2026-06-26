@@ -1,32 +1,36 @@
 import SwiftUI
 import PhotosUI
 
-/// Sheet for editing your couple-profile identity: photo and display name.
-/// Calls `onSave` with the chosen image (nil = no photo selected) and trimmed name.
+/// Sheet for editing your couple-profile identity: photo, display name, and garden mood.
+/// Calls `onSave` with the chosen image (nil = no photo selected), trimmed name, and mood.
 struct ProfileEditorSheet: View {
     private static let maxNameLength = 24
-    private static let sheetHeight: CGFloat = 520
 
     let initialName: String
     let initialImage: UIImage?
-    let onSave: (UIImage?, String) -> Void
+    let initialMood: ProfileNoteMood?
+    let onSave: (UIImage?, String, ProfileNoteMood?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var image: UIImage?
+    @State private var selectedMood: ProfileNoteMood?
     @State private var pickerItem: PhotosPickerItem?
     @FocusState private var isNameFocused: Bool
 
     init(
         initialName: String,
         initialImage: UIImage?,
-        onSave: @escaping (UIImage?, String) -> Void
+        initialMood: ProfileNoteMood? = nil,
+        onSave: @escaping (UIImage?, String, ProfileNoteMood?) -> Void
     ) {
         self.initialName = initialName
         self.initialImage = initialImage
+        self.initialMood = initialMood
         self.onSave = onSave
         _name = State(initialValue: initialName)
         _image = State(initialValue: initialImage)
+        _selectedMood = State(initialValue: initialMood)
     }
 
     private var trimmedName: String {
@@ -58,6 +62,7 @@ struct ProfileEditorSheet: View {
                 VStack(spacing: 28) {
                     photoSection
                     nameSection
+                    moodSection
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -70,7 +75,7 @@ struct ProfileEditorSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(panelBackground.ignoresSafeArea())
-        .presentationDetents([.height(Self.sheetHeight)])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground { panelBackground }
         .presentationCornerRadius(24)
@@ -86,11 +91,6 @@ struct ProfileEditorSheet: View {
         .onChange(of: name) { _, newValue in
             if newValue.count > Self.maxNameLength {
                 name = String(newValue.prefix(Self.maxNameLength))
-            }
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                isNameFocused = true
             }
         }
     }
@@ -225,6 +225,22 @@ struct ProfileEditorSheet: View {
         }
     }
 
+    private var moodSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Mood")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.black.opacity(0.5))
+                .padding(.leading, 6)
+
+            Text("Pick a mood to fill the garden with its energy.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.black.opacity(0.45))
+                .padding(.leading, 6)
+
+            ProfileNoteMoodGrid(selectedMood: $selectedMood)
+        }
+    }
+
     private var bottomActions: some View {
         HStack(spacing: 12) {
             Button { dismiss() } label: {
@@ -241,7 +257,7 @@ struct ProfileEditorSheet: View {
             .buttonStyle(.plain)
 
             Button {
-                onSave(image, trimmedName)
+                onSave(image, trimmedName, selectedMood)
                 dismiss()
             } label: {
                 SavePillLabel(

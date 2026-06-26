@@ -5,6 +5,7 @@ struct ProfileStickerView: View {
     let sticker: ProfileSticker
     let image: UIImage?
     let label: String?
+    var moodBadge: ProfileNoteMood? = nil
     let canvasSize: CGSize
     let isCustomizing: Bool
     var onTap: (() -> Void)?
@@ -61,14 +62,20 @@ struct ProfileStickerView: View {
             stickerBody(side: side)
 
             if let label {
-                Text(label)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Color.black, in: Capsule())
-                    .offset(y: labelVerticalOffset(forSquareSide: side))
+                VStack(spacing: StickerImageLayout.moodPillGap) {
+                    Text(label)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.black, in: Capsule())
+
+                    if let moodBadge {
+                        ProfileGardenMoodPill(mood: moodBadge)
+                    }
+                }
+                .offset(y: labelVerticalOffset(forSquareSide: side))
             }
         }
         .contentShape(Rectangle())
@@ -222,5 +229,24 @@ struct ProfileStickerView: View {
             dragGesture,
             SimultaneousGesture(pinchGesture, rotationGesture)
         )
+    }
+}
+
+/// Mood badge shown beneath the profile name pill on the user avatar sticker.
+struct ProfileGardenMoodPill: View {
+    let mood: ProfileNoteMood
+
+    var body: some View {
+        Text(mood.displayName)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(mood.tintColor.opacity(0.92), in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.55), lineWidth: 1)
+            )
     }
 }

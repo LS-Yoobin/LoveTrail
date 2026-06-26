@@ -34,7 +34,6 @@ struct MomentPhotoViewer: View {
     @State private var isEditingStickers = false
     @State private var selectedStickerID: UUID?
     @State private var noteDraft = ""
-    @State private var noteDraftMood: ProfileNoteMood?
     @State private var composingNotePosition: NormalizedPoint?
     @State private var isCanvasDragActive = false
     @State private var metadataBottomY: CGFloat = 0
@@ -258,7 +257,7 @@ struct MomentPhotoViewer: View {
                                 isEditingStickers: isEditingStickers,
                                 selectedStickerID: selectedStickerID,
                                 noteDraft: $noteDraft,
-                                noteDraftMood: $noteDraftMood,
+                                noteDraftMood: .constant(nil),
                                 isNoteFocused: $isNoteFocused,
                                 onSelectComposingNote: selectComposingNote,
                                 onDeselectComposingNote: { isComposingNoteSelected = false },
@@ -299,12 +298,6 @@ struct MomentPhotoViewer: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
                             .padding(.bottom, 12)
-
-                        if isComposingNote {
-                            ProfileNoteMoodPickerBar(selectedMood: $noteDraftMood)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 12)
-                        }
                     }
                     .background {
                         Color(red: 0.96, green: 0.95, blue: 0.93)
@@ -394,7 +387,6 @@ struct MomentPhotoViewer: View {
         canvas.upsertNote(author: .localUser, text: nil, position: nil)
         persistCanvas()
         noteDraft = ""
-        noteDraftMood = nil
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
@@ -879,7 +871,6 @@ struct MomentPhotoViewer: View {
         noteDraft = canvas.localUserNote.map {
             ProfileGardenNoteLayout.clampedNoteText($0.text, noteWidth: noteWidth)
         } ?? ""
-        noteDraftMood = canvas.localUserNote?.mood
         composingNotePosition = canvas.localUserNote?.position
         selectedStickerID = nil
         isComposingNoteSelected = false
@@ -906,7 +897,6 @@ struct MomentPhotoViewer: View {
         noteDraft = canvas.localUserNote.map {
             ProfileGardenNoteLayout.clampedNoteText($0.text, noteWidth: noteWidth)
         } ?? ""
-        noteDraftMood = canvas.localUserNote?.mood
         composingNotePosition = nil
         isComposingNote = false
         isNoteFocused = false
@@ -925,7 +915,7 @@ struct MomentPhotoViewer: View {
             author: .localUser,
             text: trimmed.isEmpty ? nil : trimmed,
             position: trimmed.isEmpty ? nil : position,
-            mood: trimmed.isEmpty ? nil : noteDraftMood
+            mood: nil
         )
         persistCanvas()
         composingNotePosition = nil

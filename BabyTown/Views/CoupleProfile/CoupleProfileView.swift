@@ -210,6 +210,11 @@ struct CoupleProfileView: View {
             )
             .ignoresSafeArea()
 
+            if let gardenMood = profile.gardenMood {
+                GardenMoodRainOverlay(mood: gardenMood)
+                    .ignoresSafeArea()
+            }
+
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
@@ -240,6 +245,7 @@ struct CoupleProfileView: View {
                                 images: stickerImages,
                                 profileNote: profile.profileNote,
                                 profileNoteMood: profile.profileNoteMood,
+                                gardenMood: profile.gardenMood,
                                 profileNotePosition: profile.profileNotePosition,
                                 recordPlayerPosition: profile.recordPlayerPosition,
                                 recordPlayerScale: profile.recordPlayerScale,
@@ -366,18 +372,25 @@ struct CoupleProfileView: View {
             WatchTogetherEntryView()
         }
         .sheet(isPresented: $showEditProfile) {
-            ProfileEditorSheet(initialName: displayName, initialImage: userAvatar) { image, name in
+            ProfileEditorSheet(
+                initialName: displayName,
+                initialImage: userAvatar,
+                initialMood: profile.gardenMood
+            ) { image, name, mood in
                 if isPartnerAccount {
                     if let image {
                         dpm.savePartnerProfilePhoto(image)
                     }
                     dpm.saveUserNickname(name)
+                    profile.gardenMood = mood
+                    dpm.saveCoupleProfile(profile)
                 } else {
                     dpm.saveUserAvatar(image)
                     profile.displayName = name
                     if image != nil {
                         ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
                     }
+                    profile.gardenMood = mood
                     dpm.saveCoupleProfile(profile)
                 }
                 userAvatar = image
@@ -487,10 +500,9 @@ struct CoupleProfileView: View {
         }
         .fullScreenCover(isPresented: $showProfileNoteEditor) {
             ProfileNoteEditorSheet(
-                initialText: profile.profileNote ?? "",
-                initialMood: profile.profileNoteMood
-            ) { note, mood in
-                saveProfileNote(note, mood: mood)
+                initialText: profile.profileNote ?? ""
+            ) { note in
+                saveProfileNote(note)
             }
         }
         .sheet(isPresented: $showDateCapSheet) {
@@ -900,7 +912,7 @@ struct CoupleProfileView: View {
         }
     }
 
-    private func saveProfileNote(_ note: String, mood: ProfileNoteMood?) {
+    private func saveProfileNote(_ note: String) {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             profile.profileNote = nil
@@ -908,7 +920,7 @@ struct CoupleProfileView: View {
             profile.profileNotePosition = nil
         } else {
             profile.profileNote = trimmed
-            profile.profileNoteMood = mood
+            profile.profileNoteMood = nil
             if profile.profileNotePosition == nil {
                 profile.profileNotePosition = ProfileGardenNoteLayout.defaultPosition(
                     stickers: profile.stickers,

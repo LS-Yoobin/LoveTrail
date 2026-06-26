@@ -32,7 +32,8 @@ struct HomeView: View {
     @State private var coupleSpaceBloomCount = 0
     @State private var coupleSpaceAvatar: UIImage?
     @State private var coupleSpacePartnerAvatar: UIImage?
-    @State private var coupleSpaceGardenThumbnail: UIImage?
+    @State private var coupleSpaceGardenElements: [GardenElement] = []
+    @State private var coupleSpaceGardenSeason: GardenSeason = .blooming
     @State private var homeSpecialDates: [SpecialDate] = []
     @State private var showHomeSpecialDateEditor = false
     @State private var editingHomeSpecialDate: SpecialDate?
@@ -222,7 +223,8 @@ struct HomeView: View {
                                         CoupleSpaceCard(
                                             avatar: coupleSpaceAvatar,
                                             partnerAvatar: coupleSpacePartnerAvatar,
-                                            gardenThumbnail: coupleSpaceGardenThumbnail,
+                                            gardenElements: coupleSpaceGardenElements,
+                                            gardenSeason: coupleSpaceGardenSeason,
                                             bloomCount: coupleSpaceBloomCount,
                                             isReadyToInvite: store.isForeverUnlocked,
                                             onTap: {
@@ -759,16 +761,10 @@ struct HomeView: View {
             promptMemories: viewModel.promptMemories,
             dpm: dpm
         )
-        coupleSpaceBloomCount = GardenActMapper.composeElements(context: gardenContext).count
-
-        let season = dpm.loadGardenState().season(now: Date())
-        Task { @MainActor in
-            let thumbnail = await GardenSnapshotRenderer.render(
-                context: gardenContext,
-                season: season
-            )
-            coupleSpaceGardenThumbnail = thumbnail
-        }
+        let elements = GardenActMapper.composeElements(context: gardenContext)
+        coupleSpaceBloomCount = elements.count
+        coupleSpaceGardenElements = elements
+        coupleSpaceGardenSeason = dpm.loadGardenState().season(now: Date())
     }
 
     private func openHomeSpecialDate(_ special: SpecialDate) {

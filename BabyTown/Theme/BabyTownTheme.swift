@@ -36,6 +36,11 @@ enum BabyTownTheme {
         isBlue ? "home_table_of_contents_blue" : "home_table_of_contents_pink"
     }
 
+    /// Home garden patch pet house — theme-specific artwork.
+    static var homePetHouseImage: String {
+        isBlue ? "home_pet_house_blue" : "home_pet_house"
+    }
+
     // MARK: - Text
 
     static let textPrimary = Color(.darkGray)

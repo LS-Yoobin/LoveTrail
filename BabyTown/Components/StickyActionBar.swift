@@ -61,7 +61,6 @@ struct StickyActionBar: View {
                 .padding(.horizontal, Metrics.horizontalPadding)
                 .padding(.vertical, Metrics.verticalPadding)
                 .background(Capsule().fill(BabyTownTheme.accentGradient))
-                .shadow(color: BabyTownTheme.buttonShadow, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
     }

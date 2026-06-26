@@ -7,6 +7,10 @@ enum StickerImageLayout {
     static let labelGap: CGFloat = 6
     /// Approximate rendered height of the black name pill (subheadline + vertical padding).
     static let labelPillHeight: CGFloat = 34
+    /// Gap between the name pill and the mood pill beneath it.
+    static let moodPillGap: CGFloat = 4
+    /// Approximate rendered height of the mood pill (caption + vertical padding).
+    static let moodPillHeight: CGFloat = 26
 
     private static let boundsCache = NSCache<NSString, NSValue>()
 
@@ -43,9 +47,17 @@ enum StickerImageLayout {
     }
 
     /// Total stacked height of sticker square + label block when a label is shown.
-    static func labeledStackHeight(squareSide side: CGFloat, image: UIImage?) -> CGFloat {
+    static func labeledStackHeight(
+        squareSide side: CGFloat,
+        image: UIImage?,
+        showsMoodPill: Bool = false
+    ) -> CGFloat {
         let contentBottom = image.map { visibleContentBottom(inSquareSide: side, image: $0) } ?? side
-        return contentBottom + labelGap + labelPillHeight
+        var height = contentBottom + labelGap + labelPillHeight
+        if showsMoodPill {
+            height += moodPillGap + moodPillHeight
+        }
+        return height
     }
 
     private static func cacheKey(for image: UIImage) -> NSString {

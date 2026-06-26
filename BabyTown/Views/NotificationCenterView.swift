@@ -11,6 +11,7 @@ struct NotificationCenterView: View {
     @State private var openedWelcomeCard = false
     @State private var showComposeLetter = false
     @State private var showForeverPaywall = false
+    @State private var selectedLetter: UserLetter?
 
     private var thirtyDaysAgo: Date {
         Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
@@ -31,7 +32,9 @@ struct NotificationCenterView: View {
                         LazyVStack(spacing: 12) {
                             ForEach(userLetters.sorted { $0.sortDate > $1.sortDate }) { letter in
                                 if store.isForeverUnlocked || letter.createdAt >= thirtyDaysAgo {
-                                    UserLetterRow(letter: letter)
+                                    UserLetterRow(letter: letter) {
+                                        selectedLetter = letter
+                                    }
                                 } else {
                                     VaultedLetterRow(letter: letter) {
                                         showForeverPaywall = true
@@ -82,6 +85,9 @@ struct NotificationCenterView: View {
                     onUnlock: { showForeverPaywall = false },
                     onDismiss: { showForeverPaywall = false }
                 )
+            }
+            .fullScreenCover(item: $selectedLetter, onDismiss: reloadContent) { letter in
+                UserLetterDetailView(letter: letter, onLetterUpdated: reloadContent)
             }
             .onAppear {
                 reloadContent()
@@ -152,6 +158,7 @@ struct NotificationCenterView: View {
 private struct UserLetterRow: View {
 
     let letter: UserLetter
+    let onTap: () -> Void
 
     private var timestampText: String {
         let formatter = DateFormatter()
@@ -173,47 +180,54 @@ private struct UserLetterRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(BabyTownTheme.accent.opacity(0.15))
-                    .frame(width: 44, height: 44)
+        Button(action: onTap) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(BabyTownTheme.accent.opacity(0.15))
+                        .frame(width: 44, height: 44)
 
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(BabyTownTheme.accent)
-            }
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(BabyTownTheme.accent)
+                }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(letter.displayTitle)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(letter.displayTitle)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .lineLimit(1)
 
-                Text(letter.bodyPreview)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.black.opacity(0.55))
-                    .lineLimit(1)
-            }
+                    Text(letter.bodyPreview)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black.opacity(0.55))
+                        .lineLimit(1)
+                }
 
-            Spacer()
+                Spacer()
 
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(timestampText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.black.opacity(0.4))
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(timestampText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.black.opacity(0.4))
 
-                Text(statusLabel)
+                    Text(statusLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(letter.isScheduled ? BabyTownTheme.accent : .black.opacity(0.55))
+                }
+
+                Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(letter.isScheduled ? BabyTownTheme.accent : .black.opacity(0.55))
+                    .foregroundStyle(.black.opacity(0.25))
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+            )
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.white)
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-        )
+        .buttonStyle(.plain)
     }
 }
 

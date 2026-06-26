@@ -376,6 +376,66 @@ struct ProfileGardenNoteArt: View {
     }
 }
 
+/// Vertical grid of mood chips for profile and note editors.
+struct ProfileNoteMoodGrid: View {
+    @Binding var selectedMood: ProfileNoteMood?
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10),
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(ProfileNoteMood.allCases, id: \.self) { mood in
+                moodCell(mood)
+            }
+        }
+    }
+
+    private func moodCell(_ mood: ProfileNoteMood) -> some View {
+        let isSelected = selectedMood == mood
+
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                selectedMood = isSelected ? nil : mood
+            }
+        } label: {
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: mood.iconName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(mood.tintColor)
+
+                    if isSelected {
+                        Circle()
+                            .stroke(mood.tintColor, lineWidth: 2)
+                            .frame(width: 40, height: 40)
+                    }
+                }
+
+                Text(mood.displayName)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(Color.black.opacity(isSelected ? 0.88 : 0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .scaleEffect(isSelected ? 1.06 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mood.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 /// Horizontal scroll of mood chips for the note editor.
 struct ProfileNoteMoodPicker: View {
     @Binding var selectedMood: ProfileNoteMood?
@@ -429,7 +489,7 @@ struct ProfileNoteMoodPicker: View {
 
                 Text(mood.displayName)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(mood.tintColor.opacity(isSelected ? 0.95 : 0.72))
+                    .foregroundStyle(Color.black.opacity(isSelected ? 0.88 : 0.55))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

@@ -6,26 +6,21 @@ struct ProfileNoteEditorSheet: View {
     static let maxLength = 500
 
     let initialText: String
-    let initialMood: ProfileNoteMood?
-    let onSave: (String, ProfileNoteMood?) -> Void
+    let onSave: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var draftText: String
-    @State private var draftMood: ProfileNoteMood?
     @FocusState private var isNoteFocused: Bool
 
     init(
         initialText: String,
-        initialMood: ProfileNoteMood? = nil,
-        onSave: @escaping (String, ProfileNoteMood?) -> Void
+        onSave: @escaping (String) -> Void
     ) {
         self.initialText = initialText
-        self.initialMood = initialMood
         self.onSave = onSave
         let noteWidth: CGFloat = 280
         let clamped = ProfileGardenNoteLayout.clampedNoteText(initialText, noteWidth: noteWidth)
         _draftText = State(initialValue: clamped)
-        _draftMood = State(initialValue: initialMood)
     }
 
     private var trimmedDraft: String {
@@ -50,10 +45,6 @@ struct ProfileNoteEditorSheet: View {
                     .padding(.top, 8)
                     .padding(.bottom, 12)
 
-                ProfileNoteMoodPickerBar(selectedMood: $draftMood)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
-
                 noteComposer
                     .padding(.horizontal, 24)
 
@@ -76,7 +67,7 @@ struct ProfileNoteEditorSheet: View {
             Spacer()
 
             Button {
-                onSave(trimmedDraft, draftMood)
+                onSave(trimmedDraft)
                 dismiss()
             } label: {
                 SavePillLabel(
@@ -95,18 +86,10 @@ struct ProfileNoteEditorSheet: View {
         let noteHeight = ProfileGardenNoteLayout.noteHeight(for: noteWidth)
 
         return ZStack {
-            ProfileGardenNoteArt(noteWidth: noteWidth, mood: draftMood)
+            ProfileGardenNoteArt(noteWidth: noteWidth)
                 .shadow(color: .black.opacity(0.14), radius: 12, y: 6)
 
             ZStack(alignment: .topLeading) {
-                if let draftMood, draftText.isEmpty && !isNoteFocused {
-                    Image(systemName: draftMood.iconName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(draftMood.tintColor)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 2)
-                }
-
                 Text("Write something for your garden…")
                     .font(.body)
                     .foregroundStyle(Color(red: 0.55, green: 0.48, blue: 0.42).opacity(0.55))
@@ -119,11 +102,9 @@ struct ProfileNoteEditorSheet: View {
                 FixedLineNoteTextEditor(
                     text: $draftText,
                     noteWidth: noteWidth,
-                    mood: draftMood,
                     isFocused: $isNoteFocused
                 )
             }
-            .animation(.easeInOut(duration: 0.2), value: draftMood)
             .padding(.horizontal, noteWidth * ProfileGardenNoteLayout.textHorizontalInsetFraction)
             .padding(.top, noteHeight * ProfileGardenNoteLayout.textTopInsetFraction)
             .padding(.bottom, noteHeight * ProfileGardenNoteLayout.textBottomInsetFraction)

@@ -24,6 +24,10 @@ struct BabyTownHeader: View {
         isNightMode ? .white.opacity(0.9) : BabyTownTheme.textPrimary.opacity(0.6)
     }
 
+    private var navigationMenuIconColor: Color {
+        isNightMode ? .white.opacity(0.9) : .black
+    }
+
     var body: some View {
         ZStack {
             // Logo hidden for now — restore to bring back the BabyTown wordmark.
@@ -77,10 +81,13 @@ struct BabyTownHeader: View {
                     } label: {
                         Image(systemName: "line.3")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(isNightMode ? .white.opacity(0.9) : .black)
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(navigationMenuIconColor)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .tint(navigationMenuIconColor)
                     .accessibilityLabel("Home navigation menu")
                 }
             }

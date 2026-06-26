@@ -69,7 +69,7 @@ struct HomeGardenPatchView: View {
             ZStack {
                 HStack(alignment: .bottom, spacing: 0) {
                     propColumn(
-                        imageName: "home_pet_house",
+                        imageName: BabyTownTheme.homePetHouseImage,
                         imageHeight: sceneHeight * 0.48,
                         label: petHouseLabel,
                         pillStyle: petHousePillStyle,

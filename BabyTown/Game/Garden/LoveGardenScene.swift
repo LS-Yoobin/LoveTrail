@@ -16,6 +16,8 @@ final class LoveGardenScene: SKScene {
     private let season: GardenSeason
     /// When true, blooms and backdrop are drawn at rest with no motion (thumbnails).
     private let isStaticSnapshot: Bool
+    /// When true with `isStaticSnapshot`, clouds drift within the scene bounds (home card).
+    private let animateClouds: Bool
     /// When true, sky and clouds are omitted so a SwiftUI night backdrop shows through.
     private let isNightMode: Bool
     private var elementNodes: [UUID: SKNode] = [:]
@@ -25,12 +27,14 @@ final class LoveGardenScene: SKScene {
         elements: [GardenElement],
         season: GardenSeason,
         isStaticSnapshot: Bool = false,
-        isNightMode: Bool = false
+        isNightMode: Bool = false,
+        animateClouds: Bool = false
     ) {
         self.elements = elements
         self.season = season
         self.isStaticSnapshot = isStaticSnapshot
         self.isNightMode = isNightMode
+        self.animateClouds = animateClouds
         super.init(size: size)
         scaleMode = .resizeFill
         anchorPoint = CGPoint(x: 0, y: 0)
@@ -46,10 +50,13 @@ final class LoveGardenScene: SKScene {
         addDistantHills()
         drawGround()
         if !isNightMode {
-            if !isStaticSnapshot {
-                addDriftingClouds()
-            } else {
+            switch cloudMotionStyle {
+            case .still:
                 addStaticClouds()
+            case .fieldDrift:
+                addDriftingClouds()
+            case .boundedDrift:
+                addBoundedDriftingClouds()
             }
         }
         for (index, element) in elements.enumerated() {
@@ -83,6 +90,19 @@ final class LoveGardenScene: SKScene {
     }
 
     // MARK: Layout
+
+    private enum CloudMotionStyle {
+        case still
+        case fieldDrift
+        case boundedDrift
+    }
+
+    private var cloudMotionStyle: CloudMotionStyle {
+        if isStaticSnapshot {
+            return animateClouds ? .boundedDrift : .still
+        }
+        return .fieldDrift
+    }
 
     /// Draw order for blooms and roaming cats — lower Y (closer to camera) renders
     /// in front, matching pet-room `propDepthZ` (front = higher z, back = lower z).
@@ -234,6 +254,47 @@ final class LoveGardenScene: SKScene {
             ]))
             bob.timingMode = .easeInEaseOut
             cloud.run(.sequence([.wait(forDuration: Double(i) * 1.3), bob]))
+        }
+    }
+
+    /// Gentle ping-pong drift for compact widgets — clouds stay inside the clipped card.
+    private func addBoundedDriftingClouds() {
+        let alpha: CGFloat = season == .blooming ? 0.55 : 0.38
+        let cloudColor = SKColor(white: 1, alpha: alpha)
+        let cloudCount = 4
+        let marginX = size.width * 0.10
+        let skyMinY = size.height * 0.52
+        let skyMaxY = size.height * 0.86
+
+        for i in 0..<cloudCount {
+            let cloud = makeCloud(variant: i, color: cloudColor)
+            let slot = CGFloat(i + 1) / CGFloat(cloudCount + 1)
+            let x = marginX + (size.width - marginX * 2) * slot
+            let y = skyMinY + (skyMaxY - skyMinY) * CGFloat(i % 3) / 2.0
+            cloud.position = CGPoint(x: x, y: y)
+            cloud.zPosition = (i % 2 == 0) ? -2 : -3
+            cloud.setScale(0.50 + CGFloat(i % 3) * 0.07)
+            addChild(cloud)
+
+            let driftX = size.width * (0.035 + CGFloat(i % 3) * 0.018)
+            let driftY: CGFloat = 2.5 + CGFloat(i % 2) * 2
+            let durX = TimeInterval(11 + i * 2)
+            let durY = TimeInterval(6 + i * 2)
+
+            let horizontal = SKAction.repeatForever(.sequence([
+                .moveBy(x: driftX, y: 0, duration: durX),
+                .moveBy(x: -driftX, y: 0, duration: durX),
+            ]))
+            horizontal.timingMode = .easeInEaseOut
+
+            let vertical = SKAction.repeatForever(.sequence([
+                .moveBy(x: 0, y: driftY, duration: durY),
+                .moveBy(x: 0, y: -driftY, duration: durY),
+            ]))
+            vertical.timingMode = .easeInEaseOut
+
+            cloud.run(.sequence([.wait(forDuration: Double(i) * 0.8), horizontal]))
+            cloud.run(.sequence([.wait(forDuration: Double(i) * 1.0), vertical]))
         }
     }
 

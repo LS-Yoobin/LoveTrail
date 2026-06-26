@@ -7,6 +7,7 @@ struct ProfileStickersLayer: View {
     let images: [UUID: UIImage]
     let profileNote: String?
     let profileNoteMood: ProfileNoteMood?
+    let gardenMood: ProfileNoteMood?
     let profileNotePosition: NormalizedPoint?
     let recordPlayerPosition: NormalizedPoint?
     let recordPlayerScale: CGFloat?
@@ -209,7 +210,12 @@ struct ProfileStickersLayer: View {
         let side = ProfileSticker.renderedSize(scale: sticker.scale)
         let hasLabel = sticker.kind == .userAvatar || sticker.kind == .partnerInvite
         guard hasLabel else { return side }
-        return StickerImageLayout.labeledStackHeight(squareSide: side, image: images[sticker.id])
+        let showsMoodPill = sticker.kind == .userAvatar && gardenMood != nil
+        return StickerImageLayout.labeledStackHeight(
+            squareSide: side,
+            image: images[sticker.id],
+            showsMoodPill: showsMoodPill
+        )
     }
 
     private var profileStickers: [ProfileSticker] {
@@ -226,6 +232,7 @@ struct ProfileStickersLayer: View {
             sticker: sticker,
             image: images[sticker.id],
             label: label(for: sticker),
+            moodBadge: moodBadge(for: sticker),
             canvasSize: canvasSize,
             isCustomizing: isCustomizing,
             onTap: browseTap(for: sticker),
@@ -270,5 +277,10 @@ struct ProfileStickersLayer: View {
         case .moment, .specialDate, .pet:
             return nil
         }
+    }
+
+    private func moodBadge(for sticker: ProfileSticker) -> ProfileNoteMood? {
+        guard sticker.kind == .userAvatar else { return nil }
+        return gardenMood
     }
 }

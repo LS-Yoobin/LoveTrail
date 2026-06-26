@@ -1,4 +1,5 @@
 import SwiftUI
+import GardenCore
 
 /// Full-width garden card on the Home feed. Taps into the Couple Profile / Secret Garden.
 struct CoupleSpaceCard: View {
@@ -7,7 +8,8 @@ struct CoupleSpaceCard: View {
 
     var avatar: UIImage?
     var partnerAvatar: UIImage? = nil
-    var gardenThumbnail: UIImage? = nil
+    var gardenElements: [GardenElement] = []
+    var gardenSeason: GardenSeason = .blooming
     var bloomCount: Int
     var isReadyToInvite: Bool
     var onTap: () -> Void
@@ -51,11 +53,7 @@ struct CoupleSpaceCard: View {
 
     private var gardenBackground: some View {
         Group {
-            if let gardenThumbnail {
-                Image(uiImage: gardenThumbnail)
-                    .resizable()
-                    .scaledToFill()
-            } else {
+            if gardenElements.isEmpty {
                 LinearGradient(
                     colors: [
                         Color(red: 0.78, green: 0.90, blue: 0.98),
@@ -63,6 +61,11 @@ struct CoupleSpaceCard: View {
                     ],
                     startPoint: .top,
                     endPoint: .bottom
+                )
+            } else {
+                CoupleSpaceGardenBackground(
+                    elements: gardenElements,
+                    season: gardenSeason
                 )
             }
         }
@@ -108,7 +111,8 @@ struct CoupleSpaceCard: View {
     CoupleSpaceCard(
         avatar: nil,
         partnerAvatar: nil,
-        gardenThumbnail: nil,
+        gardenElements: [],
+        gardenSeason: .blooming,
         bloomCount: 8,
         isReadyToInvite: false,
         onTap: {}

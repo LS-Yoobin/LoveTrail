@@ -292,6 +292,13 @@ final class DataPersistenceManager {
         letters.append(letter)
         saveUserLetters(letters)
     }
+
+    func updateUserLetter(_ letter: UserLetter) {
+        var letters = loadUserLetters()
+        guard let index = letters.firstIndex(where: { $0.id == letter.id }) else { return }
+        letters[index] = letter
+        saveUserLetters(letters)
+    }
     
     // MARK: - Pet (Adopt a Pet)
 
