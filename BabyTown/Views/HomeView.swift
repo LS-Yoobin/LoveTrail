@@ -62,6 +62,7 @@ struct HomeView: View {
     @State private var didAlignInitialScroll = false
     @State private var showNotifications = false
     @State private var hasUnreadNotifications = AppNotification.hasUnread()
+    @State private var hasUnreadMail = false
     @State private var showOnThisDayViewer = false
     @State private var onThisDayPhotos: [Moment] = []
     @State private var onThisDayStartIndex = 0
@@ -221,6 +222,12 @@ struct HomeView: View {
                                                 showCoupleProfile = true
                                             }
                                         }
+                                    )
+
+                                    HomeGardenPatchView(
+                                        hasUnreadMail: hasUnreadMail,
+                                        onPetHouseTap: { showVisitPet = true },
+                                        onMailboxTap: {}
                                     )
 
                                     // On This Day section (cached; never computed in body)
@@ -670,6 +677,7 @@ struct HomeView: View {
             .onAppear {
                 viewModel.onPinCapReached = { showPinCapSheet = true }
                 refreshCoupleSpaceCardMetadata()
+                hasUnreadMail = DataPersistenceManager.shared.loadHasUnreadMail()
             }
             .onChange(of: viewModel.moments.count) { _, _ in
                 refreshCoupleSpaceCardMetadata()
