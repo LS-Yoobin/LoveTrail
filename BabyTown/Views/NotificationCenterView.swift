@@ -7,6 +7,7 @@ struct NotificationCenterView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store: StoreManager = .shared
     @State private var notifications: [AppNotification] = []
+    @State private var readNotificationIDs: Set<String> = []
     @State private var userLetters: [UserLetter] = []
     @State private var openedWelcomeCard = false
     @State private var showComposeLetter = false
@@ -43,7 +44,10 @@ struct NotificationCenterView: View {
                             }
 
                             ForEach(notifications) { notification in
-                                NotificationRow(notification: notification) {
+                                NotificationRow(
+                                    notification: notification,
+                                    isRead: readNotificationIDs.contains(notification.id)
+                                ) {
                                     handleTap(notification)
                                 }
                             }
@@ -114,6 +118,7 @@ struct NotificationCenterView: View {
         notifications = AppNotification.seededNotifications(
             userNickname: DataPersistenceManager.shared.loadUserNickname()
         )
+        readNotificationIDs = DataPersistenceManager.shared.readInAppNotificationIDs()
         userLetters = DataPersistenceManager.shared.loadUserLetters()
     }
 
@@ -236,6 +241,7 @@ private struct UserLetterRow: View {
 private struct NotificationRow: View {
 
     let notification: AppNotification
+    let isRead: Bool
     let onTap: () -> Void
 
     @State private var pressed = false
@@ -255,23 +261,37 @@ private struct NotificationRow: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(BabyTownTheme.accent.opacity(0.15))
+                        .fill(
+                            isRead
+                                ? BabyTownTheme.textPrimary.opacity(0.08)
+                                : BabyTownTheme.accent.opacity(0.15)
+                        )
                         .frame(width: 44, height: 44)
 
                     Image(systemName: notification.icon)
                         .font(.system(size: 18))
-                        .foregroundStyle(BabyTownTheme.accent)
+                        .foregroundStyle(
+                            isRead
+                                ? BabyTownTheme.textPrimary.opacity(0.45)
+                                : BabyTownTheme.accent
+                        )
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(notification.title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(
+                            isRead ? BabyTownTheme.textPrimary : .black
+                        )
                         .lineLimit(1)
 
                     Text(notification.bodyPreview)
                         .font(.system(size: 13))
-                        .foregroundStyle(.black.opacity(0.55))
+                        .foregroundStyle(
+                            isRead
+                                ? BabyTownTheme.textPrimary.opacity(0.85)
+                                : .black.opacity(0.55)
+                        )
                         .lineLimit(1)
                 }
 
@@ -280,23 +300,33 @@ private struct NotificationRow: View {
                 VStack(alignment: .trailing, spacing: 6) {
                     Text(timestampText)
                         .font(.system(size: 12))
-                        .foregroundStyle(.black.opacity(0.4))
-
-                    Text("Open")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(BabyTownTheme.accentGradient)
+                        .foregroundStyle(
+                            isRead
+                                ? BabyTownTheme.textPrimary.opacity(0.45)
+                                : .black.opacity(0.4)
                         )
+
+                    if isRead {
+                        Text("Open")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.55))
+                    } else {
+                        Text("Open")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(BabyTownTheme.accentGradient)
+                            )
+                    }
                 }
             }
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(.white)
+                    .fill(isRead ? .white : BabyTownTheme.blushSoft)
                     .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
             )
         }

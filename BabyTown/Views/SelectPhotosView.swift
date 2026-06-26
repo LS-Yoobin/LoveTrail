@@ -50,9 +50,19 @@ struct SelectPhotosView: View {
                         imageManager: viewModel.imageManager,
                         selectedAssets: viewModel.selectedAssets,
                         onToggleSelection: { asset in
+                            if !viewModel.selectionMode {
+                                viewModel.selectionMode = true
+                            }
                             viewModel.toggleSelection(asset)
                             photoSelectedInViewer = true
                         },
+                        onSave: {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                viewModel.viewerIndex = nil
+                            }
+                            performSave()
+                        },
+                        isSaving: viewModel.isSaving,
                         onDismiss: {
                             withAnimation(.easeOut(duration: 0.25)) {
                                 viewModel.viewerIndex = nil

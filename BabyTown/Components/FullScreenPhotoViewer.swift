@@ -8,6 +8,8 @@ struct FullScreenPhotoViewer: View {
     let imageManager: PHCachingImageManager
     var selectedAssets: Set<String>
     var onToggleSelection: ((PHAsset) -> Void)?
+    var onSave: (() -> Void)?
+    var isSaving: Bool = false
     var onDismiss: () -> Void
     var promptText: String?
 
@@ -22,6 +24,8 @@ struct FullScreenPhotoViewer: View {
         imageManager: PHCachingImageManager,
         selectedAssets: Set<String> = [],
         onToggleSelection: ((PHAsset) -> Void)? = nil,
+        onSave: (() -> Void)? = nil,
+        isSaving: Bool = false,
         onDismiss: @escaping () -> Void,
         promptText: String? = nil
     ) {
@@ -30,6 +34,8 @@ struct FullScreenPhotoViewer: View {
         self.imageManager = imageManager
         self.selectedAssets = selectedAssets
         self.onToggleSelection = onToggleSelection
+        self.onSave = onSave
+        self.isSaving = isSaving
         self.onDismiss = onDismiss
         self.promptText = promptText
         _currentIndex = State(initialValue: initialIndex)
@@ -62,27 +68,46 @@ struct FullScreenPhotoViewer: View {
 
     // MARK: - Page
 
+    private var isSelectionMode: Bool { onToggleSelection != nil }
+
     @ViewBuilder
     private func pageView(for asset: PHAsset) -> some View {
-        Group {
-            if let image = loadedImages[asset.localIdentifier] {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity)
-            } else {
-                ProgressView()
-                    .tint(.white.opacity(0.6))
-                    .scaleEffect(1.2)
+        let selected = isSelected(asset)
+
+        ZStack {
+            Group {
+                if let image = loadedImages[asset.localIdentifier] {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                } else {
+                    ProgressView()
+                        .tint(.white.opacity(0.6))
+                        .scaleEffect(1.2)
+                }
+            }
+
+            if isSelectionMode && selected {
+                Color.black.opacity(0.25)
+                    .allowsHitTesting(false)
+
+                photoSelectionBadge
+                    .allowsHitTesting(false)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.2), value: selected)
         .onTapGesture {
-            guard !showSelectButton else { return }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showSelectButton = true
+            if isSelectionMode {
+                onToggleSelection?(asset)
+            } else if !showSelectButton {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showSelectButton = true
+                }
             }
         }
     }
@@ -92,8 +117,8 @@ struct FullScreenPhotoViewer: View {
             HStack {
                 closeButton
                 Spacer()
-                if onToggleSelection != nil {
-                    topSelectButton
+                if onSave != nil {
+                    topSaveButton
                 }
             }
             .padding(.top, 12)
@@ -102,7 +127,7 @@ struct FullScreenPhotoViewer: View {
             Spacer()
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard showSelectButton else { return }
+                    guard !isSelectionMode, showSelectButton else { return }
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSelectButton = false
                     }
@@ -110,11 +135,11 @@ struct FullScreenPhotoViewer: View {
 
             photoPreviewStrip
         }
-        .opacity(showSelectButton ? 1 : 0)
+        .opacity(isSelectionMode || showSelectButton ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showSelectButton)
-        .allowsHitTesting(showSelectButton)
+        .allowsHitTesting(isSelectionMode || showSelectButton)
         .background(alignment: .top) {
-            if showSelectButton {
+            if showSelectButton || isSelectionMode {
                 PhotoViewerTopScrim()
             }
         }
@@ -126,63 +151,70 @@ struct FullScreenPhotoViewer: View {
         CircleBackdropCloseButton(action: onDismiss)
     }
     
-    private var topSelectButton: some View {
+    private var topSaveButton: some View {
         Button {
-            if let asset = currentAsset {
-                onToggleSelection?(asset)
-            }
+            onSave?()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: isCurrentPhotoSelected ? "heart.fill" : "heart")
-                    .font(.system(size: 16, weight: .semibold))
-                Text(isCurrentPhotoSelected ? "Selected" : "Select")
+            HStack(spacing: 8) {
+                if isSaving {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(0.85)
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 22, height: 22)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(BabyTownTheme.savePillFill)
+                    }
+                }
+
+                Text(saveButtonTitle)
                     .font(.system(size: 15, weight: .semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 16)
+            .padding(.leading, 10)
+            .padding(.trailing, 16)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.blue)
+                    .fill(BabyTownTheme.savePillFill)
                     .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
             )
         }
+        .disabled(selectedAssets.isEmpty || isSaving)
+        .opacity(selectedAssets.isEmpty ? 0.5 : 1)
     }
-    
-    private var selectButton: some View {
-        Button {
-            if let asset = currentAsset {
-                onToggleSelection?(asset)
+
+    private var saveButtonTitle: String {
+        let count = selectedAssets.count
+        return count > 0 ? "Save (\(count))" : "Save"
+    }
+
+    private var photoSelectionBadge: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(BabyTownTheme.savePillFill)
+                    .frame(width: 56, height: 56)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.white)
             }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: isCurrentPhotoSelected ? "heart.fill" : "heart")
-                    .font(.system(size: 16, weight: .semibold))
-                Text(isCurrentPhotoSelected ? "Deselect" : "Select")
-                    .font(.system(size: 16, weight: .semibold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 14)
-            .background(
-                Capsule()
-                    .fill(isCurrentPhotoSelected ? BabyTownTheme.accent : Color.white.opacity(0.2))
-                    .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
-            )
+
+            Text("Selected")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(BabyTownTheme.savePillFill))
         }
-        .padding(.bottom, 40)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
-    
-    
-    private var currentAsset: PHAsset? {
-        guard currentIndex < assets.count else { return nil }
-        return assets[currentIndex]
-    }
-    
-    private var isCurrentPhotoSelected: Bool {
-        guard let asset = currentAsset else { return false }
-        return selectedAssets.contains(asset.localIdentifier)
+
+    private func isSelected(_ asset: PHAsset) -> Bool {
+        selectedAssets.contains(asset.localIdentifier)
     }
 
     // MARK: - Loading
