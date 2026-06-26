@@ -37,7 +37,7 @@ struct HomeGardenPatchView: View {
             .offset(y: 14)
         }
         .frame(height: 160)
-        .clipped()
+        .clipped() // intentional: crops props' bottom edge so they appear grounded on the island
     }
 }
 
