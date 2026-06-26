@@ -132,6 +132,7 @@ final class DataPersistenceManager {
     private let pendingPartnerInviteKey = "pendingPartnerInvite"
     private let pendingInviteCodeKey = "pendingInviteCode"
     private let pendingInvitePartnerNameKey = "pendingInvitePartnerName"
+    private let hasUnreadMailKey = "hasUnreadMail"
 
     private init() {
         createDirectoriesIfNeeded()
@@ -718,6 +719,10 @@ final class DataPersistenceManager {
         guard let name = userDefaults.string(forKey: inviterNameKey) else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func loadHasUnreadMail() -> Bool {
+        userDefaults.bool(forKey: hasUnreadMailKey)
     }
 
     func readInAppNotificationIDs() -> Set<String> {
