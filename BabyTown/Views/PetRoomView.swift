@@ -1258,6 +1258,20 @@ struct PetRoomView: View {
     }
 
     private func handleTrickCommand(_ trick: PetTrick) {
+        // #region agent log
+        AgentDebugLog.write(
+            location: "PetRoomView.handleTrickCommand",
+            message: "voice command received",
+            hypothesisId: "A,C,D",
+            data: [
+                "trick": trick.displayName,
+                "speechStatus": "\(speechRecognizer.status)",
+                "isDraggingSnack": isDraggingSnack ? "yes" : "no",
+            ],
+            runId: "post-fix"
+        )
+        // #endregion
+        guard !isDraggingSnack else { return }
         let outcome = viewModel.attemptTrick(trick)
         switch outcome {
         case .locked:

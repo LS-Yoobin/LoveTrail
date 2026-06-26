@@ -15,7 +15,6 @@ struct SettingsSheet: View {
     var onLogOut: () -> Void = {}
 
     @State private var showResetConfirmation = false
-    @State private var showLogOutConfirmation = false
     @State private var showAppIconViewer = false
     @State private var showPlaylistEditor = false
     @State private var showPaywall = false
@@ -64,16 +63,6 @@ struct SettingsSheet: View {
                     .listRowBackground(Color.clear)
                 } header: {
                     Text("Subscription")
-                }
-
-                Section {
-                    NavigationLink {
-                        AccountInfoView()
-                    } label: {
-                        Text("Account Info")
-                    }
-                } header: {
-                    Text("Account")
                 }
 
                 Section {
@@ -183,6 +172,15 @@ struct SettingsSheet: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        ProfileSettingsView(onLogOut: {
+                            onLogOut()
+                            dismiss()
+                        })
+                    } label: {
+                        Text("Profile Settings")
+                    }
+
                     // Temporarily hidden: Replay Our Story
                     Button(role: .destructive) {
                         showResetConfirmation = true
@@ -191,17 +189,6 @@ struct SettingsSheet: View {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 16))
                             Text("Reset App")
-                                .font(.system(size: 16))
-                        }
-                    }
-
-                    Button(role: .destructive) {
-                        showLogOutConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 16))
-                            Text("Log Out")
                                 .font(.system(size: 16))
                         }
                     }
@@ -264,19 +251,6 @@ struct SettingsSheet: View {
             } message: {
                 Text("This will delete all your saved memories, photos, and data. You will start fresh from the welcome screen. This action cannot be undone.")
             }
-            .confirmationDialog(
-                "Log out of Covela?",
-                isPresented: $showLogOutConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Log Out", role: .destructive) {
-                    onLogOut()
-                    dismiss()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Your data stays on this device.")
-            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -285,63 +259,6 @@ struct SettingsSheet: View {
                 }
             }
         }
-    }
-}
-
-private struct AccountInfoView: View {
-    private static let birthdayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "MMM d, yyyy"
-        return f
-    }()
-
-    private var email: String {
-        DataPersistenceManager.shared.loadUserEmail()
-            ?? AuthService.shared.currentUser?.email
-            ?? "Not set"
-    }
-
-    private var username: String {
-        DataPersistenceManager.shared.loadUserNickname() ?? "Not set"
-    }
-
-    private var birthday: String {
-        let profile = DataPersistenceManager.shared.loadCoupleProfile()
-        guard let entry = profile.specialDates.first(where: { $0.id == SpecialDate.localUserBirthdayID }) else {
-            return "Not set"
-        }
-        return Self.birthdayFormatter.string(from: entry.date)
-    }
-
-    var body: some View {
-        List {
-            Section {
-                HStack {
-                    Text("Email")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(email)
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Username")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(username)
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Birthday")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(birthday)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .navigationTitle("Account Info")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

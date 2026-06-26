@@ -36,7 +36,13 @@ struct AppNotification: Identifiable {
     }
 
     static func hasUnread(userNickname: String? = nil) -> Bool {
+        unreadCount(userNickname: userNickname) > 0
+    }
+
+    static func unreadCount(userNickname: String? = nil) -> Int {
         let readIDs = DataPersistenceManager.shared.readInAppNotificationIDs()
-        return seededNotifications(userNickname: userNickname).contains { !readIDs.contains($0.id) }
+        return seededNotifications(userNickname: userNickname)
+            .filter { !readIDs.contains($0.id) }
+            .count
     }
 }

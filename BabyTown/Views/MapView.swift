@@ -103,8 +103,8 @@ struct MapView: View {
                 isPresented: $showVaultedPrompt,
                 onUnlockForever: { showForeverPaywall = true }
             )
-            .presentationDetents([.height(340)])
-            .presentationDragIndicator(.hidden)
+            .presentationDetents([.height(460)])
+            .presentationDragIndicator(.visible)
             .presentationBackground(BabyTownTheme.cardBackground)
         }
         .fullScreenCover(isPresented: $showForeverPaywall) {

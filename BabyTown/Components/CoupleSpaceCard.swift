@@ -17,42 +17,26 @@ struct CoupleSpaceCard: View {
             ZStack {
                 gardenBackground
 
-                // Scrim: darker at top (title) and bottom (avatars)
-                VStack(spacing: 0) {
-                    LinearGradient(
-                        colors: [.black.opacity(0.42), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 64)
-                    Spacer()
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.38)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 64)
-                }
+                Color.black.opacity(0.25)
 
-                // Title row at top
-                HStack(alignment: .center) {
-                    Text("Our Garden")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
+                HStack(alignment: .center, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Our Garden")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("\(bloomCount) Moments Shared")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.80))
+                    }
                     Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                    HStack(spacing: 10) {
+                        avatarRow
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                // Avatar pair at bottom-left
-                avatarRow
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
             .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

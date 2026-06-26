@@ -28,12 +28,12 @@ struct PetRoomLayoutState: Codable, Equatable {
     /// Most-recently-used play toys, newest first (`PetShopItem.id`).
     var playToyUsageOrder: [String]
 
-    private static let currentBuiltInLayoutVersion = 10
+    private static let currentBuiltInLayoutVersion = 11
 
     /// Canonical normalized anchors for built-in care props (pre pixel-offset nudge).
     static let canonicalBuiltInPropPositions: [String: NormalizedPoint] = [
-        // Right side, behind the litter box.
-        PetRoomPropKey.catTree: NormalizedPoint(x: 0.79, y: 0.28),
+        // Right side, tucked behind the litter box.
+        PetRoomPropKey.catTree: NormalizedPoint(x: 0.805, y: 0.20),
         // Bottom-left bowls sit closer together, just above the Train pill.
         PetRoomPropKey.foodBowl: NormalizedPoint(x: 0.15, y: 0.125),
         PetRoomPropKey.waterBowl: NormalizedPoint(x: 0.31, y: 0.125),
@@ -43,6 +43,7 @@ struct PetRoomLayoutState: Codable, Equatable {
 
     /// Prior shipped cat-tree anchors — used to refresh only untouched defaults on migrate.
     private static let legacyCatTreeDefaultPositions: [NormalizedPoint] = [
+        NormalizedPoint(x: 0.79, y: 0.28),
         NormalizedPoint(x: 0.84, y: 0.30),
         NormalizedPoint(x: 0.22, y: 0.30)
     ]
@@ -159,7 +160,21 @@ struct PetRoomLayoutState: Codable, Equatable {
         if builtInLayoutVersion < 10 {
             migrateToBuiltInLayoutV10()
         }
+        if builtInLayoutVersion < 11 {
+            migrateToBuiltInLayoutV11()
+        }
         builtInLayoutVersion = Self.currentBuiltInLayoutVersion
+    }
+
+    /// v11: tuck the cat tree closer to the litter box while keeping it behind.
+    private mutating func migrateToBuiltInLayoutV11() {
+        if let current = propPositions[PetRoomPropKey.catTree] {
+            if Self.isLegacyCatTreeDefaultPosition(current) {
+                applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+            }
+        } else {
+            applyCanonicalBuiltInPositions(forKeys: [PetRoomPropKey.catTree])
+        }
     }
 
     /// v10: move the cat tree to the right side, behind the litter box.

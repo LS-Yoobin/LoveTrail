@@ -40,20 +40,25 @@ struct DayClusterCard: View {
             .transition(.scale(scale: 0.96).combined(with: .opacity))
 
             if isVaulted {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius, style: .continuous)
                     .fill(.ultraThinMaterial)
                     .overlay(
                         VStack(spacing: 8) {
                             Image(systemName: "lock.fill")
-                                .font(.system(size: 22))
+                                .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(.white)
                             Text("This memory is in your vault")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .multilineTextAlignment(.center)
+                                .padding(.horizontal, 12)
                         }
                     )
-                    .allowsHitTesting(false)
+                    .contentShape(RoundedRectangle(cornerRadius: BabyTownTheme.cardRadius, style: .continuous))
+                    .onTapGesture {
+                        guard let moment = section.moments.first else { return }
+                        onOpenPhoto(moment, section.moments)
+                    }
             }
         }
     }
@@ -339,8 +344,9 @@ struct DayClusterCard: View {
 
     private func photoButton(_ moment: Moment) -> some View {
         Button {
-            guard !isVaulted else { return }
-            if !moment.isLocked {
+            if isVaulted {
+                onOpenPhoto(moment, section.moments)
+            } else if !moment.isLocked {
                 onOpenPhoto(moment, section.moments)
             }
         } label: {

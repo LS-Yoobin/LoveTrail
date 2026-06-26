@@ -42,7 +42,7 @@ struct StickyActionBar: View {
                             .frame(width: Metrics.iconSize + Metrics.verticalPadding * 2,
                                    height: Metrics.iconSize + Metrics.verticalPadding * 2)
                             .background(
-                                Circle().fill(isNightMode ? Color.white.opacity(0.12) : BabyTownTheme.accentSoft)
+                                Circle().fill(isNightMode ? Color.white.opacity(0.22) : BabyTownTheme.accent.opacity(0.18))
                             )
                     }
                 }

@@ -54,15 +54,14 @@ struct HomeView: View {
     @State private var viewerImportantDate: MemoryPageImportantDateInfo?
     @State private var viewerPromptMemoryId: UUID?
     @State private var showPromptSheet = false
-    @State private var scrollOffset: CGFloat = 0
     @State private var showUpButton = false
     @State private var scrollToNewMemory = false
     @State private var scrollToTop = false
     /// Aligns the initial rest position with the scroll-to-top button's target.
     @State private var didAlignInitialScroll = false
     @State private var showNotifications = false
-    @State private var hasUnreadNotifications = AppNotification.hasUnread()
-    @State private var hasUnreadMail = false
+    @State private var hasPetAdopted = false
+    @State private var unreadLetterCount = 0
     @State private var showOnThisDayViewer = false
     @State private var onThisDayPhotos: [Moment] = []
     @State private var onThisDayStartIndex = 0
@@ -70,9 +69,6 @@ struct HomeView: View {
     @State private var showMapView = false
     @State private var showToC = false
     @State private var showPinnedMemoriesFeed = false
-    @State private var peakPullOffset: CGFloat = 0
-    @State private var didCrossMapOpenThreshold = false
-    @State private var mapThresholdHapticTick = 0
     @State private var mapOpenHapticTick = 0
     @State private var visibleRowCount = HomeView.timelinePageSize
     @State private var selectedTimelineYear = 0
@@ -81,7 +77,6 @@ struct HomeView: View {
     @State private var showForeverPaywall = false
     @State private var showPinCapSheet = false
 
-    private let mapOpenThreshold: CGFloat = 110
     private static let timelinePageSize = 15
 
     private var vaultedIDs: Set<UUID> {
@@ -164,10 +159,31 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     BabyTownHeader(
                         onSettingsTap: { showSettings = true },
-                        onNotificationsTap: { showNotifications = true },
-                        onMapTap: { openMap() },
-                        isNightMode: nightModeManager.isNightMode,
-                        showsUnreadBadge: hasUnreadNotifications
+                        unreadLetterCount: unreadLetterCount,
+                        onLettersTap: {
+                            dismissMemorySearchKeyboard()
+                            showNotifications = true
+                        },
+                        onGardenTap: {
+                            dismissMemorySearchKeyboard()
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showCoupleProfile = true
+                            }
+                        },
+                        onVisitPetTap: {
+                            dismissMemorySearchKeyboard()
+                            showVisitPet = true
+                        },
+                        onMapTap: {
+                            dismissMemorySearchKeyboard()
+                            openMap()
+                        },
+                        onTableOfContentsTap: {
+                            dismissMemorySearchKeyboard()
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showToC = true
+                        },
+                        isNightMode: nightModeManager.isNightMode
                     )
                     
                     StickyActionBar(
@@ -195,14 +211,6 @@ struct HomeView: View {
                                     .frame(height: 0)
                                     .id("homeScrollTop")
 
-                                if !isUsingMemorySearch {
-                                    MapPullHintView(
-                                        progress: min(currentPullProgress, 1),
-                                        isVisible: scrollOffset > -24 && scrollOffset < 30 && !showMapView && !isYearFilterPinned,
-                                        isNightMode: nightModeManager.isNightMode
-                                    )
-                                }
-
                                 if !isSearchBarPinned {
                                     memorySearchBarPlaceholder
                                 }
@@ -210,25 +218,38 @@ struct HomeView: View {
                                 if isMemorySearchActive {
                                     inlineMemorySearchResults
                                 } else {
-                                    CoupleSpaceCard(
-                                        avatar: coupleSpaceAvatar,
-                                        partnerAvatar: coupleSpacePartnerAvatar,
-                                        gardenThumbnail: coupleSpaceGardenThumbnail,
-                                        bloomCount: coupleSpaceBloomCount,
-                                        isReadyToInvite: store.isForeverUnlocked,
-                                        onTap: {
-                                            dismissMemorySearchKeyboard()
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                showCoupleProfile = true
+                                    VStack(spacing: 0) {
+                                        CoupleSpaceCard(
+                                            avatar: coupleSpaceAvatar,
+                                            partnerAvatar: coupleSpacePartnerAvatar,
+                                            gardenThumbnail: coupleSpaceGardenThumbnail,
+                                            bloomCount: coupleSpaceBloomCount,
+                                            isReadyToInvite: store.isForeverUnlocked,
+                                            onTap: {
+                                                dismissMemorySearchKeyboard()
+                                                withAnimation(.easeInOut(duration: 0.3)) {
+                                                    showCoupleProfile = true
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
 
-                                    HomeGardenPatchView(
-                                        hasUnreadMail: hasUnreadMail,
-                                        onPetHouseTap: { showVisitPet = true },
-                                        onMailboxTap: {}
-                                    )
+                                        HomeGardenPatchView(
+                                            hasPetAdopted: hasPetAdopted,
+                                            unreadLetterCount: unreadLetterCount,
+                                            mapIsPresented: showMapView,
+                                            onPetHouseTap: { showVisitPet = true },
+                                            onMailboxTap: {
+                                                dismissMemorySearchKeyboard()
+                                                showNotifications = true
+                                            },
+                                            onMapTap: {
+                                                dismissMemorySearchKeyboard()
+                                                openMap()
+                                            }
+                                        )
+                                        .padding(.top, -94)
+                                        .zIndex(1)
+                                    }
 
                                     // On This Day section (cached; never computed in body)
                                     let onThisDayMatches = viewModel.onThisDaySections
@@ -305,12 +326,6 @@ struct HomeView: View {
                             visibleRowCount = Self.timelinePageSize
                             clampVisibleRowCount()
                         }
-                        .onChange(of: isYearFilterPinned) { _, pinned in
-                            if pinned {
-                                peakPullOffset = 0
-                                didCrossMapOpenThreshold = false
-                            }
-                        }
                         .onScrollGeometryChange(for: CGFloat.self) { geometry in
                             geometry.contentOffset.y + geometry.contentInsets.top
                         } action: { previousTopOffset, topOffset in
@@ -367,7 +382,6 @@ struct HomeView: View {
                         }
                     }
                 }
-                .sensoryFeedback(.impact(weight: .medium), trigger: mapThresholdHapticTick)
                 .sensoryFeedback(.success, trigger: mapOpenHapticTick)
                 .onAppear {
                     viewModel.checkAndReleasePhotos()
@@ -526,7 +540,6 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
             } // Close ZStack
-            .animation(.easeInOut(duration: 0.3), value: showMapView)
             .animation(.easeInOut(duration: 0.3), value: showCoupleProfile)
             .animation(.easeInOut(duration: 0.3), value: showVisitPet)
             .animation(.easeInOut(duration: 0.25), value: showingPinnedViewer != nil)
@@ -578,10 +591,13 @@ struct HomeView: View {
             .sheet(isPresented: $showInviteFlow) {
                 InvitePartnerFlowView(onDone: { showInviteFlow = false })
             }
-            .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshUnreadNotifications) {
-                NotificationCenterView(onNotificationRead: refreshUnreadNotifications)
+            .fullScreenCover(isPresented: $showNotifications, onDismiss: refreshGardenPatchState) {
+                NotificationCenterView(onNotificationRead: refreshGardenPatchState)
             }
-            .onAppear(perform: refreshUnreadNotifications)
+            .onAppear(perform: refreshGardenPatchState)
+            .onChange(of: showVisitPet) { _, isShowing in
+                if !isShowing { refreshGardenPatchState() }
+            }
             .fullScreenCover(isPresented: $showScan) {
                 ScanView(existingAssetIdentifiers: Set(viewModel.moments.compactMap { $0.assetIdentifier })) { moments in
                     viewModel.addMoments(moments)
@@ -613,8 +629,8 @@ struct HomeView: View {
                     isPresented: $showVaultedPrompt,
                     onUnlockForever: { showForeverPaywall = true }
                 )
-                .presentationDetents([.height(340)])
-                .presentationDragIndicator(.hidden)
+                .presentationDetents([.height(460)])
+                .presentationDragIndicator(.visible)
                 .presentationBackground(BabyTownTheme.cardBackground)
             }
             .sheet(isPresented: $showPinCapSheet) {
@@ -677,7 +693,7 @@ struct HomeView: View {
             .onAppear {
                 viewModel.onPinCapReached = { showPinCapSheet = true }
                 refreshCoupleSpaceCardMetadata()
-                hasUnreadMail = DataPersistenceManager.shared.loadHasUnreadMail()
+                refreshGardenPatchState()
             }
             .onChange(of: viewModel.moments.count) { _, _ in
                 refreshCoupleSpaceCardMetadata()
@@ -701,7 +717,7 @@ struct HomeView: View {
         )
     }
     
-    // MARK: - Map pull reveal
+    // MARK: - Visit Pet overlay
 
     @ViewBuilder
     private var visitPetOverlay: some View {
@@ -876,60 +892,14 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.25), value: showingMomentViewer)
     }
     
-    private var currentPullProgress: CGFloat {
-        max(0, -scrollOffset) / mapOpenThreshold
-    }
-    
     private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
         showUpButton = topOffset > 100
-
-        // Avoid re-rendering the feed on every scroll frame (pinned photos can flash,
-        // especially over the animated night background). Search keeps scrollOffset frozen.
-        if !isMemorySearchActive {
-            if topOffset < 80 {
-                if scrollOffset != topOffset {
-                    scrollOffset = topOffset
-                }
-            } else {
-                let coarseOffset = (topOffset / 32).rounded() * 32
-                if scrollOffset < 80 || abs(coarseOffset - scrollOffset) >= 32 {
-                    scrollOffset = coarseOffset
-                }
-            }
-        }
-
-        guard !isUsingMemorySearch, !isYearFilterPinned else {
-            peakPullOffset = 0
-            didCrossMapOpenThreshold = false
-            return
-        }
-        
-        // Negative topOffset = overscroll pull-down at the top of the feed.
-        let pull = max(0, -topOffset)
-        
-        if pull > peakPullOffset {
-            peakPullOffset = pull
-        }
-        
-        if pull >= mapOpenThreshold, !didCrossMapOpenThreshold {
-            didCrossMapOpenThreshold = true
-            mapThresholdHapticTick += 1
-        }
-        
-        let wasPulling = peakPullOffset > 2
-        if wasPulling && pull < 2 {
-            if peakPullOffset >= mapOpenThreshold {
-                openVisitPet()
-            }
-            peakPullOffset = 0
-            didCrossMapOpenThreshold = false
-        }
     }
     
-    private func refreshUnreadNotifications() {
-        hasUnreadNotifications = AppNotification.hasUnread(
-            userNickname: DataPersistenceManager.shared.loadUserNickname()
-        )
+    private func refreshGardenPatchState() {
+        let dpm = DataPersistenceManager.shared
+        hasPetAdopted = dpm.loadPetState().adoptedSkin != nil
+        unreadLetterCount = AppNotification.unreadCount(userNickname: dpm.loadUserNickname())
     }
 
     private func openMap() {
@@ -937,14 +907,6 @@ struct HomeView: View {
         mapOpenHapticTick += 1
         withAnimation(.easeInOut(duration: 0.3)) {
             showMapView = true
-        }
-    }
-
-    private func openVisitPet() {
-        guard !showVisitPet, !isYearFilterPinned else { return }
-        mapOpenHapticTick += 1
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showVisitPet = true
         }
     }
 
@@ -1465,16 +1427,14 @@ struct HomeView: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     showToC = true
                 } label: {
-                    Image(systemName: "book.closed")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(
-                            Circle()
-                                .fill(BabyTownTheme.accentGradient)
-                                .shadow(color: BabyTownTheme.accent.opacity(0.28), radius: 4, y: 2)
-                        )
+                    Image(BabyTownTheme.homeTableOfContentsImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(height: 51)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Table of Contents")
             }
         }
     }
@@ -2255,10 +2215,10 @@ struct HomeView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(BabyTownTheme.accentIconBackdropGradient)
+                        .fill(BabyTownTheme.cameraButtonFillGradient)
                         .frame(width: 64, height: 64)
                         .overlay(
-                            Circle().stroke(BabyTownTheme.accent.opacity(0.25), lineWidth: 1.5)
+                            Circle().stroke(BabyTownTheme.accentDeep.opacity(0.45), lineWidth: 1.5)
                         )
                         .shadow(color: BabyTownTheme.buttonShadow, radius: 12, y: 4)
 

@@ -28,8 +28,8 @@ struct HomeBackgroundView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
             } else {
-                // Day mode: Existing background
-                BabyTownTheme.backgroundGradient
+                // Day mode: solid white so the flower video blends cleanly at the bottom
+                BabyTownTheme.background
                     .ignoresSafeArea()
                     .transition(.opacity)
             }

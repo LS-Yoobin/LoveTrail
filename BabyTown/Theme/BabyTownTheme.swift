@@ -31,6 +31,11 @@ enum BabyTownTheme {
     }
     static var accentSoft: Color { accent.opacity(0.08) }
 
+    /// Home feed Table of Contents button — theme-specific book artwork.
+    static var homeTableOfContentsImage: String {
+        isBlue ? "home_table_of_contents_blue" : "home_table_of_contents_pink"
+    }
+
     // MARK: - Text
 
     static let textPrimary = Color(.darkGray)
@@ -105,6 +110,11 @@ enum BabyTownTheme {
     }
     static var accentIconBackdropGradient: LinearGradient {
         LinearGradient(colors: [accent.opacity(0.15), accentDeep.opacity(0.08)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    /// Home floating camera control — richer accent fill than light icon backdrops.
+    static var cameraButtonFillGradient: LinearGradient {
+        LinearGradient(colors: [accent.opacity(0.75), accentDeep.opacity(0.75)],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 

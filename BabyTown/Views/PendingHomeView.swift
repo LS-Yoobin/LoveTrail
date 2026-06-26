@@ -12,19 +12,8 @@ struct PendingHomeView: View {
     @State private var showSettings = false
     @State private var showVisitPet = false
     @State private var showWaitingGarden = false
-    @State private var scrollOffset: CGFloat = 0
-    @State private var peakPullOffset: CGFloat = 0
-    @State private var didCrossPetOpenThreshold = false
-    @State private var petThresholdHapticTick = 0
-    @State private var petOpenHapticTick = 0
     @State private var officialMoment: Moment? = nil
     @State private var firstMetMoment: Moment? = nil
-
-    private let petOpenThreshold: CGFloat = 110
-
-    private var currentPullProgress: CGFloat {
-        max(0, -scrollOffset) / petOpenThreshold
-    }
 
     private var partnerName: String {
         DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "your partner"
@@ -44,7 +33,10 @@ struct PendingHomeView: View {
                     .offset(y: 50)
 
                 VStack(spacing: 0) {
-                    BabyTownHeader(onSettingsTap: { showSettings = true })
+                    BabyTownHeader(
+                        onSettingsTap: { showSettings = true },
+                        onGardenTap: { showWaitingGarden = true }
+                    )
 
                     if bannerVisible {
                         waitingBanner
@@ -99,8 +91,6 @@ struct PendingHomeView: View {
             loadFoundingMoments()
         }
         .onDisappear { stopPolling() }
-        .sensoryFeedback(.impact(weight: .medium), trigger: petThresholdHapticTick)
-        .sensoryFeedback(.success, trigger: petOpenHapticTick)
     }
 
     // MARK: Waiting banner
@@ -144,23 +134,12 @@ struct PendingHomeView: View {
     private var pendingHomeScroll: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                MapPullHintView(
-                    progress: min(currentPullProgress, 1),
-                    isVisible: scrollOffset > -24 && scrollOffset < 30,
-                    isNightMode: false
-                )
-
                 pendingPreviewContent
             }
             .padding(.top, 8)
             .padding(.bottom, 100)
         }
         .background(Color.white)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top
-        } action: { _, topOffset in
-            handleScrollTopOffsetChange(topOffset)
-        }
     }
 
     // MARK: Pending preview sections
@@ -338,45 +317,6 @@ struct PendingHomeView: View {
         let moments = DataPersistenceManager.shared.loadMoments()
         officialMoment = moments.first { $0.promptText == "When we became official" }
         firstMetMoment = moments.first { $0.promptText == "When we first met" }
-    }
-
-    private func handleScrollTopOffsetChange(_ topOffset: CGFloat) {
-        if topOffset < 80 {
-            scrollOffset = topOffset
-        } else {
-            let coarseOffset = (topOffset / 32).rounded() * 32
-            if scrollOffset < 80 || abs(coarseOffset - scrollOffset) >= 32 {
-                scrollOffset = coarseOffset
-            }
-        }
-
-        let pull = max(0, -topOffset)
-
-        if pull > peakPullOffset {
-            peakPullOffset = pull
-        }
-
-        if pull >= petOpenThreshold, !didCrossPetOpenThreshold {
-            didCrossPetOpenThreshold = true
-            petThresholdHapticTick += 1
-        }
-
-        let wasPulling = peakPullOffset > 2
-        if wasPulling && pull < 2 {
-            if peakPullOffset >= petOpenThreshold {
-                openVisitPet()
-            }
-            peakPullOffset = 0
-            didCrossPetOpenThreshold = false
-        }
-    }
-
-    private func openVisitPet() {
-        guard !showVisitPet else { return }
-        petOpenHapticTick += 1
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showVisitPet = true
-        }
     }
 
     private var waitingGardenView: some View {
