@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AuthenticationServices
 
 // MARK: - AuthUser
 
@@ -13,11 +14,15 @@ struct AuthUser: Codable, Equatable {
 enum AuthError: LocalizedError {
     case invalidEmail
     case networkError(String)
+    case appleSignInCancelled
+    case appleSignInFailed
 
     var errorDescription: String? {
         switch self {
         case .invalidEmail:            return "Please enter a valid email address."
         case .networkError(let msg):   return msg
+        case .appleSignInCancelled:    return nil
+        case .appleSignInFailed:       return "Apple Sign In failed. Please try again."
         }
     }
 }
@@ -29,23 +34,111 @@ final class AuthService: ObservableObject {
     static let shared = AuthService()
 
     @Published private(set) var currentUser: AuthUser?
+    @Published private(set) var authToken: String?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
-    var isSignedIn: Bool { currentUser != nil }
+    var isSignedIn: Bool { currentUser != nil && authToken != nil }
 
-    private init() {}
+    private let apiClient: CovelaAPIClient
+
+    private init(apiClient: CovelaAPIClient = .shared) {
+        self.apiClient = apiClient
+        restoreSession()
+    }
+
+    // MARK: - Session
+
+    private func restoreSession() {
+        guard let session = KeychainTokenStore.load() else { return }
+        authToken = session.token
+        currentUser = AuthUser(id: session.userId, email: session.email ?? "")
+    }
+
+    private func persistSession(userId: String, email: String?, token: String) throws {
+        let session = AuthSession(userId: userId, email: email, token: token)
+        try KeychainTokenStore.save(session)
+        authToken = token
+        currentUser = AuthUser(id: userId, email: email ?? "")
+    }
+
+    // MARK: - Apple Sign In
+
+    func handleAppleSignIn(result: Result<ASAuthorization, Error>) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        switch result {
+        case .failure(let error):
+            if let authError = error as? ASAuthorizationError,
+               authError.code == .canceled {
+                return false
+            }
+            errorMessage = AuthError.appleSignInFailed.errorDescription
+            return false
+
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                print("[AuthService] Apple credential cast failed: \(type(of: authorization.credential))")
+                errorMessage = AuthError.appleSignInFailed.errorDescription
+                return false
+            }
+
+            print("[AuthService] Apple credential user=\(credential.user) hasIdentityToken=\(credential.identityToken != nil) hasAuthCode=\(credential.authorizationCode != nil) realUserStatus=\(credential.realUserStatus.rawValue)")
+
+            guard let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8),
+                  !identityToken.isEmpty else {
+                print("[AuthService] identityToken missing or empty after decode. tokenDataBytes=\(credential.identityToken?.count ?? -1)")
+                errorMessage = AuthError.appleSignInFailed.errorDescription
+                return false
+            }
+
+            print("[AuthService] identityToken decoded, length=\(identityToken.count), prefix=\(identityToken.prefix(12))...")
+
+            let authorizationCode = credential.authorizationCode
+                .flatMap { String(data: $0, encoding: .utf8) }
+            if let authorizationCode {
+                print("[AuthService] authorizationCode decoded, length=\(authorizationCode.count)")
+            } else {
+                print("[AuthService] authorizationCode is nil or failed to decode as UTF-8")
+            }
+
+            let displayName = Self.formatAppleFullName(credential.fullName)
+
+            do {
+                let response = try await apiClient.signInWithApple(
+                    identityToken: identityToken,
+                    authorizationCode: authorizationCode,
+                    displayName: displayName.isEmpty ? nil : displayName
+                )
+                try persistSession(userId: response.userId, email: nil, token: response.token)
+                return true
+            } catch let error as CovelaAPIError {
+                errorMessage = error.errorDescription
+                return false
+            } catch {
+                errorMessage = AuthError.networkError(error.localizedDescription).errorDescription
+                return false
+            }
+        }
+    }
+
+    private static func formatAppleFullName(_ name: PersonNameComponents?) -> String {
+        guard let name else { return "" }
+        return PersonNameComponentsFormatter.localizedString(from: name, style: .default)
+    }
 
     // MARK: - Email Auth
 
     /// Creates a new account with email and password.
-    /// TODO: Replace stub with real API call — POST /auth/signup { email, password }
+    /// TODO: Replace stub with real API call — POST /auth/register { email, password }
     func createAccount(email: String, password: String) async throws -> AuthUser {
         guard isValidEmail(email) else { throw AuthError.invalidEmail }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        // Simulate 0.8s network round-trip — remove when wiring real API.
         try await Task.sleep(nanoseconds: 800_000_000)
         let user = AuthUser(id: UUID().uuidString, email: email)
         currentUser = user
@@ -53,13 +146,12 @@ final class AuthService: ObservableObject {
     }
 
     /// Signs in with email and password.
-    /// TODO: Replace stub with real API call — POST /auth/signin { email, password }
+    /// TODO: Replace stub with real API call — POST /auth/login { email, password }
     func signIn(email: String, password: String) async throws -> AuthUser {
         guard isValidEmail(email) else { throw AuthError.invalidEmail }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        // Simulate 0.8s network round-trip — remove when wiring real API.
         try await Task.sleep(nanoseconds: 800_000_000)
         let user = AuthUser(id: UUID().uuidString, email: email)
         currentUser = user
@@ -69,7 +161,10 @@ final class AuthService: ObservableObject {
     // MARK: - Sign Out
 
     func signOut() {
+        KeychainTokenStore.clear()
         currentUser = nil
+        authToken = nil
+        errorMessage = nil
     }
 
     // MARK: - Validation
@@ -79,13 +174,6 @@ final class AuthService: ObservableObject {
         return email.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil
     }
 }
-
-// MARK: - Apple Sign In (activate when UI stub is removed)
-// 1. Add "Sign in with Apple" capability in Xcode → Signing & Capabilities.
-// 2. Import AuthenticationServices.
-// 3. Implement handleAppleSignIn(result: Result<ASAuthorization, Error>) here.
-// 4. Exchange Apple identity token with backend — POST /auth/apple { id_token }.
-// 5. Store returned JWT and set currentUser from response payload.
 
 // MARK: - Google Sign In (activate when UI stub is removed)
 // 1. Add GoogleSignIn Swift package via SPM.

@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct CovelaAuthView: View {
     var onAuthenticated: () -> Void
@@ -8,6 +9,7 @@ struct CovelaAuthView: View {
     @State private var showEmailSignUp = false
     @State private var showEmailLogin = false
     @State private var showComingSoon = false
+    @State private var showAuthError = false
 
     @State private var catScale: CGFloat = 0.6
     @State private var catOpacity: Double = 0
@@ -74,7 +76,12 @@ struct CovelaAuthView: View {
             .alert("Coming Soon", isPresented: $showComingSoon) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Apple and Google sign-in are coming soon. Use email for now.")
+                Text("Google sign-in is coming soon. Use Apple or email for now.")
+            }
+            .alert("Sign In Failed", isPresented: $showAuthError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(authService.errorMessage ?? "Something went wrong. Please try again.")
             }
             .navigationDestination(isPresented: $showEmailSignUp) {
                 EmailSignUpView(onAuthenticated: {
@@ -91,6 +98,9 @@ struct CovelaAuthView: View {
                 .environmentObject(authService)
             }
         }
+        .onChange(of: authService.errorMessage) { _, message in
+            showAuthError = message != nil
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.2)) {
                 catScale = 1.0
@@ -102,24 +112,28 @@ struct CovelaAuthView: View {
         }
     }
 
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        Task {
+            let success = await authService.handleAppleSignIn(result: result)
+            if success {
+                onAuthenticated()
+            }
+        }
+    }
+
     // MARK: - Auth Buttons
 
     private var appleButton: some View {
-        Button {
-            showComingSoon = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "apple.logo")
-                    .font(.system(size: 18, weight: .medium))
-                Text("Continue with Apple")
-                    .font(.system(size: 17, weight: .semibold))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 17)
-            .background(Capsule().fill(Color.black))
+        SignInWithAppleButton(.continue) { request in
+            request.requestedScopes = [.fullName, .email]
+        } onCompletion: { result in
+            handleAppleSignIn(result)
         }
-        .buttonStyle(.plain)
+        .signInWithAppleButtonStyle(.black)
+        .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54)
+        .clipShape(Capsule())
+        .disabled(authService.isLoading)
+        .opacity(authService.isLoading ? 0.6 : 1)
     }
 
     private var googleButton: some View {
