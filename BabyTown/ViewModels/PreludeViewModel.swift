@@ -50,6 +50,7 @@ final class PreludeViewModel: ObservableObject {
         captures.append(capture)
         sortCapturesForTimeline()
         saveCaptures()
+        syncCaptureCreateOrUpdate(capture)
     }
 
     func updateCapture(_ capture: PreludeCapture) {
@@ -57,6 +58,7 @@ final class PreludeViewModel: ObservableObject {
         captures[idx] = capture
         sortCapturesForTimeline()
         saveCaptures()
+        syncCaptureCreateOrUpdate(capture)
     }
 
     func deleteCapture(_ capture: PreludeCapture) {
@@ -68,18 +70,77 @@ final class PreludeViewModel: ObservableObject {
         }
         captures.removeAll { $0.id == capture.id }
         saveCaptures()
+        syncDelete(capture)
     }
 
     func toggleGiftInclusion(for capture: PreludeCapture) {
         guard let idx = captures.firstIndex(where: { $0.id == capture.id }) else { return }
         captures[idx].isIncludedInGift.toggle()
         saveCaptures()
+        syncGiftInclusion(captures[idx])
     }
 
     // MARK: - Gift
 
     var giftCaptures: [PreludeCapture] {
         captures.filter { $0.isIncludedInGift && !$0.isPartnerRetroactive }
+    }
+
+    /// Ensures every gift capture has a `serverId`, uploading any that are still local-only.
+    /// Call right before `create-invite` so `gift_capture_ids` are all valid.
+    func syncGiftCapturesForInvite() async throws -> [String] {
+        let toSync = giftCaptures
+        guard !toSync.isEmpty else { return [] }
+        let synced = try await PreludeAPIClient.shared.syncAllCaptures(toSync)
+        for updated in synced {
+            if let idx = captures.firstIndex(where: { $0.id == updated.id }) {
+                captures[idx].serverId = updated.serverId
+            }
+        }
+        saveCaptures()
+        return synced.compactMap(\.serverId)
+    }
+
+    // MARK: - Backend sync (fire-and-forget)
+
+    private func syncCaptureCreateOrUpdate(_ capture: PreludeCapture) {
+        guard AuthService.shared.isSignedIn else { return }
+        Task {
+            do {
+                if let serverId = capture.serverId {
+                    try await PreludeAPIClient.shared.updateCapture(serverId: serverId, capture: capture)
+                } else {
+                    let serverId = try await PreludeAPIClient.shared.createCapture(capture)
+                    guard let idx = captures.firstIndex(where: { $0.id == capture.id }) else { return }
+                    captures[idx].serverId = serverId
+                    saveCaptures()
+                }
+            } catch {
+                print("[PreludeViewModel] capture sync failed: \(error)")
+            }
+        }
+    }
+
+    private func syncGiftInclusion(_ capture: PreludeCapture) {
+        guard AuthService.shared.isSignedIn, let serverId = capture.serverId else { return }
+        Task {
+            do {
+                try await PreludeAPIClient.shared.updateGiftInclusion(serverId: serverId, isIncluded: capture.isIncludedInGift)
+            } catch {
+                print("[PreludeViewModel] gift inclusion sync failed: \(error)")
+            }
+        }
+    }
+
+    private func syncDelete(_ capture: PreludeCapture) {
+        guard AuthService.shared.isSignedIn, let serverId = capture.serverId else { return }
+        Task {
+            do {
+                try await PreludeAPIClient.shared.deleteCapture(serverId: serverId)
+            } catch {
+                print("[PreludeViewModel] capture delete sync failed: \(error)")
+            }
+        }
     }
 
     // MARK: - Stage Transitions

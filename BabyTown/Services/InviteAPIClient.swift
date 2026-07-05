@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 // MARK: - Display model
 
@@ -26,7 +27,14 @@ struct InviteCreatedResponse {
 
 struct InviteStatusResponse {
     enum Status: String { case pending, accepted, expired, cancelled }
-    let status: Status
+    /// `false` when the code does not correspond to any invite at all.
+    let valid: Bool
+    /// `nil` only when the code was never found.
+    let status: Status?
+    /// The inviter's display name, when known.
+    let inviterName: String?
+    /// Whether the caller (if authenticated) already has an account.
+    let existingUser: Bool
 }
 
 struct InviteAcceptedResponse {
@@ -40,23 +48,180 @@ struct InviteAcceptedResponse {
 
 protocol InviteAPIClientProtocol {
     /// POST /create-invite
-    func createInvite(inviterName: String) async throws -> InviteCreatedResponse
+    func createInvite(inviterName: String, giftCaptureIds: [String]) async throws -> InviteCreatedResponse
     /// POST /send-invite-email
     func sendInviteEmail(partnerEmail: String, inviterName: String, code: String) async throws
-    /// GET /invite/:code — polls for partner acceptance
+    /// GET /invite/:code — validates a code and polls for partner acceptance
     func checkInviteStatus(code: String) async throws -> InviteStatusResponse
     /// POST /accept-invite — called when user enters a referral code
     func acceptInvite(code: String) async throws -> InviteAcceptedResponse
 }
 
-// MARK: - Stub (replace with real URLSession calls when backend is ready)
+// MARK: - Friendly error mapping
+
+enum InviteErrorMapper {
+    static func message(for error: Error) -> String {
+        guard let apiError = error as? CovelaAPIError else {
+            return "Something went wrong. Please try again."
+        }
+        switch apiError {
+        case .unauthorized:
+            return "Please sign in again."
+        case .invalidURL, .invalidResponse:
+            return "Something went wrong. Please try again."
+        case .server(let message):
+            let lower = message.lowercased()
+            if lower.contains("cannot accept your own invite") {
+                return "You can't use your own code."
+            } else if lower.contains("expired") {
+                return "That code has expired."
+            } else if lower.contains("already accepted") || lower.contains("already in an official couple") {
+                return "You're already paired."
+            } else if lower.contains("not found") {
+                return "That code is not valid."
+            }
+            return message
+        }
+    }
+}
+
+// MARK: - Live implementation
+
+final class LiveInviteAPIClient: InviteAPIClientProtocol {
+    private let client: CovelaAPIClient
+
+    init(client: CovelaAPIClient = .shared) {
+        self.client = client
+    }
+
+    private struct CreateInviteResponse: Decodable {
+        let code: String
+        let link: String
+    }
+
+    func createInvite(inviterName: String, giftCaptureIds: [String]) async throws -> InviteCreatedResponse {
+        guard let token = await AuthService.shared.authToken else {
+            throw CovelaAPIError.unauthorized
+        }
+        let response: CreateInviteResponse = try await client.post(
+            path: "create-invite",
+            body: ["inviter_name": inviterName, "gift_capture_ids": giftCaptureIds],
+            token: token
+        )
+        return InviteCreatedResponse(code: response.code, link: response.link)
+    }
+
+    func sendInviteEmail(partnerEmail: String, inviterName: String, code: String) async throws {
+        throw CovelaAPIError.server("Email invites aren't available yet. Share the code instead.")
+    }
+
+    private struct InviteLookupResponse: Decodable {
+        let valid: Bool
+        let status: String?
+        let inviterName: String?
+        let existingUser: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case valid, status
+            case inviterName = "inviter_name"
+            case existingUser = "existing_user"
+        }
+    }
+
+    func checkInviteStatus(code: String) async throws -> InviteStatusResponse {
+        let token = await AuthService.shared.authToken
+        let response: InviteLookupResponse = try await client.get(path: "invite/\(code)", token: token)
+        return InviteStatusResponse(
+            valid: response.valid,
+            status: response.status.flatMap(InviteStatusResponse.Status.init(rawValue:)),
+            inviterName: response.inviterName,
+            existingUser: response.existingUser ?? false
+        )
+    }
+
+    private struct BackendCaptureDTO: Decodable {
+        let id: String
+        let type: String
+        let noteText: String?
+        let firstLabel: String?
+        let reasonText: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, type
+            case noteText = "note_text"
+            case firstLabel = "first_label"
+            case reasonText = "reason_text"
+        }
+    }
+
+    private struct AcceptInviteResponse: Decodable {
+        let coupleId: String
+        let inviterName: String
+        let partnerHadPrelude: Bool
+        let inviterGiftCaptures: [BackendCaptureDTO]
+        let partnerGiftCaptures: [BackendCaptureDTO]
+
+        enum CodingKeys: String, CodingKey {
+            case coupleId = "couple_id"
+            case inviterName = "inviter_name"
+            case partnerHadPrelude = "partner_had_prelude"
+            case inviterGiftCaptures = "inviter_gift_captures"
+            case partnerGiftCaptures = "partner_gift_captures"
+        }
+    }
+
+    private func mapToGiftRevealCapture(_ dto: BackendCaptureDTO) -> GiftRevealCapture? {
+        guard let type = PreludeCapture.CaptureType(rawValue: dto.type) else { return nil }
+        let placeholder = PreludeCapture(
+            type: type,
+            noteText: dto.noteText,
+            firstLabel: dto.firstLabel,
+            reasonText: dto.reasonText
+        )
+        return GiftRevealCapture(
+            id: dto.id.deterministicUUID,
+            type: type,
+            displayText: placeholder.displayTitle,
+            typeIcon: placeholder.typeIcon
+        )
+    }
+
+    func acceptInvite(code: String) async throws -> InviteAcceptedResponse {
+        guard let token = await AuthService.shared.authToken else {
+            throw CovelaAPIError.unauthorized
+        }
+        let response: AcceptInviteResponse = try await client.post(
+            path: "accept-invite",
+            body: ["code": code],
+            token: token
+        )
+        let captures = response.inviterGiftCaptures.compactMap(mapToGiftRevealCapture)
+        return InviteAcceptedResponse(revealCaptures: captures, revealerName: response.inviterName)
+    }
+}
+
+// MARK: - Dependency injection
+
+enum InviteAPI {
+    static var client: InviteAPIClientProtocol = makeDefaultClient()
+
+    private static func makeDefaultClient() -> InviteAPIClientProtocol {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["USE_STUB_INVITE_API"] == "1" {
+            return StubInviteAPIClient.shared
+        }
+        #endif
+        return LiveInviteAPIClient()
+    }
+}
+
+// MARK: - Stub (offline UI work — enable with env var USE_STUB_INVITE_API=1)
 
 final class StubInviteAPIClient: InviteAPIClientProtocol {
     static let shared = StubInviteAPIClient()
     private init() {}
 
-    func createInvite(inviterName: String) async throws -> InviteCreatedResponse {
-        // TODO: POST /create-invite with body { inviterName, gift_capture_ids }
+    func createInvite(inviterName: String, giftCaptureIds: [String]) async throws -> InviteCreatedResponse {
         try await Task.sleep(nanoseconds: 600_000_000)
         let code = PartnerInvite.generateCode()
         let encodedName = inviterName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? inviterName
@@ -67,20 +232,32 @@ final class StubInviteAPIClient: InviteAPIClientProtocol {
     }
 
     func sendInviteEmail(partnerEmail: String, inviterName: String, code: String) async throws {
-        // TODO: POST /send-invite-email with body { partner_email, inviter_name, code }
         try await Task.sleep(nanoseconds: 400_000_000)
     }
 
     func checkInviteStatus(code: String) async throws -> InviteStatusResponse {
-        // TODO: GET /invite/:code — check status field in response JSON
-        return InviteStatusResponse(status: .pending)
+        return InviteStatusResponse(valid: true, status: .pending, inviterName: "Your partner", existingUser: false)
     }
 
     func acceptInvite(code: String) async throws -> InviteAcceptedResponse {
-        // TODO: POST /accept-invite with body { code }
-        // On success, map inviter_gift_captures to GiftRevealCapture array.
-        // If inviter had no prelude captures, return empty revealCaptures.
         try await Task.sleep(nanoseconds: 600_000_000)
         return InviteAcceptedResponse(revealCaptures: [], revealerName: "Your partner")
+    }
+}
+
+// MARK: - Deterministic UUID helper
+
+private extension String {
+    /// Deterministic UUID derived from an arbitrary identifier string (e.g. a Mongo ObjectId),
+    /// so server ids can be used as SwiftUI `Identifiable` ids across app launches.
+    var deterministicUUID: UUID {
+        let digest = Insecure.MD5.hash(data: Data(self.utf8))
+        let bytes = Array(digest)
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }

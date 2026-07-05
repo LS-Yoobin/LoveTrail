@@ -14,6 +14,7 @@ struct PreludeHomeView: View {
     @State private var showGiftCuration = false
     @State private var captureToDelete: PreludeCapture?
     @State private var showSettings = false
+    @State private var showInviteCode = false
 
     private var displayName: String {
         DataPersistenceManager.shared.loadCoupleProfile().displayName ?? "them"
@@ -72,6 +73,11 @@ struct PreludeHomeView: View {
         .fullScreenCover(isPresented: $showGiftCuration) {
             GiftCurationView(viewModel: viewModel, onDone: { showGiftCuration = false })
         }
+        .sheet(isPresented: $showInviteCode) {
+            if let code = DataPersistenceManager.shared.loadPendingInviteCode() {
+                InviteCodeSheet(code: code, onDone: { showInviteCode = false })
+            }
+        }
         .sheet(isPresented: $showSettings) {
             PreludeSettingsSheet(
                 onReturnToOnboarding: onReturnToOnboarding,
@@ -97,7 +103,11 @@ struct PreludeHomeView: View {
 
     private var inviteBanner: some View {
         Button {
-            showGiftCuration = true
+            if viewModel.inviteSent, DataPersistenceManager.shared.loadPendingInviteCode() != nil {
+                showInviteCode = true
+            } else {
+                showGiftCuration = true
+            }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "envelope.heart.fill")

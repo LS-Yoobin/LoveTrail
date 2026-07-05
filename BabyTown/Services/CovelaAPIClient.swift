@@ -9,12 +9,14 @@ struct AppleAuthResponse: Decodable {
 enum CovelaAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
+    case unauthorized
     case server(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: return "Invalid API configuration."
         case .invalidResponse: return "Unexpected server response."
+        case .unauthorized: return "Please sign in again."
         case .server(let message): return message
         }
     }
@@ -39,24 +41,56 @@ final class CovelaAPIClient {
         if let authorizationCode { body["authorizationCode"] = authorizationCode }
         if let displayName, !displayName.isEmpty { body["displayName"] = displayName }
 
-        return try await post(path: "auth/apple", body: body)
+        return try await request(method: "POST", path: "auth/apple", body: body, token: nil)
     }
 
-    private func post<T: Decodable>(path: String, body: [String: Any]) async throws -> T {
+    // MARK: - Generic authenticated methods
+
+    func get<T: Decodable>(path: String, token: String? = nil) async throws -> T {
+        try await request(method: "GET", path: path, body: nil, token: token)
+    }
+
+    func post<T: Decodable>(path: String, body: [String: Any] = [:], token: String? = nil) async throws -> T {
+        try await request(method: "POST", path: path, body: body, token: token)
+    }
+
+    func patch<T: Decodable>(path: String, body: [String: Any], token: String? = nil) async throws -> T {
+        try await request(method: "PATCH", path: path, body: body, token: token)
+    }
+
+    func delete<T: Decodable>(path: String, token: String? = nil) async throws -> T {
+        try await request(method: "DELETE", path: path, body: nil, token: token)
+    }
+
+    // MARK: - Core request
+
+    private func request<T: Decodable>(
+        method: String,
+        path: String,
+        body: [String: Any]?,
+        token: String?
+    ) async throws -> T {
         let base = CovelaAPIConfig.baseURL
         let url = base.appendingPathComponent(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let bodyData = try JSONSerialization.data(withJSONObject: body)
-        request.httpBody = bodyData
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
-        let valueLengths = body.mapValues { value -> Int in
+        var bodyData: Data?
+        if let body {
+            bodyData = try JSONSerialization.data(withJSONObject: body)
+            urlRequest.httpBody = bodyData
+        }
+
+        let valueLengths = (body ?? [:]).mapValues { value -> Int in
             (value as? String)?.count ?? -1
         }
-        print("[CovelaAPIClient] POST \(url.absoluteString) bodyKeys=\(Array(body.keys)) valueLengths=\(valueLengths) bodyBytes=\(bodyData.count)")
+        print("[CovelaAPIClient] \(method) \(url.absoluteString) bodyKeys=\(Array((body ?? [:]).keys)) valueLengths=\(valueLengths) bodyBytes=\(bodyData?.count ?? 0) authed=\(token != nil)")
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
             throw CovelaAPIError.invalidResponse
         }
@@ -72,11 +106,15 @@ final class CovelaAPIClient {
             }
         }
 
+        if token != nil, http.statusCode == 401 {
+            throw CovelaAPIError.unauthorized
+        }
+
         if let serverError = try? decoder.decode([String: String].self, from: data),
            let message = serverError["error"] {
             throw CovelaAPIError.server(message)
         }
 
-        throw CovelaAPIError.server("Sign in failed (\(http.statusCode)).")
+        throw CovelaAPIError.server("Request failed (\(http.statusCode)).")
     }
 }

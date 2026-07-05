@@ -8,10 +8,13 @@ struct GiftCurationView: View {
     var onDone: () -> Void
 
     @State private var showPreview = false
-    @State private var showInviteSent = false
     @State private var showAccountSetup = false
     @State private var showGiftSongSheet = false
     @State private var giftSong: PreludeGiftSong?
+    @State private var isSendingInvite = false
+    @State private var sendInviteError: String?
+    @State private var generatedInviteCode: String?
+    @State private var showCodeSheet = false
 
     var body: some View {
         NavigationStack {
@@ -54,10 +57,18 @@ struct GiftCurationView: View {
         .sheet(isPresented: $showPreview) {
             GiftPreviewSheet(captures: viewModel.giftCaptures)
         }
-        .alert("Invite sent!", isPresented: $showInviteSent) {
-            Button("Got it") { onDone() }
+        .alert("Couldn't send invite", isPresented: Binding(
+            get: { sendInviteError != nil },
+            set: { if !$0 { sendInviteError = nil } }
+        )) {
+            Button("OK") { sendInviteError = nil }
         } message: {
-            Text("Your partner will receive your Prelude when they download the app. You can still add captures and update your gift until they accept.")
+            Text(sendInviteError ?? "")
+        }
+        .sheet(isPresented: $showCodeSheet) {
+            if let code = generatedInviteCode {
+                InviteCodeSheet(code: code, onDone: onDone)
+            }
         }
         .fullScreenCover(isPresented: $showAccountSetup) {
             AccountSetupFlow(
@@ -67,8 +78,7 @@ struct GiftCurationView: View {
                         DataPersistenceManager.shared.saveUserAvatar(img)
                     }
                     showAccountSetup = false
-                    viewModel.sendInvite()
-                    showInviteSent = true
+                    Task { await sendInviteAndShowCode() }
                 },
                 onCancel: { showAccountSetup = false }
             )
@@ -76,6 +86,33 @@ struct GiftCurationView: View {
         .sheet(isPresented: $showGiftSongSheet) {
             PreludeGiftSongSheet(giftSong: $giftSong)
         }
+    }
+
+    // MARK: - Actions
+
+    private func sendInviteAndShowCode() async {
+        guard !isSendingInvite else { return }
+        guard AuthService.shared.isSignedIn else {
+            sendInviteError = "Please sign in to send an invite."
+            return
+        }
+        isSendingInvite = true
+        do {
+            let giftCaptureIds = try await viewModel.syncGiftCapturesForInvite()
+            let inviterName = DataPersistenceManager.shared.loadUserNickname() ?? "You"
+            let response = try await InviteAPI.client.createInvite(
+                inviterName: inviterName,
+                giftCaptureIds: giftCaptureIds
+            )
+            DataPersistenceManager.shared.setPendingPartnerInvite(true)
+            DataPersistenceManager.shared.savePendingInviteCode(response.code)
+            viewModel.sendInvite()
+            generatedInviteCode = response.code
+            showCodeSheet = true
+        } catch {
+            sendInviteError = InviteErrorMapper.message(for: error)
+        }
+        isSendingInvite = false
     }
 
     private var captureList: some View {
@@ -141,18 +178,24 @@ struct GiftCurationView: View {
     private var sendButton: some View {
         Button {
             if DataPersistenceManager.shared.loadUserEmail() != nil {
-                viewModel.sendInvite()
-                showInviteSent = true
+                Task { await sendInviteAndShowCode() }
             } else {
                 showAccountSetup = true
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "envelope.badge.shield.half.filled.fill")
-                Text(viewModel.inviteSent ? "Resend Invite" : "Send Invite")
-                    .fontWeight(.semibold)
+            Group {
+                if isSendingInvite {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "key.fill")
+                        Text(viewModel.inviteSent ? "Get New Code" : "Get Invite Code")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(.white)
+                }
             }
-            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
@@ -160,6 +203,7 @@ struct GiftCurationView: View {
                     .fill(AnyShapeStyle(BabyTownTheme.accentGradient))
             )
         }
+        .disabled(isSendingInvite)
         .buttonStyle(.plain)
     }
 }

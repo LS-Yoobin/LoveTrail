@@ -60,6 +60,9 @@ final class AuthService: ObservableObject {
         try KeychainTokenStore.save(session)
         authToken = token
         currentUser = AuthUser(id: userId, email: email ?? "")
+        if let deviceToken = AppDelegate.lastDeviceTokenHex {
+            Task { await DeviceAPIClient.shared.registerPushToken(deviceToken) }
+        }
     }
 
     // MARK: - Apple Sign In

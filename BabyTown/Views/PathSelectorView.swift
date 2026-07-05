@@ -74,7 +74,7 @@ struct PathSelectorView: View {
     }
 }
 
-private struct PathCard: View {
+struct PathCard: View {
     let icon: String
     let title: String
     let description: String

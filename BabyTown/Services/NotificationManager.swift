@@ -28,6 +28,7 @@ class NotificationManager: NSObject, ObservableObject {
                     print("Notification permission granted")
                     self?.scheduleDailyNotification()
                     self?.refresh()
+                    UIApplication.shared.registerForRemoteNotifications()
                 } else if let error = error {
                     print("Notification permission error: \(error.localizedDescription)")
                 }

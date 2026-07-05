@@ -11,7 +11,9 @@ struct ContentView: View {
 
     enum Screen: Equatable {
         case launch, auth, welcome, storyOnboarding, nickname, colorTheme, birthday
-        case pathSelector          // NEW — branch point after birthday
+        case checkInviteCode       // NEW — "do you have a code?" before pathSelector
+        case joinWithCode          // NEW — code entry reached from checkInviteCode
+        case pathSelector          // branch point after checkInviteCode
         case firstMemories, howItWorks, photoAccess, home, selectPhotos
         case loveGarden   // TEMP (Slice 1): direct route to verify the garden; remove when the cat-room door lands.
         case prelude
@@ -194,7 +196,46 @@ struct ContentView: View {
                         let nickname = DataPersistenceManager.shared.loadUserNickname() ?? ""
                         DataPersistenceManager.shared.saveOnboardingUserBirthday(birthday, nickname: nickname)
                         withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .checkInviteCode
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .checkInviteCode:
+                InviteCodeCheckView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .birthday
+                        }
+                    },
+                    onHaveCode: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .joinWithCode
+                        }
+                    },
+                    onNoCode: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .pathSelector
+                        }
+                    }
+                )
+                .transition(.opacity)
+
+            case .joinWithCode:
+                JoinWithCodeView(
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .checkInviteCode
+                        }
+                    },
+                    onJoined: { captures, revealerName in
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            if captures.isEmpty {
+                                screen = .justPickPhotos
+                            } else {
+                                screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
+                            }
                         }
                     }
                 )
@@ -204,7 +245,7 @@ struct ContentView: View {
                 PathSelectorView(
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            screen = .birthday
+                            screen = .checkInviteCode
                         }
                     },
                     onSelectPrelude: {

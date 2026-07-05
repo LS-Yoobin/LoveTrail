@@ -15,7 +15,7 @@ struct PendingHomeView: View {
     )
 
     @State private var pollTimer: Timer? = nil
-    @State private var showLockedToast = false
+    @State private var toastMessage: String? = nil
     @State private var bannerVisible = true
     @State private var showSettings = false
     @State private var showVisitPet = false
@@ -37,6 +37,10 @@ struct PendingHomeView: View {
 
     private var partnerName: String {
         DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "your partner"
+    }
+
+    private var pendingInviteCode: String? {
+        DataPersistenceManager.shared.loadPendingInviteCode()
     }
 
     var body: some View {
@@ -69,8 +73,8 @@ struct PendingHomeView: View {
                 }
             }
 
-            if showLockedToast {
-                lockedToast
+            if let toastMessage {
+                toastView(toastMessage)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .padding(.bottom, 40)
             }
@@ -132,6 +136,9 @@ struct PendingHomeView: View {
         }
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
+        .onReceive(NotificationCenter.default.publisher(for: AppDelegate.partnerInviteAcceptedNotificationName)) { _ in
+            Task { await checkAcceptance() }
+        }
         .onChange(of: firstMetPickerItem) { _, newItem in
             guard let newItem else { return }
             Task {
@@ -197,27 +204,49 @@ struct PendingHomeView: View {
     // MARK: Waiting banner
 
     private var waitingBanner: some View {
-        HStack(spacing: 6) {
-            ProgressView()
-                .scaleEffect(0.7)
-                .tint(BabyTownTheme.inviteBannerText)
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .tint(BabyTownTheme.inviteBannerText)
 
-            Text("Waiting for \(partnerName)\u{2026}")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(BabyTownTheme.inviteBannerText)
+                Text("Waiting for \(partnerName)\u{2026}")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(BabyTownTheme.inviteBannerText)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(BabyTownTheme.inviteBannerFill)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(BabyTownTheme.inviteBannerBorder, lineWidth: 1)
+                    )
+            )
+
+            if let code = pendingInviteCode {
+                inviteCodeButton(code)
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(BabyTownTheme.inviteBannerFill)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(BabyTownTheme.inviteBannerBorder, lineWidth: 1)
-                )
-        )
         .padding(.horizontal, 20)
         .padding(.bottom, 4)
+    }
+
+    private func inviteCodeButton(_ code: String) -> some View {
+        Button {
+            UIPasteboard.general.string = code
+            showToast("Invite code copied")
+        } label: {
+            HStack(spacing: 6) {
+                Text(code)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .tracking(2)
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 11))
+            }
+            .foregroundStyle(BabyTownTheme.inviteBannerText.opacity(0.85))
+        }
     }
 
     // MARK: Locked home chrome
@@ -534,8 +563,8 @@ struct PendingHomeView: View {
 
     // MARK: Toast
 
-    private var lockedToast: some View {
-        Text("Available once your partner joins")
+    private func toastView(_ message: String) -> some View {
+        Text(message)
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
@@ -545,10 +574,10 @@ struct PendingHomeView: View {
             )
     }
 
-    private func showToast() {
-        withAnimation { showLockedToast = true }
+    private func showToast(_ message: String = "Available once your partner joins") {
+        withAnimation { toastMessage = message }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { showLockedToast = false }
+            withAnimation { toastMessage = nil }
         }
     }
 
@@ -568,10 +597,13 @@ struct PendingHomeView: View {
 
     private func checkAcceptance() async {
         guard let code = DataPersistenceManager.shared.loadPendingInviteCode() else { return }
-        guard let status = try? await StubInviteAPIClient.shared.checkInviteStatus(code: code) else { return }
+        guard let status = try? await InviteAPI.client.checkInviteStatus(code: code) else { return }
         if status.status == .accepted {
             stopPolling()
             withAnimation { bannerVisible = false }
+            var profile = DataPersistenceManager.shared.loadCoupleProfile()
+            profile.relationshipStage = .officialCouple
+            DataPersistenceManager.shared.saveCoupleProfile(profile)
             let name = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
             onPartnerJoined([], name)

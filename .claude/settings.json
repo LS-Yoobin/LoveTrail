@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/inseo/LoveTrail/LoveTrail diff --stat)",
+      "Bash(git -C /Users/inseo/LoveTrail/LoveTrail log -1 --format=%H -- BabyTown/Components/GardenMoodRainOverlay.swift)"
+    ]
+  }
+}

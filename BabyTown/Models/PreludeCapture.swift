@@ -15,6 +15,8 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
     var voiceMemoFileId: String?
     var reasonText: String?
     var firstDate: Date?
+    /// Backend Covela capture id, set once this capture has been synced to the server.
+    var serverId: String?
 
     enum CaptureType: String, Codable {
         case note, first, voiceMemo, reason
@@ -33,7 +35,8 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
         firstPhotoId: UUID? = nil,
         voiceMemoFileId: String? = nil,
         reasonText: String? = nil,
-        firstDate: Date? = nil
+        firstDate: Date? = nil,
+        serverId: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -48,6 +51,7 @@ struct PreludeCapture: Codable, Identifiable, Equatable {
         self.voiceMemoFileId = voiceMemoFileId
         self.reasonText = reasonText
         self.firstDate = firstDate
+        self.serverId = serverId
     }
 
     var displayTitle: String {

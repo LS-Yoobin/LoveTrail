@@ -4,7 +4,11 @@ import UserNotifications
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     static let openScrapbookNotificationName = Notification.Name("OpenScrapbookNotification")
+    static let partnerInviteAcceptedNotificationName = Notification.Name("PartnerInviteAcceptedNotification")
     private static let appIconRefreshKey = "covela_app_icon_refresh_v1"
+
+    /// Cached so it can be (re-)registered with the backend after a later sign-in.
+    static var lastDeviceTokenHex: String?
 
     func application(
         _ application: UIApplication,
@@ -24,10 +28,25 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return true
     }
     
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Self.lastDeviceTokenHex = tokenString
+        Task {
+            await DeviceAPIClient.shared.registerPushToken(tokenString)
+        }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[AppDelegate] Failed to register for remote notifications: \(error)")
+    }
+
     // Handle notification when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         Task { @MainActor in
             NotificationManager.shared.acknowledgeNotification(identifier: notification.request.identifier)
+        }
+        if (notification.request.content.userInfo["type"] as? String) == "invite_accepted" {
+            NotificationCenter.default.post(name: AppDelegate.partnerInviteAcceptedNotificationName, object: nil)
         }
         completionHandler([.banner, .sound])
     }
@@ -53,6 +72,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     DataPersistenceManager.shared.deleteArchiveBundle()
                 }
             }
+        } else if (response.notification.request.content.userInfo["type"] as? String) == "invite_accepted" {
+            NotificationCenter.default.post(name: AppDelegate.partnerInviteAcceptedNotificationName, object: nil)
         } else if identifier.hasPrefix("watch_together_invite_") {
             let userInfo = response.notification.request.content.userInfo
             if let sessionIDString = userInfo["sessionID"] as? String,
