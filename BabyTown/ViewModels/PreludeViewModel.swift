@@ -7,6 +7,9 @@ final class PreludeViewModel: ObservableObject {
     @Published var captures: [PreludeCapture] = []
     @Published var stage: RelationshipStage = .prelude
     @Published var inviteSent: Bool = false
+    /// (completed, total) media/capture uploads remaining while preparing an invite.
+    /// Nil when no invite-prep upload is in progress.
+    @Published var invitePrepProgress: (completed: Int, total: Int)?
 
     private let dpm = DataPersistenceManager.shared
 
@@ -91,10 +94,15 @@ final class PreludeViewModel: ObservableObject {
     func syncGiftCapturesForInvite() async throws -> [String] {
         let toSync = giftCaptures
         guard !toSync.isEmpty else { return [] }
-        let synced = try await PreludeAPIClient.shared.syncAllCaptures(toSync)
+        defer { invitePrepProgress = nil }
+        let synced = try await PreludeAPIClient.shared.syncAllCaptures(toSync) { [weak self] completed, total in
+            self?.invitePrepProgress = (completed, total)
+        }
         for updated in synced {
             if let idx = captures.firstIndex(where: { $0.id == updated.id }) {
                 captures[idx].serverId = updated.serverId
+                captures[idx].remotePhotoPath = updated.remotePhotoPath
+                captures[idx].remoteVoiceMemoPath = updated.remoteVoiceMemoPath
             }
         }
         saveCaptures()
@@ -107,14 +115,17 @@ final class PreludeViewModel: ObservableObject {
         guard AuthService.shared.isSignedIn else { return }
         Task {
             do {
-                if let serverId = capture.serverId {
-                    try await PreludeAPIClient.shared.updateCapture(serverId: serverId, capture: capture)
+                let synced: PreludeCapture
+                if capture.serverId != nil {
+                    synced = try await PreludeAPIClient.shared.updateCapture(capture)
                 } else {
-                    let serverId = try await PreludeAPIClient.shared.createCapture(capture)
-                    guard let idx = captures.firstIndex(where: { $0.id == capture.id }) else { return }
-                    captures[idx].serverId = serverId
-                    saveCaptures()
+                    synced = try await PreludeAPIClient.shared.createCapture(capture)
                 }
+                guard let idx = captures.firstIndex(where: { $0.id == capture.id }) else { return }
+                captures[idx].serverId = synced.serverId
+                captures[idx].remotePhotoPath = synced.remotePhotoPath
+                captures[idx].remoteVoiceMemoPath = synced.remoteVoiceMemoPath
+                saveCaptures()
             } catch {
                 print("[PreludeViewModel] capture sync failed: \(error)")
             }

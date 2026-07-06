@@ -10,11 +10,32 @@ struct GiftRevealCapture: Identifiable {
     let type: PreludeCapture.CaptureType
     let displayText: String
     let typeIcon: String
+    /// Signed, short-lived covela-fs URL for a note/first photo, when present.
+    let photoURL: String?
+    /// Signed, short-lived covela-fs URL for a voice memo, when present.
+    let audioURL: String?
+
+    init(
+        id: UUID,
+        type: PreludeCapture.CaptureType,
+        displayText: String,
+        typeIcon: String,
+        photoURL: String? = nil,
+        audioURL: String? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.displayText = displayText
+        self.typeIcon = typeIcon
+        self.photoURL = photoURL
+        self.audioURL = audioURL
+    }
 }
 
 extension GiftRevealCapture: Equatable {
     static func == (lhs: GiftRevealCapture, rhs: GiftRevealCapture) -> Bool {
-        lhs.id == rhs.id && lhs.type == rhs.type && lhs.displayText == rhs.displayText && lhs.typeIcon == rhs.typeIcon
+        lhs.id == rhs.id && lhs.type == rhs.type && lhs.displayText == rhs.displayText
+            && lhs.typeIcon == rhs.typeIcon && lhs.photoURL == rhs.photoURL && lhs.audioURL == rhs.audioURL
     }
 }
 
@@ -145,12 +166,16 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
         let noteText: String?
         let firstLabel: String?
         let reasonText: String?
+        let notePhotoUrl: String?
+        let voiceMemoUrl: String?
 
         enum CodingKeys: String, CodingKey {
             case id, type
             case noteText = "note_text"
             case firstLabel = "first_label"
             case reasonText = "reason_text"
+            case notePhotoUrl = "note_photo_url"
+            case voiceMemoUrl = "voice_memo_url"
         }
     }
 
@@ -182,7 +207,9 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
             id: dto.id.deterministicUUID,
             type: type,
             displayText: placeholder.displayTitle,
-            typeIcon: placeholder.typeIcon
+            typeIcon: placeholder.typeIcon,
+            photoURL: dto.notePhotoUrl,
+            audioURL: dto.voiceMemoUrl
         )
     }
 

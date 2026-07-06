@@ -259,7 +259,12 @@ struct PreludeFirstEditSheet: View {
         var updated = capture
         updated.firstLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.firstDate = date
-        updated.firstPhotoId = resolvePhotoId()
+        let newPhotoId = resolvePhotoId()
+        if newPhotoId != capture.firstPhotoId {
+            // Photo attachment changed — force a re-upload next sync.
+            updated.remotePhotoPath = nil
+        }
+        updated.firstPhotoId = newPhotoId
         viewModel.updateCapture(updated)
         dismiss()
         onDone()

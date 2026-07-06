@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct PartnerGiftRevealView: View {
     let captures: [GiftRevealCapture]
@@ -77,12 +78,17 @@ struct PartnerGiftRevealView: View {
 private struct CaptureRevealCard: View {
     let capture: GiftRevealCapture
 
+    @State private var audioPlayer: AVPlayer?
+    @State private var isPlaying = false
+    @State private var endObserver: NSObjectProtocol?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: capture.typeIcon)
+                Image(systemName: isPlaying ? "waveform" : capture.typeIcon)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
+                    .symbolEffect(.variableColor.iterative, isActive: isPlaying)
                 Text(capture.type.typeLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .tracking(1.5)
@@ -90,10 +96,38 @@ private struct CaptureRevealCard: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
 
+            if let photoURLString = capture.photoURL, let photoURL = URL(string: photoURLString) {
+                AsyncImage(url: photoURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Color.white.opacity(0.08)
+                    }
+                }
+                .frame(height: 200)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
             Text(capture.displayText)
                 .font(.system(size: 17))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if capture.audioURL != nil {
+                Button(action: toggleVoiceMemoPlayback) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        Text(isPlaying ? "Playing…" : "Play voice memo")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(.white.opacity(0.15)))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,6 +135,46 @@ private struct CaptureRevealCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(.white.opacity(0.12))
         )
+        .onDisappear { stopVoiceMemo() }
+    }
+
+    private func toggleVoiceMemoPlayback() {
+        if isPlaying {
+            stopVoiceMemo()
+        } else {
+            playVoiceMemo()
+        }
+    }
+
+    private func playVoiceMemo() {
+        guard let audioURLString = capture.audioURL, let url = URL(string: audioURLString) else { return }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("[PartnerGiftRevealView] audio session error: \(error)")
+        }
+        let player = AVPlayer(url: url)
+        audioPlayer = player
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { _ in
+            isPlaying = false
+        }
+        player.play()
+        isPlaying = true
+    }
+
+    private func stopVoiceMemo() {
+        audioPlayer?.pause()
+        audioPlayer = nil
+        isPlaying = false
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = nil
     }
 }
 

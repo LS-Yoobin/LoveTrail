@@ -114,7 +114,14 @@ struct OnboardingInviteView: View {
             }
 
             if isLoading {
-                ProgressView()
+                VStack(spacing: 6) {
+                    ProgressView()
+                    if let progress = preludeViewModel.invitePrepProgress {
+                        Text("Uploading your gift… \(progress.completed)/\(progress.total)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    }
+                }
             }
 
             if let err = choosingActionError {

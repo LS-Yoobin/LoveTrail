@@ -30,6 +30,14 @@ struct GiftCurationView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
 
+                if let progress = viewModel.invitePrepProgress {
+                    Text("Uploading your gift… \(progress.completed)/\(progress.total)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 4)
+                }
+
                 sendButton
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
@@ -185,8 +193,13 @@ struct GiftCurationView: View {
         } label: {
             Group {
                 if isSendingInvite {
-                    ProgressView()
-                        .tint(.white)
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Uploading…")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                    }
                 } else {
                     HStack(spacing: 10) {
                         Image(systemName: "key.fill")

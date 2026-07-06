@@ -792,7 +792,10 @@ struct CaptureEditorView: View {
             firstPhotoId: type == .first ? savedFirstPhotoId : nil,
             voiceMemoFileId: resolvedFileId,
             reasonText: type == .reason ? reasonText.trimmingCharacters(in: .whitespacesAndNewlines) : nil,
-            firstDate: type == .first ? firstDate : nil
+            firstDate: type == .first ? firstDate : nil,
+            serverId: existing?.serverId,
+            remotePhotoPath: type == .first && savedFirstPhotoId == existing?.firstPhotoId ? existing?.remotePhotoPath : nil,
+            remoteVoiceMemoPath: resolvedFileId == existing?.voiceMemoFileId ? existing?.remoteVoiceMemoPath : nil
         )
 
         if existing != nil {
