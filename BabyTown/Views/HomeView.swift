@@ -19,6 +19,7 @@ struct HomeView: View {
     var onResetApp: (() -> Void)? = nil
     var onReplayStory: (() -> Void)? = nil
     var onLogOut: (() -> Void)? = nil
+    var onDeleteAccount: (() -> Void)? = nil
     @Binding var selectedPrompt: PromptItem?
     var onMemoriesAdded: (() -> Void)? = nil
     
@@ -27,6 +28,8 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showVisitPet = false
     @State private var showCoupleProfile = false
+    @State private var showPreludeGiftBook = false
+    @State private var hasPreludeContent = false
     /// Cached for `CoupleSpaceCard` — recomputing garden blooms on every scroll frame
     /// was reloading JSON from disk and tanking Home scroll performance.
     @State private var coupleSpaceBloomCount = 0
@@ -126,6 +129,7 @@ struct HomeView: View {
         onResetApp: (() -> Void)? = nil,
         onReplayStory: (() -> Void)? = nil,
         onLogOut: (() -> Void)? = nil,
+        onDeleteAccount: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
@@ -138,6 +142,7 @@ struct HomeView: View {
         self.onResetApp = onResetApp
         self.onReplayStory = onReplayStory
         self.onLogOut = onLogOut
+        self.onDeleteAccount = onDeleteAccount
         _selectedPrompt = selectedPrompt
     }
 
@@ -148,6 +153,7 @@ struct HomeView: View {
         onResetApp: (() -> Void)? = nil,
         onReplayStory: (() -> Void)? = nil,
         onLogOut: (() -> Void)? = nil,
+        onDeleteAccount: (() -> Void)? = nil,
         selectedPrompt: Binding<PromptItem?> = .constant(nil)
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -156,6 +162,7 @@ struct HomeView: View {
         self.onResetApp = onResetApp
         self.onReplayStory = onReplayStory
         self.onLogOut = onLogOut
+        self.onDeleteAccount = onDeleteAccount
         _selectedPrompt = selectedPrompt
     }
 
@@ -622,7 +629,15 @@ struct HomeView: View {
                     onReplayStory: { onReplayStory?() },
                     onVisitPet: { showVisitPet = true },
                     onOpenCoupleProfile: { showCoupleProfile = true },
-                    onLogOut: { onLogOut?() }
+                    onOpenPrelude: hasPreludeContent ? { showPreludeGiftBook = true } : nil,
+                    onLogOut: { onLogOut?() },
+                    onDeleteAccount: { onDeleteAccount?() }
+                )
+            }
+            .fullScreenCover(isPresented: $showPreludeGiftBook) {
+                PreludeGiftBookView(
+                    onComplete: { showPreludeGiftBook = false },
+                    completeButtonTitle: "Done"
                 )
             }
             .sheet(isPresented: $showHomeSpecialDateEditor) {
@@ -841,6 +856,7 @@ struct HomeView: View {
         coupleSpaceGardenElements = elements
         coupleSpaceGardenSeason = dpm.loadGardenState().season(now: Date())
         coupleSpaceGardenMood = dpm.loadCoupleProfile().gardenMood
+        hasPreludeContent = dpm.hasAccessiblePreludeContent()
     }
 
     private func openHomeSpecialDate(_ special: SpecialDate) {

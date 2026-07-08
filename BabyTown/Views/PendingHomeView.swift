@@ -4,9 +4,10 @@ import Photos
 import GardenCore
 
 struct PendingHomeView: View {
-    var onPartnerJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
+    var onPartnerJoined: (_ captures: [PreludeCapture], _ revealerName: String) -> Void
     var onResetApp: () -> Void = {}
     var onLogOut: () -> Void = {}
+    var onDeleteAccount: () -> Void = {}
 
     @StateObject private var viewModel = HomeViewModel(
         pinnedFirstMet: nil,
@@ -127,7 +128,8 @@ struct PendingHomeView: View {
                     showSettings = false
                     showWaitingGarden = true
                 },
-                onLogOut: { onLogOut() }
+                onLogOut: { onLogOut() },
+                onDeleteAccount: { onDeleteAccount() }
             )
         }
         .animation(.easeInOut(duration: 0.3), value: showVisitPet)
@@ -606,6 +608,7 @@ struct PendingHomeView: View {
             DataPersistenceManager.shared.saveCoupleProfile(profile)
             let name = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
+            DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
             onPartnerJoined([], name)
         }
     }

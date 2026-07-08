@@ -10,11 +10,105 @@ final class DataPersistenceManager {
     private let fileManager = FileManager.default
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    
-    private var documentsDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+
+    /// The signed-out bucket, and the name used for the anonymous Prelude phase
+    /// before a user has an account.
+    private static let anonymousScopeId = "anonymous"
+
+    /// Scopes for which we've already checked/run the one-time migration this launch.
+    private var provisionedDocumentScopes: Set<String> = []
+    private var provisionedDefaultsScopes: Set<String> = []
+
+    /// Every top-level item DataPersistenceManager used to store directly under
+    /// `Documents/` before storage became per-account. Used only to migrate
+    /// pre-existing installs into the scoped layout, once.
+    private static let legacyTopLevelItemNames = [
+        "moments.json", "pinned_photos", "prompt_memories.json", "user_letters.json",
+        "pet_state.json", "garden_state.json", "couple_profile.json", "memory_canvases.json",
+        "prelude_captures.json", "prelude_chapter.json", "partner_gift_captures.json", "archive_bundle.json",
+        "reconnect_invite.json", "PreludeVoiceMemos", "letter_voice_memos",
+        "letter_stickers", "letter_photos", "PreludePhotos", "prelude_gift_song",
+    ]
+
+    /// Every UserDefaults.standard key DataPersistenceManager used before storage
+    /// became per-account. Used only for the one-time migration.
+    private var legacyDefaultsKeys: [String] {
+        [
+            hasCompletedOnboardingKey, lastActiveScreenKey, userNicknameKey,
+            readInAppNotificationIDsKey, isPartnerUnlockedKey, partnerInviteCodeKey,
+            appJoinedDateKey, foundingOfficialDateKey, foundingFirstMetDateKey,
+            celebratedMomentMilestonesKey, petNeedsNotifiedWhileLowKey,
+            petMissesYouNotifiedForInteractionAtKey, colorThemeKey, partnerEmailKey,
+            userEmailKey, isPartnerAccountKey, inviterNameKey, pendingPartnerInviteKey,
+            pendingInviteCodeKey, pendingInvitePartnerNameKey, hasUnreadMailKey,
+        ]
     }
-    
+
+    /// The signed-in user's id, or the shared anonymous bucket pre-signup / signed-out.
+    /// All local storage is scoped by this so multiple accounts on one device (or a
+    /// signed-out Prelude phase followed by account creation) don't see each other's data.
+    private var currentScopeId: String {
+        AuthService.shared.currentUser?.id ?? Self.anonymousScopeId
+    }
+
+    private func defaultsSuiteName(for scopeId: String) -> String {
+        "com.covela.userdata.\(scopeId)"
+    }
+
+    private var documentsDirectory: URL {
+        let root = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let scopeId = currentScopeId
+        let scoped = root
+            .appendingPathComponent("CovelaUserData", isDirectory: true)
+            .appendingPathComponent(scopeId, isDirectory: true)
+        provisionDocumentsScopeIfNeeded(scoped, scopeId: scopeId, legacyRoot: root)
+        return scoped
+    }
+
+    /// One-time-per-launch: migrates legacy flat `Documents/*` files (pre-scoping installs)
+    /// into the current scope, or — for a freshly created account — adopts whatever was
+    /// journaled anonymously before signup. No-ops once the scope already has data.
+    private func provisionDocumentsScopeIfNeeded(_ scoped: URL, scopeId: String, legacyRoot: URL) {
+        guard !provisionedDocumentScopes.contains(scopeId) else { return }
+        provisionedDocumentScopes.insert(scopeId)
+
+        if !fileManager.fileExists(atPath: scoped.path) {
+            try? fileManager.createDirectory(at: scoped, withIntermediateDirectories: true)
+        }
+
+        // Media subdirectories for this scope must exist before any save/load call writes
+        // into them — every scope needs this created freshly, not just whichever scope was
+        // active when DataPersistenceManager.shared was first constructed.
+        for subdirectoryName in ["pinned_photos", "PreludeVoiceMemos", "letter_voice_memos", "PreludePhotos", "prelude_gift_song"] {
+            let subdirectory = scoped.appendingPathComponent(subdirectoryName)
+            if !fileManager.fileExists(atPath: subdirectory.path) {
+                try? fileManager.createDirectory(at: subdirectory, withIntermediateDirectories: true)
+            }
+        }
+
+        let scopedIsEmpty = (try? fileManager.contentsOfDirectory(atPath: scoped.path).isEmpty) ?? true
+        guard scopedIsEmpty else { return }
+
+        var movedLegacyItem = false
+        for name in Self.legacyTopLevelItemNames {
+            let source = legacyRoot.appendingPathComponent(name)
+            guard fileManager.fileExists(atPath: source.path) else { continue }
+            if (try? fileManager.moveItem(at: source, to: scoped.appendingPathComponent(name))) != nil {
+                movedLegacyItem = true
+            }
+        }
+        if movedLegacyItem { return }
+
+        guard scopeId != Self.anonymousScopeId else { return }
+        let anonymousDir = legacyRoot
+            .appendingPathComponent("CovelaUserData", isDirectory: true)
+            .appendingPathComponent(Self.anonymousScopeId, isDirectory: true)
+        guard let items = try? fileManager.contentsOfDirectory(atPath: anonymousDir.path), !items.isEmpty else { return }
+        for name in items {
+            try? fileManager.moveItem(at: anonymousDir.appendingPathComponent(name), to: scoped.appendingPathComponent(name))
+        }
+    }
+
     private var momentsFileURL: URL {
         documentsDirectory.appendingPathComponent("moments.json")
     }
@@ -61,6 +155,10 @@ final class DataPersistenceManager {
 
     private var preludeChapterFileURL: URL {
         documentsDirectory.appendingPathComponent("prelude_chapter.json")
+    }
+
+    private var partnerGiftCapturesFileURL: URL {
+        documentsDirectory.appendingPathComponent("partner_gift_captures.json")
     }
 
     private var archiveBundleFileURL: URL {
@@ -135,7 +233,44 @@ final class DataPersistenceManager {
         pinnedPhotosDirectory.appendingPathComponent("profile_sticker_\(id.uuidString).png")
     }
     
-    private let userDefaults = UserDefaults.standard
+    /// Scoped to the current account (or the anonymous bucket) via a dedicated suite,
+    /// so switching accounts on one device doesn't see each other's defaults.
+    private var userDefaults: UserDefaults {
+        let scopeId = currentScopeId
+        let suite = UserDefaults(suiteName: defaultsSuiteName(for: scopeId)) ?? .standard
+        provisionDefaultsScopeIfNeeded(suite, scopeId: scopeId)
+        return suite
+    }
+
+    /// One-time-per-launch: migrates legacy `UserDefaults.standard` values (pre-scoping
+    /// installs) into the current scope's suite, or — for a freshly created account —
+    /// adopts whatever was set anonymously before signup.
+    private func provisionDefaultsScopeIfNeeded(_ suite: UserDefaults, scopeId: String) {
+        guard !provisionedDefaultsScopes.contains(scopeId) else { return }
+        provisionedDefaultsScopes.insert(scopeId)
+
+        let keys = legacyDefaultsKeys
+        guard !keys.contains(where: { suite.object(forKey: $0) != nil }) else { return }
+
+        let standard = UserDefaults.standard
+        if keys.contains(where: { standard.object(forKey: $0) != nil }) {
+            for key in keys {
+                guard let value = standard.object(forKey: key) else { continue }
+                suite.set(value, forKey: key)
+                standard.removeObject(forKey: key)
+            }
+            return
+        }
+
+        guard scopeId != Self.anonymousScopeId,
+              let anonymousSuite = UserDefaults(suiteName: defaultsSuiteName(for: Self.anonymousScopeId)) else { return }
+        for key in keys {
+            guard let value = anonymousSuite.object(forKey: key) else { continue }
+            suite.set(value, forKey: key)
+            anonymousSuite.removeObject(forKey: key)
+        }
+    }
+
     private let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     private let lastActiveScreenKey = "lastActiveScreen"
     private let userNicknameKey = "userNickname"
@@ -158,28 +293,8 @@ final class DataPersistenceManager {
     private let pendingInvitePartnerNameKey = "pendingInvitePartnerName"
     private let hasUnreadMailKey = "hasUnreadMail"
 
-    private init() {
-        createDirectoriesIfNeeded()
-    }
-    
-    private func createDirectoriesIfNeeded() {
-        if !fileManager.fileExists(atPath: pinnedPhotosDirectory.path) {
-            try? fileManager.createDirectory(at: pinnedPhotosDirectory, withIntermediateDirectories: true)
-        }
-        if !fileManager.fileExists(atPath: preludeVoiceMemosDirectory.path) {
-            try? fileManager.createDirectory(at: preludeVoiceMemosDirectory, withIntermediateDirectories: true)
-        }
-        if !fileManager.fileExists(atPath: letterVoiceMemosDirectory.path) {
-            try? fileManager.createDirectory(at: letterVoiceMemosDirectory, withIntermediateDirectories: true)
-        }
-        if !fileManager.fileExists(atPath: preludePhotosDirectory.path) {
-            try? fileManager.createDirectory(at: preludePhotosDirectory, withIntermediateDirectories: true)
-        }
-        if !fileManager.fileExists(atPath: preludeGiftSongDirectory.path) {
-            try? fileManager.createDirectory(at: preludeGiftSongDirectory, withIntermediateDirectories: true)
-        }
-    }
-    
+    private init() {}
+
     func saveMoments(_ moments: [Moment]) {
         guard let data = try? encoder.encode(moments) else { return }
         try? data.write(to: momentsFileURL)
@@ -534,6 +649,92 @@ final class DataPersistenceManager {
         return captures
     }
 
+    func savePartnerGiftCaptures(_ captures: [PreludeCapture]) {
+        guard let data = try? encoder.encode(captures) else { return }
+        try? data.write(to: partnerGiftCapturesFileURL)
+    }
+
+    func loadPartnerGiftCaptures() -> [PreludeCapture] {
+        guard fileManager.fileExists(atPath: partnerGiftCapturesFileURL.path),
+              let data = try? Data(contentsOf: partnerGiftCapturesFileURL),
+              let captures = try? decoder.decode([PreludeCapture].self, from: data) else {
+            return []
+        }
+        return captures
+    }
+
+    /// True when the couple has any prelude gift content worth surfacing in official mode.
+    func hasAccessiblePreludeContent() -> Bool {
+        if loadPreludeGiftSong() != nil { return true }
+        return !loadAccessiblePreludeGiftCaptures().isEmpty
+    }
+
+    /// Merges `photo_path` from the server into local prelude captures (by `serverId`).
+    func mergeServerPhotoPaths(from serverCaptures: [PreludeAPIClient.ServerCaptureSummary]) {
+        guard !serverCaptures.isEmpty else { return }
+        var local = loadPreludeCaptures()
+        var changed = false
+
+        for server in serverCaptures {
+            guard let photoPath = server.photo_path,
+                  let normalized = CovelaMediaPath.normalizePermanentPath(photoPath) else { continue }
+            guard let index = local.firstIndex(where: { $0.serverId == server.id }) else { continue }
+            if local[index].remotePhotoPath != normalized {
+                local[index].remotePhotoPath = normalized
+                changed = true
+            }
+        }
+
+        if changed {
+            savePreludeCaptures(local)
+        }
+    }
+
+    /// Gift captures to show in the prelude book: partner gift, chapter snapshot, or own gift.
+    func loadAccessiblePreludeGiftCaptures() -> [PreludeCapture] {
+        var combined: [PreludeCapture] = []
+        var seenIds = Set<UUID>()
+
+        func appendUnique(_ captures: [PreludeCapture]) {
+            for capture in captures where seenIds.insert(capture.id).inserted {
+                combined.append(capture)
+            }
+        }
+
+        appendUnique(loadPartnerGiftCaptures())
+
+        if let chapter = loadPreludeChapter() {
+            let giftIds = Set(chapter.giftCaptureIds)
+            let chapterCaptures = loadPreludeCaptures()
+                .filter { giftIds.contains($0.id) || $0.isPartnerRetroactive }
+            appendUnique(chapterCaptures)
+        }
+
+        let ownGift = loadPreludeCaptures()
+            .filter { $0.isIncludedInGift && !$0.isPartnerRetroactive }
+        appendUnique(ownGift)
+
+        return combined.sorted {
+            if $0.timelineDate != $1.timelineDate { return $0.timelineDate < $1.timelineDate }
+            return $0.createdAt < $1.createdAt
+        }
+    }
+
+    /// Snapshots the prelude gift into a chapter the first time a couple goes official.
+    func recordPreludeChapterIfNeeded() {
+        guard loadPreludeChapter() == nil else { return }
+        let captures = loadAccessiblePreludeGiftCaptures()
+        guard !captures.isEmpty else { return }
+        let chapter = PreludeChapter(
+            startDate: captures.map(\.timelineDate).min() ?? Date(),
+            officialDate: Date(),
+            creatorUserId: "local",
+            partnerUserId: "partner",
+            giftCaptureIds: captures.map(\.id)
+        )
+        savePreludeChapter(chapter)
+    }
+
     func savePreludeChapter(_ chapter: PreludeChapter) {
         guard let data = try? encoder.encode(chapter) else { return }
         try? data.write(to: preludeChapterFileURL)
@@ -619,15 +820,31 @@ final class DataPersistenceManager {
     }
 
     func savePreludePhoto(_ image: UIImage, photoId: UUID) {
-        guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return }
-        try? jpegData.write(to: preludePhotoURL(photoId: photoId))
+        guard let jpegData = image.jpegData(compressionQuality: 0.85) else {
+            print("[DataPersistenceManager] savePreludePhoto FAILED — jpegData() returned nil for photoId=\(photoId)")
+            return
+        }
+        let url = preludePhotoURL(photoId: photoId)
+        do {
+            try jpegData.write(to: url)
+            print("[DataPersistenceManager] savePreludePhoto OK — photoId=\(photoId) bytes=\(jpegData.count) path=\(url.path)")
+        } catch {
+            print("[DataPersistenceManager] savePreludePhoto FAILED — photoId=\(photoId) path=\(url.path) error=\(error)")
+        }
     }
 
     func loadPreludePhoto(photoId: UUID) -> UIImage? {
         let url = preludePhotoURL(photoId: photoId)
-        guard fileManager.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url) else {
+        guard fileManager.fileExists(atPath: url.path) else {
+            print("[DataPersistenceManager] loadPreludePhoto MISS — no file at \(url.path) for photoId=\(photoId)")
             return nil
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            print("[DataPersistenceManager] loadPreludePhoto FAILED — file exists but unreadable at \(url.path) for photoId=\(photoId)")
+            return nil
+        }
+        if UIImage(data: data) == nil {
+            print("[DataPersistenceManager] loadPreludePhoto FAILED — file exists but not decodable as UIImage, photoId=\(photoId) bytes=\(data.count)")
         }
         return UIImage(data: data)
     }
@@ -855,6 +1072,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: partnerAvatarURL)
         try? fileManager.removeItem(at: preludeCapturesFileURL)
         try? fileManager.removeItem(at: preludeChapterFileURL)
+        try? fileManager.removeItem(at: partnerGiftCapturesFileURL)
         try? fileManager.removeItem(at: preludeVoiceMemosDirectory)
         try? fileManager.removeItem(at: preludePhotosDirectory)
         try? fileManager.removeItem(at: preludeGiftSongDirectory)

@@ -136,29 +136,41 @@ final class AuthService: ObservableObject {
     // MARK: - Email Auth
 
     /// Creates a new account with email and password.
-    /// TODO: Replace stub with real API call — POST /auth/register { email, password }
-    func createAccount(email: String, password: String) async throws -> AuthUser {
+    func createAccount(email: String, password: String, displayName: String? = nil) async throws -> AuthUser {
         guard isValidEmail(email) else { throw AuthError.invalidEmail }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        try await Task.sleep(nanoseconds: 800_000_000)
-        let user = AuthUser(id: UUID().uuidString, email: email)
-        currentUser = user
-        return user
+        do {
+            let response = try await apiClient.registerWithEmail(email: email, password: password, displayName: displayName)
+            try persistSession(userId: response.userId, email: email, token: response.token)
+            return AuthUser(id: response.userId, email: email)
+        } catch let error as CovelaAPIError {
+            errorMessage = error.errorDescription
+            throw error
+        } catch {
+            errorMessage = AuthError.networkError(error.localizedDescription).errorDescription
+            throw error
+        }
     }
 
     /// Signs in with email and password.
-    /// TODO: Replace stub with real API call — POST /auth/login { email, password }
     func signIn(email: String, password: String) async throws -> AuthUser {
         guard isValidEmail(email) else { throw AuthError.invalidEmail }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        try await Task.sleep(nanoseconds: 800_000_000)
-        let user = AuthUser(id: UUID().uuidString, email: email)
-        currentUser = user
-        return user
+        do {
+            let response = try await apiClient.loginWithEmail(email: email, password: password)
+            try persistSession(userId: response.userId, email: email, token: response.token)
+            return AuthUser(id: response.userId, email: email)
+        } catch let error as CovelaAPIError {
+            errorMessage = error.errorDescription
+            throw error
+        } catch {
+            errorMessage = AuthError.networkError(error.localizedDescription).errorDescription
+            throw error
+        }
     }
 
     // MARK: - Sign Out
@@ -168,6 +180,31 @@ final class AuthService: ObservableObject {
         currentUser = nil
         authToken = nil
         errorMessage = nil
+    }
+
+    // MARK: - Delete Account
+
+    /// Permanently deletes the signed-in account on the server, then clears local auth state.
+    func deleteAccount() async throws {
+        guard let token = authToken else {
+            throw CovelaAPIError.unauthorized
+        }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let response = try await apiClient.deleteAccount(token: token)
+            guard response.success else {
+                throw CovelaAPIError.server("Account deletion failed.")
+            }
+            signOut()
+        } catch let error as CovelaAPIError {
+            errorMessage = error.errorDescription
+            throw error
+        } catch {
+            errorMessage = AuthError.networkError(error.localizedDescription).errorDescription
+            throw error
+        }
     }
 
     // MARK: - Validation

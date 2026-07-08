@@ -24,6 +24,7 @@ struct ProfileStickersLayer: View {
     var isRecordPlayerSelected: Bool = false
     var isWatchTogetherTVSelected: Bool = false
     var isPreludeBookSelected: Bool = false
+    var showsPreludeBook: Bool = true
     let onSelect: (UUID?) -> Void
     let onSelectNote: () -> Void
     var onSelectRecordPlayer: (() -> Void)?
@@ -118,18 +119,20 @@ struct ProfileStickersLayer: View {
                 )
                 .zIndex(watchTogetherTVZIndex)
 
-                ProfileGardenPreludeBookView(
-                    position: preludeBookPosition,
-                    scale: preludeBookScale,
-                    canvasSize: geo.size,
-                    isCustomizing: isCustomizing,
-                    isSelected: isPreludeBookSelected,
-                    onPositionChanged: onPreludeBookPositionChanged,
-                    onScaleChanged: onPreludeBookScaleChanged,
-                    onSelect: onSelectPreludeBook,
-                    onTap: isCustomizing ? nil : onTapPreludeBook
-                )
-                .zIndex(preludeBookZIndex)
+                if showsPreludeBook {
+                    ProfileGardenPreludeBookView(
+                        position: preludeBookPosition,
+                        scale: preludeBookScale,
+                        canvasSize: geo.size,
+                        isCustomizing: isCustomizing,
+                        isSelected: isPreludeBookSelected,
+                        onPositionChanged: onPreludeBookPositionChanged,
+                        onScaleChanged: onPreludeBookScaleChanged,
+                        onSelect: onSelectPreludeBook,
+                        onTap: isCustomizing ? nil : onTapPreludeBook
+                    )
+                    .zIndex(preludeBookZIndex)
+                }
 
                 if isCustomizing {
                     editGardenDeleteButtons(canvasSize: geo.size)

@@ -6,8 +6,11 @@ import Foundation
 enum InviteJoinFlow {
 
     enum Outcome {
-        case joined(captures: [GiftRevealCapture], revealerName: String)
-        case failure(message: String)
+        case joined(captures: [PreludeCapture], revealerName: String)
+        /// `alreadyPaired` is true when the failure means this account is
+        /// already an official couple — callers should route to Home instead
+        /// of just displaying `message`.
+        case failure(message: String, alreadyPaired: Bool = false)
     }
 
     static func join(code: String) async -> Outcome {
@@ -21,9 +24,16 @@ enum InviteJoinFlow {
             profile.relationshipStage = .officialCouple
             DataPersistenceManager.shared.saveCoupleProfile(profile)
             DataPersistenceManager.shared.clearPendingInviteState()
-            return .joined(captures: response.revealCaptures, revealerName: response.revealerName)
+            DataPersistenceManager.shared.saveInviterName(response.revealerName)
+            DataPersistenceManager.shared.setPartnerAccount(true)
+            let captures = await PartnerGiftCaptureImporter.importCaptures(response.revealCaptures)
+            DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
+            return .joined(captures: captures, revealerName: response.revealerName)
         } catch {
-            return .failure(message: InviteErrorMapper.message(for: error))
+            return .failure(
+                message: InviteErrorMapper.message(for: error),
+                alreadyPaired: InviteErrorMapper.isAlreadyPaired(error)
+            )
         }
     }
 

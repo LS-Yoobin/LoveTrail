@@ -62,6 +62,18 @@ struct PreludeChapterView: View {
     }
 
     private func chapterCaptureRow(_ capture: PreludeCapture) -> some View {
+        ChapterCaptureRow(capture: capture)
+    }
+}
+
+private struct ChapterCaptureRow: View {
+    let capture: PreludeCapture
+
+    private var hasPhoto: Bool {
+        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    }
+
+    var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 4) {
                 Image(systemName: capture.typeIcon)
@@ -80,19 +92,25 @@ struct PreludeChapterView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(capture.typeLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(capture.isPartnerRetroactive ? .purple : BabyTownTheme.accent)
-                    .textCase(.uppercase)
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(capture.typeLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(capture.isPartnerRetroactive ? .purple : BabyTownTheme.accent)
+                        .textCase(.uppercase)
 
-                Text(capture.displayTitle)
-                    .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    Text(capture.displayTitle)
+                        .font(.system(size: 15))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
 
-                Text(capture.createdAt, style: .date)
-                    .font(.system(size: 12))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    Text(capture.createdAt, style: .date)
+                        .font(.system(size: 12))
+                        .foregroundStyle(BabyTownTheme.textSecondary)
+                }
+
+                if hasPhoto {
+                    PreludeCapturePhotoView(capture: capture, height: 160, cornerRadius: 12)
+                }
             }
         }
     }

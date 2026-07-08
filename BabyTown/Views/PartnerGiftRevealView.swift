@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 
 struct PartnerGiftRevealView: View {
-    let captures: [GiftRevealCapture]
+    let captures: [PreludeCapture]
     let revealerName: String
     var onContinue: () -> Void
 
@@ -76,11 +76,14 @@ struct PartnerGiftRevealView: View {
 }
 
 private struct CaptureRevealCard: View {
-    let capture: GiftRevealCapture
+    let capture: PreludeCapture
 
-    @State private var audioPlayer: AVPlayer?
+    @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
-    @State private var endObserver: NSObjectProtocol?
+
+    private var hasPhoto: Bool {
+        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -96,25 +99,18 @@ private struct CaptureRevealCard: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
 
-            if let photoURLString = capture.photoURL, let photoURL = URL(string: photoURLString) {
-                AsyncImage(url: photoURL) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        Color.white.opacity(0.08)
-                    }
-                }
-                .frame(height: 200)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            if hasPhoto {
+                PreludeCapturePhotoView(capture: capture, height: 200, cornerRadius: 12)
             }
 
-            Text(capture.displayText)
-                .font(.system(size: 17))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
+            if capture.type != .voiceMemo || capture.voiceMemoFileId == nil {
+                Text(capture.displayTitle)
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            if capture.audioURL != nil {
+            if capture.type == .voiceMemo, capture.voiceMemoFileId != nil {
                 Button(action: toggleVoiceMemoPlayback) {
                     HStack(spacing: 8) {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
@@ -147,34 +143,24 @@ private struct CaptureRevealCard: View {
     }
 
     private func playVoiceMemo() {
-        guard let audioURLString = capture.audioURL, let url = URL(string: audioURLString) else { return }
+        guard let fileId = capture.voiceMemoFileId else { return }
+        let url = DataPersistenceManager.shared.preludeVoiceMemoFileURL(fileId: fileId)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.play()
+            isPlaying = true
         } catch {
-            print("[PartnerGiftRevealView] audio session error: \(error)")
+            print("[PartnerGiftRevealView] voice memo playback error: \(error)")
         }
-        let player = AVPlayer(url: url)
-        audioPlayer = player
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem,
-            queue: .main
-        ) { _ in
-            isPlaying = false
-        }
-        player.play()
-        isPlaying = true
     }
 
     private func stopVoiceMemo() {
-        audioPlayer?.pause()
+        audioPlayer?.stop()
         audioPlayer = nil
         isPlaying = false
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
-        }
-        endObserver = nil
     }
 }
 
@@ -205,9 +191,9 @@ private extension Color {
 #Preview {
     PartnerGiftRevealView(
         captures: [
-            GiftRevealCapture(id: UUID(), type: .note, displayText: "I keep thinking about you.", typeIcon: "pencil.and.scribble"),
-            GiftRevealCapture(id: UUID(), type: .reason, displayText: "The way you always laugh first.", typeIcon: "heart.fill"),
-            GiftRevealCapture(id: UUID(), type: .first, displayText: "First time we danced.", typeIcon: "star.fill")
+            PreludeCapture(type: .note, noteText: "I keep thinking about you."),
+            PreludeCapture(type: .reason, reasonText: "The way you always laugh first."),
+            PreludeCapture(type: .first, firstLabel: "First time we danced.")
         ],
         revealerName: "Sarah",
         onContinue: {}

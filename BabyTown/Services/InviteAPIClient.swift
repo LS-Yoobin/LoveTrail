@@ -8,34 +8,60 @@ import CryptoKit
 struct GiftRevealCapture: Identifiable {
     let id: UUID
     let type: PreludeCapture.CaptureType
-    let displayText: String
     let typeIcon: String
+    let noteText: String?
+    let firstLabel: String?
+    let reasonText: String?
+    /// Permanent covela-fs S3 key for a note/first photo, when present.
+    let photoPath: String?
     /// Signed, short-lived covela-fs URL for a note/first photo, when present.
     let photoURL: String?
     /// Signed, short-lived covela-fs URL for a voice memo, when present.
     let audioURL: String?
+    /// Backend capture id (Mongo ObjectId string).
+    let serverId: String?
+
+    var displayText: String {
+        PreludeCapture(
+            type: type,
+            noteText: noteText,
+            firstLabel: firstLabel,
+            reasonText: reasonText
+        ).displayTitle
+    }
 
     init(
         id: UUID,
         type: PreludeCapture.CaptureType,
-        displayText: String,
         typeIcon: String,
+        noteText: String? = nil,
+        firstLabel: String? = nil,
+        reasonText: String? = nil,
+        photoPath: String? = nil,
         photoURL: String? = nil,
-        audioURL: String? = nil
+        audioURL: String? = nil,
+        serverId: String? = nil
     ) {
         self.id = id
         self.type = type
-        self.displayText = displayText
         self.typeIcon = typeIcon
+        self.noteText = noteText
+        self.firstLabel = firstLabel
+        self.reasonText = reasonText
+        self.photoPath = photoPath
         self.photoURL = photoURL
         self.audioURL = audioURL
+        self.serverId = serverId
     }
 }
 
 extension GiftRevealCapture: Equatable {
     static func == (lhs: GiftRevealCapture, rhs: GiftRevealCapture) -> Bool {
-        lhs.id == rhs.id && lhs.type == rhs.type && lhs.displayText == rhs.displayText
-            && lhs.typeIcon == rhs.typeIcon && lhs.photoURL == rhs.photoURL && lhs.audioURL == rhs.audioURL
+        lhs.id == rhs.id && lhs.type == rhs.type && lhs.typeIcon == rhs.typeIcon
+            &&         lhs.noteText == rhs.noteText && lhs.firstLabel == rhs.firstLabel
+            && lhs.reasonText == rhs.reasonText && lhs.photoPath == rhs.photoPath
+            && lhs.photoURL == rhs.photoURL && lhs.audioURL == rhs.audioURL
+            && lhs.serverId == rhs.serverId
     }
 }
 
@@ -65,6 +91,16 @@ struct InviteAcceptedResponse {
     let revealerName: String
 }
 
+struct PairingStatusResponse {
+    /// Whether this account already belongs to an official couple on the backend,
+    /// regardless of what local onboarding state says.
+    let paired: Bool
+    let partnerName: String?
+    /// Backend couple stage when the user has a couple profile but is not paired yet.
+    let relationshipStage: RelationshipStage?
+    let inviteSent: Bool
+}
+
 // MARK: - Protocol
 
 protocol InviteAPIClientProtocol {
@@ -76,6 +112,9 @@ protocol InviteAPIClientProtocol {
     func checkInviteStatus(code: String) async throws -> InviteStatusResponse
     /// POST /accept-invite — called when user enters a referral code
     func acceptInvite(code: String) async throws -> InviteAcceptedResponse
+    /// GET /pairing-status — authoritative check of whether this account is
+    /// already an official couple on the backend, independent of any code.
+    func checkPairingStatus() async throws -> PairingStatusResponse
 }
 
 // MARK: - Friendly error mapping
@@ -103,6 +142,16 @@ enum InviteErrorMapper {
             }
             return message
         }
+    }
+
+    /// True when the server rejected the call because this account (or the
+    /// couple behind the code) is already an official couple — the caller
+    /// should stop offering invite/join actions and route to Home instead of
+    /// just displaying the error text.
+    static func isAlreadyPaired(_ error: Error) -> Bool {
+        guard let apiError = error as? CovelaAPIError, case .server(let message) = apiError else { return false }
+        let lower = message.lowercased()
+        return lower.contains("already accepted") || lower.contains("already in an official couple")
     }
 }
 
@@ -167,6 +216,9 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
         let firstLabel: String?
         let reasonText: String?
         let notePhotoUrl: String?
+        let firstPhotoUrl: String?
+        let photoUrl: String?
+        let photoPath: String?
         let voiceMemoUrl: String?
 
         enum CodingKeys: String, CodingKey {
@@ -175,6 +227,9 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
             case firstLabel = "first_label"
             case reasonText = "reason_text"
             case notePhotoUrl = "note_photo_url"
+            case firstPhotoUrl = "first_photo_url"
+            case photoUrl = "photo_url"
+            case photoPath = "photo_path"
             case voiceMemoUrl = "voice_memo_url"
         }
     }
@@ -195,8 +250,33 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
         }
     }
 
+    private func mapCaptureType(_ raw: String) -> PreludeCapture.CaptureType? {
+        switch raw {
+        case "voice_memo": return .voiceMemo
+        default: return PreludeCapture.CaptureType(rawValue: raw)
+        }
+    }
+
+    private func photoURL(from dto: BackendCaptureDTO, type: PreludeCapture.CaptureType) -> String? {
+        switch type {
+        case .first:
+            return dto.firstPhotoUrl ?? dto.notePhotoUrl ?? dto.photoUrl
+        case .note:
+            return dto.notePhotoUrl ?? dto.photoUrl
+        default:
+            return nil
+        }
+    }
+
+    private func permanentPhotoPath(from dto: BackendCaptureDTO) -> String? {
+        CovelaMediaPath.normalizePermanentPath(dto.photoPath)
+            ?? CovelaMediaPath.normalizePermanentPath(dto.notePhotoUrl)
+            ?? CovelaMediaPath.normalizePermanentPath(dto.firstPhotoUrl)
+            ?? CovelaMediaPath.normalizePermanentPath(dto.photoUrl)
+    }
+
     private func mapToGiftRevealCapture(_ dto: BackendCaptureDTO) -> GiftRevealCapture? {
-        guard let type = PreludeCapture.CaptureType(rawValue: dto.type) else { return nil }
+        guard let type = mapCaptureType(dto.type) else { return nil }
         let placeholder = PreludeCapture(
             type: type,
             noteText: dto.noteText,
@@ -206,10 +286,14 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
         return GiftRevealCapture(
             id: dto.id.deterministicUUID,
             type: type,
-            displayText: placeholder.displayTitle,
             typeIcon: placeholder.typeIcon,
-            photoURL: dto.notePhotoUrl,
-            audioURL: dto.voiceMemoUrl
+            noteText: dto.noteText,
+            firstLabel: dto.firstLabel,
+            reasonText: dto.reasonText,
+            photoPath: permanentPhotoPath(from: dto),
+            photoURL: photoURL(from: dto, type: type),
+            audioURL: dto.voiceMemoUrl,
+            serverId: dto.id
         )
     }
 
@@ -224,6 +308,33 @@ final class LiveInviteAPIClient: InviteAPIClientProtocol {
         )
         let captures = response.inviterGiftCaptures.compactMap(mapToGiftRevealCapture)
         return InviteAcceptedResponse(revealCaptures: captures, revealerName: response.inviterName)
+    }
+
+    private struct PairingStatusDTO: Decodable {
+        let paired: Bool
+        let partnerName: String?
+        let relationshipStage: String?
+        let inviteSent: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case paired
+            case partnerName = "partner_name"
+            case relationshipStage = "relationship_stage"
+            case inviteSent = "invite_sent"
+        }
+    }
+
+    func checkPairingStatus() async throws -> PairingStatusResponse {
+        guard let token = await AuthService.shared.authToken else {
+            throw CovelaAPIError.unauthorized
+        }
+        let response: PairingStatusDTO = try await client.get(path: "pairing-status", token: token)
+        return PairingStatusResponse(
+            paired: response.paired,
+            partnerName: response.partnerName,
+            relationshipStage: response.relationshipStage.flatMap(RelationshipStage.init(rawValue:)),
+            inviteSent: response.inviteSent ?? false
+        )
     }
 }
 
@@ -269,6 +380,10 @@ final class StubInviteAPIClient: InviteAPIClientProtocol {
     func acceptInvite(code: String) async throws -> InviteAcceptedResponse {
         try await Task.sleep(nanoseconds: 600_000_000)
         return InviteAcceptedResponse(revealCaptures: [], revealerName: "Your partner")
+    }
+
+    func checkPairingStatus() async throws -> PairingStatusResponse {
+        PairingStatusResponse(paired: false, partnerName: nil, relationshipStage: nil, inviteSent: false)
     }
 }
 

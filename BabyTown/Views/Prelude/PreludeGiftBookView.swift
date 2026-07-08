@@ -10,8 +10,13 @@ struct PreludeGiftBookView: View {
     @State private var captures: [PreludeCapture] = []
     @State private var currentIndex = 0
     @State private var giftSong: PreludeGiftSong?
-    @State private var audioPlayer: AVAudioPlayer?
-    @State private var isPlaying = false
+    @State private var giftSongPlayer: AVAudioPlayer?
+    @State private var isGiftSongPlaying = false
+    @State private var voiceMemoPlayer: AVAudioPlayer?
+    @State private var isVoiceMemoPlaying = false
+    #if DEBUG
+    @AppStorage("debugPreludePhotoLoadSource") private var debugPhotoLoadSource = PreludePhotoLoader.PhotoLoadSource.localFirst.rawValue
+    #endif
 
     private static let parchmentGradient = LinearGradient(
         colors: [
@@ -35,21 +40,37 @@ struct PreludeGiftBookView: View {
         }
         .overlay(alignment: .topTrailing) {
             if giftSong != nil {
-                VinylRecordPlayerView(isPlaying: isPlaying, scale: 1.0)
+                VinylRecordPlayerView(isPlaying: isGiftSongPlaying, scale: 1.0)
                     .padding(16)
             }
         }
-        .onAppear {
-            captures = DataPersistenceManager.shared.loadPreludeCaptures()
-                .filter { $0.isIncludedInGift && !$0.isPartnerRetroactive }
-                .sorted { $0.timelineDate < $1.timelineDate }
-            giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
-            if giftSong != nil {
-                startGiftSongPlayback()
-            }
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            debugPhotoSourcePicker
+                .padding(.top, 56)
+                .padding(.leading, 16)
+        }
+        #endif
+        .task {
+            await refreshCapturesAndGiftSong()
         }
         .onDisappear {
             stopGiftSongPlayback()
+            stopVoiceMemoPlayback()
+        }
+    }
+
+    private func refreshCapturesAndGiftSong() async {
+        let dpm = DataPersistenceManager.shared
+        if await AuthService.shared.authToken != nil {
+            if let serverCaptures = try? await PreludeAPIClient.shared.listOwnCaptureSummaries() {
+                dpm.mergeServerPhotoPaths(from: serverCaptures)
+            }
+        }
+        captures = dpm.loadAccessiblePreludeGiftCaptures()
+        giftSong = dpm.loadPreludeGiftSong()
+        if giftSong != nil {
+            startGiftSongPlayback()
         }
     }
 
@@ -104,23 +125,47 @@ struct PreludeGiftBookView: View {
 
     private func captureContent(_ capture: PreludeCapture) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: capture.typeIcon)
-                .font(.system(size: 36))
-                .foregroundStyle(BabyTownTheme.accent)
+            if capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil {
+                PreludeCapturePhotoView(capture: capture, height: 180, cornerRadius: 12)
+            } else {
+                Image(systemName: capture.typeIcon)
+                    .font(.system(size: 36))
+                    .foregroundStyle(BabyTownTheme.accent)
+            }
 
             Text(capture.typeLabel.uppercased())
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(Color(red: 0.761, green: 0.392, blue: 0.165))
                 .tracking(2)
 
-            Text(capture.displayTitle)
-                .font(.system(size: 17, design: .serif))
-                .foregroundStyle(Color(red: 0.239, green: 0.094, blue: 0.000))
-                .lineSpacing(17 * 0.6)
-                .lineLimit(4)
-                .minimumScaleFactor(0.8)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            if capture.type != .voiceMemo || capture.voiceMemoFileId == nil {
+                Text(capture.displayTitle)
+                    .font(.system(size: 17, design: .serif))
+                    .foregroundStyle(Color(red: 0.239, green: 0.094, blue: 0.000))
+                    .lineSpacing(17 * 0.6)
+                    .lineLimit(6)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            if capture.type == .voiceMemo, capture.voiceMemoFileId != nil {
+                Button(action: toggleVoiceMemoPlayback) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isVoiceMemoPlaying ? "pause.fill" : "play.fill")
+                        Text(isVoiceMemoPlaying ? "Playing…" : "Play voice memo")
+                    }
+                    .font(.system(size: 12, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color(red: 0.761, green: 0.392, blue: 0.165))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color(red: 0.761, green: 0.392, blue: 0.165).opacity(0.12))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
 
             Text(capture.createdAt.formatted(date: .abbreviated, time: .omitted))
                 .font(.system(size: 11, design: .serif))
@@ -128,9 +173,42 @@ struct PreludeGiftBookView: View {
         }
     }
 
+    private func toggleVoiceMemoPlayback() {
+        guard captures.indices.contains(currentIndex) else { return }
+        let capture = captures[currentIndex]
+        guard let fileId = capture.voiceMemoFileId else { return }
+        if isVoiceMemoPlaying {
+            stopVoiceMemoPlayback()
+        } else {
+            playVoiceMemo(fileId: fileId)
+        }
+    }
+
+    private func playVoiceMemo(fileId: String) {
+        let url = DataPersistenceManager.shared.preludeVoiceMemoFileURL(fileId: fileId)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        stopGiftSongPlayback()
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            voiceMemoPlayer = try AVAudioPlayer(contentsOf: url)
+            voiceMemoPlayer?.play()
+            isVoiceMemoPlaying = true
+        } catch {
+            // silent failure — scrapbook remains usable
+        }
+    }
+
+    private func stopVoiceMemoPlayback() {
+        voiceMemoPlayer?.stop()
+        voiceMemoPlayer = nil
+        isVoiceMemoPlaying = false
+    }
+
     private var navigationRow: some View {
         HStack {
             Button {
+                stopVoiceMemoPlayback()
                 withAnimation(.easeInOut(duration: 0.25)) { currentIndex -= 1 }
             } label: {
                 Text("\u{2190} Prev Page")
@@ -163,6 +241,7 @@ struct PreludeGiftBookView: View {
                 .buttonStyle(.plain)
             } else {
                 Button {
+                    stopVoiceMemoPlayback()
                     withAnimation(.easeInOut(duration: 0.25)) { currentIndex += 1 }
                 } label: {
                     Text("Next Page \u{2192}")
@@ -187,18 +266,31 @@ struct PreludeGiftBookView: View {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
-            audioPlayer = try AVAudioPlayer(contentsOf: url)
-            audioPlayer?.numberOfLoops = -1
-            audioPlayer?.play()
-            isPlaying = true
+            giftSongPlayer = try AVAudioPlayer(contentsOf: url)
+            giftSongPlayer?.numberOfLoops = -1
+            giftSongPlayer?.play()
+            isGiftSongPlaying = true
         } catch {
             // silent failure — vinyl won't spin but scrapbook remains usable
         }
     }
 
     private func stopGiftSongPlayback() {
-        audioPlayer?.stop()
-        audioPlayer = nil
-        isPlaying = false
+        giftSongPlayer?.stop()
+        giftSongPlayer = nil
+        isGiftSongPlaying = false
     }
+
+    #if DEBUG
+    private var debugPhotoSourcePicker: some View {
+        Picker("Photo source", selection: $debugPhotoLoadSource) {
+            ForEach(PreludePhotoLoader.PhotoLoadSource.allCases, id: \.rawValue) { source in
+                Text(source.label).tag(source.rawValue)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 280)
+        .accessibilityLabel("Debug photo source")
+    }
+    #endif
 }

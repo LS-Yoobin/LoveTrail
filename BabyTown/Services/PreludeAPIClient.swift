@@ -31,6 +31,15 @@ final class PreludeAPIClient {
         let ok: Bool
     }
 
+    struct ServerCaptureSummary: Decodable {
+        let id: String
+        let photo_path: String?
+    }
+
+    private struct ListCapturesResponse: Decodable {
+        let captures: [ServerCaptureSummary]
+    }
+
     private func requireToken() async throws -> String {
         guard let token = await AuthService.shared.authToken else {
             throw PreludeAPIError.notSignedIn
@@ -43,19 +52,37 @@ final class PreludeAPIClient {
     /// photo/voice attachment hasn't changed since the last sync is left alone.
     private func uploadMediaIfNeeded(_ capture: inout PreludeCapture) async throws {
         let dpm = DataPersistenceManager.shared
+        let tag = "[PreludeAPIClient] capture=\(capture.id) type=\(capture.type.rawValue)"
 
         if capture.remotePhotoPath == nil {
             let localPhotoId: UUID? = capture.type == .note ? capture.notePhotoId : capture.firstPhotoId
-            if let photoId = localPhotoId, let image = dpm.loadPreludePhoto(photoId: photoId) {
-                capture.remotePhotoPath = try await mediaUploader.uploadPhoto(image, filename: "\(photoId.uuidString).jpg")
+            if let photoId = localPhotoId {
+                if let image = dpm.loadPreludePhoto(photoId: photoId) {
+                    print("\(tag) photoId=\(photoId) — loaded local photo, uploading…")
+                    capture.remotePhotoPath = try await mediaUploader.uploadPhoto(image, filename: "\(photoId.uuidString).jpg")
+                    print("\(tag) photoId=\(photoId) — upload succeeded, remotePhotoPath=\(capture.remotePhotoPath ?? "nil")")
+                } else {
+                    print("\(tag) photoId=\(photoId) — SKIPPING upload, local photo file could not be loaded (capture will sync WITHOUT a photo)")
+                }
+            } else {
+                print("\(tag) — no local photoId set, nothing to upload")
             }
+        } else {
+            print("\(tag) — remotePhotoPath already set (\(capture.remotePhotoPath!)), skipping re-upload")
         }
 
-        if capture.remoteVoiceMemoPath == nil,
-           capture.type == .voiceMemo,
-           let fileId = capture.voiceMemoFileId,
-           let audioData = dpm.loadPreludeVoiceMemoData(fileId: fileId) {
-            capture.remoteVoiceMemoPath = try await mediaUploader.uploadVoiceMemo(audioData, filename: fileId)
+        if capture.remoteVoiceMemoPath == nil, capture.type == .voiceMemo {
+            if let fileId = capture.voiceMemoFileId {
+                if let audioData = dpm.loadPreludeVoiceMemoData(fileId: fileId) {
+                    print("\(tag) fileId=\(fileId) — loaded local voice memo, uploading…")
+                    capture.remoteVoiceMemoPath = try await mediaUploader.uploadVoiceMemo(audioData, filename: fileId)
+                    print("\(tag) fileId=\(fileId) — upload succeeded, remoteVoiceMemoPath=\(capture.remoteVoiceMemoPath ?? "nil")")
+                } else {
+                    print("\(tag) fileId=\(fileId) — SKIPPING upload, local voice memo data could not be loaded")
+                }
+            } else {
+                print("\(tag) — no local voiceMemoFileId set, nothing to upload")
+            }
         }
     }
 
@@ -82,12 +109,14 @@ final class PreludeAPIClient {
         var capture = capture
         try await uploadMediaIfNeeded(&capture)
         let token = try await requireToken()
+        print("[PreludeAPIClient] createCapture \(capture.id) — POSTing with remotePhotoPath=\(capture.remotePhotoPath ?? "nil") remoteVoiceMemoPath=\(capture.remoteVoiceMemoPath ?? "nil")")
         let response: CaptureIdResponse = try await client.post(
             path: "prelude/captures",
             body: body(for: capture),
             token: token
         )
         capture.serverId = response.id
+        print("[PreludeAPIClient] createCapture \(capture.id) — server assigned serverId=\(response.id)")
         return capture
     }
 
@@ -100,6 +129,7 @@ final class PreludeAPIClient {
         var capture = capture
         try await uploadMediaIfNeeded(&capture)
         let token = try await requireToken()
+        print("[PreludeAPIClient] updateCapture \(capture.id) serverId=\(serverId) — PATCHing with remotePhotoPath=\(capture.remotePhotoPath ?? "nil") remoteVoiceMemoPath=\(capture.remoteVoiceMemoPath ?? "nil")")
         let _: CaptureIdResponse = try await client.patch(
             path: "prelude/captures/\(serverId)",
             body: body(for: capture),
@@ -133,6 +163,13 @@ final class PreludeAPIClient {
             return true
         }
         return false
+    }
+
+    /// Fetches the signed-in user's captures from the server (used to backfill `remotePhotoPath`).
+    func listOwnCaptureSummaries() async throws -> [ServerCaptureSummary] {
+        let token = try await requireToken()
+        let response: ListCapturesResponse = try await client.get(path: "prelude/captures", token: token)
+        return response.captures
     }
 
     /// Uploads any captures missing a `serverId` or still missing an attached media upload,

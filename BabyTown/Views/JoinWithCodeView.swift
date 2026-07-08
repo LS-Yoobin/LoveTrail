@@ -5,7 +5,10 @@ import SwiftUI
 /// partner's code connect immediately instead of setting up their own space first.
 struct JoinWithCodeView: View {
     var onBack: () -> Void
-    var onJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
+    var onJoined: (_ captures: [PreludeCapture], _ revealerName: String) -> Void
+    /// Called instead of showing an error when the backend says this account
+    /// is already an official couple (local onboarding state was stale).
+    var onAlreadyPaired: () -> Void = {}
 
     @State private var codeInput = ""
     @State private var isLoading = false
@@ -100,8 +103,12 @@ struct JoinWithCodeView: View {
         switch await InviteJoinFlow.join(code: codeInput) {
         case .joined(let captures, let revealerName):
             onJoined(captures, revealerName)
-        case .failure(let message):
-            codeError = message
+        case .failure(let message, let alreadyPaired):
+            if alreadyPaired {
+                onAlreadyPaired()
+            } else {
+                codeError = message
+            }
         }
         isLoading = false
     }

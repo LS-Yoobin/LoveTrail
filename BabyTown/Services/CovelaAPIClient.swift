@@ -6,6 +6,15 @@ struct AppleAuthResponse: Decodable {
     let isNewUser: Bool
 }
 
+struct EmailAuthResponse: Decodable {
+    let token: String
+    let userId: String
+}
+
+struct AccountDeleteResponse: Decodable {
+    let success: Bool
+}
+
 enum CovelaAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -44,6 +53,59 @@ final class CovelaAPIClient {
         return try await request(method: "POST", path: "auth/apple", body: body, token: nil)
     }
 
+    func registerWithEmail(email: String, password: String, displayName: String?) async throws -> EmailAuthResponse {
+        var body: [String: Any] = ["email": email, "password": password]
+        if let displayName, !displayName.isEmpty { body["displayName"] = displayName }
+        return try await request(method: "POST", path: "auth/register", body: body, token: nil)
+    }
+
+    func loginWithEmail(email: String, password: String) async throws -> EmailAuthResponse {
+        let body: [String: Any] = ["email": email, "password": password]
+        return try await request(method: "POST", path: "auth/login", body: body, token: nil)
+    }
+
+    func deleteAccount(token: String? = nil) async throws -> AccountDeleteResponse {
+        try await request(method: "DELETE", path: "account", body: nil, token: token)
+    }
+
+    func signedMediaURL(forPath path: String, token: String? = nil) async throws -> URL {
+        let authToken: String
+        if let token {
+            authToken = token
+        } else if let sessionToken = await AuthService.shared.authToken {
+            authToken = sessionToken
+        } else {
+            throw CovelaAPIError.unauthorized
+        }
+
+        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
+
+        struct SignedURLResponse: Decodable {
+            let result: String
+            let url: String?
+        }
+
+        var components = URLComponents(
+            url: CovelaAPIConfig.baseURL.appendingPathComponent("media/signed-url"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "path", value: trimmed)]
+        guard let requestURL = components?.url else {
+            throw CovelaAPIError.invalidURL
+        }
+
+        let response: SignedURLResponse = try await request(
+            method: "GET",
+            url: requestURL,
+            body: nil,
+            token: authToken
+        )
+        guard response.result == "OK", let urlString = response.url, let url = URL(string: urlString) else {
+            throw CovelaAPIError.invalidResponse
+        }
+        return url
+    }
+
     // MARK: - Generic authenticated methods
 
     func get<T: Decodable>(path: String, token: String? = nil) async throws -> T {
@@ -70,8 +132,16 @@ final class CovelaAPIClient {
         body: [String: Any]?,
         token: String?
     ) async throws -> T {
-        let base = CovelaAPIConfig.baseURL
-        let url = base.appendingPathComponent(path)
+        let url = CovelaAPIConfig.baseURL.appendingPathComponent(path)
+        return try await request(method: method, url: url, body: body, token: token)
+    }
+
+    private func request<T: Decodable>(
+        method: String,
+        url: URL,
+        body: [String: Any]?,
+        token: String?
+    ) async throws -> T {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")

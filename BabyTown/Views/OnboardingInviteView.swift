@@ -3,7 +3,10 @@ import SwiftUI
 struct OnboardingInviteView: View {
     var onBack: () -> Void
     var onSkip: () -> Void
-    var onPartnerJoined: (_ captures: [GiftRevealCapture], _ revealerName: String) -> Void
+    var onPartnerJoined: (_ captures: [PreludeCapture], _ revealerName: String) -> Void
+    /// Called instead of showing an error when the backend says this account
+    /// is already an official couple (local onboarding state was stale).
+    var onAlreadyPaired: () -> Void = {}
 
     private enum InviteState {
         case choosingAction
@@ -378,7 +381,11 @@ struct OnboardingInviteView: View {
             withAnimation { state = .pending(code: response.code) }
             startPolling(code: response.code)
         } catch {
-            choosingActionError = InviteErrorMapper.message(for: error)
+            if InviteErrorMapper.isAlreadyPaired(error) {
+                onAlreadyPaired()
+            } else {
+                choosingActionError = InviteErrorMapper.message(for: error)
+            }
         }
         isLoading = false
     }
@@ -410,8 +417,12 @@ struct OnboardingInviteView: View {
         switch await InviteJoinFlow.join(code: codeInput) {
         case .joined(let captures, let revealerName):
             onPartnerJoined(captures, revealerName)
-        case .failure(let message):
-            codeError = message
+        case .failure(let message, let alreadyPaired):
+            if alreadyPaired {
+                onAlreadyPaired()
+            } else {
+                codeError = message
+            }
         }
         isLoading = false
     }
@@ -437,6 +448,7 @@ struct OnboardingInviteView: View {
             DataPersistenceManager.shared.saveCoupleProfile(profile)
             let revealerName = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
+            DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
             // The inviter's poll never receives gift captures — only the invitee's accept-invite call does.
             onPartnerJoined([], revealerName)
         }

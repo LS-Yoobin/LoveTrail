@@ -113,6 +113,10 @@ struct CoupleProfileView: View {
         dpm.isPartnerAccount()
     }
 
+    private var showsPreludeBook: Bool {
+        dpm.hasAccessiblePreludeContent()
+    }
+
     private var hasUserProfileSticker: Bool {
         profile.stickers.contains { $0.kind == .userAvatar }
     }
@@ -263,6 +267,7 @@ struct CoupleProfileView: View {
                                 isRecordPlayerSelected: isRecordPlayerSelected,
                                 isWatchTogetherTVSelected: isWatchTogetherTVSelected,
                                 isPreludeBookSelected: isPreludeBookSelected,
+                                showsPreludeBook: showsPreludeBook,
                                 onSelect: { id in
                                     selectedStickerID = id
                                     isNoteSelected = false

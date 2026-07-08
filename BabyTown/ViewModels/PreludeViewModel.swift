@@ -20,7 +20,13 @@ final class PreludeViewModel: ObservableObject {
     // MARK: - Load / Save
 
     func load() {
-        captures = dpm.loadPreludeCaptures()
+        var loaded = dpm.loadPreludeCaptures()
+        if dpm.isPartnerAccount() {
+            let ownIds = Set(loaded.map(\.id))
+            let inviterGifts = dpm.loadPartnerGiftCaptures().filter { !ownIds.contains($0.id) }
+            loaded = inviterGifts + loaded
+        }
+        captures = loaded
         sortCapturesForTimeline()
         let profile = dpm.loadCoupleProfile()
         stage = profile.relationshipStage
@@ -93,10 +99,20 @@ final class PreludeViewModel: ObservableObject {
     /// Call right before `create-invite` so `gift_capture_ids` are all valid.
     func syncGiftCapturesForInvite() async throws -> [String] {
         let toSync = giftCaptures
-        guard !toSync.isEmpty else { return [] }
+        print("[PreludeViewModel] syncGiftCapturesForInvite — \(toSync.count) gift capture(s) to check")
+        guard !toSync.isEmpty else {
+            print("[PreludeViewModel] syncGiftCapturesForInvite — no gift captures, nothing to sync")
+            return []
+        }
         defer { invitePrepProgress = nil }
-        let synced = try await PreludeAPIClient.shared.syncAllCaptures(toSync) { [weak self] completed, total in
-            self?.invitePrepProgress = (completed, total)
+        let synced: [PreludeCapture]
+        do {
+            synced = try await PreludeAPIClient.shared.syncAllCaptures(toSync) { [weak self] completed, total in
+                self?.invitePrepProgress = (completed, total)
+            }
+        } catch {
+            print("[PreludeViewModel] syncGiftCapturesForInvite FAILED: \(error)")
+            throw error
         }
         for updated in synced {
             if let idx = captures.firstIndex(where: { $0.id == updated.id }) {
@@ -106,13 +122,22 @@ final class PreludeViewModel: ObservableObject {
             }
         }
         saveCaptures()
+        let missingPhoto = synced.filter { ($0.type == .note || $0.type == .first) && $0.remotePhotoPath == nil && ($0.notePhotoId != nil || $0.firstPhotoId != nil) }
+        if !missingPhoto.isEmpty {
+            print("[PreludeViewModel] syncGiftCapturesForInvite — WARNING: \(missingPhoto.count) capture(s) have a local photo id but no remotePhotoPath after sync: \(missingPhoto.map(\.id))")
+        }
+        print("[PreludeViewModel] syncGiftCapturesForInvite — done, \(synced.compactMap(\.serverId).count)/\(synced.count) have serverId")
         return synced.compactMap(\.serverId)
     }
 
     // MARK: - Backend sync (fire-and-forget)
 
     private func syncCaptureCreateOrUpdate(_ capture: PreludeCapture) {
-        guard AuthService.shared.isSignedIn else { return }
+        guard AuthService.shared.isSignedIn else {
+            print("[PreludeViewModel] capture \(capture.id) NOT synced — user is not signed in")
+            return
+        }
+        print("[PreludeViewModel] capture \(capture.id) type=\(capture.type.rawValue) — starting background sync (hasServerId=\(capture.serverId != nil), firstPhotoId=\(capture.firstPhotoId?.uuidString ?? "nil"), notePhotoId=\(capture.notePhotoId?.uuidString ?? "nil"))")
         Task {
             do {
                 let synced: PreludeCapture
@@ -126,8 +151,9 @@ final class PreludeViewModel: ObservableObject {
                 captures[idx].remotePhotoPath = synced.remotePhotoPath
                 captures[idx].remoteVoiceMemoPath = synced.remoteVoiceMemoPath
                 saveCaptures()
+                print("[PreludeViewModel] capture \(capture.id) — sync OK, serverId=\(synced.serverId ?? "nil") remotePhotoPath=\(synced.remotePhotoPath ?? "nil")")
             } catch {
-                print("[PreludeViewModel] capture sync failed: \(error)")
+                print("[PreludeViewModel] capture \(capture.id) sync FAILED: \(error)")
             }
         }
     }
@@ -174,6 +200,7 @@ final class PreludeViewModel: ObservableObject {
         stage = .officialCouple
         inviteSent = false
         saveStage()
+        dpm.recordPreludeChapterIfNeeded()
     }
 
     func archiveRelationship() {

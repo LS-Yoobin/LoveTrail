@@ -8,15 +8,24 @@ struct SettingsSheet: View {
     @StateObject private var notificationManager = NotificationManager.shared
     @ObservedObject private var store = StoreManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var authService = AuthService.shared
     var onResetApp: () -> Void
     var onReplayStory: () -> Void
     var onVisitPet: () -> Void
     var onOpenCoupleProfile: () -> Void = {}
+    var onOpenPrelude: (() -> Void)? = nil
     var onLogOut: () -> Void = {}
+    var onDeleteAccount: () -> Void = {}
 
     @State private var showResetConfirmation = false
     @State private var showLogOutConfirmation = false
+    @State private var showDeleteAccountConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
     @State private var showAppIconViewer = false
+    #if DEBUG
+    @AppStorage("debugPreludePhotoLoadSource") private var debugPreludePhotoLoadSource = PreludePhotoLoader.PhotoLoadSource.localFirst.rawValue
+    #endif
     @State private var showPlaylistEditor = false
     @State private var showPaywall = false
     
@@ -113,6 +122,25 @@ struct SettingsSheet: View {
                         }
                     }
                     .foregroundStyle(.primary)
+
+                    if let onOpenPrelude {
+                        Button {
+                            dismiss()
+                            onOpenPrelude()
+                        } label: {
+                            HStack {
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 16))
+                                Text("Our Prelude")
+                                    .font(.system(size: 16))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                    }
                 } header: {
                     Text("Pet")
                 }
@@ -195,6 +223,25 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    if authService.isSignedIn {
+                        Button(role: .destructive) {
+                            showDeleteAccountConfirmation = true
+                        } label: {
+                            HStack {
+                                if isDeletingAccount {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "person.crop.circle.badge.minus")
+                                        .font(.system(size: 16))
+                                }
+                                Text("Delete Account")
+                                    .font(.system(size: 16))
+                            }
+                        }
+                        .disabled(isDeletingAccount)
+                    }
+
                     // Temporarily hidden: Replay Our Story
                     Button(role: .destructive) {
                         showResetConfirmation = true
@@ -212,6 +259,12 @@ struct SettingsSheet: View {
 
                 #if DEBUG
                 Section {
+                    Picker("Prelude photo source", selection: $debugPreludePhotoLoadSource) {
+                        ForEach(PreludePhotoLoader.PhotoLoadSource.allCases, id: \.rawValue) { source in
+                            Text(source.label).tag(source.rawValue)
+                        }
+                    }
+
                     Button("Test Watch Together invite") {
                         NotificationManager.shared.handlePartnerEvent(
                             .watchTogetherInvite(
@@ -294,6 +347,29 @@ struct SettingsSheet: View {
             } message: {
                 Text("Your data stays on this device.")
             }
+            .confirmationDialog(
+                "Delete your Covela account?",
+                isPresented: $showDeleteAccountConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    Task { await performDeleteAccount() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account, prelude captures, couple data, and invites from our servers. If you are paired, your partner will return to Prelude. This cannot be undone.")
+            }
+            .alert(
+                "Could Not Delete Account",
+                isPresented: Binding(
+                    get: { deleteAccountError != nil },
+                    set: { if !$0 { deleteAccountError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteAccountError ?? "")
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -301,6 +377,21 @@ struct SettingsSheet: View {
                     await notificationManager.checkPermissionStatus()
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func performDeleteAccount() async {
+        isDeletingAccount = true
+        deleteAccountError = nil
+        defer { isDeletingAccount = false }
+
+        do {
+            try await authService.deleteAccount()
+            dismiss()
+            onDeleteAccount()
+        } catch {
+            deleteAccountError = error.localizedDescription
         }
     }
 }

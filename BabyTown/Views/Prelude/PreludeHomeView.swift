@@ -275,7 +275,9 @@ private struct CaptureRowCard: View {
 
     private var secondaryTextColor: Color { .black }
 
-    @State private var firstPhoto: UIImage?
+    private var hasPhoto: Bool {
+        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    }
 
     private static let lightTrashTint = Color(red: 0.94, green: 0.58, blue: 0.58)
 
@@ -364,13 +366,8 @@ private struct CaptureRowCard: View {
                 }
             }
 
-            if let firstPhoto {
-                Image(uiImage: firstPhoto)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 190)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            if hasPhoto {
+                PreludeCapturePhotoView(capture: capture, height: 190, cornerRadius: 12)
             }
 
             HStack {
@@ -391,11 +388,6 @@ private struct CaptureRowCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(cardBackground)
         )
-        .onAppear {
-            if let photoId = capture.firstPhotoId {
-                firstPhoto = DataPersistenceManager.shared.loadPreludePhoto(photoId: photoId)
-            }
-        }
     }
 }
 

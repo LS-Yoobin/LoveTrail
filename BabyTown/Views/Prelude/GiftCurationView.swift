@@ -227,30 +227,40 @@ struct GiftCaptureRow: View {
     let capture: PreludeCapture
     var onToggle: () -> Void
 
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: capture.typeIcon)
-                .font(.system(size: 14))
-                .foregroundStyle(BabyTownTheme.accent)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(BabyTownTheme.cardBackground))
+    private var hasPhoto: Bool {
+        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(capture.typeLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.accent)
-                    .textCase(.uppercase)
-                Text(capture.displayTitle)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: capture.typeIcon)
                     .font(.system(size: 14))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
-                    .lineLimit(1)
+                    .foregroundStyle(BabyTownTheme.accent)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(BabyTownTheme.cardBackground))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(capture.typeLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.accent)
+                        .textCase(.uppercase)
+                    Text(capture.displayTitle)
+                        .font(.system(size: 14))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: .init(get: { capture.isIncludedInGift }, set: { _ in onToggle() }))
+                    .tint(BabyTownTheme.accent)
+                    .labelsHidden()
             }
 
-            Spacer()
-
-            Toggle("", isOn: .init(get: { capture.isIncludedInGift }, set: { _ in onToggle() }))
-                .tint(BabyTownTheme.accent)
-                .labelsHidden()
+            if hasPhoto {
+                PreludeCapturePhotoView(capture: capture, height: 150, cornerRadius: 10)
+            }
         }
         .padding(12)
         .background(
@@ -306,22 +316,50 @@ struct GiftCardView: View {
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
 
+    private var hasPhoto: Bool {
+        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: isPlaying ? "waveform" : capture.typeIcon)
-                .font(.system(size: 36))
-                .foregroundStyle(BabyTownTheme.accent)
-                .symbolEffect(.variableColor.iterative, isActive: isPlaying)
+            if hasPhoto {
+                PreludeCapturePhotoView(capture: capture, height: 200, cornerRadius: 16)
+            } else {
+                Image(systemName: isPlaying ? "waveform" : capture.typeIcon)
+                    .font(.system(size: 36))
+                    .foregroundStyle(BabyTownTheme.accent)
+                    .symbolEffect(.variableColor.iterative, isActive: isPlaying)
+            }
 
             Text(capture.typeLabel)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(BabyTownTheme.accent)
                 .textCase(.uppercase)
 
-            Text(capture.displayTitle)
-                .font(.system(size: 20, weight: .semibold, design: .serif))
-                .foregroundStyle(BabyTownTheme.textPrimary)
-                .multilineTextAlignment(.center)
+            if capture.type != .voiceMemo || capture.voiceMemoFileId == nil {
+                Text(capture.displayTitle)
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if capture.type == .voiceMemo, capture.voiceMemoFileId != nil {
+                Button(action: toggleVoiceMemoPlayback) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        Text(isPlaying ? "Playing…" : "Play voice memo")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.accent)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(BabyTownTheme.accent.opacity(0.12))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
 
             Text(capture.createdAt, style: .date)
                 .font(.system(size: 13))
@@ -338,6 +376,14 @@ struct GiftCardView: View {
         .onDisappear { stopVoiceMemo() }
         .onChange(of: isCurrentPage) { _, isCurrent in
             if isCurrent { playVoiceMemoIfNeeded() } else { stopVoiceMemo() }
+        }
+    }
+
+    private func toggleVoiceMemoPlayback() {
+        if isPlaying {
+            stopVoiceMemo()
+        } else {
+            playVoiceMemoIfNeeded()
         }
     }
 

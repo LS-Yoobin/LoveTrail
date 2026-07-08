@@ -22,7 +22,7 @@ struct ContentView: View {
         case partnerOnboarding(inviterName: String)
         case invitePartner
         case officialPending
-        case partnerGiftReveal(captures: [GiftRevealCapture], revealerName: String)
+        case partnerGiftReveal(captures: [PreludeCapture], revealerName: String)
         case justPickPhotos
     }
 
@@ -56,6 +56,25 @@ struct ContentView: View {
         }
     }
 
+    /// Routes straight to Home when the backend says this account is already
+    /// an official couple, even though local onboarding state didn't know it
+    /// (e.g. reinstall, or a prior test run that never signed out). Skips the
+    /// invite/join screens entirely rather than leaving the user stuck on a
+    /// "you're already paired" error with no way to proceed.
+    private func resolveAlreadyPaired(partnerName: String? = nil) {
+        if let partnerName, !partnerName.isEmpty {
+            DataPersistenceManager.shared.saveInviterName(partnerName)
+        }
+        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+        profile.relationshipStage = .officialCouple
+        DataPersistenceManager.shared.saveCoupleProfile(profile)
+        DataPersistenceManager.shared.clearPendingInviteState()
+        DataPersistenceManager.shared.setOnboardingCompleted(true)
+        withAnimation(.easeInOut(duration: 0.4)) {
+            screen = .home
+        }
+    }
+
     private func syncBackgroundMusic(for screen: Screen) {
         let shouldPlay: Bool
         switch screen {
@@ -67,6 +86,88 @@ struct ContentView: View {
         AudioManager.shared.setGardenActive(shouldPlay)
     }
 
+    /// Resolves the main app screen for a user who has already finished onboarding locally.
+    private static func completedOnboardingScreen() -> Screen {
+        let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
+        let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
+        if lastScreen == "officialPending" || DataPersistenceManager.shared.hasPendingPartnerInvite() {
+            return .officialPending
+        }
+        if lastScreen == "selectPhotos" {
+            return .selectPhotos
+        }
+        if stage == .prelude {
+            return .prelude
+        }
+        if stage == .archivedCouple {
+            return .archivedCouple
+        }
+        return .home
+    }
+
+    private func applyServerRelationshipStage(_ stage: RelationshipStage, inviteSent: Bool) {
+        var profile = DataPersistenceManager.shared.loadCoupleProfile()
+        profile.relationshipStage = stage
+        profile.inviteSent = inviteSent
+        DataPersistenceManager.shared.saveCoupleProfile(profile)
+    }
+
+    private func screenForServerRelationshipStage(_ stage: RelationshipStage) -> Screen {
+        switch stage {
+        case .prelude:
+            return .prelude
+        case .officialCouple:
+            return .home
+        case .archivedCouple:
+            return .archivedCouple
+        }
+    }
+
+    /// After sign-in, skip onboarding when local state or the backend says this account
+    /// already has a home in Covela.
+    private func routeAfterAuthentication() {
+        Task {
+            if DataPersistenceManager.shared.hasCompletedOnboarding() {
+                let destination = Self.completedOnboardingScreen()
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = destination
+                    }
+                    syncBackgroundMusic(for: destination)
+                }
+                return
+            }
+
+            if let status = try? await InviteAPI.client.checkPairingStatus() {
+                if status.paired {
+                    await MainActor.run {
+                        resolveAlreadyPaired(partnerName: status.partnerName)
+                    }
+                    return
+                }
+
+                if let stage = status.relationshipStage, stage != .officialCouple {
+                    await MainActor.run {
+                        applyServerRelationshipStage(stage, inviteSent: status.inviteSent)
+                        DataPersistenceManager.shared.setOnboardingCompleted(true)
+                        let destination = screenForServerRelationshipStage(stage)
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = destination
+                        }
+                        syncBackgroundMusic(for: destination)
+                    }
+                    return
+                }
+            }
+
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    screen = .welcome
+                }
+            }
+        }
+    }
+
     init() {
         let hasCompletedOnboarding = DataPersistenceManager.shared.hasCompletedOnboarding()
         
@@ -74,19 +175,7 @@ struct ContentView: View {
         _screen = State(initialValue: .launch)
         
         if hasCompletedOnboarding {
-            let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
-            let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
-            if lastScreen == "officialPending" || DataPersistenceManager.shared.hasPendingPartnerInvite() {
-                _targetScreen = State(initialValue: .officialPending)
-            } else if lastScreen == "selectPhotos" {
-                _targetScreen = State(initialValue: .selectPhotos)
-            } else if stage == .prelude {
-                _targetScreen = State(initialValue: .prelude)
-            } else if stage == .archivedCouple {
-                _targetScreen = State(initialValue: .archivedCouple)
-            } else {
-                _targetScreen = State(initialValue: .home)
-            }
+            _targetScreen = State(initialValue: Self.completedOnboardingScreen())
             
             _homeViewModel = StateObject(wrappedValue: HomeViewModel(
                 pinnedFirstMet: nil,
@@ -120,11 +209,7 @@ struct ContentView: View {
                     }
             
             case .auth:
-                CovelaAuthView(onAuthenticated: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        screen = .welcome
-                    }
-                })
+                CovelaAuthView(onAuthenticated: routeAfterAuthentication)
                 .transition(.opacity)
 
             case .welcome:
@@ -221,6 +306,13 @@ struct ContentView: View {
                     }
                 )
                 .transition(.opacity)
+                .task {
+                    // Local onboarding state can diverge from the backend (reinstall,
+                    // stale test account) — confirm we're not already paired before
+                    // walking the user through invite/join screens that would dead-end.
+                    guard let status = try? await InviteAPI.client.checkPairingStatus(), status.paired else { return }
+                    resolveAlreadyPaired(partnerName: status.partnerName)
+                }
 
             case .joinWithCode:
                 JoinWithCodeView(
@@ -237,7 +329,8 @@ struct ContentView: View {
                                 screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
                             }
                         }
-                    }
+                    },
+                    onAlreadyPaired: { resolveAlreadyPaired() }
                 )
                 .transition(.opacity)
 
@@ -376,6 +469,12 @@ struct ContentView: View {
                             screen = .auth
                         }
                     },
+                    onDeleteAccount: {
+                        resetAppToWelcome()
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .auth
+                        }
+                    },
                     selectedPrompt: $selectedPrompt
                 )
                 .transition(.identity)
@@ -503,7 +602,8 @@ struct ContentView: View {
                                 screen = .partnerGiftReveal(captures: captures, revealerName: revealerName)
                             }
                         }
-                    }
+                    },
+                    onAlreadyPaired: { resolveAlreadyPaired() }
                 )
                 .transition(.opacity)
 
@@ -521,6 +621,12 @@ struct ContentView: View {
                     onResetApp: resetAppToWelcome,
                     onLogOut: {
                         AuthService.shared.signOut()
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            screen = .auth
+                        }
+                    },
+                    onDeleteAccount: {
+                        resetAppToWelcome()
                         withAnimation(.easeInOut(duration: 0.4)) {
                             screen = .auth
                         }
