@@ -88,14 +88,15 @@ struct OnboardingInviteView: View {
         VStack(spacing: 24) {
             VStack(spacing: 8) {
                 Text("Connect with your partner")
-                    .font(.system(size: 30, weight: .bold, design: .serif))
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
 
                 Text("Choose how you want to get started.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                     .multilineTextAlignment(.center)
+                    .lineSpacing(3)
             }
 
             VStack(spacing: 14) {
@@ -142,14 +143,15 @@ struct OnboardingInviteView: View {
         VStack(spacing: 24) {
             VStack(spacing: 8) {
                 Text("Where should we send the invite?")
-                    .font(.system(size: 30, weight: .bold, design: .serif))
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
 
                 Text("Your partner will get an email with your code and a link to download Covela.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                     .multilineTextAlignment(.center)
+                    .lineSpacing(3)
             }
 
             VStack(spacing: 8) {
@@ -223,13 +225,14 @@ struct OnboardingInviteView: View {
 
             VStack(spacing: 10) {
                 Text("Your invite code is ready")
-                    .font(.system(size: 32, weight: .bold, design: .serif))
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
 
                 Text("Share this code with your partner however you like. We will let you know the moment they join.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                     .multilineTextAlignment(.center)
+                    .lineSpacing(3)
             }
 
             Text(code)
@@ -299,18 +302,24 @@ struct OnboardingInviteView: View {
         VStack(spacing: 24) {
             VStack(spacing: 8) {
                 Text("Enter your code")
-                    .font(.system(size: 30, weight: .bold, design: .serif))
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(BabyTownTheme.accentDeep)
+                    .foregroundStyle(BabyTownTheme.textPrimary)
 
                 Text("Enter the 6 character code from the invite email.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                     .multilineTextAlignment(.center)
+                    .lineSpacing(3)
             }
 
             VStack(spacing: 8) {
-                TextField("Enter your 6 character code", text: $codeInput)
+                TextField(
+                    "",
+                    text: $codeInput,
+                    prompt: Text("Enter your 6 character code")
+                        .foregroundStyle(BabyTownTheme.textSecondary)
+                )
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
                     .font(.system(size: 22, weight: .semibold, design: .monospaced))
@@ -345,7 +354,7 @@ struct OnboardingInviteView: View {
                             .tint(.white)
                     } else {
                         Text("Join")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white)
                     }
                 }
@@ -489,12 +498,13 @@ private struct InviteActionCard: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.accentDeep)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                     Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.68))
                         .multilineTextAlignment(.leading)
+                        .lineSpacing(2)
                 }
 
                 Spacer()

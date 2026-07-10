@@ -44,7 +44,7 @@ struct FirstMemoriesView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+            colors: [.white, BabyTownTheme.blushSoft, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -54,14 +54,19 @@ struct FirstMemoriesView: View {
     // MARK: - Title
 
     private var titleSection: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
+            Text("05  FIRST MEMORIES")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(BabyTownTheme.accentDeep)
+
             Text("Your First Memories")
-                .font(.system(size: 26, weight: .light, design: .serif))
-                .foregroundStyle(.black)
+                .font(.system(size: 31, weight: .semibold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
 
             Text("Choose the photos that mean the most")
-                .font(.system(size: 14))
-                .foregroundStyle(.black)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
         }
         .padding(.top, 28)
         .padding(.bottom, 20)
@@ -123,7 +128,7 @@ struct FirstMemoriesView: View {
             onFinished(viewModel.firstMetImage, official, viewModel.firstMetDate, viewModel.officialDate)
         } label: {
             Text("Done")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)

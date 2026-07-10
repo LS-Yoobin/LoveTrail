@@ -26,13 +26,15 @@ struct NicknameView: View {
 
                 VStack(spacing: 14) {
                     Text("What should we call you?")
-                        .font(.system(size: 26, weight: .light, design: .serif))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                         .multilineTextAlignment(.center)
 
                     Text("So we know how to address you")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 32)
@@ -89,7 +91,7 @@ struct NicknameView: View {
     private var continueButton: some View {
         Button(action: continueTapped) {
             Text("Continue")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)

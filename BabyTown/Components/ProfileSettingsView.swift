@@ -9,6 +9,9 @@ struct ProfileSettingsView: View {
 
     private let dpm = DataPersistenceManager.shared
     private static let maxUsernameLength = 24
+    private static let primaryText = Color.black
+    private static let secondaryText = Color.black.opacity(0.68)
+    private static let tertiaryText = Color.black.opacity(0.45)
 
     private enum ProfileField: Hashable {
         case email, username
@@ -93,11 +96,11 @@ struct ProfileSettingsView: View {
             VStack(spacing: 6) {
                 Text(trimmedUsername.isEmpty ? "Your Profile" : trimmedUsername)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(Self.primaryText)
 
                 Text("Changes save automatically when you leave this page.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(Self.secondaryText)
                     .multilineTextAlignment(.center)
             }
         }
@@ -152,7 +155,7 @@ struct ProfileSettingsView: View {
             if !trimmedUsername.isEmpty {
                 Text("\(username.count)/\(Self.maxUsernameLength)")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textTertiary)
+                    .foregroundStyle(Self.tertiaryText)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -165,7 +168,7 @@ struct ProfileSettingsView: View {
                     Text("Enter a valid email address.")
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(BabyTownTheme.accentDeep)
+                .foregroundStyle(Self.primaryText)
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
@@ -198,7 +201,7 @@ struct ProfileSettingsView: View {
 
             Text("Your profile details stay on this device and help personalize your Covela experience.")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(BabyTownTheme.textSecondary)
+                .foregroundStyle(Self.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 4)
@@ -224,11 +227,11 @@ struct ProfileSettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.textSecondary)
+                    .foregroundStyle(Self.secondaryText)
 
                 content()
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .foregroundStyle(Self.primaryText)
             }
 
             Spacer(minLength: 0)

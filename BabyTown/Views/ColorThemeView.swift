@@ -13,7 +13,6 @@ struct ColorThemeView: View {
     var body: some View {
         ZStack {
             background
-            ambientOrbs
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -52,16 +51,22 @@ struct ColorThemeView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 14) {
-            Text("Choose your palette")
-                .font(.system(size: 26, weight: .light, design: .serif))
-                .foregroundStyle(.black)
+        VStack(spacing: 12) {
+            Text("03  COLOR THEME")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(selected.accentDeep)
+
+            Text("Choose your Covela palette")
+                .font(.system(size: 31, weight: .semibold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
                 .multilineTextAlignment(.center)
 
-            Text("Sets the mood for memories, buttons, and every little detail. You can switch anytime in Settings.")
-                .font(.system(size: 15))
-                .foregroundStyle(.black)
+            Text("This sets the color language for your shared space. You can switch anytime in Settings.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -70,10 +75,10 @@ struct ColorThemeView: View {
 
     private var livePreview: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("PREVIEW")
-                .font(.system(size: 11, weight: .semibold))
+            Text("LIVE PREVIEW")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.2)
-                .foregroundStyle(.black)
+                .foregroundStyle(selected.accentDeep)
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -91,6 +96,12 @@ struct ColorThemeView: View {
                     .shadow(color: selected.accent.opacity(0.14), radius: 20, y: 10)
 
                 VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        previewPill(icon: "photo.on.rectangle.angled", title: "Select")
+                        previewPill(icon: "camera.viewfinder", title: "Scan")
+                        previewPill(icon: "calendar.badge.plus", title: "Planner")
+                    }
+
                     previewSearchBar
 
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -104,11 +115,14 @@ struct ColorThemeView: View {
                         .frame(height: 72)
                         .overlay(alignment: .leading) {
                             VStack(alignment: .leading, spacing: 6) {
+                                Text("Our Garden")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(selected.accent.opacity(0.35))
-                                    .frame(width: 88, height: 8)
+                                    .fill(Color.white.opacity(0.72))
+                                    .frame(width: 88, height: 7)
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(.systemGray4))
+                                    .fill(Color.white.opacity(0.45))
                                     .frame(width: 120, height: 6)
                             }
                             .padding(.leading, 14)
@@ -138,6 +152,21 @@ struct ColorThemeView: View {
             .frame(height: 188)
             .animation(.easeInOut(duration: 0.35), value: selected)
         }
+    }
+
+    private func previewPill(icon: String, title: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(title)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .background(selected.buttonGradient, in: Capsule())
+        .shadow(color: selected.accent.opacity(0.18), radius: 5, y: 2)
     }
 
     private var previewSearchBar: some View {
@@ -182,11 +211,11 @@ struct ColorThemeView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(theme.displayName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                     Text(theme.tagline)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textSecondary)
                         .multilineTextAlignment(.leading)
                 }
 
@@ -277,31 +306,29 @@ struct ColorThemeView: View {
     // MARK: - Chrome
 
     private var background: some View {
-        LinearGradient(
-            colors: [.white, selected.accent.opacity(0.07)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.4), value: selected)
-    }
-
-    private var ambientOrbs: some View {
         ZStack {
-            Circle()
-                .fill(selected.accent.opacity(0.12))
-                .frame(width: 220, height: 220)
-                .blur(radius: 60)
-                .offset(x: -120, y: -280)
+            LinearGradient(
+                colors: [.white, selected.blushSoft, selected.accent.opacity(0.07)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-            Circle()
-                .fill(selected.accentDeep.opacity(0.08))
-                .frame(width: 180, height: 180)
-                .blur(radius: 50)
-                .offset(x: 140, y: 120)
+            VStack {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.70, blue: 0.22).opacity(0.8))
+                    Spacer()
+                }
+                .padding(.top, 88)
+                .padding(.leading, 56)
+
+                Spacer()
+            }
         }
+        .ignoresSafeArea()
         .allowsHitTesting(false)
-        .animation(.easeInOut(duration: 0.5), value: selected)
+        .animation(.easeInOut(duration: 0.4), value: selected)
     }
 
     private var continueButton: some View {
@@ -310,7 +337,7 @@ struct ColorThemeView: View {
             onContinue(selected)
         } label: {
             Text("Continue")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)

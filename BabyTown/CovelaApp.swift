@@ -1,6 +1,6 @@
 //
-//  BabyTownApp.swift
-//  BabyTown
+//  CovelaApp.swift
+//  Covela
 //
 //  Created by Justin Seo on 2/12/26.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct BabyTownApp: App {
+struct CovelaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {

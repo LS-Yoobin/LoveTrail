@@ -50,7 +50,7 @@ struct PhotoAccessView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+            colors: [.white, BabyTownTheme.blushSoft, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -88,15 +88,20 @@ struct PhotoAccessView: View {
 
     private var titleSection: some View {
         VStack(spacing: 10) {
+            Text("06  MOMENTS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(BabyTownTheme.accentDeep)
+
             Text("Save your\nmoments")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(.black)
+                .font(.system(size: 31, weight: .semibold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
 
             Text("Fill your timeline with memories you've\nalready made—or capture new ones together.")
-                .font(.system(size: 15))
-                .foregroundStyle(.black.opacity(0.6))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
         }
@@ -133,7 +138,7 @@ struct PhotoAccessView: View {
                         .tint(.white)
                 } else {
                     Text("Continue")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
                 }
             }
@@ -206,12 +211,12 @@ private struct AccessLevelCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.black)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary)
 
                 Text(description)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.black.opacity(0.6))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.64))
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
             }

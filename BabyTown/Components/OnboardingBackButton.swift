@@ -6,8 +6,8 @@ struct OnboardingBackButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text("<")
-                .font(.system(size: 28, weight: .light))
+            Image(systemName: "arrow.left")
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.black)
                 .frame(width: 44, height: 44, alignment: .leading)
                 .contentShape(Rectangle())

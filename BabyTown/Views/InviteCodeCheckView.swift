@@ -22,14 +22,15 @@ struct InviteCodeCheckView: View {
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
                     Text("Did your partner send you a code?")
-                        .font(.system(size: 26, weight: .light, design: .serif))
-                        .foregroundStyle(BabyTownTheme.accentDeep)
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                         .multilineTextAlignment(.center)
 
                     Text("If they already started your shared space, connect right away.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(BabyTownTheme.accent)
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                         .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 80)

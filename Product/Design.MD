@@ -117,7 +117,7 @@ All type is set with `.system(size:weight:)`. No custom fonts are imported.
 | Settings list row | 16 | `.regular` | SettingsSheet list items |
 | CTA button | 18 | `.semibold` | PrimaryCTAButton |
 | Navigation title | system default | `.semibold` (toolbar Done) | NavigationStack title is `.inline` |
-| Onboarding back | 28 | `.light` | OnboardingBackButton `"<"` |
+| Onboarding back | 22 | `.bold` | OnboardingBackButton `arrow.left` |
 
 **Rules:**
 - Use `.lineLimit(1)` or `.lineLimit(2)` on cards to prevent layout blowout.

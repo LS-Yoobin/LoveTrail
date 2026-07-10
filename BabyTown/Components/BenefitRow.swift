@@ -9,8 +9,8 @@ struct BenefitRow: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundStyle(BabyTownTheme.accent)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(BabyTownTheme.accentIconGradient)
                 .frame(width: 40, height: 40)
                 .background(
                     Circle()
@@ -18,8 +18,8 @@ struct BenefitRow: View {
                 )
 
             Text(title)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color(.darkGray))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
 
             Spacer()
         }

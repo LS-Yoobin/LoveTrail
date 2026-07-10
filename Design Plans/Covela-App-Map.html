@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Covela — the whole map</title>
+<style>
+  :root {
+    --paper: #FBF7F5;
+    --card: #FFFFFF;
+    --ink: #241C26;
+    --muted: #6E5F6E;
+    --hairline: #E9DEE3;
+    --rose: #E24A6E;
+    --rose-deep: #C22F53;
+    --rose-soft: rgba(226, 74, 110, 0.10);
+    --blue: #387AF5;
+    --blue-deep: #2457C7;
+    --blue-soft: rgba(56, 122, 245, 0.10);
+    --slate: #64748B;
+    --slate-soft: rgba(100, 116, 139, 0.12);
+    --code: #C9912E;
+    --code-soft: rgba(201, 145, 46, 0.14);
+    --shadow: 0 1px 2px rgba(36, 28, 38, 0.05), 0 8px 24px rgba(36, 28, 38, 0.06);
+    --serif: "Charter", "Iowan Old Style", "Palatino", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14121F;
+      --card: #1E1A2C;
+      --ink: #F2ECF2;
+      --muted: #A398AE;
+      --hairline: #2F2941;
+      --rose: #F06588;
+      --rose-deep: #F58BA6;
+      --rose-soft: rgba(240, 101, 136, 0.14);
+      --blue: #5B93FF;
+      --blue-deep: #86AEFF;
+      --blue-soft: rgba(91, 147, 255, 0.14);
+      --slate: #8FA0B8;
+      --slate-soft: rgba(143, 160, 184, 0.14);
+      --code: #EFB63F;
+      --code-soft: rgba(239, 182, 63, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FBF7F5; --card: #FFFFFF; --ink: #241C26; --muted: #6E5F6E;
+    --hairline: #E9DEE3; --rose: #E24A6E; --rose-deep: #C22F53;
+    --rose-soft: rgba(226, 74, 110, 0.10); --blue: #387AF5; --blue-deep: #2457C7;
+    --blue-soft: rgba(56, 122, 245, 0.10); --slate: #64748B;
+    --slate-soft: rgba(100, 116, 139, 0.12); --code: #C9912E;
+    --code-soft: rgba(201, 145, 46, 0.14);
+    --shadow: 0 1px 2px rgba(36, 28, 38, 0.05), 0 8px 24px rgba(36, 28, 38, 0.06);
+  }
+  :root[data-theme="dark"] {
+    --paper: #14121F; --card: #1E1A2C; --ink: #F2ECF2; --muted: #A398AE;
+    --hairline: #2F2941; --rose: #F06588; --rose-deep: #F58BA6;
+    --rose-soft: rgba(240, 101, 136, 0.14); --blue: #5B93FF; --blue-deep: #86AEFF;
+    --blue-soft: rgba(91, 147, 255, 0.14); --slate: #8FA0B8;
+    --slate-soft: rgba(143, 160, 184, 0.14); --code: #EFB63F;
+    --code-soft: rgba(239, 182, 63, 0.14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  /* ---------- typography ---------- */
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(36px, 6vw, 52px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
+    margin: 8px 0 14px;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(24px, 3.6vw, 31px);
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .eyebrow b { color: var(--rose); font-weight: 700; }
+  .eyebrow.blue b { color: var(--blue); }
+  .eyebrow.slate b { color: var(--slate); }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  section { margin-top: 88px; }
+  .sec-head { margin-bottom: 30px; }
+  code, .file {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    background: var(--hairline);
+    padding: 1px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+
+  /* ---------- hero ---------- */
+  .hero-rule {
+    height: 6px; border-radius: 3px; margin: 34px 0 0;
+    background: linear-gradient(90deg, var(--rose) 0 38%, var(--code) 38% 44%, var(--blue) 44% 100%);
+  }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px 22px;
+    margin-top: 22px; padding-top: 18px;
+    font-size: 13px; color: var(--muted);
+  }
+  .legend .key { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 22px; height: 5px; border-radius: 3px; flex: none; }
+  .swatch.dashed { background: repeating-linear-gradient(90deg, var(--muted) 0 4px, transparent 4px 8px); height: 3px; }
+  .diamond { width: 9px; height: 9px; background: var(--code); transform: rotate(45deg); border-radius: 2px; flex: none; }
+  .star { color: var(--rose); font-size: 15px; line-height: 1; flex: none; }
+
+  /* ---------- map (SVG) ---------- */
+  .mapcard {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  .mapcard svg { display: block; min-width: 820px; width: 100%; height: auto; }
+  .rail { fill: none; stroke-linecap: round; }
+  .rail.rose { stroke: var(--rose); stroke-width: 5; }
+  .rail.blue { stroke: var(--blue); stroke-width: 5; }
+  .rail.thin { stroke-width: 3.5; }
+  .rail.waiting { stroke-dasharray: 2 9; }
+  .rail.spur { stroke-dasharray: 2 8; stroke-width: 3.5; }
+  .stn { fill: var(--card); stroke-width: 3.5; }
+  .stn.rose { stroke: var(--rose); }
+  .stn.blue { stroke: var(--blue); }
+  .stn.both { stroke: var(--ink); stroke-width: 3; }
+  .svglbl { font-family: var(--sans); font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+  .svgsub { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+  .svgnote { font-family: var(--sans); font-size: 11px; font-style: italic; fill: var(--muted); }
+  .svgcode { fill: var(--code); }
+  .svgstar { fill: var(--rose); font-size: 13px; }
+  .cove-label { font-family: var(--serif); font-size: 17px; font-weight: 700; fill: var(--ink); letter-spacing: 0.04em; }
+  .pulse-ring { fill: none; stroke: var(--rose); opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse-ring { animation: pulse 3.2s ease-out infinite; }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.55; }
+      70% { transform: scale(1.9); opacity: 0; }
+      100% { opacity: 0; }
+    }
+  }
+  .pulse-ring { transform-origin: 470px 885px; transform-box: view-box; }
+
+  /* ---------- pairing sequence ---------- */
+  .seq { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 18px;
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-left: 4px solid var(--hairline);
+    border-radius: 14px;
+    padding: 18px 22px;
+    box-shadow: var(--shadow);
+  }
+  .step.rose { border-left-color: var(--rose); }
+  .step.blue { border-left-color: var(--blue); }
+  .step.gold { border-left-color: var(--code); }
+  .step.both { border-left-color: transparent;
+    border-image: linear-gradient(180deg, var(--rose), var(--blue)) 1;
+    border-left-width: 4px; border-left-style: solid; }
+  .stepnum {
+    font-family: var(--serif); font-size: 30px; font-weight: 700;
+    color: var(--hairline); line-height: 1;
+    font-variant-numeric: tabular-nums; padding-top: 2px;
+  }
+  .step.rose .stepnum { color: var(--rose); opacity: 0.45; }
+  .step.blue .stepnum { color: var(--blue); opacity: 0.45; }
+  .step.gold .stepnum { color: var(--code); opacity: 0.55; }
+  .step h3 { margin: 0 0 3px; font-size: 16px; font-weight: 650; }
+  .step p { margin: 0; font-size: 14px; color: var(--muted); max-width: 60ch; }
+  .actor {
+    display: inline-block; font-family: var(--mono); font-size: 10px;
+    font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 20px; margin-bottom: 8px;
+  }
+  .actor.rose { background: var(--rose-soft); color: var(--rose); }
+  .actor.blue { background: var(--blue-soft); color: var(--blue); }
+  .actor.gold { background: var(--code-soft); color: var(--code); }
+  .step .file { margin-top: 8px; display: inline-block; }
+
+  /* ---------- the cove hub ---------- */
+  .cove-banner {
+    background: linear-gradient(120deg, var(--rose-soft), var(--blue-soft));
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    padding: 26px 30px;
+    margin-bottom: 14px;
+  }
+  .cove-banner h3 { font-family: var(--serif); font-size: 24px; margin: 0 0 4px; }
+  .cove-banner p { margin: 0; font-size: 14px; color: var(--muted); max-width: 66ch; }
+  .hub {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+    gap: 14px;
+  }
+  .tile {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    box-shadow: var(--shadow);
+    transition: transform 0.18s ease, border-color 0.18s ease;
+    position: relative;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tile:hover { transform: translateY(-3px); border-color: var(--rose); }
+  }
+  .tile h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 650; }
+  .tile p { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+  .tile .file { font-size: 10.5px; }
+  .tile .badge {
+    position: absolute; top: 14px; right: 14px;
+    color: var(--rose); font-size: 15px;
+  }
+  .tile.starred { border-color: var(--rose); background: linear-gradient(160deg, var(--card) 55%, var(--rose-soft)); }
+
+  /* ---------- breakup fork ---------- */
+  .flowline { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; row-gap: 18px; }
+  .fstep {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    flex: 1 1 190px;
+    min-width: 185px;
+  }
+  .fstep h3 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
+  .fstep p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .fstep .file { font-size: 10.5px; }
+  .farrow {
+    flex: 0 0 34px; align-self: center; text-align: center;
+    color: var(--slate); font-size: 19px; line-height: 1;
+  }
+  .fork { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+  .fork .fstep { border-top: 3px solid var(--slate); }
+  .fork .fstep.rejoin { border-top-color: var(--rose); }
+  .fork .fstep.solo { border-top-color: var(--blue); }
+  .exit-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--slate);
+    display: block; margin-bottom: 6px;
+  }
+  @media (max-width: 620px) {
+    .fork { grid-template-columns: 1fr; }
+    .farrow { flex-basis: 100%; transform: rotate(90deg); padding: 2px 0; }
+  }
+
+  /* ---------- architecture ---------- */
+  .layers { display: flex; flex-direction: column; gap: 0; }
+  .layer {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 16px 22px;
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 20px;
+    align-items: baseline;
+    box-shadow: var(--shadow);
+  }
+  .layer + .connector {
+    width: 2px; height: 22px; margin-left: 74px;
+    background: repeating-linear-gradient(180deg, var(--muted) 0 4px, transparent 4px 8px);
+  }
+  .layer .lname { font-family: var(--serif); font-size: 18px; font-weight: 700; }
+  .layer .lrule { font-size: 13.5px; color: var(--muted); margin: 0; }
+  .layer .lrule strong { color: var(--ink); font-weight: 600; }
+  .layer .lfiles { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+  @media (max-width: 560px) { .layer { grid-template-columns: 1fr; gap: 6px; } }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px; }
+  @media (max-width: 680px) { .duo { grid-template-columns: 1fr; } }
+  .store {
+    background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .store h3 { margin: 0 0 6px; font-size: 16px; font-weight: 650; }
+  .store h3::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 9px; }
+  .store.local h3::before { background: var(--rose); }
+  .store.cloud h3::before { background: var(--blue); }
+  .store p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); }
+  .store .lfiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .engines { margin-top: 14px; }
+  .engines .store h3::before { background: var(--code); }
+
+  /* ---------- footer ---------- */
+  footer { margin-top: 96px; border-top: 1px solid var(--hairline); padding-top: 30px; }
+  .dirmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px 22px; margin: 20px 0 28px; }
+  .dirmap div { font-size: 13px; color: var(--muted); }
+  .dirmap .file { font-size: 11px; }
+  .closing { font-family: var(--serif); font-style: italic; color: var(--muted); font-size: 15px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ================= HERO ================= -->
+  <header>
+    <p class="eyebrow">Covela · app map for the design team · Jul 2026</p>
+    <h1>Two lines, one map.</h1>
+    <p class="lede">
+      Everything in Covela is the story of two people on two phones. The <strong>rose line</strong> is the person
+      who starts the space; the <strong>blue line</strong> is the one who joins. They ride alone through onboarding,
+      meet at the pairing moment, and travel together through the Cove. The two colors aren&rsquo;t decoration:
+      they are the app&rsquo;s two real themes, Pink and Blue, and every screen you design must work on both lines.
+    </p>
+    <div class="hero-rule"></div>
+    <div class="legend">
+      <span class="key"><span class="swatch" style="background:var(--rose)"></span>starts the space</span>
+      <span class="key"><span class="swatch" style="background:var(--blue)"></span>joins with a code</span>
+      <span class="key"><span class="swatch dashed"></span>waiting, or off-app</span>
+      <span class="key"><span class="diamond"></span>invite code crosses phones</span>
+      <span class="key"><span class="star">&#9733;</span>scrapbook territory — your brief</span>
+    </div>
+  </header>
+
+  <!-- ================= ACT I ================= -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow"><b>Act I</b> · Beginnings</p>
+      <h2>Every rider boards the same train</h2>
+      <p class="lede">
+        One shared onboarding spine, then a single question — <em>got an invite code?</em> — splits the map into
+        three routes. Hover any station for its Swift file.
+      </p>
+    </div>
+
+    <div class="mapcard">
+    <svg viewBox="0 0 940 990" role="img" aria-label="Metro-style map of Covela onboarding: a shared spine that splits into Prelude, Official, and Join-with-code routes, all converging on the Cove">
+
+      <!-- spine: two parallel rails, both riders pass here -->
+      <path class="rail rose thin" d="M466,42 L466,416" />
+      <path class="rail blue thin" d="M474,42 L474,416" />
+
+      <!-- rose route: no code -->
+      <path class="rail rose" d="M466,416 C466,468 250,458 250,503" />
+      <path class="rail rose" d="M250,517 C250,555 120,548 120,583" />
+      <path class="rail rose" d="M250,517 C250,555 330,548 330,583" />
+      <path class="rail rose" d="M120,590 L120,800" />
+      <path class="rail rose" d="M330,590 L330,730" />
+      <!-- waiting: dashed into the cove -->
+      <path class="rail rose thin waiting" d="M120,809 C120,868 468,842 469,872" />
+      <path class="rail rose thin waiting" d="M330,739 C330,806 466,826 468,872" />
+
+      <!-- blue route: has code -->
+      <path class="rail blue" d="M474,416 C474,468 700,458 700,503" />
+      <path class="rail blue" d="M700,510 L700,800" />
+      <path class="rail blue" d="M700,809 C700,868 472,842 471,872" />
+      <!-- deep link spur -->
+      <path class="rail blue spur" d="M868,462 C868,528 762,552 710,585" />
+
+      <!-- ===== spine stations ===== -->
+      <g>
+        <rect class="stn both" x="452" y="53" width="36" height="14" rx="7"><title>LaunchScreenView.swift</title></rect>
+        <text class="svglbl" x="500" y="64">Launch</text>
+
+        <rect class="stn both" x="452" y="111" width="36" height="14" rx="7"><title>Auth/CovelaAuthView — Sign in with Apple</title></rect>
+        <text class="svglbl" x="500" y="122">Sign in with Apple</text>
+
+        <rect class="stn both" x="452" y="169" width="36" height="14" rx="7"><title>WelcomeView.swift</title></rect>
+        <text class="svglbl" x="500" y="180">Welcome</text>
+
+        <rect class="stn both" x="452" y="227" width="36" height="14" rx="7"><title>NicknameView.swift</title></rect>
+        <text class="svglbl" x="500" y="238">Nickname</text>
+
+        <rect class="stn both" x="452" y="285" width="36" height="14" rx="7"><title>ColorThemeView.swift — Pink or Blue</title></rect>
+        <text class="svglbl" x="500" y="296">Pick a theme <tspan class="svgsub">pink or blue, right here</tspan></text>
+
+        <rect class="stn both" x="452" y="343" width="36" height="14" rx="7"><title>UserBirthdayView.swift</title></rect>
+        <text class="svglbl" x="500" y="354">Birthday</text>
+
+        <!-- interchange -->
+        <rect class="stn both" x="448" y="418" width="44" height="20" rx="10"><title>InviteCodeCheckView.swift — the branch point</title></rect>
+        <text class="svglbl" x="504" y="426">Got an invite code?</text>
+        <text class="svgsub" x="504" y="440">InviteCodeCheckView</text>
+      </g>
+
+      <!-- ===== rose: path selector ===== -->
+      <circle class="stn rose" cx="250" cy="510" r="9"><title>PathSelectorView.swift</title></circle>
+      <text class="svglbl" x="250" y="490" text-anchor="middle">No code — choose a path</text>
+      <text class="svgsub" x="250" y="533" text-anchor="middle">PathSelectorView</text>
+
+      <!-- ===== rose branch: prelude ===== -->
+      <circle class="stn rose" cx="120" cy="590" r="8"><title>PreludeOnboardingView.swift</title></circle>
+      <text class="svglbl" x="120" y="613" text-anchor="middle">Prelude intro</text>
+      <text class="svgsub" x="120" y="626" text-anchor="middle">not official yet</text>
+
+      <circle class="stn rose" cx="120" cy="660" r="8"><title>PreludeHomeView.swift — notes, firsts, voice memos, reasons</title></circle>
+      <text class="svglbl" x="120" y="683" text-anchor="middle">Prelude home</text>
+      <text class="svgsub" x="120" y="696" text-anchor="middle">notes · firsts · voice · reasons</text>
+
+      <circle class="stn rose" cx="120" cy="730" r="8"><title>GiftCurationView.swift — curate captures, attach one song</title></circle>
+      <text class="svgstar" x="98" y="726" text-anchor="end">&#9733;</text>
+      <text class="svglbl" x="120" y="753" text-anchor="middle">Gift curation</text>
+      <text class="svgsub" x="120" y="766" text-anchor="middle">+ one song on vinyl</text>
+
+      <circle class="stn rose" cx="120" cy="800" r="8"><title>InviteCodeSheet — code minted by InviteAPIClient</title></circle>
+      <rect class="svgcode" x="94" y="787" width="9" height="9" rx="2" transform="rotate(45 98.5 791.5)"></rect>
+      <text class="svglbl" x="120" y="823" text-anchor="middle">Send the invite</text>
+      <text class="svgsub" x="120" y="836" text-anchor="middle">then… you wait</text>
+
+      <!-- ===== rose branch: official ===== -->
+      <circle class="stn rose" cx="330" cy="590" r="8"><title>FirstMemoriesView.swift — when we met, when we became official</title></circle>
+      <text class="svglbl" x="330" y="613" text-anchor="middle">Founding photos</text>
+      <text class="svgsub" x="330" y="626" text-anchor="middle">already official</text>
+
+      <circle class="stn rose" cx="330" cy="660" r="8"><title>OnboardingInviteView.swift</title></circle>
+      <text class="svglbl" x="330" y="683" text-anchor="middle">Invite partner</text>
+      <text class="svgsub" x="330" y="696" text-anchor="middle">or skip for now</text>
+
+      <circle class="stn rose" cx="330" cy="730" r="8"><title>PendingHomeView.swift — solo home while the invite is out</title></circle>
+      <rect class="svgcode" x="304" y="717" width="9" height="9" rx="2" transform="rotate(45 308.5 721.5)"></rect>
+      <text class="svglbl" x="330" y="753" text-anchor="middle">Pending home</text>
+      <text class="svgsub" x="330" y="766" text-anchor="middle">waiting for them</text>
+
+      <!-- ===== blue branch ===== -->
+      <circle class="stn blue" cx="700" cy="510" r="9"><title>JoinWithCodeView.swift</title></circle>
+      <rect class="svgcode" x="669" y="490" width="9" height="9" rx="2" transform="rotate(45 673.5 494.5)"></rect>
+      <text class="svglbl" x="722" y="507">Join with code</text>
+      <text class="svgsub" x="722" y="521">JoinWithCodeView</text>
+
+      <circle class="stn blue" cx="700" cy="590" r="8"><title>PartnerGiftRevealView / PreludeGiftBookView — the scrapbook</title></circle>
+      <text class="svgstar" x="682" y="586" text-anchor="end">&#9733;</text>
+      <text class="svglbl" x="722" y="587">The gift opens</text>
+      <text class="svgsub" x="722" y="601">PartnerGiftRevealView</text>
+
+      <circle class="stn blue" cx="700" cy="660" r="8"><title>JustPickPhotosView.swift</title></circle>
+      <text class="svglbl" x="722" y="657">Pick your photos</text>
+      <text class="svgsub" x="722" y="671">JustPickPhotosView</text>
+
+      <circle class="stn blue" cx="700" cy="730" r="8"><title>HowItWorksView.swift</title></circle>
+      <text class="svglbl" x="722" y="727">How it works</text>
+      <text class="svgsub" x="722" y="741">HowItWorksView</text>
+
+      <circle class="stn blue" cx="700" cy="800" r="8"><title>PhotoAccessView.swift — photo library permission</title></circle>
+      <text class="svglbl" x="722" y="797">Photo access</text>
+      <text class="svgsub" x="722" y="811">PhotoAccessView</text>
+
+      <!-- deep link label -->
+      <text class="svglbl" x="930" y="442" text-anchor="end">Or: the invite link</text>
+      <text class="svgsub" x="930" y="456" text-anchor="end">babytown://invite → story scenes</text>
+      <text class="svgsub" x="930" y="469" text-anchor="end">PartnerOnboardingFlow</text>
+
+      <!-- waiting notes -->
+      <text class="svgnote" x="235" y="862" text-anchor="middle">…they accept, and the doors open</text>
+
+      <!-- ===== the cove terminus ===== -->
+      <circle class="pulse-ring" cx="470" cy="885" r="18" stroke-width="2"></circle>
+      <circle class="stn rose" cx="470" cy="885" r="17" stroke-width="4"><title>HomeView.swift — the shared home</title></circle>
+      <circle class="stn blue" cx="470" cy="885" r="9" stroke-width="4"></circle>
+      <text class="cove-label" x="470" y="932" text-anchor="middle">THE COVE</text>
+      <text class="svgsub" x="470" y="948" text-anchor="middle">HomeView — both lines end here, together</text>
+    </svg>
+    </div>
+  </section>
+
+  <!-- ================= INTERLUDE: PAIRING ================= -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow"><b>Interlude</b> · The pairing moment</p>
+      <h2>How two phones become one space</h2>
+      <p class="lede">
+        The emotional climax of the whole app, in six beats. Beat five is the scrapbook — the thing you&rsquo;re redesigning.
+      </p>
+    </div>
+
+    <div class="seq">
+      <div class="step rose">
+        <div class="stepnum">1</div>
+        <div>
+          <span class="actor rose">Rose · their phone</span>
+          <h3>Curate the gift</h3>
+          <p>Everything captured during Prelude — notes, firsts, voice memos, reasons — gets toggled in or out of the gift. One song can ride along on vinyl.</p>
+          <span class="file">GiftCurationView.swift</span>
+        </div>
+      </div>
+      <div class="step rose">
+        <div class="stepnum">2</div>
+        <div>
+          <span class="actor rose">Rose · their phone</span>
+          <h3>Send the invite</h3>
+          <p>A code is minted on the backend and the gift bundle syncs up. The sender&rsquo;s screen becomes a quiet waiting room.</p>
+          <span class="file">InviteAPIClient.swift</span> <span class="file">InviteCodeSheet</span>
+        </div>
+      </div>
+      <div class="step gold">
+        <div class="stepnum">3</div>
+        <div>
+          <span class="actor gold">Off-app · the real world</span>
+          <h3>The code crosses over</h3>
+          <p>Texted, whispered, written on a napkin. Covela deliberately doesn&rsquo;t own this moment — no UI exists here, and that&rsquo;s a design decision.</p>
+        </div>
+      </div>
+      <div class="step blue">
+        <div class="stepnum">4</div>
+        <div>
+          <span class="actor blue">Blue · the partner&rsquo;s phone</span>
+          <h3>Enter the code</h3>
+          <p>Typed in by hand, or skipped entirely via the <code>babytown://invite</code> deep link, which routes through the story-scene onboarding instead.</p>
+          <span class="file">JoinWithCodeView.swift</span> <span class="file">PartnerOnboardingFlow.swift</span>
+        </div>
+      </div>
+      <div class="step blue">
+        <div class="stepnum">5</div>
+        <div>
+          <span class="actor blue">Blue · the partner&rsquo;s phone</span>
+          <h3>The gift opens &#9733;</h3>
+          <p>Page by page, the vinyl spinning: everything the other person felt before they were ever official. This is the highest-emotion screen in the app — and it&rsquo;s your project.</p>
+          <span class="file">PartnerGiftRevealView.swift</span> <span class="file">PreludeGiftBookView.swift</span>
+        </div>
+      </div>
+      <div class="step both">
+        <div class="stepnum">6</div>
+        <div>
+          <span class="actor rose">Rose</span> <span class="actor blue">Blue</span>
+          <h3>Both land in the Cove</h3>
+          <p>The moment blue finishes, rose&rsquo;s waiting screen flips. Two solo lines become one shared home.</p>
+          <span class="file">PendingHomeView.swift → HomeView.swift</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ACT II ================= -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow blue"><b>Act II</b> · Together</p>
+      <h2>The Cove and everything off it</h2>
+      <p class="lede">
+        Home isn&rsquo;t a tab bar — it&rsquo;s a hub. Every feature below opens as an overlay from the shared timeline
+        and returns to it. Starred tiles touch scrapbook territory.
+      </p>
+    </div>
+
+    <div class="cove-banner">
+      <h3>Home — the shared timeline</h3>
+      <p>Day-clustered memories, pinned moments, on-this-day callbacks, and prompts that nudge the couple to add more.
+      Every door below opens from here. <span class="file">HomeView.swift</span> <span class="file">HomeViewModel.swift</span></p>
+    </div>
+
+    <div class="hub">
+      <div class="tile">
+        <h3>Add memories</h3>
+        <p>Photo scan, smart clustering by day and place, best-photo picks.</p>
+        <span class="file">SelectPhotosView</span> <span class="file">ScanView</span>
+      </div>
+      <div class="tile">
+        <h3>Memory map</h3>
+        <p>A pin for every place you&rsquo;ve been together — the couple&rsquo;s world, drawn.</p>
+        <span class="file">MapView.swift</span>
+      </div>
+      <div class="tile starred">
+        <span class="badge">&#9733;</span>
+        <h3>Secret Garden</h3>
+        <p>Couple profile: garden moods, sticker play, notes — and the door back into the gift scrapbook.</p>
+        <span class="file">CoupleProfile/</span>
+      </div>
+      <div class="tile">
+        <h3>Pet room</h3>
+        <p>Adopt a cat, feed it, teach it tricks, earn coins, buy furniture. SpriteKit under the hood.</p>
+        <span class="file">PetRoomView</span> <span class="file">Game/</span>
+      </div>
+      <div class="tile">
+        <h3>Date planner</h3>
+        <p>Plan the next date with place search and saved plans.</p>
+        <span class="file">DatePlanner/</span>
+      </div>
+      <div class="tile">
+        <h3>Watch together</h3>
+        <p>Synced video with a live call on top — WebRTC between the two phones.</p>
+        <span class="file">WatchTogether/</span>
+      </div>
+      <div class="tile">
+        <h3>Letters</h3>
+        <p>Composed from blocks — text, voice, photos, stickers — then vaulted until an unlock date.</p>
+        <span class="file">ComposeLetterView</span> <span class="file">LetterBlock</span>
+      </div>
+      <div class="tile">
+        <h3>Polaroid camera</h3>
+        <p>Instant-film captures that develop into the timeline.</p>
+        <span class="file">PolaroidCameraView</span>
+      </div>
+      <div class="tile">
+        <h3>Memory search</h3>
+        <p>Find any moment by place, date, or words.</p>
+        <span class="file">MemorySearchView</span>
+      </div>
+      <div class="tile">
+        <h3>Daily check-in</h3>
+        <p>Streaks and gentle nudges that keep both people showing up.</p>
+        <span class="file">DailyCheckInPopupView</span>
+      </div>
+      <div class="tile">
+        <h3>Notifications</h3>
+        <p>The couple&rsquo;s inbox — partner activity, unlocks, reminders.</p>
+        <span class="file">NotificationCenterView</span>
+      </div>
+      <div class="tile">
+        <h3>Covela Forever</h3>
+        <p>The subscription paywall — the only commerce in the app.</p>
+        <span class="file">CovelaForeverPaywallView</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ACT III ================= -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow slate"><b>Act III</b> · If it ends</p>
+      <h2>A kind exit, with the door left open</h2>
+      <p class="lede">
+        Breakup isn&rsquo;t deletion — it&rsquo;s an archive. The shared space folds into a time-limited scrapbook,
+        and from there each person chooses: step out, or reconnect.
+      </p>
+    </div>
+
+    <div class="flowline">
+      <div class="fstep">
+        <h3>Stepping out begins</h3>
+        <p>One partner starts the breakup flow. Direct, plain copy — no warmth games here.</p>
+        <span class="file">BreakupInitiationView</span>
+      </div>
+      <div class="farrow">&#8594;</div>
+      <div class="fstep">
+        <h3>Everything is archived</h3>
+        <p>Memories, garden, and pet are bundled and exported before anything closes.</p>
+        <span class="file">ExportProgressView</span> <span class="file">ArchiveService</span>
+      </div>
+      <div class="farrow">&#8594;</div>
+      <div class="fstep">
+        <h3>The archive scrapbook</h3>
+        <p>Three tabs — memories, garden, pet — viewable until the archive&rsquo;s expiry date.</p>
+        <span class="file">ScrapbookHomeView</span>
+      </div>
+    </div>
+
+    <div class="fork">
+      <div class="fstep solo">
+        <span class="exit-tag">Exit A</span>
+        <h3>Step out</h3>
+        <p>Confirm, and the app returns to Prelude — solo again, memories archived, nothing shared.</p>
+        <span class="file">StepOutConfirmationView → PreludeHomeView</span>
+      </div>
+      <div class="fstep rejoin">
+        <span class="exit-tag">Exit B</span>
+        <h3>Reconnect</h3>
+        <p>An invite to try again. Accepted, both riders step back into the Cove.</p>
+        <span class="file">ReconnectInviteView → HomeView</span>
+      </div>
+    </div>
+
+    <p class="lede" style="margin-top:18px; font-size:13.5px;">
+      Naming note: the <code>Scrapbook*</code> files in <code>Views/Breakup/</code> are this archive viewer — a
+      different feature from the Prelude gift scrapbook in your brief, despite the shared name.
+    </p>
+  </section>
+
+  <!-- ================= UNDER THE HOOD ================= -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow"><b>Under the hood</b> · For when engineering talks</p>
+      <h2>Strict MVVM, four floors down</h2>
+      <p class="lede">
+        Every screen you design maps onto this stack. The rule that never bends: views never talk to services.
+      </p>
+    </div>
+
+    <div class="layers">
+      <div class="layer">
+        <span class="lname">View</span>
+        <div>
+          <p class="lrule">SwiftUI screens and components. Renders state, calls ViewModel methods, <strong>never touches a Service.</strong></p>
+          <div class="lfiles"><span class="file">Views/</span> <span class="file">Components/</span></div>
+        </div>
+      </div>
+      <div class="connector"></div>
+      <div class="layer">
+        <span class="lname">ViewModel</span>
+        <div>
+          <p class="lrule"><code>@MainActor</code> classes owning <code>@Published</code> state — one per feature.</p>
+          <div class="lfiles"><span class="file">HomeViewModel</span> <span class="file">PreludeViewModel</span> <span class="file">PetViewModel</span> <span class="file">WatchTogetherViewModel</span></div>
+        </div>
+      </div>
+      <div class="connector"></div>
+      <div class="layer">
+        <span class="lname">Service</span>
+        <div>
+          <p class="lrule">Singletons (<code>.shared</code>) doing the real work — persistence, networking, engines.</p>
+          <div class="lfiles"><span class="file">DataPersistenceManager</span> <span class="file">AuthService</span> <span class="file">ThemeManager</span> <span class="file">NotificationManager</span> <span class="file">StoreManager</span></div>
+        </div>
+      </div>
+      <div class="connector"></div>
+      <div class="layer">
+        <span class="lname">Model</span>
+        <div>
+          <p class="lrule">Plain <code>Codable</code> structs. No side effects, ever.</p>
+          <div class="lfiles"><span class="file">Moment</span> <span class="file">PreludeCapture</span> <span class="file">Pet</span> <span class="file">LetterBlock</span> <span class="file">ArchiveBundle</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="duo">
+      <div class="store local">
+        <h3>On device — privacy first</h3>
+        <p>Photos, notes, and voice memos live in the Documents directory and UserDefaults. Auth tokens sit in the Keychain. Nothing leaves unless the user pairs or shares.</p>
+        <div class="lfiles"><span class="file">DataPersistenceManager</span> <span class="file">KeychainTokenStore</span> <span class="file">LocalPolaroidStore</span></div>
+      </div>
+      <div class="store cloud">
+        <h3>Backend — MongoDB</h3>
+        <p>Pairing, gift sync, archives, and call signaling flow through a small family of API clients.</p>
+        <div class="lfiles"><span class="file">CovelaAPIClient</span> <span class="file">InviteAPIClient</span> <span class="file">PreludeAPIClient</span> <span class="file">ArchiveAPIClient</span> <span class="file">WatchTogetherAPIClient</span></div>
+      </div>
+    </div>
+    <div class="duo engines" style="margin-top:14px;">
+      <div class="store">
+        <h3>Engines</h3>
+        <p>SpriteKit renders the pet room. WebRTC carries watch-together calls. AVFoundation plays voice memos, the gift song, and background music.</p>
+        <div class="lfiles"><span class="file">Game/</span> <span class="file">WatchTogetherCallController</span> <span class="file">AudioManager</span></div>
+      </div>
+      <div class="store">
+        <h3>Photo pipeline</h3>
+        <p>The camera roll becomes memories: scan, cluster by day and place, pick the best shots, resolve place names.</p>
+        <div class="lfiles"><span class="file">PhotoScanService</span> <span class="file">PhotoClusteringService</span> <span class="file">BestPhotoSelector</span> <span class="file">SmartPlaceResolver</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer>
+    <p class="eyebrow">Finding your way in the repo</p>
+    <div class="dirmap">
+      <div><span class="file">BabyTown/Views/</span><br>every screen, grouped by area</div>
+      <div><span class="file">BabyTown/Components/</span><br>reusable UI pieces</div>
+      <div><span class="file">BabyTown/ViewModels/</span><br>feature state owners</div>
+      <div><span class="file">BabyTown/Services/</span><br>persistence, API, engines</div>
+      <div><span class="file">BabyTown/Models/</span><br>the data shapes</div>
+      <div><span class="file">BabyTown/Theme/</span><br>BabyTownTheme tokens — always use these</div>
+      <div><span class="file">Product/</span><br>Brand, Voice, Design docs</div>
+      <div><span class="file">Design Plans/</span><br>your scrapbook brief lives here</div>
+    </div>
+    <p class="closing">Read this next to Design Plans/Scrapbook-Intern-Brief.md — the map shows where you are; the brief shows where you&rsquo;re going.</p>
+  </footer>
+
+</div>
+</body>
+</html>

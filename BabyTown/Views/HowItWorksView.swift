@@ -49,7 +49,7 @@ struct HowItWorksView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [.white, BabyTownTheme.accent.opacity(0.05)],
+            colors: [.white, BabyTownTheme.blushSoft, BabyTownTheme.accent.opacity(0.06)],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -59,18 +59,23 @@ struct HowItWorksView: View {
     // MARK: - Title
 
     private var titleSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
+            Text("07  YOUR COVE")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(BabyTownTheme.accentDeep)
+
             Text("Just pick photos of us.")
-                .font(.system(size: 25, weight: .light, design: .serif))
-                .foregroundStyle(.white)
+                .font(.system(size: 31, weight: .semibold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary)
 
             Text("Covela does the rest.")
-                .font(.system(size: 25, weight: .light, design: .serif))
-                .foregroundStyle(BabyTownTheme.accent)
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .foregroundStyle(BabyTownTheme.accentDeep)
 
             Text("Select your favorite moments and we'll\norganize them by day and place for you.")
-                .font(.system(size: 14))
-                .foregroundStyle(Color(.secondaryLabel))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .padding(.top, 4)
@@ -110,7 +115,7 @@ struct HowItWorksView: View {
     private var enterButton: some View {
         Button(action: onEnterHome) {
             Text("Enter Covela")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)

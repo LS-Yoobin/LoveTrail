@@ -26,18 +26,24 @@ struct JoinWithCodeView: View {
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {
                         Text("Enter your code")
-                            .font(.system(size: 30, weight: .bold, design: .serif))
+                            .font(.system(size: 31, weight: .semibold, design: .rounded))
                             .multilineTextAlignment(.center)
-                            .foregroundStyle(BabyTownTheme.accentDeep)
+                            .foregroundStyle(BabyTownTheme.textPrimary)
 
                         Text("Enter the 6 character code your partner shared with you.")
-                            .font(.system(size: 15))
-                            .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                             .multilineTextAlignment(.center)
+                            .lineSpacing(3)
                     }
 
                     VStack(spacing: 8) {
-                        TextField("Enter your 6 character code", text: $codeInput)
+                        TextField(
+                            "",
+                            text: $codeInput,
+                            prompt: Text("Enter your 6 character code")
+                                .foregroundStyle(BabyTownTheme.textSecondary)
+                        )
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .font(.system(size: 22, weight: .semibold, design: .monospaced))
@@ -72,7 +78,7 @@ struct JoinWithCodeView: View {
                                     .tint(.white)
                             } else {
                                 Text("Join")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                                     .foregroundStyle(.white)
                             }
                         }

@@ -36,14 +36,15 @@ struct UserBirthdayView: View {
 
                 VStack(spacing: 14) {
                     Text("When's your birthday?")
-                        .font(.system(size: 26, weight: .light, design: .serif))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                         .multilineTextAlignment(.center)
 
                     Text("We'll save it in your Important Dates")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                         .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 28)
@@ -80,7 +81,7 @@ struct UserBirthdayView: View {
             onContinue(SpecialDate.normalizedTimelineDay(birthday))
         } label: {
             Text("Continue")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)

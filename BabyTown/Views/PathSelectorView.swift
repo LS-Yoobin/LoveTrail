@@ -11,7 +11,7 @@ struct PathSelectorView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [.white, BabyTownTheme.accent.opacity(0.06)],
+                colors: [.white, BabyTownTheme.blushSoft, BabyTownTheme.accent.opacity(0.07)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -19,15 +19,21 @@ struct PathSelectorView: View {
 
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
-                    Text("Where are you right now?")
-                        .font(.system(size: 26, weight: .light, design: .serif))
+                    Text("04  YOUR STORY")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .tracking(1.1)
                         .foregroundStyle(BabyTownTheme.accentDeep)
+
+                    Text("Where are you right now?")
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                         .multilineTextAlignment(.center)
 
-                    Text("We will set things up just right for you.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(BabyTownTheme.accent)
+                    Text("Covela changes shape depending on whether this is a quiet prelude or an official shared space.")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.66))
                         .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 80)
@@ -38,14 +44,14 @@ struct PathSelectorView: View {
                     PathCard(
                         icon: "envelope.open.fill",
                         title: "Prelude",
-                        description: "There is someone special on your mind. Not official yet.",
+                        description: "Capture the little almost-love moments before you become official.",
                         action: selectPrelude
                     )
 
                     PathCard(
                         icon: "heart.circle.fill",
                         title: "Already Official",
-                        description: "You are in a relationship and ready to build your shared space.",
+                        description: "Build your private couple space with photos, notes, plans, and your pet.",
                         action: selectOfficial
                     )
                 }
@@ -84,18 +90,18 @@ struct PathCard: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 26))
-                    .foregroundStyle(BabyTownTheme.accent)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(BabyTownTheme.accentIconGradient)
                     .frame(width: 52, height: 52)
-                    .background(Circle().fill(BabyTownTheme.accent.opacity(0.1)))
+                    .background(Circle().fill(BabyTownTheme.accent.opacity(0.10)))
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.accentDeep)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary)
                     Text(description)
-                        .font(.system(size: 13))
-                        .foregroundStyle(BabyTownTheme.accentDeep.opacity(0.72))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(BabyTownTheme.textPrimary.opacity(0.68))
                         .fixedSize(horizontal: false, vertical: true)
                         .lineSpacing(2)
                 }
@@ -103,7 +109,7 @@ struct PathCard: View {
                 Spacer(minLength: 0)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(BabyTownTheme.accent.opacity(0.55))
             }
             .padding(20)

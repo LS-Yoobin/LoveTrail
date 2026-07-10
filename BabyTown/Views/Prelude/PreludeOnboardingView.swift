@@ -11,24 +11,18 @@ struct PreludeOnboardingView: View {
     private var pageBackground: Color { BabyTownTheme.cardBackground }
 
     var body: some View {
-        VStack(spacing: 0) {
-            heroSection
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    featureList
-                    giftSection
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, 24)
-                }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                heroSection
+                featureList
+                giftSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                beginButton
+                    .padding(.horizontal, 40)
+                    .padding(.top, 20)
+                    .padding(.bottom, 52)
             }
-
-            beginButton
-                .padding(.horizontal, 40)
-                .padding(.top, 16)
-                .padding(.bottom, 52)
-                .background(pageBackground)
         }
         .background(pageBackground.ignoresSafeArea())
         .opacity(contentOpacity)
