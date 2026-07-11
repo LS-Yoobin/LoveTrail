@@ -11,20 +11,15 @@ struct CovelaAuthView: View {
     @State private var showComingSoon = false
     @State private var showAuthError = false
 
-    @State private var catScale: CGFloat = 0.6
-    @State private var catOpacity: Double = 0
+    @State private var bookScale: CGFloat = 0.6
+    @State private var bookOpacity: Double = 0
     @State private var contentOpacity: Double = 0
+    @State private var sparkleShift: CGFloat = 0
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background — matches WelcomeView
-                LinearGradient(
-                    colors: [Color.white, BabyTownTheme.accent.opacity(0.06)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                OnboardingWelcomeBackground()
 
                 FloatingHeartsView()
                     .ignoresSafeArea()
@@ -32,14 +27,9 @@ struct CovelaAuthView: View {
                 VStack(spacing: 0) {
                     Spacer()
 
-                    // Hero image
-                    Image("First Page Cat")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 100)
-                        .scaleEffect(catScale)
-                        .opacity(catOpacity)
-                        .shadow(color: BabyTownTheme.accent.opacity(0.3), radius: 20, y: 8)
+                    authHeroMark
+                        .scaleEffect(bookScale)
+                        .opacity(bookOpacity)
 
                     // Headline
                     Text("Your private world starts here.")
@@ -102,9 +92,12 @@ struct CovelaAuthView: View {
             showAuthError = message != nil
         }
         .onAppear {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                sparkleShift = 8
+            }
             withAnimation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.2)) {
-                catScale = 1.0
-                catOpacity = 1.0
+                bookScale = 1.0
+                bookOpacity = 1.0
             }
             withAnimation(.easeOut(duration: 0.6).delay(0.6)) {
                 contentOpacity = 1.0
@@ -122,6 +115,51 @@ struct CovelaAuthView: View {
     }
 
     // MARK: - Auth Buttons
+
+    private var authHeroMark: some View {
+        ZStack {
+            Image("BabyTownFullIcon")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 136, height: 136)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .stroke(.white.opacity(0.78), lineWidth: 3)
+                )
+                .shadow(color: BabyTownTheme.accentDeep.opacity(0.18), radius: 18, y: 10)
+
+            VStack {
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("for two")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(BabyTownTheme.accentDeep)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(.white.opacity(0.92))
+                        .shadow(color: BabyTownTheme.accent.opacity(0.16), radius: 10, y: 4)
+                )
+                .offset(y: 12)
+            }
+            .frame(width: 136, height: 136)
+
+            Image(systemName: "sparkle")
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(Color(red: 1.0, green: 0.70, blue: 0.22))
+                .offset(x: -60, y: -61 - sparkleShift)
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(Color(red: 1.0, green: 0.70, blue: 0.22).opacity(0.85))
+                .offset(x: 63, y: -52 + sparkleShift)
+        }
+    }
 
     private var appleButton: some View {
         SignInWithAppleButton(.continue) { request in

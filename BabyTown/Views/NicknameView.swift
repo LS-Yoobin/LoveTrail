@@ -80,12 +80,8 @@ struct NicknameView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [.white, BabyTownTheme.accent.opacity(0.06)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        BabyTownTheme.backgroundCream
+            .ignoresSafeArea()
     }
 
     private var continueButton: some View {

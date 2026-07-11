@@ -20,13 +20,10 @@ struct EmailLoginView: View {
 
     var body: some View {
         ZStack {
-            // Background — matches WelcomeView
-            LinearGradient(
-                colors: [Color.white, BabyTownTheme.accent.opacity(0.06)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            OnboardingWelcomeBackground()
+
+            FloatingHeartsView()
+                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
