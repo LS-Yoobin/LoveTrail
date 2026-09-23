@@ -38,11 +38,6 @@ enum CaptureEditorDestination {
 
 struct CaptureEditorView: View {
 
-    private enum FirstEditorStep {
-        case details
-        case photo
-    }
-
     let type: PreludeCapture.CaptureType
     let existing: PreludeCapture?
     let destination: CaptureEditorDestination
@@ -62,17 +57,22 @@ struct CaptureEditorView: View {
     @State private var showVoicePrompt: Bool = false
     @State private var firstDate: Date = Date()
     @State private var isDatePickerExpanded: Bool = false
-    @State private var firstEditorStep: FirstEditorStep = .details
+    @State private var calendarMonth: Int = Calendar.current.component(.month, from: Date()) - 1
+    @State private var calendarYear: Int = Calendar.current.component(.year, from: Date())
     @State private var firstPhotoImage: UIImage?
     @State private var firstPhotoId: UUID?
     @State private var showFirstPhotoPicker = false
+    @State private var notePhotoImage: UIImage?
+    @State private var notePhotoId: UUID?
+    @State private var showNotePhotoPicker = false
     @State private var firstOptionsPage: Int = 0
     @FocusState private var isEditorFocused: Bool
 
+    /// The prototype shows three options per page.
     private var displayedFirstOptions: [String] {
         let pages = PreludeViewModel.firstOptionPages
         guard !pages.isEmpty else { return [] }
-        return pages[firstOptionsPage % pages.count]
+        return Array(pages[firstOptionsPage % pages.count].prefix(3))
     }
 
     private var showsGiftToggle: Bool {
@@ -103,12 +103,11 @@ struct CaptureEditorView: View {
         NavigationStack {
             Group {
                 if type == .first {
-                    switch firstEditorStep {
-                    case .details:
-                        firstEditor
-                    case .photo:
-                        firstPhotoEditor
-                    }
+                    firstEditor
+                } else if type == .voiceMemo {
+                    voiceMemoEditor
+                } else if type == .reason {
+                    reasonEditor
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 20) {
@@ -117,41 +116,28 @@ struct CaptureEditorView: View {
                             }
                             editorContent
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, type == .note ? 18 : 24)
                         .padding(.top, 16)
                         .padding(.bottom, 40)
                     }
                 }
             }
-            .background(BabyTownTheme.background.ignoresSafeArea())
+            .background(
+                editorBackground
+                    .ignoresSafeArea()
+            )
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if type == .first, firstEditorStep == .photo {
-                        Button("Back") {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                firstEditorStep = .details
-                            }
-                        }
-                    } else {
-                        Button("Cancel", action: onCancel)
-                    }
+                    Button("Cancel", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    if type == .first, firstEditorStep == .details {
-                        Button(action: advanceFirstToPhotoStep) {
-                            SavePillLabel(title: "Next", isEnabled: canAdvanceFirstStep)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canAdvanceFirstStep)
-                    } else {
-                        Button(action: save) {
-                            SavePillLabel(title: saveButtonTitle, isEnabled: canSave)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canSave)
+                    Button(action: save) {
+                        SavePillLabel(title: saveButtonTitle, isEnabled: canSave)
                     }
+                    .buttonStyle(.plain)
+                    .disabled(!canSave)
                 }
             }
         }
@@ -172,12 +158,37 @@ struct CaptureEditorView: View {
             )
             .ignoresSafeArea()
         }
+        .sheet(isPresented: $showNotePhotoPicker) {
+            PhotoPickerView(
+                selectedImages: .constant([]),
+                selectionLimit: 1,
+                onFinish: { results in
+                    showNotePhotoPicker = false
+                    guard let result = results.first else { return }
+                    result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
+                        guard let image = object as? UIImage else { return }
+                        DispatchQueue.main.async {
+                            notePhotoImage = image
+                        }
+                    }
+                }
+            )
+            .ignoresSafeArea()
+        }
         .onAppear {
             loadExisting()
             guard type != .first else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isEditorFocused = true
             }
+        }
+    }
+
+    /// Note and First use the prototype's paper tones; the other editors keep the app default.
+    private var editorBackground: Color {
+        switch type {
+        case .note: return PreludePalette.noteBackground
+        case .first, .voiceMemo, .reason: return PreludePalette.sheetBackground
         }
     }
 
@@ -210,158 +221,216 @@ struct CaptureEditorView: View {
             noteEditor
         case .first:
             EmptyView()
-        case .voiceMemo:
-            voiceMemoEditor
-        case .reason:
-            reasonEditor
+        case .voiceMemo, .reason:
+            EmptyView()   // both are full-sheet editors, routed in `body`
         }
     }
 
     // MARK: - First Editor
 
     private var firstEditor: some View {
-        VStack(spacing: 0) {
-            // Fixed zone
-            VStack(alignment: .leading, spacing: 12) {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+
                 if showsGiftToggle {
                     giftToggle
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 20)
                 }
 
-                Text("📅 WHEN WAS THIS?")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.top, 4)
+                Text("What was the first?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(PreludePalette.sectionLabel)
+                    .padding(.bottom, 17)
 
-                dateBanner
-
-                if isDatePickerExpanded {
-                    DatePicker("", selection: $firstDate, displayedComponents: .date)
-                        .datePickerStyle(.graphical)
-                        .tint(BabyTownTheme.accent)
-                        .colorScheme(.light)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .onChange(of: firstDate) { _, _ in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isDatePickerExpanded = false
-                            }
-                        }
-                }
-
-                firstSectionDivider
-
-                HStack(spacing: 8) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.black)
-                    TextField(
-                        "",
-                        text: $customFirstLabel,
-                        prompt: Text("Write your own first…").foregroundStyle(Color.black.opacity(0.5))
-                    )
-                    .font(.system(size: 15))
-                    .foregroundStyle(.black)
-                    .focused($isEditorFocused)
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(
-                            isEditorFocused ? BabyTownTheme.savePillFill : Color.black,
-                            style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
-                        )
-                )
-                .animation(.easeInOut(duration: 0.2), value: isEditorFocused)
-                .onChange(of: customFirstLabel) { _, val in
-                    if !val.isEmpty { firstLabel = val }
-                }
+                ownFirstField
+                    .padding(.bottom, 18)
 
                 Text("or pick one")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.black.opacity(0.55))
+                    .font(.system(size: 11))
+                    .foregroundStyle(PreludePalette.orPickInk)
                     .frame(maxWidth: .infinity, alignment: .center)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .animation(.easeInOut(duration: 0.2), value: isDatePickerExpanded)
+                    .padding(.bottom, 23)
 
-            // Scrollable zone
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 8) {
-                    ForEach(displayedFirstOptions, id: \.self) { option in
-                        Button {
-                            isEditorFocused = false
-                            firstLabel = option
-                            customFirstLabel = ""
-                        } label: {
-                            HStack {
-                                Text(option)
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(BabyTownTheme.textPrimary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                if firstLabel == option {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(BabyTownTheme.accent)
-                                }
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(firstLabel == option ? BabyTownTheme.accentSoft : BabyTownTheme.cardBackground)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    generateMoreFirstOptionsButton
+                ForEach(displayedFirstOptions, id: \.self) { option in
+                    firstOptionCard(option)
+                        .padding(.bottom, 21)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
+
+                generateMoreFirstOptionsButton
+                    .padding(.bottom, 32)
+
+                Text("When was this?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(PreludePalette.sectionLabel)
+                    .padding(.bottom, 17)
+
+                dateBanner
+                    .padding(.bottom, isDatePickerExpanded ? 25 : 37)
+
+                // In the normal layout flow: opening the calendar pushes the
+                // photo section down instead of covering it.
+                if isDatePickerExpanded {
+                    PreludeInlineCalendar(
+                        month: $calendarMonth,
+                        year: $calendarYear,
+                        selection: $firstDate
+                    )
+                    .padding(.bottom, 37)
+                    .transition(.opacity)
+                }
+
+                HStack(spacing: 5) {
+                    Text("Add a photo?")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(PreludePalette.sectionLabel)
+                    Text("— optional")
+                        .font(.system(size: 13))
+                        .italic()
+                        .foregroundStyle(PreludePalette.optionalItalic)
+                }
+                .padding(.bottom, 17)
+
+                PolaroidPhotoWell(
+                    image: firstPhotoImage,
+                    onTap: { showFirstPhotoPicker = true },
+                    onRemove: { firstPhotoImage = nil }
+                )
                 .padding(.bottom, 40)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .frame(maxHeight: .infinity)
+            .padding(.horizontal, 27)
+            .padding(.top, 34)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .animation(.easeInOut(duration: 0.2), value: isDatePickerExpanded)
+    }
+
+    /// Dashed "write your own" field. Once it holds text it fills in and gets pinned.
+    private var ownFirstField: some View {
+        let isFilled = !customFirstLabel.trimmingCharacters(in: .whitespaces).isEmpty
+        return ZStack(alignment: .topTrailing) {
+            HStack(spacing: 11) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.black)
+                TextField(
+                    "",
+                    text: $customFirstLabel,
+                    prompt: Text("Write your own first…")
+                        .foregroundStyle(Color(red: 0.60, green: 0.60, blue: 0.60))
+                        .italic()
+                )
+                .font(.system(size: 15))
+                .foregroundStyle(Color(red: 0.17, green: 0.15, blue: 0.14))
+                .focused($isEditorFocused)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(isFilled ? PreludePalette.textAreaFill : Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(
+                        isFilled ? Color.clear
+                                 : (isEditorFocused ? PreludePalette.focusBlue : PreludePalette.dashedBorder),
+                        style: StrokeStyle(lineWidth: 1, dash: isFilled ? [] : [2, 2])
+                    )
+            )
+            .animation(.easeInOut(duration: 0.2), value: isEditorFocused)
+
+            if isFilled {
+                Text("📌")
+                    .font(.system(size: 25))
+                    .offset(x: -17, y: -13)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onChange(of: customFirstLabel) { _, val in
+            if !val.trimmingCharacters(in: .whitespaces).isEmpty {
+                firstLabel = val
+            } else if !displayedFirstOptions.contains(firstLabel) {
+                // typed text was cleared and no option is pinned
+                firstLabel = ""
+            }
+        }
+    }
+
+    /// One tape-topped option. Picking it pins it and clears anything typed.
+    private func firstOptionCard(_ option: String) -> some View {
+        let isPicked = firstLabel == option && customFirstLabel.isEmpty
+        return ZStack(alignment: .top) {
+            Button {
+                isEditorFocused = false
+                customFirstLabel = ""
+                firstLabel = isPicked ? "" : option
+            } label: {
+                Text(option)
+                    .font(.system(size: 14))
+                    .foregroundStyle(isPicked ? PreludePalette.optionPickedInk : PreludePalette.optionInk)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 31)
+                    .frame(height: 38)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(isPicked ? PreludePalette.optionPicked : PreludePalette.optionFill)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            WashiTapeStrip(width: 57)
+                .offset(y: -9)
+
+            if isPicked {
+                Text("📌")
+                    .font(.system(size: 25))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 8)
+                    .offset(y: -8)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
     private var dateBanner: some View {
         Button {
             isEditorFocused = false
+            if !isDatePickerExpanded {
+                calendarMonth = Calendar.current.component(.month, from: firstDate) - 1
+                calendarYear = Calendar.current.component(.year, from: firstDate)
+            }
             withAnimation(.easeInOut(duration: 0.2)) {
                 isDatePickerExpanded.toggle()
             }
         } label: {
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(firstDate, format: .dateTime.month(.wide).day())
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.black)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(PreludePalette.dateInk)
                     Text(firstDate, format: .dateTime.year())
-                        .font(.system(size: 14))
-                        .foregroundStyle(.black.opacity(0.65))
+                        .font(.system(size: 16))
+                        .foregroundStyle(PreludePalette.dateYearInk)
                 }
                 Spacer()
-                HStack(spacing: 4) {
-                    Text("📅")
-                        .font(.system(size: 20))
+                HStack(spacing: 9) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(.black)
                     Text("tap to change")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.black.opacity(0.65))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(PreludePalette.dateHintInk)
                 }
             }
-            .padding(14)
+            .padding(.horizontal, 21)
+            .frame(height: 59)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 253 / 255, green: 240 / 255, blue: 234 / 255),
-                                Color(red: 252 / 255, green: 232 / 255, blue: 222 / 255)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(PreludePalette.textAreaFill)
             )
         }
         .buttonStyle(.plain)
@@ -374,193 +443,21 @@ struct CaptureEditorView: View {
             guard pageCount > 1 else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 firstOptionsPage = (firstOptionsPage + 1) % pageCount
+                firstLabel = customFirstLabel        // only the wording changes
             }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(BabyTownTheme.accent)
-                Text("Generate More")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.accent)
-                Spacer()
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(BabyTownTheme.accent.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(BabyTownTheme.accent.opacity(0.3), lineWidth: 1)
-                    )
-            )
+            Text("Generate more options")
+                .font(.system(size: 11))
+                .foregroundStyle(PreludePalette.generateInk)
+                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .background(
+                    Capsule()
+                        .fill(PreludePalette.generateFill)
+                        .overlay(Capsule().strokeBorder(PreludePalette.generateBorder, lineWidth: 1))
+                )
         }
         .buttonStyle(.plain)
-    }
-
-    private var firstSectionDivider: some View {
-        HStack(spacing: 8) {
-            Rectangle()
-                .fill(BabyTownTheme.accent.opacity(0.3))
-                .frame(height: 1)
-            Text("What was the first?")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(BabyTownTheme.accent)
-                .lineLimit(1)
-                .fixedSize()
-            Rectangle()
-                .fill(BabyTownTheme.accent.opacity(0.3))
-                .frame(height: 1)
-        }
-    }
-
-    // MARK: - First Photo Step
-
-    private var firstPhotoEditor: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
-                if showsGiftToggle {
-                    giftToggle
-                }
-
-                Text("📅 WHEN WAS THIS?")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.black)
-
-                firstDateSummaryBanner
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Your first")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.black.opacity(0.55))
-                        .textCase(.uppercase)
-
-                    Text(firstLabel)
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                        .foregroundStyle(.black)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 14))
-                            .foregroundStyle(BabyTownTheme.accent)
-                        Text("Add a photo?")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(BabyTownTheme.textPrimary)
-                        Spacer()
-                        Text(firstPhotoImage == nil ? "Optional" : "1")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(BabyTownTheme.accent)
-                    }
-
-                    firstPhotoPickerArea
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .padding(.bottom, 40)
-        }
-    }
-
-    private var firstDateSummaryBanner: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(firstDate, format: .dateTime.month(.wide).day())
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.black)
-                Text(firstDate, format: .dateTime.year())
-                    .font(.system(size: 14))
-                    .foregroundStyle(.black.opacity(0.65))
-            }
-            Spacer()
-            Text("📅")
-                .font(.system(size: 20))
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 253 / 255, green: 240 / 255, blue: 234 / 255),
-                            Color(red: 252 / 255, green: 232 / 255, blue: 222 / 255)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-    }
-
-    private var firstPhotoPickerArea: some View {
-        Group {
-            if let firstPhotoImage {
-                ZStack(alignment: .topTrailing) {
-                    Button {
-                        showFirstPhotoPicker = true
-                    } label: {
-                        Image(uiImage: firstPhotoImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        self.firstPhotoImage = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white)
-                            .background(
-                                Circle()
-                                    .fill(.black.opacity(0.5))
-                                    .frame(width: 24, height: 24)
-                            )
-                    }
-                    .padding(.top, 10)
-                    .padding(.trailing, 10)
-                    .accessibilityLabel("Remove photo")
-                }
-            } else {
-                Button {
-                    showFirstPhotoPicker = true
-                } label: {
-                    VStack(spacing: 10) {
-                        Image(systemName: "photo")
-                            .font(.system(size: 32, weight: .thin))
-                        Text("Tap to add a photo")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundStyle(BabyTownTheme.accent)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(
-                                BabyTownTheme.accent,
-                                style: StrokeStyle(lineWidth: 2, dash: [8, 5])
-                            )
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(BabyTownTheme.accent.opacity(0.08))
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func advanceFirstToPhotoStep() {
-        isEditorFocused = false
-        withAnimation(.easeInOut(duration: 0.2)) {
-            firstEditorStep = .photo
-        }
     }
 
     // MARK: - Other Editors
@@ -569,49 +466,133 @@ struct CaptureEditorView: View {
         notePrompts[promptIndex % notePrompts.count]
     }
 
-    private var noteEditor: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ProfileNoteMoodPickerBar(selectedMood: $noteMood)
+    // MARK: - Note Editor
 
-            Button(showNotePrompt ? "Different prompt" : "Generate Prompt") {
+    private var noteEditor: some View {
+        VStack(alignment: .leading, spacing: 0) {
+
+            // Prompt generation button
+            Button {
                 if showNotePrompt {
                     promptIndex += 1
                 } else {
                     showNotePrompt = true
                 }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "star")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(BabyTownTheme.notePromptFill)
+                    Text(showNotePrompt ? "Different prompt" : "Generate a prompt")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(PreludePalette.promptChipText)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(PreludePalette.promptChipBorder, lineWidth: 1.5)
+                )
             }
-            .font(.system(size: 13))
-            .foregroundStyle(BabyTownTheme.accent)
+            .buttonStyle(.plain)
+            .padding(.bottom, 12)
 
+            // Prompt chip (dark mocha bar)
             if showNotePrompt {
-                promptChip(currentNotePrompt)
+                notePromptChip(currentNotePrompt)
+                    .padding(.bottom, 14)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
+            // Text entry area
             ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(PreludePalette.textAreaFill)
+
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isEditorFocused ? BabyTownTheme.notePromptFill : .clear, lineWidth: 1.5)
+                    .animation(.easeInOut(duration: 0.15), value: isEditorFocused)
+
                 TextEditor(text: $noteText)
                     .scrollContentBackground(.hidden)
-                    .foregroundStyle(.black)
-                    .frame(minHeight: 160)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(noteMood?.fieldBackgroundColor ?? BabyTownTheme.cardBackground)
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: noteMood)
-                    .font(.system(size: 16))
+                    .foregroundStyle(PreludePalette.bodyText)
+                    .frame(minHeight: 136)
+                    .padding(9)
+                    .font(.system(size: 15))
                     .focused($isEditorFocused)
-                if noteText.isEmpty, showNotePrompt {
-                    Text(currentNotePrompt)
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color(uiColor: .darkGray).opacity(0.5))
+
+                // Placeholder never mirrors the prompt — it always reads the same.
+                if noteText.isEmpty {
+                    Text("Enter your thoughts...")
+                        .font(.system(size: 15))
+                        .foregroundStyle(PreludePalette.placeholderInk)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 18)
+                        .padding(.vertical, 17)
                         .allowsHitTesting(false)
                 }
             }
+            .frame(minHeight: 164)
+            .padding(.bottom, 22)
+
+            // Mood stamp carousel
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 5) {
+                    Text("How are you feeling?")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(PreludePalette.bodyText)
+                    Text("— optional")
+                        .font(.system(size: 13))
+                        .italic()
+                        .foregroundStyle(PreludePalette.optionalItalic)
+                }
+                StampCarouselView(selectedMood: $noteMood)
+            }
+            .padding(.bottom, 22)
+
+            // Photo section
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 5) {
+                    Text("Add a photo?")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(PreludePalette.bodyText)
+                    Text("— optional")
+                        .font(.system(size: 13))
+                        .italic()
+                        .foregroundStyle(PreludePalette.optionalItalic)
+                }
+                notePolaroidPhoto
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: showNotePrompt)
+    }
+
+    /// Warm mocha prompt bar with the washi-tape strip layered in front of it.
+    private func notePromptChip(_ text: String) -> some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(BabyTownTheme.notePromptFill)
+                .frame(height: 44)
+                .overlay(alignment: .leading) {
+                    Text(text)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .padding(.horizontal, 14)
+                }
+                .padding(.top, 9)
+
+            WashiTapeStrip(width: 86)
+        }
+    }
+
+    /// Polaroid-framed note photo area (frame artwork carries the "+" placeholder).
+    private var notePolaroidPhoto: some View {
+        PolaroidPhotoWell(
+            image: notePhotoImage,
+            onTap: { showNotePhotoPicker = true },
+            onRemove: { notePhotoImage = nil }
+        )
     }
 
     private var currentVoicePrompt: String {
@@ -629,40 +610,62 @@ struct CaptureEditorView: View {
     }
 
     private var voiceMemoEditor: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+
+                if showsGiftToggle {
+                    giftToggle
+                        .padding(.bottom, 20)
+                }
+
                 Text(voiceMemoHeadline)
-                    .font(.system(size: 22, weight: .semibold, design: .serif))
-                    .foregroundStyle(BabyTownTheme.textPrimary)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(PreludePalette.voiceHeading)
+                    .padding(.bottom, 20)
 
                 Text(voiceMemoDescription)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.black)
+                    .font(.system(size: 13))
+                    .lineSpacing(2.5)
+                    .foregroundStyle(PreludePalette.voiceCopy)
                     .fixedSize(horizontal: false, vertical: true)
-            }
+                    .padding(.bottom, 29)
 
-            Button(showVoicePrompt ? "Different idea" : "Need an idea?") {
+                Button(showVoicePrompt ? "Different prompt" : "Generate a prompt") {
+                    if showVoicePrompt {
+                        voicePromptIndex += 1
+                    } else {
+                        showVoicePrompt = true
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(PreludePalette.generateInk)
+                .padding(.horizontal, 13)
+                .frame(height: 28)
+                .overlay(
+                    Capsule().strokeBorder(PreludePalette.generateBorder, lineWidth: 1)
+                )
+                .buttonStyle(.plain)
+
                 if showVoicePrompt {
-                    voicePromptIndex += 1
-                } else {
-                    showVoicePrompt = true
+                    PreludeTapedPromptBar(text: currentVoicePrompt)
+                        .padding(.top, 7)
+                        .transition(.opacity)
                 }
-            }
-            .font(.system(size: 13))
-            .foregroundStyle(BabyTownTheme.accent)
 
-            if showVoicePrompt {
-                promptChip(currentVoicePrompt)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                VoiceMemoRecorderView(
+                    existingFileId: existing?.voiceMemoFileId,
+                    storage: voiceMemoStorage,
+                    onSaved: { fileId in
+                        savedVoiceMemoFileId = fileId
+                    }
+                )
+                .padding(.top, 83)
+                .frame(maxWidth: .infinity)
             }
-
-            VoiceMemoRecorderView(
-                existingFileId: existing?.voiceMemoFileId,
-                storage: voiceMemoStorage,
-                onSaved: { fileId in
-                    savedVoiceMemoFileId = fileId
-                }
-            )
+            .padding(.horizontal, 27)
+            .padding(.top, 37)
+            .padding(.bottom, 40)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .animation(.easeInOut(duration: 0.2), value: showVoicePrompt)
     }
@@ -672,24 +675,61 @@ struct CaptureEditorView: View {
     }
 
     private var reasonEditor: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            promptChip(reasonPrompt)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
 
-            TextField(
-                "", text: $reasonText,
-                prompt: Text(reasonPlaceholder).foregroundStyle(Color(uiColor: .darkGray).opacity(0.55)),
-                axis: .vertical
-            )
-            .foregroundStyle(.black)
-            .lineLimit(3, reservesSpace: true)
-            .font(.system(size: 16))
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(BabyTownTheme.cardBackground)
-            )
-            .focused($isEditorFocused)
+                if showsGiftToggle {
+                    giftToggle
+                        .padding(.bottom, 20)
+                }
+
+                // Fixed prompt — this sheet never offers a different one.
+                PreludeTapedPromptBar(text: reasonPrompt)
+                    .padding(.bottom, 28)
+
+                // Thought field with the paperclip over its top-left corner.
+                ZStack(alignment: .topLeading) {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(PreludePalette.textAreaFill)
+
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(
+                                isEditorFocused ? PreludePalette.promptBrown : .clear,
+                                lineWidth: 1.5
+                            )
+
+                        TextEditor(text: $reasonText)
+                            .scrollContentBackground(.hidden)
+                            .foregroundStyle(PreludePalette.reasonInk)
+                            .font(.system(size: 15))
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 5)
+                            .focused($isEditorFocused)
+
+                        if reasonText.isEmpty {
+                            Text("Enter your thoughts...")
+                                .font(.system(size: 15))
+                                .italic()
+                                .foregroundStyle(PreludePalette.reasonPlaceholder)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 13)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .frame(height: 135)
+
+                    PreludePaperclip()
+                        .offset(x: -7, y: -9)
+                }
+                .padding(.bottom, 34)
+            }
+            .padding(.horizontal, 27)
+            .padding(.top, 34)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .animation(.easeInOut(duration: 0.15), value: isEditorFocused)
     }
 
     private func promptChip(_ text: String) -> some View {
@@ -705,14 +745,10 @@ struct CaptureEditorView: View {
 
     // MARK: - Save / Load
 
-    private var canAdvanceFirstStep: Bool {
-        !firstLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     private var canSave: Bool {
         switch type {
         case .note: return !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .first: return firstEditorStep == .photo
+        case .first: return !firstLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .voiceMemo: return savedVoiceMemoFileId != nil || existing?.voiceMemoFileId != nil
         case .reason: return !reasonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -727,10 +763,26 @@ struct CaptureEditorView: View {
         reasonText = c.reasonText ?? ""
         savedVoiceMemoFileId = c.voiceMemoFileId
         firstDate = c.firstDate ?? Date()
+        calendarMonth = Calendar.current.component(.month, from: firstDate) - 1
+        calendarYear = Calendar.current.component(.year, from: firstDate)
         firstPhotoId = c.firstPhotoId
         if let photoId = c.firstPhotoId {
             firstPhotoImage = DataPersistenceManager.shared.loadPreludePhoto(photoId: photoId)
         }
+        notePhotoId = c.notePhotoId
+        if let photoId = c.notePhotoId {
+            notePhotoImage = DataPersistenceManager.shared.loadPreludePhoto(photoId: photoId)
+        }
+    }
+
+    private func resolvedNotePhotoId() -> UUID? {
+        if notePhotoImage != nil {
+            return notePhotoId ?? existing?.notePhotoId ?? UUID()
+        }
+        if let existingPhotoId = existing?.notePhotoId {
+            DataPersistenceManager.shared.deletePreludePhoto(photoId: existingPhotoId)
+        }
+        return nil
     }
 
     private func resolvedFirstPhotoId() -> UUID? {
@@ -780,6 +832,14 @@ struct CaptureEditorView: View {
             }
         }
 
+        var savedNotePhotoId: UUID?
+        if type == .note {
+            savedNotePhotoId = resolvedNotePhotoId()
+            if let photoId = savedNotePhotoId, let image = notePhotoImage {
+                DataPersistenceManager.shared.savePreludePhoto(image, photoId: photoId)
+            }
+        }
+
         let capture = PreludeCapture(
             id: existing?.id ?? UUID(),
             createdAt: existing?.createdAt ?? Date(),
@@ -788,6 +848,7 @@ struct CaptureEditorView: View {
             isPartnerRetroactive: existing?.isPartnerRetroactive ?? false,
             noteText: type == .note ? noteText.trimmingCharacters(in: .whitespacesAndNewlines) : nil,
             noteMood: type == .note ? noteMood : nil,
+            notePhotoId: type == .note ? savedNotePhotoId : nil,
             firstLabel: type == .first ? firstLabel.trimmingCharacters(in: .whitespacesAndNewlines) : nil,
             firstPhotoId: type == .first ? savedFirstPhotoId : nil,
             voiceMemoFileId: resolvedFileId,

@@ -30,6 +30,17 @@ Always use `BabyTownTheme.*` properties. Never hardcode color values. Both theme
 | Blush Soft | `BabyTownTheme.blushSoft` | `rgb(0.92, 0.95, 1.0)` |
 | Background | `BabyTownTheme.background` | White with soft blue gradient to bottom |
 
+### Note Editor Colors (theme-dependent)
+
+These tokens power the note-capture sheet. Both themes must always be supported.
+
+| Token | Swift property | Pink value | Blue value |
+|---|---|---|---|
+| Editor background | `BabyTownTheme.noteEditorBackground` | `rgb(0.94, 0.90, 0.85)` warm linen | `rgb(0.88, 0.92, 0.97)` cool sky |
+| Prompt chip fill | `BabyTownTheme.notePromptFill` | `rgb(0.529, 0.424, 0.318)` warm mocha | `rgb(0.35, 0.45, 0.62)` steel blue |
+| Text area fill | `BabyTownTheme.noteTextAreaFill` | `rgb(0.863, 0.816, 0.765)` warm sand | `rgb(0.80, 0.86, 0.94)` cool mist |
+| Tape decoration | `BabyTownTheme.notePromptTapeFill` | `rgb(0.86, 0.80, 0.72)` at 90% (fixed, theme-neutral) | same |
+
 ### Fixed Colors (not theme-dependent)
 
 | Purpose | Token | Value |
@@ -79,6 +90,31 @@ Always use `BabyTownTheme.*` properties. Never hardcode color values. Both theme
 - Float, pulse, and sparkle effects are on-brand
 - Transitions should feel like turning a page, not clicking a button
 - Abrupt cuts and harsh snaps are off-brand
+
+## Note Editor — Image Assets
+
+All note editor assets live in `Assets.xcassets` using snake_case names.
+
+### Stamp images
+Custom PNG crops from `stamps.png` / `stamps selected.png` (75×75pt each, 5 moods).
+`StampCarouselView` resolves them automatically via `"stamp_\(mood.displayName.lowercased())_\(isSelected ? "sel" : "unsel")"`.
+
+| Asset name | State | Mood |
+|---|---|---|
+| `stamp_butterflies_unsel` / `stamp_butterflies_sel` | unsel / sel | Butterflies |
+| `stamp_giddy_unsel` / `stamp_giddy_sel` | unsel / sel | Giddy |
+| `stamp_smitten_unsel` / `stamp_smitten_sel` | unsel / sel | Smitten |
+| `stamp_dreamy_unsel` / `stamp_dreamy_sel` | unsel / sel | Dreamy |
+| `stamp_playful_unsel` / `stamp_playful_sel` | unsel / sel | Playful |
+
+### Other note assets
+
+| Asset name | Usage |
+|---|---|
+| `note_washi_tape` | Tape decoration strip on the prompt chip (57×17pt) |
+| `note_polaroid_frame` | Photo upload placeholder in the note editor (125×152pt) |
+| `note_textbox` | Textbox background decoration |
+| `note_paperclip` | Paperclip decoration on the textbox |
 
 ## Special: Story Onboarding Theme
 The story onboarding flow uses `StoryOnboardingTheme` — a separate blush/red theme distinct from the main app. Do not use main app theme tokens inside `StoryOnboardingFlow.swift` or its scene views.

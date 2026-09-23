@@ -10,7 +10,8 @@ struct VoiceMemoRecorderView: View {
     @StateObject private var recorder = VoiceRecorder()
     @State private var savedFileId: String?
     @State private var hasMicPermission: Bool = false
-    @State private var pulseScale: CGFloat = 1.0
+    /// 0 = ring at rest, 1 = ring fully expanded and faded out.
+    @State private var ringPhase: CGFloat = 0
 
     private let maxDuration: TimeInterval = 60
 
@@ -25,27 +26,24 @@ struct VoiceMemoRecorderView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
-            waveformDisplay
+        VStack(spacing: 0) {
+            PreludeWaveBars(isLive: recorder.isRecording || recorder.isPlaying)
 
             durationDisplay
+                .padding(.top, 29)
 
-            if phase != .saved {
-                recordButton
-                phaseHint
-            } else {
-                savedBadge
-            }
+            statusLine
+                .padding(.top, 14)
 
             if phase == .saved {
                 playbackControls
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .padding(.top, 96)
+                    .transition(.opacity)
+            } else {
+                recordStage
             }
         }
-        .padding(.vertical, 28)
-        .padding(.horizontal, 24)
         .frame(maxWidth: .infinity)
-        .background(recorderBackground)
         .animation(.easeInOut(duration: 0.25), value: phase)
         .onAppear {
             checkMicPermission()
@@ -65,12 +63,13 @@ struct VoiceMemoRecorderView: View {
         }
         .onChange(of: recorder.isRecording) { _, isRecording in
             if isRecording {
-                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                    pulseScale = 1.12
+                ringPhase = 0
+                withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) {
+                    ringPhase = 1
                 }
             } else {
                 withAnimation(.easeOut(duration: 0.2)) {
-                    pulseScale = 1.0
+                    ringPhase = 0
                 }
             }
         }
@@ -78,39 +77,86 @@ struct VoiceMemoRecorderView: View {
 
     // MARK: - Visual Components
 
-    private var recorderBackground: some View {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(BabyTownTheme.blushSoft)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(BabyTownTheme.accent.opacity(phase == .recording ? 0.25 : 0.08), lineWidth: 1)
-            )
-    }
-
-    private var waveformDisplay: some View {
-        Image(systemName: "waveform")
-            .font(.system(size: 36, weight: .light))
-            .foregroundStyle(BabyTownTheme.accent.opacity(phase == .ready ? 0.3 : 0.85))
-            .symbolEffect(.variableColor.iterative.reversing, isActive: phase == .recording || recorder.isPlaying)
-            .frame(height: 40)
-    }
-
+    /// Timer. Counts up while recording, then holds the take's length.
     private var durationDisplay: some View {
-        VStack(spacing: 4) {
-            Text(durationString(recorder.recordingDuration))
-                .font(.system(size: 44, weight: .thin, design: .monospaced))
-                .foregroundStyle(phase == .recording ? BabyTownTheme.accent : BabyTownTheme.textPrimary)
-                .contentTransition(.numericText())
-                .animation(.linear(duration: 0.1), value: recorder.recordingDuration)
+        Text(durationString(recorder.recordingDuration))
+            .font(.system(size: 41, weight: .regular))
+            .foregroundStyle(PreludePalette.timerInk)
+            .monospacedDigit()
+            .contentTransition(.numericText())
+            .animation(.linear(duration: 0.1), value: recorder.recordingDuration)
+    }
 
-            if phase == .ready {
-                Text("Up to 1 minute")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(BabyTownTheme.textTertiary)
-                    .textCase(.uppercase)
-                    .tracking(0.6)
+    /// "UP TO 1 MINUTE" until there is a take, then the saved badge.
+    @ViewBuilder
+    private var statusLine: some View {
+        if phase == .saved {
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 15))
+                Text("Voicemail Saved")
+                    .font(.system(size: 12, weight: .semibold))
             }
+            .foregroundStyle(PreludePalette.savedRed)
+        } else {
+            Text("UP TO 1 MINUTE")
+                .font(.system(size: 11))
+                .tracking(1.3)
+                .foregroundStyle(PreludePalette.captionInk)
         }
+    }
+
+    /// The rotary phone with the record button seated on it. Lifting the
+    /// handset is what recording looks like: the on-hook art is swapped for the
+    /// off-hook handset sliding in at the bottom.
+    private var recordStage: some View {
+        ZStack(alignment: .top) {
+            if recorder.isRecording {
+                Image("voice_handset_offhook")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 286)
+                    .offset(x: -53.5, y: 183)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            } else {
+                Image("voice_phone_onhook")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 252)
+                    // The artwork has the red button baked into it, 34.5pt
+                    // right of its centre. Shifting the phone left by exactly
+                    // that puts the baked button on the container's centre
+                    // line, where the live button is drawn — so the two land
+                    // on top of each other and read as one button.
+                    .offset(x: -34.5, y: 13)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+
+            if recorder.isRecording {
+                Circle()
+                    .strokeBorder(PreludePalette.wavePink, lineWidth: 1.5)
+                    .frame(width: 92, height: 92)
+                    .scaleEffect(1 + 0.13 * ringPhase)
+                    .opacity(0.9 - 0.9 * Double(ringPhase))
+                    .offset(y: 32.5)
+                    .allowsHitTesting(false)
+            }
+
+            recordButton
+                .offset(y: 41.5)
+
+            Text(recorder.isRecording ? "Tap to finish" : "Tap to record a voicemail")
+                .font(.system(size: 11))
+                .foregroundStyle(recorder.isRecording
+                                 ? PreludePalette.savedRed
+                                 : PreludePalette.captionInk)
+                .offset(y: recorder.isRecording ? 145 : 158)
+        }
+        .frame(height: 250)
     }
 
     private var recordButton: some View {
@@ -132,62 +178,27 @@ struct VoiceMemoRecorderView: View {
             }
         } label: {
             ZStack {
-                if phase == .recording {
-                    Circle()
-                        .stroke(BabyTownTheme.accent.opacity(0.2), lineWidth: 2)
-                        .frame(width: 92, height: 92)
-                        .scaleEffect(pulseScale)
-
-                    Circle()
-                        .trim(from: 0, to: min(recorder.recordingDuration / maxDuration, 1))
-                        .stroke(BabyTownTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 92, height: 92)
-                }
-
                 Circle()
-                    .fill(
-                        phase == .recording
-                            ? AnyShapeStyle(BabyTownTheme.accentDeep)
-                            : AnyShapeStyle(BabyTownTheme.accentGradient)
-                    )
-                    .frame(width: 72, height: 72)
-                    .shadow(color: BabyTownTheme.accent.opacity(phase == .recording ? 0.45 : 0.3), radius: 12, y: 4)
+                    .fill(PreludePalette.recordRed)
+                    .frame(width: 74, height: 74)
+                    .shadow(color: PreludePalette.recordRed.opacity(0.28), radius: 7, y: 4)
 
-                Image(systemName: phase == .recording ? "stop.fill" : "mic.fill")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(.white)
+                if recorder.isRecording {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(.white)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(.white)
+                }
             }
         }
         .buttonStyle(.plain)
     }
 
-    private var savedBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14, weight: .semibold))
-            Text("Recording saved")
-                .font(.system(size: 13, weight: .medium))
-        }
-        .foregroundStyle(BabyTownTheme.accent)
-    }
-
-    private var phaseHint: some View {
-        Text(phaseHintText)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(phase == .recording ? BabyTownTheme.accent : BabyTownTheme.textTertiary)
-    }
-
-    private var phaseHintText: String {
-        switch phase {
-        case .ready: return "Tap to record"
-        case .recording: return "Tap to finish"
-        case .saved: return ""
-        }
-    }
-
     private var playbackControls: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 63) {
             Button {
                 if recorder.isPlaying {
                     recorder.stopPlaying()
@@ -198,13 +209,13 @@ struct VoiceMemoRecorderView: View {
                 HStack(spacing: 8) {
                     Image(systemName: recorder.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 13, weight: .semibold))
-                    Text(recorder.isPlaying ? "Pause" : "Play back")
+                    Text(recorder.isPlaying ? "Playing" : "Play back")
                         .font(.system(size: 15, weight: .semibold))
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Capsule().fill(BabyTownTheme.accent))
+                .padding(.horizontal, 22)
+                .frame(height: 39)
+                .background(Capsule().fill(PreludePalette.savedRed))
             }
             .buttonStyle(.plain)
 
@@ -215,11 +226,10 @@ struct VoiceMemoRecorderView: View {
                 savedFileId = nil
                 recorder.deleteRecording()
             }
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(BabyTownTheme.textSecondary)
+            .font(.system(size: 15))
+            .foregroundStyle(PreludePalette.rerecordInk)
             .buttonStyle(.plain)
         }
-        .padding(.top, 4)
     }
 
     // MARK: - Helpers

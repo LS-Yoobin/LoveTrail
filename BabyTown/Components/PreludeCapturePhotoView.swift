@@ -19,11 +19,19 @@ struct PreludeCapturePhotoView: View {
     var body: some View {
         Group {
             if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+                // Color.clear fixes the layout size to the column width by the
+                // given height; the photo is drawn as an overlay on top and
+                // clipped. Laying the image out directly lets scaledToFill
+                // report its own, much larger, ideal width, which pushed the
+                // whole card wider than the ones without a photo.
+                Color.clear
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
+                    .overlay {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             } else if isLoading && hasPhotoSource {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

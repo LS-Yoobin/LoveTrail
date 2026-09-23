@@ -83,6 +83,26 @@ enum BabyTownTheme {
         isBlue ? Color(red: 0.30, green: 0.50, blue: 0.80) : Color(red: 0.84, green: 0.41, blue: 0.45)
     }
 
+    // MARK: - Note Editor
+
+    /// Background for the note-capture sheet. Pink: warm linen. Blue: cool sky.
+    static var noteEditorBackground: Color {
+        isBlue ? Color(red: 0.88, green: 0.92, blue: 0.97) : Color(red: 0.94, green: 0.90, blue: 0.85)
+    }
+
+    /// Prompt chip fill in the note editor. Pink: warm mocha. Blue: steel blue.
+    static var notePromptFill: Color {
+        isBlue ? Color(red: 0.35, green: 0.45, blue: 0.62) : Color(red: 0.529, green: 0.424, blue: 0.318)
+    }
+
+    /// Text area fill in the note editor. Pink: warm sand. Blue: cool mist.
+    static var noteTextAreaFill: Color {
+        isBlue ? Color(red: 0.80, green: 0.86, blue: 0.94) : Color(red: 0.863, green: 0.816, blue: 0.765)
+    }
+
+    /// Washi-tape strip decoration on the note prompt chip (theme-neutral warm cream).
+    static let notePromptTapeFill = Color(red: 0.86, green: 0.80, blue: 0.72).opacity(0.9)
+
     // MARK: - Invite Banner
 
     static var inviteBannerFill: Color {

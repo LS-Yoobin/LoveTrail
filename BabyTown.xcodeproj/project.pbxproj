@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4ED48DDC302ABB7C00CBA976 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 4ED48DDB302ABB7C00CBA976 /* Algorithms */; };
 		7A455F932F3EBD2700443248 /* transparent flowers gif2.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 7A455F922F3EBD2700443248 /* transparent flowers gif2.mp4 */; };
 		7A4560F82F3F1C9400443248 /* Kawaii kittens waving with joy 1.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A4560F72F3F1C9400443248 /* Kawaii kittens waving with joy 1.png */; };
 		7A4560FE2F3F1D8F00443248 /* Cat 3.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A4560FB2F3F1D8F00443248 /* Cat 3.png */; };
@@ -64,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4ED48DDC302ABB7C00CBA976 /* Algorithms in Frameworks */,
 				AAAA0000000000000000AA03 /* GardenCore in Frameworks */,
 				BBBB0000000000000000BB03 /* WebRTC in Frameworks */,
 			);
@@ -144,6 +146,7 @@
 			packageProductDependencies = (
 				AAAA0000000000000000AA02 /* GardenCore */,
 				BBBB0000000000000000BB02 /* WebRTC */,
+				4ED48DDB302ABB7C00CBA976 /* Algorithms */,
 			);
 			productName = BabyTown;
 			productReference = 7A9F69342F3E5CE500664BD9 /* BabyTown.app */;
@@ -176,6 +179,7 @@
 			packageReferences = (
 				AAAA0000000000000000AA01 /* XCLocalSwiftPackageReference "GardenCore" */,
 				BBBB0000000000000000BB01 /* XCRemoteSwiftPackageReference "WebRTC" */,
+				4ED48DDA302ABB7C00CBA976 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7A9F69352F3E5CE500664BD9 /* Products */;
@@ -355,7 +359,7 @@
 				CODE_SIGN_ENTITLEMENTS = BabyTown/BabyTown.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = N3L5LBGNK2;
+				DEVELOPMENT_TEAM = V84X8Z6QP3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
@@ -394,7 +398,7 @@
 				CODE_SIGN_ENTITLEMENTS = BabyTown/BabyTown.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = N3L5LBGNK2;
+				DEVELOPMENT_TEAM = V84X8Z6QP3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
@@ -456,6 +460,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4ED48DDA302ABB7C00CBA976 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
 		BBBB0000000000000000BB01 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stasel/WebRTC.git";
@@ -467,6 +479,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4ED48DDB302ABB7C00CBA976 /* Algorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4ED48DDA302ABB7C00CBA976 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
+			productName = Algorithms;
+		};
 		AAAA0000000000000000AA02 /* GardenCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GardenCore;
