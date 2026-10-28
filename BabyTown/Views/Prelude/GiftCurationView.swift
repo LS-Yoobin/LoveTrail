@@ -2,6 +2,10 @@ import PhotosUI
 import SwiftUI
 import AVFoundation
 
+/// Gift step one, opened from the home screen's invite banner. A month strip
+/// picks which month's captures are listed; every tile has its own include
+/// toggle and opens that capture's editor when tapped. Create opens the
+/// page-flip preview of everything included, oldest first.
 struct GiftCurationView: View {
 
     @ObservedObject var viewModel: PreludeViewModel
@@ -15,55 +19,83 @@ struct GiftCurationView: View {
     @State private var sendInviteError: String?
     @State private var generatedInviteCode: String?
     @State private var showCodeSheet = false
+    /// Set when Add a song sends the user to Spotify; the song sheet opens
+    /// when they come back so they can import their recording.
+    @State private var awaitingSpotifyReturn = false
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var editorPresentation: CaptureEditorPresentation?
+    @State private var selectedMonth = GiftMonth(date: Date())
+    @State private var monthWindowStart = 0
+
+    /// Side gutter shared by the header, the strip and the tiles (mock: 23pt).
+    private static let gutter: CGFloat = 23
+    private static let monthsVisible = 4
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if viewModel.captures.isEmpty {
-                    emptyState
-                } else {
-                    captureList
-                }
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, Self.gutter)
+                .padding(.top, 14)
 
-                giftSongCard
+            Text("Toggle what to include in your gift. Private captures stay private forever.")
+                .font(.system(size: 11))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Self.gutter)
+                .padding(.top, 30)
+
+            if ownCaptures.isEmpty {
+                emptyState
+            } else {
+                monthStrip
+                    .padding(.top, 26)
+                captureList
+            }
+
+            giftSongCard
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            if let progress = viewModel.invitePrepProgress {
+                Text("Uploading your gift… \(progress.completed)/\(progress.total)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.black)
                     .padding(.horizontal, 24)
-                    .padding(.top, 8)
                     .padding(.bottom, 4)
+            }
 
-                if let progress = viewModel.invitePrepProgress {
-                    Text("Uploading your gift… \(progress.completed)/\(progress.total)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 4)
-                }
-
-                sendButton
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
-                    .padding(.top, 12)
-            }
-            .background(BabyTownTheme.background.ignoresSafeArea())
-            .onAppear {
-                giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
-            }
-            .navigationTitle("Your Gift")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done", action: onDone)
-                }
-                if !viewModel.giftCaptures.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Preview") { showPreview = true }
-                            .font(.system(size: 15))
-                            .foregroundStyle(BabyTownTheme.accent)
-                    }
-                }
-            }
+            sendButton
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+                .padding(.top, 12)
         }
-        .sheet(isPresented: $showPreview) {
-            GiftPreviewSheet(captures: viewModel.giftCaptures)
+        .background(BabyTownTheme.background.ignoresSafeArea())
+        .onAppear {
+            giftSong = DataPersistenceManager.shared.loadPreludeGiftSong()
+            selectInitialMonth()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, awaitingSpotifyReturn else { return }
+            awaitingSpotifyReturn = false
+            showGiftSongSheet = true
+        }
+        .sheet(item: $editorPresentation) { presentation in
+            CaptureEditorView(
+                type: presentation.type,
+                existing: presentation.existing,
+                destination: .prelude(viewModel),
+                onSave: { editorPresentation = nil },
+                onCancel: { editorPresentation = nil }
+            )
+        }
+        .fullScreenCover(isPresented: $showPreview) {
+            GiftPageFlipPreview(
+                captures: chronologicalGift,
+                giftSong: giftSong,
+                onDone: { showPreview = false }
+            )
         }
         .alert("Couldn't send invite", isPresented: Binding(
             get: { sendInviteError != nil },
@@ -96,49 +128,168 @@ struct GiftCurationView: View {
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Data
 
-    private func sendInviteAndShowCode() async {
-        guard !isSendingInvite else { return }
-        guard AuthService.shared.isSignedIn else {
-            sendInviteError = "Please sign in to send an invite."
-            return
-        }
-        isSendingInvite = true
-        do {
-            let giftCaptureIds = try await viewModel.syncGiftCapturesForInvite()
-            let inviterName = DataPersistenceManager.shared.loadUserNickname() ?? "You"
-            let response = try await InviteAPI.client.createInvite(
-                inviterName: inviterName,
-                giftCaptureIds: giftCaptureIds
-            )
-            DataPersistenceManager.shared.setPendingPartnerInvite(true)
-            DataPersistenceManager.shared.savePendingInviteCode(response.code)
-            viewModel.sendInvite()
-            generatedInviteCode = response.code
-            showCodeSheet = true
-        } catch {
-            sendInviteError = InviteErrorMapper.message(for: error)
-        }
-        isSendingInvite = false
+    /// The partner's retroactive captures are theirs, not part of this gift.
+    private var ownCaptures: [PreludeCapture] {
+        viewModel.captures.filter { !$0.isPartnerRetroactive }
     }
+
+    /// Everything included, oldest first: the order the pages are read in.
+    private var chronologicalGift: [PreludeCapture] {
+        viewModel.giftCaptures.sorted {
+            if $0.timelineDate != $1.timelineDate { return $0.timelineDate < $1.timelineDate }
+            return $0.createdAt < $1.createdAt
+        }
+    }
+
+    private var canCreate: Bool { !viewModel.giftCaptures.isEmpty }
+
+    private var monthCaptures: [PreludeCapture] {
+        ownCaptures
+            .filter { GiftMonth(date: $0.timelineDate) == selectedMonth }
+            .sorted { $0.timelineDate < $1.timelineDate }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        ZStack {
+            Text("Your Gift")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(PreludePalette.promptBrown)
+
+            HStack {
+                Button(action: onDone) {
+                    Text("Cancel")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.black)
+                        .frame(width: 94, height: 39)
+                        .background(Capsule().fill(PreludePalette.generateFill))
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button { showPreview = true } label: {
+                    Text("Create")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 94, height: 39)
+                        .background(
+                            Capsule().fill(
+                                canCreate
+                                    ? AnyShapeStyle(BabyTownTheme.savePillFill)
+                                    : AnyShapeStyle(Color.gray.opacity(0.35))
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canCreate)
+            }
+        }
+    }
+
+    // MARK: - Month strip
+
+    /// Every month that has a capture, plus this month.
+    private var availableMonths: [GiftMonth] {
+        var months = Set(ownCaptures.map { GiftMonth(date: $0.timelineDate) })
+        months.insert(GiftMonth(date: Date()))
+        return months.sorted()
+    }
+
+    private var windowUpperBound: Int { max(0, availableMonths.count - Self.monthsVisible) }
+
+    private var visibleMonths: [GiftMonth] {
+        let all = availableMonths
+        let start = min(max(0, monthWindowStart), windowUpperBound)
+        return Array(all[start..<min(all.count, start + Self.monthsVisible)])
+    }
+
+    /// Opens on the month of the newest capture, with that month at the right
+    /// end of the window.
+    private func selectInitialMonth() {
+        let newest = ownCaptures.map(\.timelineDate).max() ?? Date()
+        selectedMonth = GiftMonth(date: newest)
+        let position = availableMonths.firstIndex(of: selectedMonth) ?? 0
+        monthWindowStart = min(max(0, position - Self.monthsVisible + 1), windowUpperBound)
+    }
+
+    private var monthStrip: some View {
+        HStack(spacing: 4) {
+            chevron("chevron.left", disabled: monthWindowStart <= 0) {
+                monthWindowStart = max(0, monthWindowStart - 1)
+            }
+
+            HStack(spacing: 4) {
+                ForEach(visibleMonths) { month in
+                    monthPill(month)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            chevron("chevron.right", disabled: monthWindowStart >= windowUpperBound) {
+                monthWindowStart = min(windowUpperBound, monthWindowStart + 1)
+            }
+        }
+        .padding(.horizontal, Self.gutter)
+    }
+
+    private func chevron(_ name: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) { action() }
+        } label: {
+            Image(systemName: name)
+                .font(.system(size: 18))
+                .foregroundStyle(PreludePalette.monthPink)
+                .opacity(disabled ? 0.25 : 1)
+                .padding(.horizontal, 4)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+    }
+
+    private func monthPill(_ month: GiftMonth) -> some View {
+        let isActive = month == selectedMonth
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { selectedMonth = month }
+        } label: {
+            Text(month.shortName)
+                .font(.system(size: 17, weight: isActive ? .semibold : .regular))
+                .foregroundStyle(isActive ? .white : PreludePalette.monthPink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(isActive ? PreludePalette.monthSelected : Color.clear))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(month.accessibilityName)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    // MARK: - Tiles
 
     private var captureList: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Toggle what to include in your gift. Private captures stay private forever.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.black)
-                    .padding(.top, 8)
-
-                ForEach(viewModel.captures) { capture in
-                    GiftCaptureRow(
-                        capture: capture,
-                        onToggle: { viewModel.toggleGiftInclusion(for: capture) }
-                    )
+            LazyVStack(spacing: 22) {
+                if monthCaptures.isEmpty {
+                    Text("Nothing saved in \(selectedMonth.fullName) yet.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(PreludePalette.giftTileSubtitle)
+                        .padding(.top, 40)
+                } else {
+                    ForEach(monthCaptures) { capture in
+                        GiftToggleTile(
+                            capture: capture,
+                            onOpen: { editorPresentation = .edit(capture) },
+                            onToggle: { viewModel.toggleGiftInclusion(for: capture) }
+                        )
+                    }
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Self.gutter)
+            .padding(.top, 17)
             .padding(.bottom, 16)
         }
     }
@@ -158,8 +309,33 @@ struct GiftCurationView: View {
         .padding(.horizontal, 32)
     }
 
+    // MARK: - Song and invite (original Covela controls)
+
+    /// Opens the Spotify app, or Spotify on the web when the app isn't installed.
+    private func openSpotify() {
+        awaitingSpotifyReturn = true
+        openURL(GiftSpotify.appURL) { accepted in
+            if !accepted {
+                openURL(GiftSpotify.webURL) { opened in
+                    if !opened {
+                        awaitingSpotifyReturn = false
+                        showGiftSongSheet = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// No song yet: Add a song opens Spotify. With a song: opens the song
+    /// sheet to change or remove it.
     private var giftSongCard: some View {
-        Button { showGiftSongSheet = true } label: {
+        Button {
+            if giftSong == nil {
+                openSpotify()
+            } else {
+                showGiftSongSheet = true
+            }
+        } label: {
             HStack(spacing: 12) {
                 VinylRecordPlayerView(isPlaying: giftSong != nil, scale: 0.5)
                 if let song = giftSong {
@@ -219,91 +395,136 @@ struct GiftCurationView: View {
         .disabled(isSendingInvite)
         .buttonStyle(.plain)
     }
+
+    // MARK: - Actions
+
+    private func sendInviteAndShowCode() async {
+        guard !isSendingInvite else { return }
+        guard AuthService.shared.isSignedIn else {
+            sendInviteError = "Please sign in to send an invite."
+            return
+        }
+        isSendingInvite = true
+        do {
+            let giftCaptureIds = try await viewModel.syncGiftCapturesForInvite()
+            let inviterName = DataPersistenceManager.shared.loadUserNickname() ?? "You"
+            let response = try await InviteAPI.client.createInvite(
+                inviterName: inviterName,
+                giftCaptureIds: giftCaptureIds
+            )
+            DataPersistenceManager.shared.setPendingPartnerInvite(true)
+            DataPersistenceManager.shared.savePendingInviteCode(response.code)
+            viewModel.sendInvite()
+            generatedInviteCode = response.code
+            showCodeSheet = true
+        } catch {
+            sendInviteError = InviteErrorMapper.message(for: error)
+        }
+        isSendingInvite = false
+    }
 }
 
-// MARK: - GiftCaptureRow
+// MARK: - GiftMonth
 
-struct GiftCaptureRow: View {
+/// A calendar month in a specific year, for the gift's month strip.
+struct GiftMonth: Hashable, Comparable, Identifiable {
+    let year: Int
+    let month: Int  // 1...12
+
+    init(date: Date, calendar: Calendar = .current) {
+        year = calendar.component(.year, from: date)
+        month = calendar.component(.month, from: date)
+    }
+
+    var id: Int { year * 100 + month }
+
+    static func < (lhs: GiftMonth, rhs: GiftMonth) -> Bool { lhs.id < rhs.id }
+
+    private static let shortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    var shortName: String { Self.shortNames[month - 1] }
+
+    var fullName: String { Calendar.current.monthSymbols[month - 1] }
+
+    var accessibilityName: String { "\(fullName) \(year)" }
+}
+
+// MARK: - GiftToggleTile
+
+/// One capture in the gift list: icon, uppercase type, a one-line preview and
+/// the include toggle. Tapping anywhere but the toggle opens the editor.
+struct GiftToggleTile: View {
     let capture: PreludeCapture
+    var onOpen: () -> Void
     var onToggle: () -> Void
 
-    private var hasPhoto: Bool {
-        capture.firstPhotoId != nil || capture.notePhotoId != nil || capture.remotePhotoPath != nil
+    private var label: String {
+        switch capture.type {
+        case .reason: return "Reason"
+        case .voiceMemo: return "Voice Memo"
+        case .first: return "First"
+        case .note: return "Note"
+        }
+    }
+
+    private var iconName: String {
+        if capture.type == .note, let mood = capture.noteMood { return mood.iconName }
+        return capture.typeIcon
+    }
+
+    private var subtitle: String {
+        let text: String?
+        switch capture.type {
+        case .reason: text = capture.reasonText
+        case .voiceMemo: text = "Voice memo"
+        case .first: text = capture.firstLabel
+        case .note: text = capture.noteText
+        }
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? label : trimmed
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Image(systemName: capture.typeIcon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(BabyTownTheme.accent)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(BabyTownTheme.cardBackground))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(capture.typeLabel)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(BabyTownTheme.accent)
-                        .textCase(.uppercase)
-                    Text(capture.displayTitle)
-                        .font(.system(size: 14))
-                        .foregroundStyle(BabyTownTheme.textPrimary)
-                        .lineLimit(2)
+        HStack(spacing: 12) {
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Image(systemName: iconName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 20)
+                        Text(label.uppercased())
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+                    Text(subtitle)
+                        .font(.system(size: 17))
+                        .foregroundStyle(PreludePalette.giftTileSubtitle)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-
-                Spacer()
-
-                Toggle("", isOn: .init(get: { capture.isIncludedInGift }, set: { _ in onToggle() }))
-                    .tint(BabyTownTheme.accent)
-                    .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the editor")
 
-            if hasPhoto {
-                PreludeCapturePhotoView(capture: capture, height: 150, cornerRadius: 10)
-            }
+            Toggle("Include \(label.lowercased()) in gift", isOn: Binding(
+                get: { capture.isIncludedInGift },
+                set: { _ in onToggle() }
+            ))
+            .labelsHidden()
+            .tint(PreludePalette.recordRed)
         }
-        .padding(12)
+        .padding(.leading, 20)
+        .padding(.trailing, 20)
+        .padding(.vertical, 11)
+        .frame(minHeight: 70)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(capture.isIncludedInGift ? BabyTownTheme.accentSoft : BabyTownTheme.cardBackground)
+                .fill(PreludePalette.sheetBackground)
         )
-    }
-}
-
-// MARK: - GiftPreviewSheet
-
-private struct GiftPreviewSheet: View {
-    let captures: [PreludeCapture]
-    @State private var currentIndex: Int = 0
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                BabyTownTheme.background.ignoresSafeArea()
-
-                if captures.isEmpty {
-                    Text("No captures included in gift yet.")
-                        .foregroundStyle(BabyTownTheme.textSecondary)
-                } else {
-                    TabView(selection: $currentIndex) {
-                        ForEach(Array(captures.enumerated()), id: \.offset) { idx, capture in
-                            GiftCardView(capture: capture, isCurrentPage: currentIndex == idx)
-                                .tag(idx)
-                                .padding(.horizontal, 28)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .always))
-                }
-            }
-            .navigationTitle("Preview (\(currentIndex + 1)/\(captures.count))")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
     }
 }
 
@@ -411,9 +632,15 @@ struct GiftCardView: View {
 
 // MARK: - PreludeGiftSongSheet
 
+enum GiftSpotify {
+    static let appURL = URL(string: "spotify:")!
+    static let webURL = URL(string: "https://open.spotify.com")!
+}
+
 private struct PreludeGiftSongSheet: View {
     @Binding var giftSong: PreludeGiftSong?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @StateObject private var importCoordinator = PreludeGiftSongImportCoordinator()
 
     var body: some View {
@@ -462,6 +689,22 @@ private struct PreludeGiftSongSheet: View {
                     }
                     .disabled(importCoordinator.isImporting)
                 }
+
+                Text("Screen-record your song in Spotify, then import the recording here.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    openURL(GiftSpotify.appURL) { accepted in
+                        if !accepted { openURL(GiftSpotify.webURL) }
+                    }
+                } label: {
+                    Label("Open Spotify", systemImage: "arrow.up.forward.app")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(.black)
 
                 if importCoordinator.isImporting {
                     HStack(spacing: 10) {

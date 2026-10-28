@@ -422,3 +422,10 @@ struct PreludeInlineCalendar: View {
         }
     }
 }
+
+// MARK: - Gift flow
+
+/// Colours sampled from the "Your Gift" mock.
+extension PreludePalette {
+    static let giftTileSubtitle = Color(red: 100 / 255, green: 98 / 255, blue: 95 / 255)   // #64625F
+}
