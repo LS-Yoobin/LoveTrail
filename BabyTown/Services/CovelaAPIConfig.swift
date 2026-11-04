@@ -7,10 +7,7 @@ enum CovelaAPIConfig {
            let url = URL(string: override) {
             return url
         }
-        #if DEBUG
+        // TODO: switch Release to https://api.covela.app/covela/api once that domain has DNS + SSL pointing at the backend.
         return URL(string: "https://pocketverse.herokuapp.com/covela/api")!
-        #else
-        return URL(string: "https://api.covela.app/covela/api")!
-        #endif
     }
 }
