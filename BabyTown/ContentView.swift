@@ -88,6 +88,8 @@ struct ContentView: View {
 
     /// Resolves the main app screen for a user who has already finished onboarding locally.
     private static func completedOnboardingScreen() -> Screen {
+        // An archive whose window passed while the app was closed ends before routing.
+        ArchiveService.shared.endArchiveIfExpired()
         let lastScreen = DataPersistenceManager.shared.loadLastActiveScreen()
         let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
         if lastScreen == "officialPending" || DataPersistenceManager.shared.hasPendingPartnerInvite() {
@@ -690,6 +692,11 @@ struct ContentView: View {
                 NotificationManager.shared.refresh()
             }
             if newPhase == .active, oldPhase == .background {
+                if ArchiveService.shared.endArchiveIfExpired(), screen == .archivedCouple {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        screen = .prelude
+                    }
+                }
                 Task { await CoupleSyncEngine.shared.sync(trigger: .foreground) }
             }
         }

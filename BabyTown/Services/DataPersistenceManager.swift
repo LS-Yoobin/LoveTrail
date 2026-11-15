@@ -1150,6 +1150,77 @@ final class DataPersistenceManager {
         return theme
     }
 
+    // MARK: - End of a relationship
+
+    /// Deletes everything the couple built together, keeping only what is personal.
+    ///
+    /// Product rule (2026-11-15): everything a couple builds belongs to the relationship.
+    /// After a breakup it stays for the archive window; when the window ends or the
+    /// user steps out, it is removed so nothing carries into a future relationship.
+    ///
+    /// Removed: moments, founding photos, first memories, letters, special dates (except
+    /// the user's own birthday), garden and profile stickers, memory canvases, the pet
+    /// (and with it the coin balance), the garden, polaroids, the couple playlist, date
+    /// plans, the partner's synced avatar and name, the partner's Prelude gift, the
+    /// archive and sync bookkeeping.
+    ///
+    /// Kept: the account and onboarding state, nickname, own avatar, own birthday,
+    /// own Prelude journaling (captures, voice memos, photos, gift song), theme,
+    /// purchases, and the partner-account flag (it still decides which file holds the
+    /// user's own avatar; see `isPartnerAccount()`).
+    func clearCoupleData() {
+        CoupleSyncEngine.shared.resetLocalState()
+
+        for url in [
+            momentsFileURL, firstMetPhotoURL, officialPhotoURL, promptMemoriesFileURL,
+            userLettersFileURL, petStateFileURL, gardenStateFileURL, memoryCanvasesFileURL,
+            preludeChapterFileURL, partnerGiftCapturesFileURL, archiveBundleFileURL,
+            reconnectInviteFileURL, syncedPartnerAvatarURL,
+            letterVoiceMemosDirectory, letterStickersDirectory, letterPhotosDirectory,
+        ] {
+            try? fileManager.removeItem(at: url)
+        }
+
+        // Special date photos and sticker cutouts share the pinned photos folder with
+        // the user's own avatar, so remove them by name.
+        if let names = try? fileManager.contentsOfDirectory(atPath: pinnedPhotosDirectory.path) {
+            for name in names where name.hasPrefix("special_date_") || name.hasPrefix("profile_sticker_") {
+                try? fileManager.removeItem(at: pinnedPhotosDirectory.appendingPathComponent(name))
+            }
+        }
+
+        for key in [
+            foundingOfficialDateKey, foundingFirstMetDateKey, celebratedMomentMilestonesKey,
+            petNeedsNotifiedWhileLowKey, petMissesYouNotifiedForInteractionAtKey,
+            inviterNameKey, syncedPartnerNicknameKey, hasUnreadMailKey,
+        ] {
+            userDefaults.removeObject(forKey: key)
+        }
+        clearPendingInviteState()
+
+        // Couple profile: keep only the user's own identity.
+        let previous = loadCoupleProfile()
+        var fresh = CoupleProfile()
+        fresh.displayName = previous.displayName
+        fresh.specialDates = previous.specialDates.filter { $0.id == SpecialDate.localUserBirthdayID }
+        fresh.hasSteppedOut = previous.hasSteppedOut
+        fresh.relationshipStage = .prelude
+        if let data = try? encoder.encode(fresh) {
+            try? data.write(to: coupleProfileFileURL)
+        }
+
+        ThumbnailStore.shared.removeAll()
+        MomentVideoStore.shared.removeAll()
+        LocalPolaroidStore.deleteAllFiles()
+        CouplePlaylistStore.clearAll()
+        for plan in DatePlanStore.shared.allPlans() {
+            DatePlanStore.shared.deletePlan(id: plan.id)
+        }
+
+        NotificationManager.shared.refresh()
+        NotificationCenter.default.post(name: .coveDidReset, object: nil)
+    }
+
     func clearAllData() {
         // Must go first: with local data gone but sync snapshots kept, the next sync
         // would read every record as "deleted locally" and delete it on the server.

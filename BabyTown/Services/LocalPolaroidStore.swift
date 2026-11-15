@@ -48,6 +48,22 @@ final class LocalPolaroidStore: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadForCurrentAccount() }
         }
+        resetObserver = NotificationCenter.default.addObserver(
+            forName: .coveDidReset, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadForCurrentAccount() }
+        }
+    }
+
+    private var resetObserver: NSObjectProtocol?
+
+    /// Removes every polaroid file of the active account, for all store instances at
+    /// once. Instances reload on `.coveDidReset`.
+    static func deleteAllFiles() {
+        for name in ["polaroid_entries.json", "processing_memories.json",
+                     "polaroid_images", "polaroid_vibes", "polaroid_videos"] {
+            try? FileManager.default.removeItem(at: CovelaUserScope.documentsDirectory.appendingPathComponent(name))
+        }
     }
 
     /// Re-reads entries from the now-active account's directory.

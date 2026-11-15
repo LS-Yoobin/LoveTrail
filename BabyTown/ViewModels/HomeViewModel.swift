@@ -465,8 +465,21 @@ final class HomeViewModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+
+        // End of a relationship: drop the in-memory copies so they can't be saved back.
+        NotificationCenter.default.publisher(for: .coveDidReset)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    let dpm = DataPersistenceManager.shared
+                    self.moments = dpm.loadMoments()
+                    self.promptMemories = dpm.loadPromptMemories()
+                    self.pinnedFirstMet = nil
+                }
+            }
+            .store(in: &cancellables)
     }
-    
+
     func checkAndReleasePhotos() {
         let readyToRelease = polaroidStore.getUnreleasedEntriesReadyForRelease()
         if !readyToRelease.isEmpty {

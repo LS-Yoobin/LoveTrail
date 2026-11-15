@@ -81,13 +81,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             NotificationCenter.default.post(name: AppDelegate.openScrapbookNotificationName, object: nil)
         } else if identifier == "archive_expired" {
             Task { @MainActor in
-                var profile = DataPersistenceManager.shared.loadCoupleProfile()
-                if profile.relationshipStage == .archivedCouple {
-                    profile.relationshipStage = .prelude
-                    profile.breakupDate = nil
-                    profile.archiveExpiryDate = nil
-                    DataPersistenceManager.shared.saveCoupleProfile(profile)
-                    DataPersistenceManager.shared.deleteArchiveBundle()
+                if DataPersistenceManager.shared.loadCoupleProfile().relationshipStage == .archivedCouple {
+                    ArchiveService.shared.endRelationship()
                 }
             }
         } else if (response.notification.request.content.userInfo["type"] as? String) == "invite_accepted" {

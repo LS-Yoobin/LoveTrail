@@ -109,6 +109,16 @@ final class ThumbnailStore: @unchecked Sendable {
         }
     }
 
+    /// Deletes every thumbnail of the active account (end of a relationship).
+    func removeAll() {
+        cache.removeAllObjects()
+        let dir = directory
+        ioQueue.sync(flags: .barrier) {
+            try? fileManager.removeItem(at: dir)
+            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+    }
+
     func remove(for id: UUID) {
         cache.removeObject(forKey: id.uuidString as NSString)
         let fileURL = url(for: id)

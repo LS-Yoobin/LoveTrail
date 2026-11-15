@@ -78,4 +78,9 @@ extension Notification.Name {
     /// Posted on the main actor after the signed-in account changes (sign-in, sign-out,
     /// account switch). Stores that cache per-account data in memory should reload.
     static let covelaAccountDidChange = Notification.Name("covelaAccountDidChange")
+
+    /// Posted on the main actor after `DataPersistenceManager.clearCoupleData()` removed
+    /// everything the couple built (end of the archive window, or step out). Anything
+    /// holding couple data in memory must reload.
+    static let coveDidReset = Notification.Name("coveDidReset")
 }

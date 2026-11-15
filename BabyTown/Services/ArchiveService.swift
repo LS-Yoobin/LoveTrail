@@ -79,15 +79,32 @@ final class ArchiveService: ObservableObject {
 
     // MARK: - Step Out
 
+    /// Leaves the archive now. Everything the couple built is removed from this phone
+    /// (see `DataPersistenceManager.clearCoupleData()`).
     func stepOut() {
         var profile = dpm.loadCoupleProfile()
         profile.hasSteppedOut = true
-        profile.relationshipStage = .prelude
-        profile.breakupDate = nil
-        profile.archiveExpiryDate = nil
         dpm.saveCoupleProfile(profile)
-        dpm.deleteArchiveBundle()
-        dpm.clearReconnectInvite()
+        endRelationship()
+    }
+
+    /// Ends the archive if its window has passed. Call at launch (before routing) and
+    /// when the app returns to the foreground, so expiry doesn't depend on the user
+    /// tapping the "archive expired" notification. Returns `true` if it ended.
+    @discardableResult
+    func endArchiveIfExpired(now: Date = Date()) -> Bool {
+        let profile = dpm.loadCoupleProfile()
+        guard profile.relationshipStage == .archivedCouple,
+              let expiry = profile.archiveExpiryDate,
+              expiry <= now else { return false }
+        endRelationship()
+        return true
+    }
+
+    /// The relationship is over and its archive window is closed: remove what the
+    /// couple built and return to Prelude.
+    func endRelationship() {
+        dpm.clearCoupleData()
         cancelRetentionNotifications()
     }
 
