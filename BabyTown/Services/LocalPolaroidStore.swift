@@ -57,6 +57,16 @@ final class LocalPolaroidStore: ObservableObject {
 
     private var resetObserver: NSObjectProtocol?
 
+    /// Ids of the polaroids stored for the active account, read from disk so callers
+    /// don't need a store instance. Couple sync uses it so a Moment the server
+    /// revealed from one of this user's polaroids keeps the polaroid's id.
+    static func storedEntryIDs() -> [UUID] {
+        let url = CovelaUserScope.documentsDirectory.appendingPathComponent("polaroid_entries.json")
+        guard let data = try? Data(contentsOf: url),
+              let entries = try? JSONDecoder().decode([PolaroidEntry].self, from: data) else { return [] }
+        return entries.map(\.id)
+    }
+
     /// Removes every polaroid file of the active account, for all store instances at
     /// once. Instances reload on `.coveDidReset`.
     static func deleteAllFiles() {

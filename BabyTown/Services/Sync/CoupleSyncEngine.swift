@@ -23,7 +23,7 @@ final class CoupleSyncEngine: ObservableObject {
     static let shared = CoupleSyncEngine()
 
     enum Trigger: String {
-        case launch, foreground, localChange, retry, silentPush, pullToRefresh, accountChange, manual
+        case launch, foreground, localChange, retry, silentPush, pullToRefresh, accountChange, backgroundRefresh, manual
     }
 
     enum Status: Equatable {

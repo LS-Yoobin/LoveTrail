@@ -25,6 +25,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         NotificationManager.shared.requestAuthorization()
         refreshNotificationsAfterAppIconUpdateIfNeeded()
 
+        PolaroidRevealBackgroundTask.register()
+        PolaroidRevealBackgroundTask.scheduleNext()
+
         return true
     }
     

@@ -100,6 +100,7 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
     func applyRemote(upserts: [[String: Any]], deletedIds: [String]) {
         var moments = dpm.loadMoments()
         let deleted = Set(deletedIds)
+        let polaroidIDs = LocalPolaroidStore.storedEntryIDs()
 
         moments.removeAll { moment in
             guard Self.isSynced(moment) else { return false }
@@ -119,7 +120,11 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
 
             let index = moments.firstIndex { SyncIDCodec.matches($0.id, objectId: recordId) }
             let existing = index.map { moments[$0] }
-            guard let localId = existing?.id ?? SyncIDCodec.uuid(forObjectId: recordId) else { continue }
+            // A Moment the server revealed from one of *this* user's polaroids (BAB-143)
+            // keeps the polaroid's UUID, so the app's own 9 PM reveal recognises it
+            // instead of adding a second copy.
+            let polaroidId = polaroidIDs.first { SyncIDCodec.matches($0, objectId: recordId) }
+            guard let localId = existing?.id ?? polaroidId ?? SyncIDCodec.uuid(forObjectId: recordId) else { continue }
 
             // `dateTaken` is immutable, so rebuild the value and carry local-only fields over.
             var moment = Moment(syncedId: localId, dateTaken: timestamp, copying: existing)

@@ -524,25 +524,13 @@ final class HomeViewModel: ObservableObject {
     }
     
     private func checkAndUnlockProcessingMemories() {
-        let now = Date()
-        let unlockedMemories = polaroidStore.processingMemories.filter { $0.unlockTime <= now }
-        
-        if !unlockedMemories.isEmpty {
-            var entriesToRelease: [PolaroidEntry] = []
-            
-            for memory in unlockedMemories {
-                if let entry = polaroidStore.entries.first(where: { $0.id == memory.id }) {
-                    entriesToRelease.append(entry)
-                    polaroidStore.removeProcessingMemory(memory.id)
-                }
-            }
-            
-            // Mark entries as released (automatically at 9:00 PM)
-            if !entriesToRelease.isEmpty {
-                polaroidStore.releaseEntries(entriesToRelease)
-                releasePolaroids(entriesToRelease)
-            }
-            
+        let hadUnlocked = polaroidStore.processingMemories.contains { $0.unlockTime <= Date() }
+        // Mark entries as released (automatically at 9:00 PM)
+        let entriesToRelease = PolaroidReveal.takeDueEntries(from: polaroidStore)
+        if !entriesToRelease.isEmpty {
+            releasePolaroids(entriesToRelease)
+        }
+        if hadUnlocked {
             // Force UI refresh
             objectWillChange.send()
         }
@@ -1029,59 +1017,9 @@ final class HomeViewModel: ObservableObject {
     }
     
     func releasePolaroids(_ entries: [PolaroidEntry]) {
-        var newMoments: [Moment] = []
-        
-        let laTimeZone = TimeZone(identifier: "America/Los_Angeles")!
-        var laCalendar = Calendar.current
-        laCalendar.timeZone = laTimeZone
-        
-        for entry in entries {
-            if let image = polaroidStore.loadImage(for: entry) {
-                var isLocked = false
-                var unlockTime: Date? = nil
-                
-                if let manualReleaseTime = entry.manuallyReleasedAt {
-                    let captureDay = laCalendar.startOfDay(for: entry.capturedAt)
-                    var releaseComponents = laCalendar.dateComponents([.year, .month, .day], from: captureDay)
-                    releaseComponents.hour = 21
-                    releaseComponents.minute = 0
-                    releaseComponents.second = 0
-                    
-                    if let scheduledUnlockTime = laCalendar.date(from: releaseComponents) {
-                        if manualReleaseTime < scheduledUnlockTime {
-                            isLocked = true
-                            unlockTime = scheduledUnlockTime
-                        }
-                    }
-                }
-                
-                var videoFileName: String?
-                if let polaroidVideoFileName = entry.videoFileName {
-                    MomentVideoStore.shared.importFromPolaroid(
-                        momentId: entry.id,
-                        polaroidFileName: polaroidVideoFileName
-                    )
-                    videoFileName = MomentVideoStore.shared.fileName(for: entry.id)
-                }
-
-                let moment = Moment(
-                    id: entry.id,
-                    dateTaken: entry.capturedAt,
-                    assetIdentifier: nil,
-                    thumbnail: image,
-                    placeName: entry.placeName,
-                    isLocked: isLocked,
-                    unlockTime: unlockTime,
-                    latitude: entry.latitude,
-                    longitude: entry.longitude,
-                    videoFileName: videoFileName,
-                    dateAddedToApp: Date()
-                )
-                newMoments.append(moment)
-            }
-        }
-        
-        addMoments(newMoments)
+        var updated = moments
+        PolaroidReveal.apply(entries, store: polaroidStore, to: &updated)
+        moments = updated
     }
     
     private func scheduleNextReleaseCheck() {

@@ -2,13 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Merged with the generated Info.plist (GENERATE_INFOPLIST_FILE = YES).
-	     Only keys the INFOPLIST_KEY_* build settings cannot express live here.
-	     Kept outside BabyTown/ so the synchronized folder doesn't copy it as a resource. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>LS.Covela.polaroidReveal</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-		<!-- Couple Cloud Sync: silent push from the server when the partner changes data (BAB-71). -->
 		<string>remote-notification</string>
+		<string>fetch</string>
 	</array>
 </dict>
 </plist>
