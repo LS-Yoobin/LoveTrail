@@ -68,7 +68,7 @@ enum ProfileStickerSync {
 
     /// Photo for the right (partner) avatar slot — empty for partner viewership until sync lands.
     private static func loadPartnerSlotPhoto(dpm: DataPersistenceManager) -> UIImage? {
-        dpm.isPartnerAccount() ? nil : dpm.loadPartnerProfilePhoto()
+        dpm.loadOtherPartnerAvatar()
     }
 
     /// Guarantees exactly one user-avatar sticker (placeholder when no photo).

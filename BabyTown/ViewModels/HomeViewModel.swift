@@ -148,7 +148,7 @@ final class HomeViewModel: ObservableObject {
     private var isBackfillingCountries = false
     private var lastKnownMomentCount = DataPersistenceManager.shared.loadMoments().count
 
-    private static let foundingPrompts: Set<String> = [
+    static let foundingPrompts: Set<String> = [
         "When we first met",
         "When we became official"
     ]
@@ -188,7 +188,7 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    private static func isFoundingMoment(_ moment: Moment) -> Bool {
+    static func isFoundingMoment(_ moment: Moment) -> Bool {
         guard let prompt = moment.promptText else { return false }
         return foundingPrompts.contains(prompt)
     }
@@ -435,8 +435,24 @@ final class HomeViewModel: ObservableObject {
         refreshMapDaySections()
 
         setupPolaroidStoreObserver()
+        setupCoupleSyncObserver()
     }
-    
+
+    /// Reloads moments the instant couple sync writes the partner's changes to disk.
+    /// Must be synchronous (queue: nil): saving this in-memory array while it is stale
+    /// would erase the pulled moments and read as local deletes.
+    private func setupCoupleSyncObserver() {
+        NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)
+            .sink { [weak self] notification in
+                guard let resources = notification.userInfo?["resources"] as? Set<String>,
+                      resources.contains("moments") else { return }
+                MainActor.assumeIsolated {
+                    self?.moments = DataPersistenceManager.shared.loadMoments()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
     deinit {
         releaseTimer?.invalidate()
         periodicCheckTimer?.invalidate()

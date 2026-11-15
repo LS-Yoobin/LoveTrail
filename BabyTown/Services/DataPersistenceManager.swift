@@ -51,6 +51,9 @@ final class DataPersistenceManager {
         AuthService.shared.currentUser?.id ?? Self.anonymousScopeId
     }
 
+    /// Exposed for sync bookkeeping that must not leak between accounts.
+    var activeScopeId: String { currentScopeId }
+
     private func defaultsSuiteName(for scopeId: String) -> String {
         "com.covela.userdata.\(scopeId)"
     }
@@ -292,8 +295,23 @@ final class DataPersistenceManager {
     private let pendingInviteCodeKey = "pendingInviteCode"
     private let pendingInvitePartnerNameKey = "pendingInvitePartnerName"
     private let hasUnreadMailKey = "hasUnreadMail"
+    private let syncedPartnerNicknameKey = "syncedPartnerNickname"
 
     private init() {}
+
+    /// Runs the per-scope provisioning (legacy migration / anonymous adoption) for the
+    /// active account right away. Called on account change so it happens before any
+    /// other store writes into the new scope directory.
+    func prepareCurrentScope() {
+        _ = documentsDirectory
+        _ = userDefaults
+    }
+
+    /// The active account's storage directory, for per-account sync bookkeeping.
+    var currentScopeDirectory: URL { documentsDirectory }
+
+    /// The active account's UserDefaults suite, for per-account sync bookkeeping.
+    var currentScopeDefaults: UserDefaults { userDefaults }
 
     func saveMoments(_ moments: [Moment]) {
         guard let data = try? encoder.encode(moments) else { return }
@@ -302,6 +320,7 @@ final class DataPersistenceManager {
         for moment in moments {
             ThumbnailStore.shared.persistIfNeeded(for: moment.id)
         }
+        CoupleSyncEngine.shared.localDidChange()
     }
 
     func loadCelebratedMomentMilestones() -> Set<Int> {
@@ -477,6 +496,7 @@ final class DataPersistenceManager {
         guard let data = try? encoder.encode(profile) else { return }
         try? data.write(to: coupleProfileFileURL)
         NotificationManager.shared.refresh()
+        CoupleSyncEngine.shared.localDidChange()
     }
 
     /// Saves the onboarding birthday into Important Dates and sets the profile display name.
@@ -524,6 +544,7 @@ final class DataPersistenceManager {
     }
 
     func saveUserAvatar(_ image: UIImage?) {
+        defer { CoupleSyncEngine.shared.localDidChange() }
         guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
             try? fileManager.removeItem(at: userAvatarURL)
             return
@@ -571,12 +592,82 @@ final class DataPersistenceManager {
     func savePartnerProfilePhoto(_ image: UIImage) {
         guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
         try? jpeg.write(to: partnerAvatarURL)
+        CoupleSyncEngine.shared.localDidChange()
     }
 
     func loadPartnerProfilePhoto() -> UIImage? {
         guard fileManager.fileExists(atPath: partnerAvatarURL.path),
               let data = try? Data(contentsOf: partnerAvatarURL) else { return nil }
         return UIImage(data: data)
+    }
+
+    // MARK: - Raw media bytes (couple sync)
+    //
+    // Sync fingerprints and uploads the stored file bytes, never a re-encoded image,
+    // so unchanged media is recognised as unchanged.
+
+    func loadUserAvatarData() -> Data? {
+        try? Data(contentsOf: userAvatarURL)
+    }
+
+    func loadPartnerProfilePhotoData() -> Data? {
+        try? Data(contentsOf: partnerAvatarURL)
+    }
+
+    func saveUserAvatarData(_ data: Data) {
+        try? data.write(to: userAvatarURL, options: .atomic)
+    }
+
+    func savePartnerProfilePhotoData(_ data: Data) {
+        try? data.write(to: partnerAvatarURL, options: .atomic)
+    }
+
+    /// This user's own avatar bytes. Invited partner accounts have always stored their
+    /// own photo in the partner-photo file (see `isPartnerAccount()`); this hides that.
+    func loadOwnAvatarData() -> Data? {
+        isPartnerAccount() ? loadPartnerProfilePhotoData() : loadUserAvatarData()
+    }
+
+    /// The other partner's avatar as synced from the server. Kept in its own file so it
+    /// can never overwrite this user's photo, whichever slot convention the account uses.
+    private var syncedPartnerAvatarURL: URL {
+        pinnedPhotosDirectory.appendingPathComponent("synced_partner_avatar.jpg")
+    }
+
+    func saveOtherPartnerAvatarData(_ data: Data) {
+        try? data.write(to: syncedPartnerAvatarURL, options: .atomic)
+    }
+
+    /// Photo for the partner's slot: the synced avatar when available, otherwise the
+    /// pre-sync local fallback (inviters only; invited accounts had none).
+    func loadOtherPartnerAvatar() -> UIImage? {
+        if let data = try? Data(contentsOf: syncedPartnerAvatarURL), let image = UIImage(data: data) {
+            return image
+        }
+        return isPartnerAccount() ? nil : loadPartnerProfilePhoto()
+    }
+
+    /// The other partner's nickname as last synced from the server.
+    func saveSyncedPartnerNickname(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        userDefaults.set(trimmed, forKey: syncedPartnerNicknameKey)
+        // Invited accounts already read the other partner's name from `inviterName`.
+        if isPartnerAccount() {
+            saveInviterName(trimmed)
+        }
+    }
+
+    func loadSyncedPartnerNickname() -> String? {
+        userDefaults.string(forKey: syncedPartnerNicknameKey)
+    }
+
+    func loadSpecialDatePhotoData(id: UUID) -> Data? {
+        try? Data(contentsOf: specialDatePhotoURL(id: id))
+    }
+
+    func saveSpecialDatePhotoData(_ data: Data, id: UUID) {
+        try? data.write(to: specialDatePhotoURL(id: id), options: .atomic)
     }
 
     func saveSpecialDatePhoto(_ image: UIImage?, id: UUID) {
@@ -1005,6 +1096,7 @@ final class DataPersistenceManager {
         let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         userDefaults.set(trimmed, forKey: userNicknameKey)
+        CoupleSyncEngine.shared.localDidChange()
     }
     
     func loadUserNickname() -> String? {
@@ -1059,6 +1151,9 @@ final class DataPersistenceManager {
     }
 
     func clearAllData() {
+        // Must go first: with local data gone but sync snapshots kept, the next sync
+        // would read every record as "deleted locally" and delete it on the server.
+        CoupleSyncEngine.shared.resetLocalState()
         try? fileManager.removeItem(at: momentsFileURL)
         try? fileManager.removeItem(at: firstMetPhotoURL)
         try? fileManager.removeItem(at: officialPhotoURL)
@@ -1070,6 +1165,7 @@ final class DataPersistenceManager {
         try? fileManager.removeItem(at: memoryCanvasesFileURL)
         try? fileManager.removeItem(at: userAvatarURL)
         try? fileManager.removeItem(at: partnerAvatarURL)
+        try? fileManager.removeItem(at: syncedPartnerAvatarURL)
         try? fileManager.removeItem(at: preludeCapturesFileURL)
         try? fileManager.removeItem(at: preludeChapterFileURL)
         try? fileManager.removeItem(at: partnerGiftCapturesFileURL)

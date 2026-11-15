@@ -337,6 +337,9 @@ struct HomeView: View {
                             .padding(.bottom, 100)
                         }
                         .coordinateSpace(name: "homeScroll")
+                        .refreshable {
+                            await CoupleSyncEngine.shared.sync(trigger: .pullToRefresh)
+                        }
                         .onPreferenceChange(TimelineYearFilterAnchorKey.self) { minY in
                             updateYearFilterPinState(minY: minY)
                         }
@@ -793,6 +796,9 @@ struct HomeView: View {
                     refreshCoupleSpaceCardMetadata()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { _ in
+                refreshCoupleSpaceCardMetadata()
+            }
         }
     }
 
@@ -842,8 +848,8 @@ struct HomeView: View {
     /// `viewModel.moments` so we don't re-read `moments.json` every frame.
     private func refreshCoupleSpaceCardMetadata() {
         let dpm = DataPersistenceManager.shared
-        coupleSpaceAvatar = dpm.loadUserAvatar()
-        coupleSpacePartnerAvatar = dpm.loadPartnerProfilePhoto()
+        coupleSpaceAvatar = dpm.loadOwnAvatarData().flatMap(UIImage.init(data:))
+        coupleSpacePartnerAvatar = dpm.loadOtherPartnerAvatar()
         homeSpecialDates = dpm.loadCoupleProfile().specialDates.sorted { $0.date < $1.date }
         let moments = viewModel.moments
         let gardenContext = GardenActMapper.persistedContext(

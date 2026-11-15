@@ -18,14 +18,11 @@ final class ThumbnailStore: @unchecked Sendable {
     private let fileManager = FileManager.default
     private let ioQueue = DispatchQueue(label: "com.babytown.thumbnailstore", attributes: .concurrent)
 
-    private lazy var directory: URL = {
-        let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("thumbnails", isDirectory: true)
-        if !fileManager.fileExists(atPath: dir.path) {
-            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        }
-        return dir
-    }()
+    /// Per-account (`CovelaUserData/<scope>/thumbnails`), so a second account on the
+    /// same phone never sees the first account's moment thumbnails.
+    private var directory: URL {
+        CovelaUserScope.scopedItem(named: "thumbnails", isDirectory: true)
+    }
 
     private init() {
         cache.totalCostLimit = 64 * 1024 * 1024 // ~64 MB of decoded thumbnails
@@ -87,6 +84,28 @@ final class ThumbnailStore: @unchecked Sendable {
         let fileURL = url(for: id)
         ioQueue.async(flags: .barrier) {
             try? data.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    /// The stored JPEG bytes, read in order with pending writes. Couple sync uploads and
+    /// fingerprints these exact bytes.
+    func fileData(for id: UUID) -> Data? {
+        if !hasFile(for: id) { persistIfNeeded(for: id) }
+        let fileURL = url(for: id)
+        return ioQueue.sync(flags: .barrier) {
+            try? Data(contentsOf: fileURL)
+        }
+    }
+
+    /// Writes downloaded JPEG bytes as-is (no re-encode, so the fingerprint matches the
+    /// partner's upload and the photo is not uploaded back) and caches the decoded image.
+    func storeDownloadedJPEG(_ data: Data, for id: UUID) {
+        let fileURL = url(for: id)
+        ioQueue.sync(flags: .barrier) {
+            try? data.write(to: fileURL, options: .atomic)
+        }
+        if let image = UIImage(data: data) {
+            cache(image, for: id)
         }
     }
 

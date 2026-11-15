@@ -23,9 +23,10 @@ enum CouplePlaylistStore {
     private static var fileManager: FileManager { .default }
     private static var userDefaults: UserDefaults { .standard }
 
+    /// Per-account playlist files. Playback preferences (now playing, repeat, shuffle)
+    /// stay in `UserDefaults.standard` on purpose: they are device-local, not shared.
     private static var storageDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(directoryName, isDirectory: true)
+        CovelaUserScope.scopedItem(named: directoryName, isDirectory: true)
     }
 
     private static var tracksDirectory: URL {

@@ -678,12 +678,19 @@ struct ContentView: View {
         .task {
             StoreManager.shared.start()
         }
+        .task {
+            CoupleSyncBootstrap.registerResources()
+            await CoupleSyncEngine.shared.sync(trigger: .launch)
+        }
         .onAppear {
             NotificationManager.shared.refresh()
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .background {
                 NotificationManager.shared.refresh()
+            }
+            if newPhase == .active, oldPhase == .background {
+                Task { await CoupleSyncEngine.shared.sync(trigger: .foreground) }
             }
         }
         .onChange(of: screen) { _, newScreen in

@@ -36,6 +36,24 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
+    /// Silent push (`content-available`) sent by the server after the partner changes
+    /// couple data. Pulls the change so it is already on screen when the app opens.
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard (userInfo["type"] as? String) == "couple_sync" else {
+            completionHandler(.noData)
+            return
+        }
+        Task { @MainActor in
+            CoupleSyncBootstrap.registerResources()
+            let succeeded = await CoupleSyncEngine.shared.sync(trigger: .silentPush)
+            completionHandler(succeeded ? .newData : .failed)
+        }
+    }
+
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("[AppDelegate] Failed to register for remote notifications: \(error)")
     }

@@ -359,6 +359,7 @@
 				DEVELOPMENT_TEAM = N3L5LBGNK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Covela-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Covela uses your location to tag photos and suggest a starting area when you add a place to a memory.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Covela uses the microphone for Vibe photos and to hear trick commands when training your cat. Covela uses your microphone so you and your partner can talk while watching together.";
@@ -398,6 +399,7 @@
 				DEVELOPMENT_TEAM = N3L5LBGNK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Covela-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take daily Polaroid photos that reveal at 9:00 PM to capture spontaneous moments together. Covela uses your camera so you and your partner can see each other while watching together.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Covela uses your location to tag photos and suggest a starting area when you add a place to a memory.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Covela uses the microphone for Vibe photos and to hear trick commands when training your cat. Covela uses your microphone so you and your partner can talk while watching together.";

@@ -29,6 +29,30 @@ struct Moment: Identifiable, Codable {
 
     static let missingThumbnailPlaceholder = UIImage(systemName: "photo") ?? UIImage()
 
+    /// A moment received from the partner via couple sync. Unlike `init(id:…thumbnail:)`
+    /// it caches no image: the photo is downloaded separately, and caching a placeholder
+    /// would hide it once it arrives.
+    init(syncedId id: UUID, dateTaken: Date, copying existing: Moment? = nil) {
+        self.id = id
+        self.dateTaken = dateTaken
+        assetIdentifier = existing?.assetIdentifier
+        placeName = existing?.placeName
+        caption = existing?.caption
+        voiceNotePath = existing?.voiceNotePath
+        promptText = existing?.promptText
+        isPinned = existing?.isPinned ?? false
+        pinnedAt = existing?.pinnedAt
+        isLocked = existing?.isLocked ?? false
+        unlockTime = existing?.unlockTime
+        latitude = existing?.latitude
+        longitude = existing?.longitude
+        isAddedFromOnThisDay = existing?.isAddedFromOnThisDay ?? false
+        isPlaceNameUserSet = existing?.isPlaceNameUserSet ?? false
+        country = existing?.country
+        videoFileName = existing?.videoFileName
+        dateAddedToApp = existing?.dateAddedToApp ?? Date()
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, dateTaken, assetIdentifier, thumbnailData, placeName, caption, voiceNotePath, promptText, isPinned, pinnedAt, isLocked, unlockTime, latitude, longitude, isAddedFromOnThisDay, isPlaceNameUserSet, country, videoFileName, dateAddedToApp
     }

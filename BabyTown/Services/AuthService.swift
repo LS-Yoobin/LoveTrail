@@ -50,16 +50,33 @@ final class AuthService: ObservableObject {
     // MARK: - Session
 
     private func restoreSession() {
-        guard let session = KeychainTokenStore.load() else { return }
+        guard let session = KeychainTokenStore.load() else {
+            CovelaUserScope.setCurrentUserId(nil)
+            return
+        }
         authToken = session.token
         currentUser = AuthUser(id: session.userId, email: session.email ?? "")
+        CovelaUserScope.setCurrentUserId(session.userId)
+    }
+
+    /// Keeps the thread-safe storage scope in step with `currentUser` and tells
+    /// per-account stores (and the sync engine) to reload.
+    private func accountDidChange(from previousUserId: String?) {
+        CovelaUserScope.setCurrentUserId(currentUser?.id)
+        guard previousUserId != currentUser?.id else { return }
+        // Provision (and adopt anonymous Prelude data into) the new scope before any
+        // background media store writes into it and makes it look non-empty.
+        DataPersistenceManager.shared.prepareCurrentScope()
+        NotificationCenter.default.post(name: .covelaAccountDidChange, object: nil)
     }
 
     private func persistSession(userId: String, email: String?, token: String) throws {
         let session = AuthSession(userId: userId, email: email, token: token)
         try KeychainTokenStore.save(session)
+        let previousUserId = currentUser?.id
         authToken = token
         currentUser = AuthUser(id: userId, email: email ?? "")
+        accountDidChange(from: previousUserId)
         if let deviceToken = AppDelegate.lastDeviceTokenHex {
             Task { await DeviceAPIClient.shared.registerPushToken(deviceToken) }
         }
@@ -177,9 +194,11 @@ final class AuthService: ObservableObject {
 
     func signOut() {
         KeychainTokenStore.clear()
+        let previousUserId = currentUser?.id
         currentUser = nil
         authToken = nil
         errorMessage = nil
+        accountDidChange(from: previousUserId)
     }
 
     // MARK: - Delete Account

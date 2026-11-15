@@ -16,27 +16,42 @@ final class LocalPolaroidStore: ObservableObject {
     private let videosDirectoryName = "polaroid_videos"
     private let processingMemoriesFileName = "processing_memories.json"
     
-    private var documentsDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    }
-    
+    /// All polaroid files live under the active account's `CovelaUserData/<scope>/`.
     private var entriesFileURL: URL {
-        documentsDirectory.appendingPathComponent(entriesFileName)
+        CovelaUserScope.scopedItem(named: entriesFileName, isDirectory: false)
     }
-    
+
+    private var processingMemoriesFileURL: URL {
+        CovelaUserScope.scopedItem(named: processingMemoriesFileName, isDirectory: false)
+    }
+
     private var imagesDirectory: URL {
-        documentsDirectory.appendingPathComponent(imagesDirectoryName)
+        CovelaUserScope.scopedItem(named: imagesDirectoryName, isDirectory: true)
     }
 
     private var vibesDirectory: URL {
-        documentsDirectory.appendingPathComponent(vibesDirectoryName)
+        CovelaUserScope.scopedItem(named: vibesDirectoryName, isDirectory: true)
     }
 
     private var videosDirectory: URL {
-        documentsDirectory.appendingPathComponent(videosDirectoryName)
+        CovelaUserScope.scopedItem(named: videosDirectoryName, isDirectory: true)
     }
 
+    private var accountObserver: NSObjectProtocol?
+
     init() {
+        createMediaDirectoriesIfNeeded()
+        loadEntries()
+        loadProcessingMemories()
+        accountObserver = NotificationCenter.default.addObserver(
+            forName: .covelaAccountDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadForCurrentAccount() }
+        }
+    }
+
+    /// Re-reads entries from the now-active account's directory.
+    func reloadForCurrentAccount() {
         createMediaDirectoriesIfNeeded()
         loadEntries()
         loadProcessingMemories()
@@ -58,10 +73,6 @@ final class LocalPolaroidStore: ObservableObject {
             return
         }
         entries = decoded
-    }
-    
-    private var processingMemoriesFileURL: URL {
-        documentsDirectory.appendingPathComponent(processingMemoriesFileName)
     }
     
     private func loadProcessingMemories() {

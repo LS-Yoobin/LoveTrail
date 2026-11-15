@@ -11,18 +11,13 @@ final class MomentVideoStore: @unchecked Sendable {
     private let polaroidVideosDirectoryName = "polaroid_videos"
     private let momentVideosDirectoryName = "moment_videos"
 
-    private lazy var momentVideosDirectory: URL = {
-        let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent(momentVideosDirectoryName, isDirectory: true)
-        if !fileManager.fileExists(atPath: dir.path) {
-            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        }
-        return dir
-    }()
+    /// Per-account, like every other media store.
+    private var momentVideosDirectory: URL {
+        CovelaUserScope.scopedItem(named: momentVideosDirectoryName, isDirectory: true)
+    }
 
     private var polaroidVideosDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(polaroidVideosDirectoryName, isDirectory: true)
+        CovelaUserScope.scopedItem(named: polaroidVideosDirectoryName, isDirectory: true)
     }
 
     private init() {}

@@ -62,6 +62,17 @@ final class CovelaMediaUploadClient {
         return try await upload(fieldName: "photo", fileName: filename, contentType: "image/jpeg", data: imageData, quality: quality)
     }
 
+    /// Uploads already-encoded JPEG bytes as-is (no re-encode), so the same file
+    /// always produces the same fingerprint for sync.
+    func uploadJPEGData(_ data: Data, filename: String = "photo.jpg", quality: Int = 80) async throws -> String {
+        try await upload(fieldName: "photo", fileName: filename, contentType: "image/jpeg", data: data, quality: quality)
+    }
+
+    /// Uploads arbitrary file bytes under the given multipart field.
+    func uploadFileData(_ data: Data, fieldName: String, filename: String, contentType: String) async throws -> String {
+        try await upload(fieldName: fieldName, fileName: filename, contentType: contentType, data: data, quality: nil)
+    }
+
     /// Uploads a voice memo (m4a/AAC).
     func uploadVoiceMemo(_ data: Data, filename: String = "voice.m4a") async throws -> String {
         try await upload(fieldName: "audio", fileName: filename, contentType: "audio/m4a", data: data, quality: nil)

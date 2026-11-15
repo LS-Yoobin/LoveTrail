@@ -376,6 +376,9 @@ struct CoupleProfileView: View {
                 load()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { _ in
+            load()
+        }
         .sheet(isPresented: $showOurSongSheet) {
             OurSongSheet()
         }

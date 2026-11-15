@@ -46,23 +46,31 @@ struct GardenMoodRainOverlay: View {
                         .ignoresSafeArea()
 
                     ForEach(Self.particles) { particle in
-                        let travel = height + 80
-                        let y = ((time * Double(particle.speed) + Double(particle.phase) * Double(travel))
-                            .truncatingRemainder(dividingBy: Double(travel))) - 40
-                        let sway = sin(time * particle.swayFrequency + Double(particle.id)) * particle.swayAmplitude
-                        let x = particle.xFraction * width + sway
-
                         Image(systemName: mood.iconName)
                             .font(.system(size: particle.size, weight: .semibold))
                             .foregroundStyle(mood.tintColor.opacity(particle.opacity))
-                            .rotationEffect(.degrees(sin(time * 0.5 + Double(particle.id)) * 12))
-                            .position(x: x, y: y)
+                            .rotationEffect(.degrees(Self.rotation(for: particle, time: time)))
+                            .position(Self.position(for: particle, time: time, width: width, height: height))
                     }
                 }
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private static func position(for particle: Particle, time: Double, width: CGFloat, height: CGFloat) -> CGPoint {
+        let travel = Double(height) + 80
+        let offset: Double = time * Double(particle.speed) + Double(particle.phase) * travel
+        let y: Double = offset.truncatingRemainder(dividingBy: travel) - 40
+        let swayAngle: Double = time * Double(particle.swayFrequency) + Double(particle.id)
+        let sway: Double = sin(swayAngle) * Double(particle.swayAmplitude)
+        let x: Double = Double(particle.xFraction * width) + sway
+        return CGPoint(x: x, y: y)
+    }
+
+    private static func rotation(for particle: Particle, time: Double) -> Double {
+        sin(time * 0.5 + Double(particle.id)) * 12
     }
 
     private static func seededValue(_ seed: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {

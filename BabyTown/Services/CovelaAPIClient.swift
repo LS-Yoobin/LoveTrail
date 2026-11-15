@@ -124,6 +124,63 @@ final class CovelaAPIClient {
         try await request(method: "DELETE", path: path, body: nil, token: token)
     }
 
+    func put<T: Decodable>(path: String, body: [String: Any], token: String? = nil) async throws -> T {
+        try await request(method: "PUT", path: path, body: body, token: token)
+    }
+
+    /// Raw response for callers that must branch on the HTTP status (couple sync needs
+    /// 403 / 404 / 409 distinctly). Never throws for a non-2xx status; throws only for
+    /// transport failures (offline, timeout) or an unbuildable URL.
+    struct RawResponse {
+        let status: Int
+        let data: Data
+
+        var isSuccess: Bool { (200..<300).contains(status) }
+
+        /// The `reason` field of a `{ result: "FAIL", reason }` error body, if any.
+        var failureReason: String? {
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+            return object["reason"] as? String
+        }
+
+        func jsonObject() -> [String: Any]? {
+            try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+    }
+
+    func send(
+        method: String,
+        path: String,
+        query: [URLQueryItem] = [],
+        body: [String: Any]? = nil,
+        token: String
+    ) async throws -> RawResponse {
+        var components = URLComponents(
+            url: CovelaAPIConfig.baseURL.appendingPathComponent(path),
+            resolvingAgainstBaseURL: false
+        )
+        if !query.isEmpty { components?.queryItems = query }
+        guard let url = components?.url else { throw CovelaAPIError.invalidURL }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.timeoutInterval = 30
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else {
+            throw CovelaAPIError.invalidResponse
+        }
+        #if DEBUG
+        print("[CovelaAPIClient] \(method) \(url.path) -> \(http.statusCode)")
+        #endif
+        return RawResponse(status: http.statusCode, data: data)
+    }
+
     // MARK: - Core request
 
     private func request<T: Decodable>(
