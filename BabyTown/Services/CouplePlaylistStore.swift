@@ -332,6 +332,48 @@ enum CouplePlaylistStore {
         if let data = try? JSONEncoder().encode(tracks) {
             try? data.write(to: playlistURL, options: .atomic)
         }
+        Task { @MainActor in CoupleSyncEngine.shared.localDidChange() }
+    }
+
+    // MARK: - Couple sync
+
+    /// True for the bundled default song each install adds on its own. It is never
+    /// synced: both phones already have it, so syncing would duplicate it.
+    static func isBundledDefault(_ track: CouplePlaylistTrack) -> Bool {
+        track.fileName.hasSuffix(".\(defaultBundledResourceExtension)")
+    }
+
+    /// The stored playlist as-is (no legacy migration or default-song install).
+    static func storedTracksForSync() -> [CouplePlaylistTrack] {
+        readPlaylistFromDisk()
+    }
+
+    /// Writes tracks received from the partner and removes deleted ones (with audio).
+    static func applySynced(upserting incoming: [CouplePlaylistTrack], removing removedIDs: Set<UUID>) {
+        var playlist = readPlaylistFromDisk()
+        for track in playlist where removedIDs.contains(track.id) {
+            try? fileManager.removeItem(at: audioURL(for: track))
+        }
+        playlist.removeAll { removedIDs.contains($0.id) }
+        for track in incoming {
+            if let index = playlist.firstIndex(where: { $0.id == track.id }) {
+                playlist[index] = track
+            } else {
+                playlist.append(track)
+            }
+        }
+        if let current = nowPlayingID, removedIDs.contains(current) {
+            nowPlayingID = nil
+        }
+        savePlaylist(playlist)
+        notifyChanged()
+    }
+
+    /// Writes downloaded audio for a track and tells the player to pick it up.
+    static func storeSyncedAudio(_ data: Data, for track: CouplePlaylistTrack) {
+        ensureDirectories()
+        try? data.write(to: audioURL(for: track), options: .atomic)
+        notifyChanged()
     }
 
     private static func ensureDirectories() {
