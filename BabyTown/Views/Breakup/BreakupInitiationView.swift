@@ -79,8 +79,13 @@ struct BreakupInitiationView: View {
         stage = .uploading
         uploadProgress = 0
         let service = ArchiveService.shared
-        await service.beginBreakup()
+        let succeeded = await service.beginBreakup()
         uploadProgress = service.uploadProgress
+        guard succeeded else {
+            errorMessage = "We couldn't reach Covela just now. Check your connection and try again when you're ready."
+            stage = .failed
+            return
+        }
         onComplete()
     }
 }

@@ -125,6 +125,9 @@ final class CoupleSyncEngine: ObservableObject {
             consecutiveFailures = 0
             lastSyncedAt = Date()
             status = .idle
+        } else if status == .notPaired {
+            // The couple changed on the server (breakup started, or dissolved).
+            Task { await ArchiveService.shared.refreshFromServer() }
         } else {
             scheduleRetryIfNeeded()
         }
@@ -354,6 +357,11 @@ final class CoupleSyncEngine: ObservableObject {
             state.removeOutboxEntry(entry.id)
             state.serverUpdatedAt[entry.resource]?.removeValue(forKey: entry.recordId)
             return .ok
+        case 409 where response.failureReason == "couple_archived":
+            // The partner ended the relationship: the server refuses writes during the
+            // archive window. Keep nothing queued; let ArchiveService switch phases.
+            state.outbox.removeAll()
+            return .stop(.notPaired)
         case 409:
             // The partner changed this record after the version we edited. Their newer
             // version wins: drop our change and take theirs.
@@ -520,6 +528,12 @@ final class CoupleSyncEngine: ObservableObject {
         default: return .stop(.failed("Server error \(response.status)"))
         }
         guard let dto = response.jsonObject() else { return .ok }
+
+        // Proof that this phone really belongs to a couple on the server. Only then may a
+        // later "couple dissolved" answer clear the Cove (see ArchiveService).
+        if let coupleProfileId = dto["couple_profile_id"] as? String, !coupleProfileId.isEmpty {
+            DataPersistenceManager.shared.saveServerCoupleProfileId(coupleProfileId)
+        }
 
         let recordId = CoupleSyncState.documentRecordId
         if let updatedAt = dto["updated_at"] as? String {

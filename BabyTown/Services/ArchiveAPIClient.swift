@@ -1,61 +1,100 @@
 import Foundation
 
-// MARK: - Protocol
+/// Server side of the Breakup phase (BAB-145, client BAB-105).
+///
+/// Endpoints under `/covela/api/couple`:
+/// - `POST /breakup` starts the archive window (idempotent)
+/// - `GET /archive` returns the shared window state (409 `not_archived` while together)
+/// - `POST /archive/extend` adds 30 days
+/// - `POST /step-out` leaves now; the couple dissolves when both have stepped out
+///
+/// Export and reconnect have no server endpoints yet and stay local.
+struct ArchiveServerState: Equatable {
+    let breakupDate: Date?
+    let archiveExpiresAt: Date?
+    /// user id → stepped-out time
+    let steppedOut: [String: Date]
+    /// `true` when this call dissolved the couple (both partners stepped out).
+    let dissolved: Bool
 
-protocol ArchiveAPIClientProtocol {
-    /// Uploads photo/video data for a single moment. Called once per moment during breakup initiation.
-    func uploadMomentMedia(_ moment: Moment) async throws
-    /// Creates the archive bundle on the server. Called after all media is uploaded.
-    func createArchiveBundle(_ bundle: ArchiveBundle) async throws
-    /// Resets the archive expiry date to `newExpiry` on the server.
-    func extendRetention(coupleId: String, newExpiry: Date) async throws
-    /// Marks this user as stepped out on the server and revokes their access.
-    func stepOut(coupleId: String) async throws
-    /// Requests a server-generated ZIP export. Returns a download URL.
-    func generateExportZip(coupleId: String) async throws -> URL
-    /// Creates a reconnect invite on the server and returns it.
-    func sendReconnectInvite(coupleId: String) async throws -> BreakupReconnectInvite
-    /// Accepts a reconnect invite; server transitions both users back to officialCouple.
-    func acceptReconnectInvite(inviteId: UUID, coupleId: String) async throws
+    init(json: [String: Any]) {
+        breakupDate = SyncJSON.date(from: json["breakup_date"])
+        archiveExpiresAt = SyncJSON.date(from: json["archive_expires_at"])
+        var stepped: [String: Date] = [:]
+        for (userId, value) in json["stepped_out"] as? [String: Any] ?? [:] {
+            if let date = SyncJSON.date(from: value) { stepped[userId.lowercased()] = date }
+        }
+        steppedOut = stepped
+        dissolved = (json["dissolved"] as? Bool) ?? false
+    }
 }
 
-// MARK: - Stub (replace with real URLSession calls when backend is ready)
+enum ArchiveAPIError: Error, Equatable {
+    case offline
+    case signedOut
+    /// The couple is not in an archive window (`not_archived`, or still together).
+    case notArchived
+    /// This account can no longer reach the couple (stepped out, or dissolved).
+    case noAccess
+    case server(Int)
+}
 
-final class StubArchiveAPIClient: ArchiveAPIClientProtocol {
-    static let shared = StubArchiveAPIClient()
-    private init() {}
+protocol ArchiveAPIClientProtocol {
+    func startBreakup() async throws -> ArchiveServerState
+    func fetchArchive() async throws -> ArchiveServerState
+    func extendArchive() async throws -> ArchiveServerState
+    func stepOut() async throws -> ArchiveServerState
+}
 
-    func uploadMomentMedia(_ moment: Moment) async throws {
-        // TODO: POST media bytes to /archive/media/{moment.id}
-        try await Task.sleep(nanoseconds: 10_000_000) // simulate 10ms per photo
+final class LiveArchiveAPIClient: ArchiveAPIClientProtocol {
+    static let shared = LiveArchiveAPIClient()
+
+    private let api: CovelaAPIClient
+
+    init(api: CovelaAPIClient = .shared) {
+        self.api = api
     }
 
-    func createArchiveBundle(_ bundle: ArchiveBundle) async throws {
-        // TODO: POST encoded bundle to /archive/couples/{bundle.coupleId}
+    func startBreakup() async throws -> ArchiveServerState {
+        try await call("POST", "couple/breakup")
     }
 
-    func extendRetention(coupleId: String, newExpiry: Date) async throws {
-        // TODO: PATCH /archive/couples/{coupleId}/expiry with newExpiry
+    func fetchArchive() async throws -> ArchiveServerState {
+        try await call("GET", "couple/archive")
     }
 
-    func stepOut(coupleId: String) async throws {
-        // TODO: POST /archive/couples/{coupleId}/step-out
+    func extendArchive() async throws -> ArchiveServerState {
+        try await call("POST", "couple/archive/extend")
     }
 
-    func generateExportZip(coupleId: String) async throws -> URL {
-        // TODO: POST /archive/couples/{coupleId}/export -> returns presigned ZIP URL
-        return URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("export.zip")
+    func stepOut() async throws -> ArchiveServerState {
+        try await call("POST", "couple/step-out")
     }
 
-    func sendReconnectInvite(coupleId: String) async throws -> BreakupReconnectInvite {
-        // TODO: POST /archive/couples/{coupleId}/reconnect-invite -> returns invite JSON
-        return BreakupReconnectInvite(
-            senderUserId: "stub-sender",
-            recipientUserId: "stub-recipient"
-        )
-    }
-
-    func acceptReconnectInvite(inviteId: UUID, coupleId: String) async throws {
-        // TODO: POST /archive/reconnect-invites/{inviteId}/accept
+    private func call(_ method: String, _ path: String) async throws -> ArchiveServerState {
+        guard let token = await AuthService.shared.authToken else { throw ArchiveAPIError.signedOut }
+        let response: CovelaAPIClient.RawResponse
+        do {
+            response = try await api.send(
+                method: method,
+                path: path,
+                body: method == "GET" ? nil : [:],
+                token: token
+            )
+        } catch {
+            throw ArchiveAPIError.offline
+        }
+        switch response.status {
+        case 200..<300:
+            return ArchiveServerState(json: response.jsonObject() ?? [:])
+        case 401:
+            throw ArchiveAPIError.signedOut
+        case 403:
+            throw ArchiveAPIError.noAccess
+        case 409 where response.failureReason == "not_archived" || response.failureReason == "not_official_couple":
+            throw ArchiveAPIError.notArchived
+        default:
+            throw ArchiveAPIError.server(response.status)
+        }
     }
 }

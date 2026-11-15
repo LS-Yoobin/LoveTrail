@@ -10,6 +10,8 @@ struct ScrapbookHomeView: View {
     @State private var showStepOutConfirmation = false
     @State private var showReconnect = false
     @State private var selectedTab: Tab = .memories
+    /// The new expiry after a successful Extend (the server decides it).
+    @State private var extendedExpiry: Date?
 
     enum Tab { case memories, garden, pet }
 
@@ -40,7 +42,7 @@ struct ScrapbookHomeView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.primary)
             }
-            Text(expiryLabel(bundle.expiryDate))
+            Text(expiryLabel(extendedExpiry ?? bundle.expiryDate))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
@@ -125,7 +127,11 @@ struct ScrapbookHomeView: View {
     }
 
     private func extendRetention() {
-        ArchiveService.shared.extendRetention()
+        Task {
+            if await ArchiveService.shared.extendRetention() {
+                extendedExpiry = DataPersistenceManager.shared.loadCoupleProfile().archiveExpiryDate
+            }
+        }
     }
 
     private func expiryLabel(_ expiry: Date) -> String {

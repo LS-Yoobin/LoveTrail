@@ -11,70 +11,153 @@ final class ArchiveService: ObservableObject {
     @Published var uploadProgress: Double = 0
 
     private let dpm = DataPersistenceManager.shared
+    private let api: ArchiveAPIClientProtocol = LiveArchiveAPIClient.shared
+    /// A step-out that couldn't reach the server; retried by `refreshFromServer()`.
+    private let pendingStepOutKey = "archivePendingServerStepOut"
 
     private init() {}
 
     // MARK: - Breakup
 
-    /// Creates a local ArchiveBundle snapshot from current device state and simulates an upload.
-    /// Updates CoupleProfile to .archivedCouple on completion.
-    func beginBreakup() async {
+    /// Ends the relationship on the server, then archives locally with the server's
+    /// dates. Returns `false` (and changes nothing) if the server can't be reached:
+    /// a breakup only on this phone would leave the partner's Cove syncing as usual.
+    @discardableResult
+    func beginBreakup() async -> Bool {
         isUploading = true
         uploadProgress = 0
+        defer { isUploading = false }
 
+        // Send any last changes while writes are still allowed.
+        await CoupleSyncEngine.shared.sync(trigger: .manual)
+        uploadProgress = 0.4
+
+        let state: ArchiveServerState
+        do {
+            state = try await api.startBreakup()
+        } catch {
+            return false
+        }
+        uploadProgress = 0.8
+
+        archiveLocally(
+            breakupDate: state.breakupDate ?? Date(),
+            expiryDate: state.archiveExpiresAt
+        )
+        uploadProgress = 1
+        return true
+    }
+
+    /// Snapshots the Cove into the local scrapbook and switches to the archive phase.
+    private func archiveLocally(breakupDate: Date, expiryDate: Date?) {
+        let expiry = expiryDate ?? Calendar.current.date(byAdding: .day, value: 30, to: breakupDate)!
         let profile = dpm.loadCoupleProfile()
-        let moments = dpm.loadMoments()
-        let petState = dpm.loadPetState()
-        let preludeChapter = dpm.loadPreludeChapter()
-        let breakupDate = Date()
-        let expiryDate = Calendar.current.date(byAdding: .day, value: 30, to: breakupDate)!
-
         let bundle = ArchiveBundle(
-            coupleId: "local-\(profile.displayName ?? "couple")-\(Int(breakupDate.timeIntervalSince1970))",
+            coupleId: profile.coupleId ?? "local-\(Int(breakupDate.timeIntervalSince1970))",
             breakupDate: breakupDate,
-            expiryDate: expiryDate,
+            expiryDate: expiry,
             userASteppedOut: false,
             userBSteppedOut: false,
-            moments: moments,
+            moments: dpm.loadMoments(),
             coupleProfile: profile,
-            petState: petState,
-            preludeChapter: preludeChapter
+            petState: dpm.loadPetState(),
+            preludeChapter: dpm.loadPreludeChapter()
         )
-
-        // Simulate upload: 10 steps × 0.2s = 2s total
-        for step in 1...10 {
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            uploadProgress = Double(step) / 10.0
-        }
-
         dpm.saveArchiveBundle(bundle)
 
         var updated = profile
         updated.relationshipStage = .archivedCouple
         updated.breakupDate = breakupDate
-        updated.archiveExpiryDate = expiryDate
+        updated.archiveExpiryDate = expiry
         updated.hasSteppedOut = false
         dpm.saveCoupleProfile(updated)
 
-        scheduleRetentionNotifications(expiryDate: expiryDate)
-
-        isUploading = false
+        scheduleRetentionNotifications(expiryDate: expiry)
     }
 
     // MARK: - Retention
 
-    func extendRetention() {
-        let newExpiry = Calendar.current.date(byAdding: .day, value: 30, to: Date())!
+    /// Adds 30 days on the server (which decides when the Cove is deleted) and mirrors
+    /// the new expiry locally. Returns `false` if the server couldn't be reached.
+    @discardableResult
+    func extendRetention() async -> Bool {
+        guard let state = try? await api.extendArchive(),
+              let newExpiry = state.archiveExpiresAt else { return false }
+        applyExpiry(newExpiry)
+        return true
+    }
+
+    private func applyExpiry(_ newExpiry: Date) {
         var profile = dpm.loadCoupleProfile()
+        guard profile.archiveExpiryDate != newExpiry else { return }
         profile.archiveExpiryDate = newExpiry
         dpm.saveCoupleProfile(profile)
-
         if var bundle = dpm.loadArchiveBundle() {
             bundle.expiryDate = newExpiry
             dpm.saveArchiveBundle(bundle)
         }
-
         scheduleRetentionNotifications(expiryDate: newExpiry)
+    }
+
+    // MARK: - Server state
+
+    /// Aligns this phone with the server's view of the relationship. Call on launch,
+    /// foreground, and when a breakup or dissolve push arrives.
+    ///
+    /// - The partner started a breakup → archive locally with the server's dates.
+    /// - The window was extended on the other phone → take the new expiry.
+    /// - The couple was dissolved (window ended, or both stepped out) → clear the Cove,
+    ///   but only after `pairing-status` confirms it, so an auth or network glitch can
+    ///   never wipe a phone.
+    func refreshFromServer() async {
+        guard AuthService.shared.isSignedIn else { return }
+
+        if dpm.currentScopeDefaults.bool(forKey: pendingStepOutKey) {
+            do {
+                _ = try await api.stepOut()
+                dpm.currentScopeDefaults.removeObject(forKey: pendingStepOutKey)
+            } catch ArchiveAPIError.offline {
+                // Keep it; try again next time.
+            } catch {
+                // 403 / 409: the server already has us stepped out, or the couple is gone.
+                dpm.currentScopeDefaults.removeObject(forKey: pendingStepOutKey)
+            }
+        }
+
+        let stage = dpm.loadCoupleProfile().relationshipStage
+        guard stage == .officialCouple || stage == .archivedCouple else { return }
+
+        do {
+            let state = try await api.fetchArchive()
+            if stage == .officialCouple {
+                archiveLocally(breakupDate: state.breakupDate ?? Date(), expiryDate: state.archiveExpiresAt)
+                NotificationCenter.default.post(name: AppDelegate.openScrapbookNotificationName, object: nil)
+            } else if let expiry = state.archiveExpiresAt {
+                applyExpiry(expiry)
+            }
+        } catch ArchiveAPIError.notArchived {
+            // Still together on the server: nothing to do.
+            return
+        } catch ArchiveAPIError.noAccess {
+            await endRelationshipIfServerConfirms()
+        } catch {
+            return
+        }
+    }
+
+    /// The server deleted the couple (archive expired, or both stepped out). Clears the
+    /// Cove only when `pairing-status` agrees this account is no longer in a couple.
+    func endRelationshipIfServerConfirms() async {
+        // Never wipe a phone that has not synced with a server couple: older installs can
+        // be "official" locally without one, and "not paired" says nothing about them.
+        guard dpm.loadServerCoupleProfileId() != nil else { return }
+        guard let status = try? await InviteAPI.client.checkPairingStatus(),
+              !status.paired,
+              status.relationshipStage != .officialCouple,
+              status.relationshipStage != .archivedCouple else { return }
+        let stage = dpm.loadCoupleProfile().relationshipStage
+        guard stage == .officialCouple || stage == .archivedCouple else { return }
+        endRelationship()
     }
 
     // MARK: - Step Out
@@ -86,6 +169,21 @@ final class ArchiveService: ObservableObject {
         profile.hasSteppedOut = true
         dpm.saveCoupleProfile(profile)
         endRelationship()
+
+        // Tell the server (it dissolves the couple once both have stepped out). Stepping
+        // out never waits on the network; if offline, it is retried by `refreshFromServer`.
+        let defaults = dpm.currentScopeDefaults
+        defaults.set(true, forKey: pendingStepOutKey)
+        Task {
+            do {
+                _ = try await api.stepOut()
+                defaults.removeObject(forKey: pendingStepOutKey)
+            } catch ArchiveAPIError.offline {
+                return
+            } catch {
+                defaults.removeObject(forKey: pendingStepOutKey)
+            }
+        }
     }
 
     /// Ends the archive if its window has passed. Call at launch (before routing) and

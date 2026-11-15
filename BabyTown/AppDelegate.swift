@@ -46,7 +46,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        guard (userInfo["type"] as? String) == "couple_sync" else {
+        let type = userInfo["type"] as? String
+        if type == "couple_dissolved" || type == "couple_breakup" {
+            // The archive window ended (or both stepped out), or the partner started a
+            // breakup. ArchiveService checks with the server before changing anything.
+            Task { @MainActor in
+                await ArchiveService.shared.refreshFromServer()
+                completionHandler(.newData)
+            }
+            return
+        }
+        guard type == "couple_sync" else {
             completionHandler(.noData)
             return
         }
@@ -69,6 +79,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if (notification.request.content.userInfo["type"] as? String) == "invite_accepted" {
             NotificationCenter.default.post(name: AppDelegate.partnerInviteAcceptedNotificationName, object: nil)
         }
+        if (notification.request.content.userInfo["type"] as? String) == "couple_breakup" {
+            Task { @MainActor in await ArchiveService.shared.refreshFromServer() }
+        }
         completionHandler([.banner, .sound])
     }
     
@@ -88,6 +101,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     ArchiveService.shared.endRelationship()
                 }
             }
+        } else if (response.notification.request.content.userInfo["type"] as? String) == "couple_breakup" {
+            Task { @MainActor in await ArchiveService.shared.refreshFromServer() }
         } else if (response.notification.request.content.userInfo["type"] as? String) == "invite_accepted" {
             NotificationCenter.default.post(name: AppDelegate.partnerInviteAcceptedNotificationName, object: nil)
         } else if identifier.hasPrefix("watch_together_invite_") {

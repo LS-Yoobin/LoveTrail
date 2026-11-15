@@ -682,7 +682,15 @@ struct ContentView: View {
         }
         .task {
             CoupleSyncBootstrap.registerResources()
+            await ArchiveService.shared.refreshFromServer()
             await CoupleSyncEngine.shared.sync(trigger: .launch)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .coveDidReset)) { _ in
+            // The relationship ended (archive window over, or stepped out): back to Prelude.
+            guard screen == .home || screen == .archivedCouple || screen == .loveGarden else { return }
+            withAnimation(.easeInOut(duration: 0.4)) {
+                screen = .prelude
+            }
         }
         .onAppear {
             NotificationManager.shared.refresh()
@@ -697,7 +705,10 @@ struct ContentView: View {
                         screen = .prelude
                     }
                 }
-                Task { await CoupleSyncEngine.shared.sync(trigger: .foreground) }
+                Task {
+                    await ArchiveService.shared.refreshFromServer()
+                    await CoupleSyncEngine.shared.sync(trigger: .foreground)
+                }
             }
         }
         .onChange(of: screen) { _, newScreen in

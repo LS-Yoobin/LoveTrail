@@ -296,6 +296,7 @@ final class DataPersistenceManager {
     private let pendingInvitePartnerNameKey = "pendingInvitePartnerName"
     private let hasUnreadMailKey = "hasUnreadMail"
     private let syncedPartnerNicknameKey = "syncedPartnerNickname"
+    private let serverCoupleProfileIdKey = "serverCoupleProfileId"
 
     private init() {}
 
@@ -656,6 +657,17 @@ final class DataPersistenceManager {
         if isPartnerAccount() {
             saveInviterName(trimmed)
         }
+    }
+
+    /// The server couple this account has synced with. Set by couple sync; cleared with
+    /// the Cove. Its presence is what allows a server "dissolved" answer to wipe data.
+    func saveServerCoupleProfileId(_ id: String) {
+        guard userDefaults.string(forKey: serverCoupleProfileIdKey) != id else { return }
+        userDefaults.set(id, forKey: serverCoupleProfileIdKey)
+    }
+
+    func loadServerCoupleProfileId() -> String? {
+        userDefaults.string(forKey: serverCoupleProfileIdKey)
     }
 
     func loadSyncedPartnerNickname() -> String? {
@@ -1192,7 +1204,7 @@ final class DataPersistenceManager {
         for key in [
             foundingOfficialDateKey, foundingFirstMetDateKey, celebratedMomentMilestonesKey,
             petNeedsNotifiedWhileLowKey, petMissesYouNotifiedForInteractionAtKey,
-            inviterNameKey, syncedPartnerNicknameKey, hasUnreadMailKey,
+            inviterNameKey, syncedPartnerNicknameKey, hasUnreadMailKey, serverCoupleProfileIdKey,
         ] {
             userDefaults.removeObject(forKey: key)
         }
