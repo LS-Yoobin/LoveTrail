@@ -103,14 +103,14 @@ struct CoupleProfileView: View {
     }
 
     private var partnerSlotTitle: String {
-        if isPartnerAccount {
-            return dpm.loadInviterName() ?? "your partner"
-        }
-        return "Invite partner"
+        guard isInCouple else { return "Invite partner" }
+        return dpm.partnerDisplayName() ?? "your partner"
     }
 
-    private var isPartnerAccount: Bool {
-        dpm.isPartnerAccount()
+    /// Has a partner (together or in the archive window), so the partner slot shows
+    /// them instead of an invite.
+    private var isInCouple: Bool {
+        dpm.isInCouple
     }
 
     private var showsPreludeBook: Bool {
@@ -411,22 +411,14 @@ struct CoupleProfileView: View {
                 initialImage: userAvatar,
                 initialMood: profile.gardenMood
             ) { image, name, mood in
-                if isPartnerAccount {
-                    if let image {
-                        dpm.savePartnerProfilePhoto(image)
-                    }
-                    dpm.saveUserNickname(name)
-                    profile.setGardenMood(mood)
-                    dpm.saveCoupleProfile(profile)
-                } else {
-                    dpm.saveUserAvatar(image)
-                    profile.displayName = name
-                    if image != nil {
-                        ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
-                    }
-                    profile.setGardenMood(mood)
-                    dpm.saveCoupleProfile(profile)
+                dpm.saveUserAvatar(image)
+                dpm.saveUserNickname(name)
+                profile.displayName = name
+                if image != nil {
+                    ProfileStickerSync.addUserAvatarStickerIfMissing(profile: &profile, dpm: dpm)
                 }
+                profile.setGardenMood(mood)
+                dpm.saveCoupleProfile(profile)
                 userAvatar = image
                 refreshStickers()
             }
@@ -643,7 +635,7 @@ struct CoupleProfileView: View {
                     )
                 }
                 .buttonStyle(.plain)
-            } else if !isPartnerAccount {
+            } else if !isInCouple {
                 if store.isForeverUnlocked {
                     Button {
                         showInviteFlow = true
@@ -956,7 +948,7 @@ struct CoupleProfileView: View {
     }
 
     private func handlePartnerSlotTap() {
-        if isPartnerAccount { return }
+        if isInCouple { return }
         showInviteFlow = true
     }
 
@@ -1024,7 +1016,7 @@ struct CoupleProfileView: View {
 
     private func load() {
         profile = dpm.loadCoupleProfile()
-        userAvatar = isPartnerAccount ? dpm.loadPartnerProfilePhoto() : dpm.loadUserAvatar()
+        userAvatar = dpm.loadUserAvatar()
         refreshStickers()
     }
 

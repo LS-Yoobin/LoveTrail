@@ -63,7 +63,7 @@ enum ProfileStickerSync {
 
     /// Photo for the left (self) avatar slot — partner accounts store theirs under partner profile photo.
     private static func loadUserSlotPhoto(dpm: DataPersistenceManager) -> UIImage? {
-        dpm.isPartnerAccount() ? dpm.loadPartnerProfilePhoto() : dpm.loadUserAvatar()
+        dpm.loadUserAvatar()
     }
 
     /// Photo for the right (partner) avatar slot — empty for partner viewership until sync lands.

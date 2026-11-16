@@ -21,10 +21,11 @@ final class PreludeViewModel: ObservableObject {
 
     func load() {
         var loaded = dpm.loadPreludeCaptures()
-        if dpm.isPartnerAccount() {
-            let ownIds = Set(loaded.map(\.id))
-            let inviterGifts = dpm.loadPartnerGiftCaptures().filter { !ownIds.contains($0.id) }
-            loaded = inviterGifts + loaded
+        // A gift received from the partner (if any) shows alongside your own captures.
+        let ownIds = Set(loaded.map(\.id))
+        let partnerGifts = dpm.loadPartnerGiftCaptures().filter { !ownIds.contains($0.id) }
+        if !partnerGifts.isEmpty {
+            loaded = partnerGifts + loaded
         }
         captures = loaded
         sortCapturesForTimeline()

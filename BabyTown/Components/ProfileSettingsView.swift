@@ -269,11 +269,9 @@ struct ProfileSettingsView: View {
 
         if !trimmedUsername.isEmpty {
             dpm.saveUserNickname(trimmedUsername)
-            if !dpm.isPartnerAccount() {
-                var profile = dpm.loadCoupleProfile()
-                profile.displayName = trimmedUsername
-                dpm.saveCoupleProfile(profile)
-            }
+            var profile = dpm.loadCoupleProfile()
+            profile.displayName = trimmedUsername
+            dpm.saveCoupleProfile(profile)
         }
 
         dpm.saveOnboardingUserBirthday(birthday, nickname: nicknameForBirthday)

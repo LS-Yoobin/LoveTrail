@@ -681,6 +681,7 @@ struct ContentView: View {
             StoreManager.shared.start()
         }
         .task {
+            DataPersistenceManager.shared.migrateOwnAvatarIfNeeded()
             CoupleSyncBootstrap.registerResources()
             await ArchiveService.shared.refreshFromServer()
             await CoupleSyncEngine.shared.sync(trigger: .launch)

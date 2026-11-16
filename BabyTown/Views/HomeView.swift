@@ -102,10 +102,8 @@ struct HomeView: View {
 
     private var homePartnerSlotTitle: String {
         let dpm = DataPersistenceManager.shared
-        if dpm.isPartnerAccount() {
-            return dpm.loadInviterName() ?? "your partner"
-        }
-        return "Invite partner"
+        guard dpm.isInCouple else { return "Invite partner" }
+        return dpm.partnerDisplayName() ?? "your partner"
     }
 
     private var homeWatchTogetherPlayerBinding: Binding<Bool> {

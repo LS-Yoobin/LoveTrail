@@ -28,14 +28,7 @@ final class WatchTogetherViewModel: ObservableObject {
 
     var partnerName: String {
         if let hostName, !isHost { return hostName }
-        let dpm = DataPersistenceManager.shared
-        if isHost {
-            if dpm.isPartnerAccount() {
-                return dpm.loadInviterName() ?? "your partner"
-            }
-            return "your partner"
-        }
-        return dpm.loadInviterName() ?? dpm.loadUserNickname() ?? "your partner"
+        return DataPersistenceManager.shared.partnerDisplayName() ?? "your partner"
     }
 
     var selfInitial: String {

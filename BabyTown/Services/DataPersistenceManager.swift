@@ -306,6 +306,7 @@ final class DataPersistenceManager {
     func prepareCurrentScope() {
         _ = documentsDirectory
         _ = userDefaults
+        migrateOwnAvatarIfNeeded()
     }
 
     /// The active account's storage directory, for per-account sync bookkeeping.
@@ -643,10 +644,40 @@ final class DataPersistenceManager {
         try? data.write(to: partnerAvatarURL, options: .atomic)
     }
 
-    /// This user's own avatar bytes. Invited partner accounts have always stored their
-    /// own photo in the partner-photo file (see `isPartnerAccount()`); this hides that.
+    // MARK: - Identity (BAB-68)
+    //
+    // Who is who no longer depends on `isPartnerAccount()` (a guess from which email
+    // field is set). Your own photo is always the user-avatar file and your own name is
+    // the nickname; the partner's photo and name come from couple sync.
+
+    /// This user's own avatar bytes.
     func loadOwnAvatarData() -> Data? {
-        isPartnerAccount() ? loadPartnerProfilePhotoData() : loadUserAvatarData()
+        loadUserAvatarData()
+    }
+
+    /// Whether this account currently has a partner (together, or in the archive window).
+    var isInCouple: Bool {
+        let stage = loadCoupleProfile().relationshipStage
+        return stage == .officialCouple || stage == .archivedCouple
+    }
+
+    /// The partner's name: synced from their profile, else the name from the invite.
+    func partnerDisplayName() -> String? {
+        loadSyncedPartnerNickname() ?? loadInviterName()
+    }
+
+    private let ownAvatarMigratedKey = "ownAvatarMigratedToUserFile"
+
+    /// One-time: invited partner accounts used to keep their own photo in the
+    /// partner-photo file. Move it to the user-avatar file, where everyone's own photo
+    /// now lives. Safe to call repeatedly.
+    func migrateOwnAvatarIfNeeded() {
+        guard !userDefaults.bool(forKey: ownAvatarMigratedKey) else { return }
+        defer { userDefaults.set(true, forKey: ownAvatarMigratedKey) }
+        guard isPartnerAccount(), fileManager.fileExists(atPath: partnerAvatarURL.path) else { return }
+        // The profile photo set after joining is the newer one, so it wins.
+        try? fileManager.removeItem(at: userAvatarURL)
+        try? fileManager.moveItem(at: partnerAvatarURL, to: userAvatarURL)
     }
 
     /// The other partner's avatar as synced from the server. Kept in its own file so it
@@ -659,13 +690,10 @@ final class DataPersistenceManager {
         try? data.write(to: syncedPartnerAvatarURL, options: .atomic)
     }
 
-    /// Photo for the partner's slot: the synced avatar when available, otherwise the
-    /// pre-sync local fallback (inviters only; invited accounts had none).
+    /// Photo for the partner's slot, as synced from the partner's own profile.
     func loadOtherPartnerAvatar() -> UIImage? {
-        if let data = try? Data(contentsOf: syncedPartnerAvatarURL), let image = UIImage(data: data) {
-            return image
-        }
-        return isPartnerAccount() ? nil : loadPartnerProfilePhoto()
+        guard let data = try? Data(contentsOf: syncedPartnerAvatarURL) else { return nil }
+        return UIImage(data: data)
     }
 
     /// The other partner's nickname as last synced from the server.
@@ -673,10 +701,6 @@ final class DataPersistenceManager {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         userDefaults.set(trimmed, forKey: syncedPartnerNicknameKey)
-        // Invited accounts already read the other partner's name from `inviterName`.
-        if isPartnerAccount() {
-            saveInviterName(trimmed)
-        }
     }
 
     /// The server couple this account has synced with. Set by couple sync; cleared with
