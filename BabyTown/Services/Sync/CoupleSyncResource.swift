@@ -72,6 +72,22 @@ protocol CoupleSyncMediaHandling: AnyObject {
     func downloadPendingMedia() async -> Bool
 }
 
+/// A sync step that doesn't fit the list/document model, e.g. the coin ledger.
+/// Runs after pulls in every cycle.
+@MainActor
+protocol CoupleSyncTask: AnyObject {
+    var key: String { get }
+    func perform(token: String) async -> CoupleSyncTaskOutcome
+}
+
+enum CoupleSyncTaskOutcome {
+    case ok
+    /// Something changed locally; views showing the task's `key` should reload.
+    case changed
+    case offline
+    case notPaired
+}
+
 /// Shared JSON helpers for resources.
 enum SyncJSON {
     /// ISO 8601 with milliseconds, matching the server's `Date.toISOString()`.

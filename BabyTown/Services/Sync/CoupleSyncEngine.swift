@@ -44,6 +44,11 @@ final class CoupleSyncEngine: ObservableObject {
 
     private var collections: [CoupleSyncCollection] = []
     private var documents: [CoupleSyncDocument] = []
+    private var tasks: [CoupleSyncTask] = []
+
+    /// `true` while the last run ended because the network was unreachable. Features
+    /// that need the server right now (spending coins) check this.
+    var isOffline: Bool { status == .offline }
 
     private var state = CoupleSyncState()
     private var stateScopeId: String?
@@ -79,6 +84,11 @@ final class CoupleSyncEngine: ObservableObject {
     func register(_ document: CoupleSyncDocument) {
         guard !documents.contains(where: { $0.key == document.key }) else { return }
         documents.append(document)
+    }
+
+    func register(_ task: CoupleSyncTask) {
+        guard !tasks.contains(where: { $0.key == task.key }) else { return }
+        tasks.append(task)
     }
 
     // MARK: - Entry points
@@ -140,6 +150,7 @@ final class CoupleSyncEngine: ObservableObject {
         stateScopeId = DataPersistenceManager.shared.activeScopeId
         CoupleSyncStateStore.reset()
         SyncMediaRegistry.shared.reset()
+        CoinLedgerSync.shared.reset()
         pendingChangeCount = 0
     }
 
@@ -231,6 +242,19 @@ final class CoupleSyncEngine: ObservableObject {
             }
         }
         notifyApplied(changedResources)
+
+        for task in tasks {
+            switch await task.perform(token: token) {
+            case .ok: continue
+            case .changed: notifyApplied([task.key])
+            case .offline:
+                status = .offline
+                return false
+            case .notPaired:
+                status = .notPaired
+                return false
+            }
+        }
 
         var downloadedResources = Set<String>()
         for handler in mediaHandlers where await handler.downloadPendingMedia() {

@@ -467,6 +467,7 @@ final class DataPersistenceManager {
     func savePetState(_ state: PetState) {
         guard let data = try? encoder.encode(state) else { return }
         try? data.write(to: petStateFileURL)
+        CoupleSyncEngine.shared.localDidChange()
     }
 
     func loadPetState() -> PetState {

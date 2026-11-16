@@ -43,12 +43,28 @@ final class PetViewModel: ObservableObject {
         return calendar
     }
 
+    /// Shown when a purchase is tried while the shared coin balance can't be reached.
+    static let offlineSpendMessage = "Connect to the internet to shop together"
+
+    private var syncObserver: NSObjectProtocol?
+
     init() {
         var loaded = DataPersistenceManager.shared.loadPetState()
         let layoutsChanged = loaded.migrateAllRoomLayoutsIfNeeded()
         self.state = loaded
         if layoutsChanged {
             DataPersistenceManager.shared.savePetState(loaded)
+        }
+        // Couple sync wrote the partner's pet changes or the shared coin balance:
+        // reload at once (queue: nil), before this in-memory copy can be saved back.
+        syncObserver = NotificationCenter.default.addObserver(
+            forName: .coupleSyncDidApplyRemoteChanges, object: nil, queue: nil
+        ) { [weak self] notification in
+            guard let resources = notification.userInfo?["resources"] as? Set<String>,
+                  !resources.isDisjoint(with: ["pet", "pet-room", "pet-tricks", "coins"]) else { return }
+            MainActor.assumeIsolated {
+                self?.state = DataPersistenceManager.shared.loadPetState()
+            }
         }
     }
 
@@ -108,8 +124,12 @@ final class PetViewModel: ObservableObject {
         guard state.coins >= PetEconomy.renameCost else {
             return CareResult(coinsAwarded: 0, blockedReason: "Not enough coins")
         }
+        guard CoinLedgerSync.shared.canSpendNow else {
+            return CareResult(coinsAwarded: 0, blockedReason: Self.offlineSpendMessage)
+        }
 
         state.coins -= PetEconomy.renameCost
+        CoinLedgerSync.shared.recordSpend(PetEconomy.renameCost, reason: .rename)
         state.customPetNames[skin.rawValue] = trimmed
         awardExperience(.rename)
         return .none
@@ -225,6 +245,7 @@ final class PetViewModel: ObservableObject {
         guard events > 0 else { return 0 }
         let coins = events * PetEconomy.CareTask.cleanLitter.coinReward
         state.coins += coins
+        CoinLedgerSync.shared.recordEarn(coins, reason: .activity)
         state.litter = StoredNeed(value: 100, asOf: now)
         lastAward = (coins, UUID())
         return coins
@@ -366,6 +387,7 @@ final class PetViewModel: ObservableObject {
         defer { NotificationManager.shared.refresh() }
         let amount = task.coinReward
         state.coins += amount
+        CoinLedgerSync.shared.recordEarn(amount, reason: .activity)
         lastAward = (amount, UUID())
         switch task {
         case .pet: awardExperience(.pet)
@@ -407,6 +429,7 @@ final class PetViewModel: ObservableObject {
         state.lastCheckInDate = today
         let coins = PetEconomy.checkInReward(forDay: state.checkInStreak)
         state.coins += coins
+        CoinLedgerSync.shared.recordEarn(coins, reason: state.checkInStreak == 7 ? .streak : .checkIn)
         lastAward = (coins, UUID())
 
         if state.checkInStreak == 7 {
@@ -419,6 +442,7 @@ final class PetViewModel: ObservableObject {
     private func awardPlantWater(for key: String) -> CareResult {
         let amount = PetEconomy.plantWaterCoinReward(for: key)
         state.coins += amount
+        CoinLedgerSync.shared.recordEarn(amount, reason: .activity)
         lastAward = (amount, UUID())
         // Keep Smart XP behavior aligned with other watering interactions.
         awardExperience(.fillWater)
@@ -666,7 +690,11 @@ final class PetViewModel: ObservableObject {
             guard state.coins >= item.cost else {
                 return (CareResult(coinsAwarded: 0, blockedReason: "Not enough coins"), false)
             }
+            guard CoinLedgerSync.shared.canSpendNow else {
+                return (CareResult(coinsAwarded: 0, blockedReason: Self.offlineSpendMessage), false)
+            }
             state.coins -= item.cost
+            CoinLedgerSync.shared.recordSpend(item.cost, reason: .shopPurchase)
             state.foodServings += servings
             return (.none, false)
         }
@@ -681,7 +709,11 @@ final class PetViewModel: ObservableObject {
             guard state.coins >= item.cost else {
                 return (CareResult(coinsAwarded: 0, blockedReason: "Not enough coins"), false)
             }
+            guard CoinLedgerSync.shared.canSpendNow else {
+                return (CareResult(coinsAwarded: 0, blockedReason: Self.offlineSpendMessage), false)
+            }
             state.coins -= item.cost
+            CoinLedgerSync.shared.recordSpend(item.cost, reason: .shopPurchase)
         }
 
         mutateActiveRoomLayout { layout in
@@ -934,6 +966,7 @@ final class PetViewModel: ObservableObject {
         }
         if rewards.coins > 0 {
             state.coins += rewards.coins
+            CoinLedgerSync.shared.recordEarn(rewards.coins, reason: .bonus)
             lastAward = (rewards.coins, UUID())
         }
 
@@ -1012,6 +1045,7 @@ final class PetViewModel: ObservableObject {
             }
             if coinBonus > 0 {
                 state.coins += coinBonus
+                CoinLedgerSync.shared.recordEarn(coinBonus, reason: .bonus)
                 lastAward = (coinBonus, UUID())
             }
         }

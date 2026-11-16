@@ -15,5 +15,9 @@ enum CoupleSyncBootstrap {
         engine.register(CoupleProfileSyncResource())
         engine.register(MomentsSyncResource())
         engine.register(PlaylistSyncResource())
+        engine.register(PetSyncResource())
+        engine.register(PetRoomSyncResource())
+        engine.register(PetTricksSyncResource())
+        engine.register(CoinLedgerSync.shared)
     }
 }
