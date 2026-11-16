@@ -111,38 +111,35 @@ enum SyncMediaTransfer {
 
     /// Uploads JPEG bytes and returns the permanent covela-fs key.
     static func uploadJPEG(_ data: Data, filename: String) async throws -> String {
-        do {
-            return try await CovelaMediaUploadClient.shared.uploadJPEGData(data, filename: filename)
-        } catch CovelaMediaUploadError.httpError {
-            throw TransferError.rejected
-        } catch CovelaMediaUploadError.serializationFailed {
-            throw TransferError.rejected
-        } catch {
-            throw TransferError.offline
-        }
+        try await run { try await CovelaMediaUploadClient.shared.uploadJPEGData(data, filename: filename) }
     }
 
-    /// Uploads PNG bytes (sticker cutouts keep transparency) and returns the key.
+    /// Uploads a transparent PNG cutout (kept PNG by the file server) and returns the key.
     static func uploadPNG(_ data: Data, filename: String) async throws -> String {
-        do {
-            return try await CovelaMediaUploadClient.shared.uploadFileData(
-                data, fieldName: "photo", filename: filename, contentType: "image/png"
-            )
-        } catch CovelaMediaUploadError.httpError {
-            throw TransferError.rejected
-        } catch {
-            throw TransferError.offline
-        }
+        try await run { try await CovelaMediaUploadClient.shared.uploadSticker(data, filename: filename) }
     }
 
     /// Uploads audio bytes (m4a) and returns the key.
     static func uploadAudio(_ data: Data, filename: String) async throws -> String {
+        try await run { try await CovelaMediaUploadClient.shared.uploadVoiceMemo(data, filename: filename) }
+    }
+
+    /// Uploads a video (`.mov` / `.mp4`, max 100 MB) and returns the key.
+    static func uploadVideo(_ data: Data, filename: String) async throws -> String {
+        try await run { try await CovelaMediaUploadClient.shared.uploadVideo(data, filename: filename) }
+    }
+
+    /// Only "couldn't reach the server" stops a sync run (`offline`). Anything the
+    /// server refused is `rejected`, so the resource skips that file and moves on.
+    private static func run(_ upload: () async throws -> String) async throws -> String {
         do {
-            return try await CovelaMediaUploadClient.shared.uploadVoiceMemo(data, filename: filename)
-        } catch CovelaMediaUploadError.httpError {
-            throw TransferError.rejected
-        } catch {
+            return try await upload()
+        } catch CovelaMediaUploadError.network, CovelaMediaUploadError.notSignedIn {
             throw TransferError.offline
+        } catch let CovelaMediaUploadError.httpError(status, _) where status >= 500 {
+            throw TransferError.offline
+        } catch {
+            throw TransferError.rejected
         }
     }
 

@@ -73,6 +73,14 @@ final class MomentVideoStore: @unchecked Sendable {
         }
     }
 
+    /// Writes a reel downloaded from the partner (couple sync), byte for byte.
+    func storeDownloadedVideo(_ data: Data, for momentId: UUID) {
+        let destination = url(for: momentId)
+        ioQueue.sync(flags: .barrier) {
+            try? data.write(to: destination, options: .atomic)
+        }
+    }
+
     func removeAll() {
         ioQueue.async(flags: .barrier) {
             try? FileManager.default.removeItem(at: self.momentVideosDirectory)

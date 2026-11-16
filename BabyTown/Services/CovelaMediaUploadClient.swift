@@ -16,6 +16,10 @@ enum CovelaFileServerConfig {
 enum CovelaMediaUploadError: LocalizedError {
     case notSignedIn
     case invalidResponse
+    /// The request never completed (offline, timeout). Safe to retry later.
+    case network
+    /// The file server refused this file (`result: false`, 4xx). Retrying won't help.
+    case rejected(String?)
     case serializationFailed
     case httpError(Int, String)
 
@@ -23,6 +27,8 @@ enum CovelaMediaUploadError: LocalizedError {
         switch self {
         case .notSignedIn: return "Please sign in to upload media."
         case .invalidResponse: return "Unexpected response from the file server."
+        case .network: return "Couldn't reach the file server."
+        case .rejected(let reason): return "The file server refused the file\(reason.map { " (\($0))" } ?? "")."
         case .serializationFailed: return "Failed to prepare the file for upload."
         case .httpError(let code, let message): return "Upload failed (\(code)): \(message)"
         }
@@ -45,6 +51,7 @@ final class CovelaMediaUploadClient {
     private struct UploadResponse: Decodable {
         let path: String?
         let result: Bool?
+        let reason: String?
     }
 
     private func requireToken() async throws -> String {
@@ -71,6 +78,17 @@ final class CovelaMediaUploadClient {
     /// Uploads arbitrary file bytes under the given multipart field.
     func uploadFileData(_ data: Data, fieldName: String, filename: String, contentType: String) async throws -> String {
         try await upload(fieldName: fieldName, fileName: filename, contentType: contentType, data: data, quality: nil)
+    }
+
+    /// Uploads a video file (`.mov` or `.mp4`) as-is (BAB-144, max 100 MB).
+    func uploadVideo(_ data: Data, filename: String) async throws -> String {
+        let contentType = filename.lowercased().hasSuffix(".mp4") ? "video/mp4" : "video/quicktime"
+        return try await upload(fieldName: "video", fileName: filename, contentType: contentType, data: data, quality: nil)
+    }
+
+    /// Uploads a transparent PNG cutout; the file server keeps it PNG (BAB-144, max 10 MB).
+    func uploadSticker(_ data: Data, filename: String = "sticker.png") async throws -> String {
+        try await upload(fieldName: "sticker", fileName: filename, contentType: "image/png", data: data, quality: nil)
     }
 
     /// Uploads a voice memo (m4a/AAC).
@@ -107,7 +125,7 @@ final class CovelaMediaUploadClient {
         do {
             (responseData, response) = try await session.data(for: request)
         } catch {
-            throw CovelaMediaUploadError.invalidResponse
+            throw CovelaMediaUploadError.network
         }
 
         guard let http = response as? HTTPURLResponse else {
@@ -116,12 +134,17 @@ final class CovelaMediaUploadClient {
 
         guard (200...299).contains(http.statusCode) else {
             let message = String(data: responseData, encoding: .utf8) ?? "Upload failed."
+            if (400..<500).contains(http.statusCode) {
+                throw CovelaMediaUploadError.rejected(message)
+            }
             throw CovelaMediaUploadError.httpError(http.statusCode, message)
         }
 
-        guard let decoded = try? JSONDecoder().decode(UploadResponse.self, from: responseData),
-              let path = decoded.path, !path.isEmpty else {
+        guard let decoded = try? JSONDecoder().decode(UploadResponse.self, from: responseData) else {
             throw CovelaMediaUploadError.invalidResponse
+        }
+        guard decoded.result != false, let path = decoded.path, !path.isEmpty else {
+            throw CovelaMediaUploadError.rejected(decoded.reason)
         }
         print("[CovelaMediaUploadClient] uploaded → \(path)")
         return path

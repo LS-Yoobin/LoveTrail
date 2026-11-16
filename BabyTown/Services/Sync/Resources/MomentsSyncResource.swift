@@ -1,4 +1,6 @@
+import AVFoundation
 import Foundation
+import UIKit
 
 /// Moments (`moments.json` + `ThumbnailStore`) ↔ `/couple/moments` (BAB-67).
 ///
@@ -11,8 +13,9 @@ import Foundation
 /// - Founding moments ("When we first met" / "When we became official"). Each device
 ///   creates its own from its pinned photos and repairs duplicates by prompt, so
 ///   syncing them would duplicate them and then delete the partner's copy.
-/// - Reel video. The upload client has no video upload yet, so reels sync as their
-///   still thumbnail with `media_type: photo`.
+/// Reels sync as video (`media_type: video`, uploaded through the file server's
+/// `video` field). The server keeps one media file per moment, so the partner's phone
+/// makes the thumbnail from the video.
 /// - Moment voice notes (no playback reads them today).
 @MainActor
 final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
@@ -35,6 +38,17 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
     }
 
     private static func mediaKey(_ recordId: String) -> String { "moment.\(recordId)" }
+    /// Marks a wanted media entry as a video (stored in the entry's unused fingerprint).
+    private static let wantedVideoMarker = "type:video"
+
+    /// The file that represents this moment on the server: the reel video if there is
+    /// one, otherwise the stored photo.
+    private func mediaFile(for moment: Moment) -> (url: URL, type: String) {
+        if let videoURL = moment.resolvedVideoURL {
+            return (videoURL, "video")
+        }
+        return (thumbnails.url(for: moment.id), "photo")
+    }
     private static func wantedMediaKey(_ recordId: String) -> String { "moment.\(recordId).wanted" }
 
     private static func isSynced(_ moment: Moment) -> Bool {
@@ -56,8 +70,9 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
         var records: [String: [String: Any]] = [:]
         for moment in syncedMoments {
             let recordId = SyncIDCodec.objectId(for: moment.id)
+            let media = mediaFile(for: moment)
             var body: [String: Any?] = [
-                "media_type": "photo",
+                "media_type": media.type,
                 "timestamp": SyncJSON.string(from: moment.dateTaken),
                 "place_name": Self.nonEmpty(moment.placeName),
                 "caption": moment.caption ?? "",
@@ -68,7 +83,7 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
             if let latitude = moment.latitude, let longitude = moment.longitude {
                 body["coordinates"] = ["latitude": latitude, "longitude": longitude]
             }
-            if let mediaPath = registry.remotePath(for: Self.mediaKey(recordId), fileAt: thumbnails.url(for: moment.id)) {
+            if let mediaPath = registry.remotePath(for: Self.mediaKey(recordId), fileAt: media.url) {
                 body["media_path"] = mediaPath
             }
             records[recordId] = SyncJSON.compacted(body)
@@ -82,7 +97,7 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
         guard !Self.isFoundingPrompt(prompt) else { return nil }
 
         var body: [String: Any?] = [
-            "media_type": "photo",
+            "media_type": (dto["media_type"] as? String) == "video" ? "video" : "photo",
             "timestamp": SyncJSON.string(from: timestamp),
             "place_name": Self.nonEmpty(dto["place_name"] as? String),
             "caption": dto["caption"] as? String ?? "",
@@ -153,7 +168,12 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
 
             if let mediaPath = Self.nonEmpty(dto["media_path"] as? String),
                registry.entry(for: Self.mediaKey(recordId))?.remotePath != mediaPath {
-                registry.record(key: Self.wantedMediaKey(recordId), remotePath: mediaPath, fingerprint: nil)
+                let isVideo = (dto["media_type"] as? String) == "video"
+                registry.record(
+                    key: Self.wantedMediaKey(recordId),
+                    remotePath: mediaPath,
+                    fingerprint: isVideo ? Self.wantedVideoMarker : nil
+                )
                 if let url = dto["media_url"] as? String { signedMediaURLs[recordId] = url }
             }
         }
@@ -167,18 +187,29 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
     func uploadPendingMedia() async throws {
         for moment in syncedMoments {
             let recordId = SyncIDCodec.objectId(for: moment.id)
-            let fileURL = thumbnails.url(for: moment.id)
-            // Cheap stat-based check first; only unchanged-unknown files are read.
-            guard registry.remotePath(for: Self.mediaKey(recordId), fileAt: fileURL) == nil,
-                  let data = thumbnails.fileData(for: moment.id) else { continue }
-            let fingerprint = SyncMediaRegistry.fingerprint(of: data)
+            let media = mediaFile(for: moment)
+            // Cheap stat-based check first; only new or changed files are read.
+            guard registry.remotePath(for: Self.mediaKey(recordId), fileAt: media.url) == nil else { continue }
+            let data: Data?
+            if media.type == "video" {
+                data = try? Data(contentsOf: media.url)
+            } else {
+                data = thumbnails.fileData(for: moment.id)
+            }
+            guard let data else { continue }
             do {
-                let path = try await SyncMediaTransfer.uploadJPEG(data, filename: "moment.jpg")
+                let path: String
+                if media.type == "video" {
+                    let ext = media.url.pathExtension.isEmpty ? "mov" : media.url.pathExtension
+                    path = try await SyncMediaTransfer.uploadVideo(data, filename: "moment.\(ext)")
+                } else {
+                    path = try await SyncMediaTransfer.uploadJPEG(data, filename: "moment.jpg")
+                }
                 registry.record(
                     key: Self.mediaKey(recordId),
                     remotePath: path,
-                    fingerprint: fingerprint,
-                    fileStamp: SyncMediaRegistry.fileStamp(at: fileURL)
+                    fingerprint: SyncMediaRegistry.fingerprint(of: data),
+                    fileStamp: SyncMediaRegistry.fileStamp(at: media.url)
                 )
             } catch SyncMediaTransfer.TransferError.rejected {
                 continue
@@ -188,22 +219,61 @@ final class MomentsSyncResource: CoupleSyncCollection, CoupleSyncMediaHandling {
 
     func downloadPendingMedia() async -> Bool {
         var wroteAny = false
+        var reelIDs: [UUID] = []
         for moment in syncedMoments {
             let recordId = SyncIDCodec.objectId(for: moment.id)
-            guard let wanted = registry.entry(for: Self.wantedMediaKey(recordId))?.remotePath,
-                  registry.entry(for: Self.mediaKey(recordId))?.remotePath != wanted else { continue }
+            guard let wantedEntry = registry.entry(for: Self.wantedMediaKey(recordId)),
+                  registry.entry(for: Self.mediaKey(recordId))?.remotePath != wantedEntry.remotePath else { continue }
+            let wanted = wantedEntry.remotePath
             let signedURL = signedMediaURLs.removeValue(forKey: recordId)
             guard let data = await SyncMediaTransfer.download(signedURL: signedURL, path: wanted) else { continue }
-            thumbnails.storeDownloadedJPEG(data, for: moment.id)
+
+            let storedURL: URL
+            if wantedEntry.fingerprint == Self.wantedVideoMarker {
+                MomentVideoStore.shared.storeDownloadedVideo(data, for: moment.id)
+                storedURL = MomentVideoStore.shared.url(for: moment.id)
+                if let poster = await Self.posterImage(forVideoAt: storedURL),
+                   let jpeg = poster.jpegData(compressionQuality: 0.8) {
+                    thumbnails.storeDownloadedJPEG(jpeg, for: moment.id)
+                }
+                reelIDs.append(moment.id)
+            } else {
+                thumbnails.storeDownloadedJPEG(data, for: moment.id)
+                storedURL = thumbnails.url(for: moment.id)
+            }
             registry.record(
                 key: Self.mediaKey(recordId),
                 remotePath: wanted,
                 fingerprint: SyncMediaRegistry.fingerprint(of: data),
-                fileStamp: SyncMediaRegistry.fileStamp(at: thumbnails.url(for: moment.id))
+                fileStamp: SyncMediaRegistry.fileStamp(at: storedURL)
             )
             wroteAny = true
         }
+
+        // Point the moments at their downloaded reels, and tell HomeViewModel right away
+        // (before any further network wait) so it can't save its stale copy over this.
+        if !reelIDs.isEmpty {
+            var moments = dpm.loadMoments()
+            for index in moments.indices where reelIDs.contains(moments[index].id) {
+                moments[index].videoFileName = MomentVideoStore.shared.fileName(for: moments[index].id)
+            }
+            dpm.saveMoments(moments)
+            NotificationCenter.default.post(
+                name: .coupleSyncDidApplyRemoteChanges,
+                object: nil,
+                userInfo: ["resources": Set([key])]
+            )
+        }
         return wroteAny
+    }
+
+    /// First frame of a downloaded reel, used as its thumbnail.
+    private static func posterImage(forVideoAt url: URL) async -> UIImage? {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1200, height: 1200)
+        guard let (cgImage, _) = try? await generator.image(at: .zero) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 
     // MARK: Helpers
