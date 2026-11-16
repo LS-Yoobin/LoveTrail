@@ -57,6 +57,38 @@ final class LocalPolaroidStore: ObservableObject {
 
     private var resetObserver: NSObjectProtocol?
 
+    /// Polaroids stored for the active account, read from disk (couple sync).
+    static func storedEntries() -> [PolaroidEntry] {
+        let url = CovelaUserScope.documentsDirectory.appendingPathComponent("polaroid_entries.json")
+        guard let data = try? Data(contentsOf: url),
+              let entries = try? JSONDecoder().decode([PolaroidEntry].self, from: data) else { return [] }
+        return entries
+    }
+
+    /// When each developing polaroid reveals (its processing card's unlock time).
+    static func storedRevealTimes() -> [UUID: Date] {
+        let url = CovelaUserScope.documentsDirectory.appendingPathComponent("processing_memories.json")
+        guard let data = try? Data(contentsOf: url),
+              let memories = try? JSONDecoder().decode([ProcessingMemory].self, from: data) else { return [:] }
+        return Dictionary(memories.map { ($0.id, $0.unlockTime) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    static func imageFileURL(for entry: PolaroidEntry) -> URL {
+        CovelaUserScope.documentsDirectory.appendingPathComponent("polaroid_images").appendingPathComponent(entry.imageFileName)
+    }
+
+    static func vibeFileURL(for entry: PolaroidEntry) -> URL? {
+        entry.vibeFileName.map {
+            CovelaUserScope.documentsDirectory.appendingPathComponent("polaroid_vibes").appendingPathComponent($0)
+        }
+    }
+
+    static func videoFileURL(for entry: PolaroidEntry) -> URL? {
+        entry.videoFileName.map {
+            CovelaUserScope.documentsDirectory.appendingPathComponent("polaroid_videos").appendingPathComponent($0)
+        }
+    }
+
     /// Ids of the polaroids stored for the active account, read from disk so callers
     /// don't need a store instance. Couple sync uses it so a Moment the server
     /// revealed from one of this user's polaroids keeps the polaroid's id.
@@ -119,6 +151,7 @@ final class LocalPolaroidStore: ObservableObject {
     private func saveEntries() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
         try? data.write(to: entriesFileURL)
+        CoupleSyncEngine.shared.localDidChange()
     }
     
     func savePhoto(

@@ -14,6 +14,7 @@ enum CoupleSyncBootstrap {
         engine.register(SpecialDatesSyncResource())
         engine.register(CoupleProfileSyncResource())
         engine.register(MomentsSyncResource())
+        engine.register(PolaroidsSyncResource())
         engine.register(PlaylistSyncResource())
         engine.register(PetSyncResource())
         engine.register(PetRoomSyncResource())
