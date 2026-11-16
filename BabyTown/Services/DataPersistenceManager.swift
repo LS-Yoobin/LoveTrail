@@ -438,6 +438,25 @@ final class DataPersistenceManager {
     func saveUserLetters(_ letters: [UserLetter]) {
         guard let data = try? encoder.encode(letters) else { return }
         try? data.write(to: userLettersFileURL)
+        CoupleSyncEngine.shared.localDidChange()
+    }
+
+    // MARK: Letter media files (couple sync)
+
+    /// File of a letter photo (JPEG), sticker (PNG) or voice memo (m4a).
+    func letterMediaFileURL(for block: LetterBlock) -> URL? {
+        switch block.type {
+        case .photo: return block.photoImageId.map(letterPhotoImageURL(id:))
+        case .sticker: return block.stickerImageId.map(letterStickerImageURL(id:))
+        case .voiceMemo: return block.voiceMemoFileId.map(letterVoiceMemoURL(fileId:))
+        }
+    }
+
+    /// Writes downloaded letter media byte for byte (so it is never uploaded back).
+    func saveLetterMediaData(_ data: Data, for block: LetterBlock) {
+        guard let url = letterMediaFileURL(for: block) else { return }
+        try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
     }
 
     func loadUserLetters() -> [UserLetter] {

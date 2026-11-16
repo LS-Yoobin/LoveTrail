@@ -8,6 +8,15 @@ struct UserLetter: Identifiable, Codable, Equatable {
     let createdAt: Date
     var scheduledFor: Date?
     var sentAt: Date?
+    /// Written by the partner and received through couple sync (BAB-67). Letters are
+    /// only ever between the two of you, so this is all the "from" a letter needs.
+    var isFromPartner: Bool = false
+    /// For a received letter: when this user opened it. For your own letter: when the
+    /// partner opened it (shown as a quiet "Read").
+    var readAt: Date?
+    /// A received letter whose delivery date hasn't come yet. The server sends only its
+    /// date, so it shows as a sealed envelope until it opens.
+    var isSealed: Bool = false
 
     init(
         id: UUID,
@@ -36,6 +45,9 @@ struct UserLetter: Identifiable, Codable, Equatable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         scheduledFor = try container.decodeIfPresent(Date.self, forKey: .scheduledFor)
         sentAt = try container.decodeIfPresent(Date.self, forKey: .sentAt)
+        isFromPartner = try container.decodeIfPresent(Bool.self, forKey: .isFromPartner) ?? false
+        readAt = try container.decodeIfPresent(Date.self, forKey: .readAt)
+        isSealed = try container.decodeIfPresent(Bool.self, forKey: .isSealed) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -47,10 +59,19 @@ struct UserLetter: Identifiable, Codable, Equatable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(scheduledFor, forKey: .scheduledFor)
         try container.encodeIfPresent(sentAt, forKey: .sentAt)
+        try container.encode(isFromPartner, forKey: .isFromPartner)
+        try container.encodeIfPresent(readAt, forKey: .readAt)
+        try container.encode(isSealed, forKey: .isSealed)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, body, blocks, createdAt, scheduledFor, sentAt
+        case isFromPartner, readAt, isSealed
+    }
+
+    /// A delivered letter from the partner that this user hasn't opened yet.
+    var isNewFromPartner: Bool {
+        isFromPartner && !isSealed && readAt == nil
     }
 
     var isScheduled: Bool {

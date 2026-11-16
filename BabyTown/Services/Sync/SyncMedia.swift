@@ -133,7 +133,10 @@ enum SyncMediaTransfer {
     /// server refused is `rejected`, so the resource skips that file and moves on.
     private static func run(_ upload: () async throws -> String) async throws -> String {
         do {
-            return try await upload()
+            // The file server answers `/public/...`; the API stores `public/...`. Use the
+            // API's form so a record's path matches what comes back on the next pull.
+            let path = try await upload()
+            return CovelaMediaPath.normalizePermanentPath(path) ?? path
         } catch CovelaMediaUploadError.network, CovelaMediaUploadError.notSignedIn {
             throw TransferError.offline
         } catch let CovelaMediaUploadError.httpError(status, _) where status >= 500 {

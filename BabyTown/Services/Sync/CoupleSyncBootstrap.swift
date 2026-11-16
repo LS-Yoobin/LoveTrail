@@ -19,5 +19,7 @@ enum CoupleSyncBootstrap {
         engine.register(PetRoomSyncResource())
         engine.register(PetTricksSyncResource())
         engine.register(CoinLedgerSync.shared)
+        engine.register(LettersSyncResource.shared as CoupleSyncCollection)
+        engine.register(LettersSyncResource.shared as CoupleSyncTask)
     }
 }

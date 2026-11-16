@@ -34,7 +34,7 @@ struct NotificationCenterView: View {
                             ForEach(userLetters.sorted { $0.sortDate > $1.sortDate }) { letter in
                                 if store.isForeverUnlocked || letter.createdAt >= thirtyDaysAgo {
                                     UserLetterRow(letter: letter) {
-                                        selectedLetter = letter
+                                        openLetter(letter)
                                     }
                                 } else {
                                     VaultedLetterRow(letter: letter) {
@@ -96,6 +96,9 @@ struct NotificationCenterView: View {
             .onAppear {
                 reloadContent()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { _ in
+                reloadContent()
+            }
         }
     }
 
@@ -120,6 +123,17 @@ struct NotificationCenterView: View {
         )
         readNotificationIDs = DataPersistenceManager.shared.readInAppNotificationIDs()
         userLetters = DataPersistenceManager.shared.loadUserLetters()
+    }
+
+    /// A sealed letter can't be opened before its day. Opening a partner letter marks it
+    /// read (here and, with the next sync, on the partner's phone).
+    private func openLetter(_ letter: UserLetter) {
+        guard !letter.isSealed else { return }
+        if letter.isNewFromPartner {
+            LettersSyncResource.shared.markOpened(letter)
+            onNotificationRead?()
+        }
+        selectedLetter = letter
     }
 
     private func handleTap(_ notification: AppNotification) {
@@ -175,7 +189,39 @@ private struct UserLetterRow: View {
         return formatter.string(from: referenceDate)
     }
 
+    private var iconName: String {
+        if letter.isSealed { return "envelope.badge.fill" }
+        if letter.isNewFromPartner { return "envelope.badge.fill" }
+        if letter.isFromPartner { return "envelope.open.fill" }
+        return "envelope.fill"
+    }
+
+    /// Sealed letters show only when they open; their content isn't on the phone yet.
+    private var titleText: String {
+        letter.isSealed ? "A letter is on its way" : letter.displayTitle
+    }
+
+    private var previewText: String {
+        guard letter.isSealed else { return letter.bodyPreview }
+        guard let opensOn = letter.scheduledFor else { return "Opens soon" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return "Opens \(formatter.string(from: opensOn))"
+    }
+
     private var statusLabel: String {
+        if letter.isSealed {
+            return "Sealed"
+        }
+        if letter.isNewFromPartner {
+            return "New"
+        }
+        if letter.isFromPartner {
+            return ""
+        }
+        if letter.readAt != nil {
+            return "Read"
+        }
         if letter.isScheduled, let scheduledFor = letter.scheduledFor {
             let formatter = DateFormatter()
             formatter.dateFormat = "MMM d • h:mm a"
@@ -192,18 +238,18 @@ private struct UserLetterRow: View {
                         .fill(BabyTownTheme.accent.opacity(0.15))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: "envelope.fill")
+                    Image(systemName: iconName)
                         .font(.system(size: 18))
                         .foregroundStyle(BabyTownTheme.accent)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(letter.displayTitle)
+                    Text(titleText)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.black)
                         .lineLimit(1)
 
-                    Text(letter.bodyPreview)
+                    Text(previewText)
                         .font(.system(size: 13))
                         .foregroundStyle(.black.opacity(0.55))
                         .lineLimit(1)
@@ -218,7 +264,11 @@ private struct UserLetterRow: View {
 
                     Text(statusLabel)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(letter.isScheduled ? BabyTownTheme.accent : .black.opacity(0.55))
+                        .foregroundStyle(
+                            letter.isScheduled || letter.isNewFromPartner || letter.isSealed
+                                ? BabyTownTheme.accent
+                                : .black.opacity(0.55)
+                        )
                 }
 
                 Image(systemName: "chevron.right")

@@ -798,6 +798,7 @@ struct HomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { _ in
                 refreshCoupleSpaceCardMetadata()
+                refreshGardenPatchState()
             }
         }
     }
@@ -994,6 +995,7 @@ struct HomeView: View {
         let dpm = DataPersistenceManager.shared
         hasPetAdopted = dpm.loadPetState().adoptedSkin != nil
         unreadLetterCount = AppNotification.unreadCount(userNickname: dpm.loadUserNickname())
+            + LettersSyncResource.shared.newLetterCount()
     }
 
     private func refreshUpcomingPlans() {

@@ -97,7 +97,7 @@ struct UserLetterDetailView: View {
 
     private var deliveryStatusCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(letter.isScheduled ? "Scheduled delivery" : "Sent")
+            Text(letter.isScheduled ? "Scheduled delivery" : (letter.isFromPartner ? "Received" : "Sent"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(BabyTownTheme.accent)
 

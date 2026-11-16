@@ -151,6 +151,7 @@ final class CoupleSyncEngine: ObservableObject {
         CoupleSyncStateStore.reset()
         SyncMediaRegistry.shared.reset()
         CoinLedgerSync.shared.reset()
+        LettersSyncResource.shared.reset()
         pendingChangeCount = 0
     }
 
