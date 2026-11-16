@@ -735,6 +735,15 @@ final class DataPersistenceManager {
         return UIImage(data: data)
     }
 
+    /// The PNG cutout file of a sticker (couple sync uploads these bytes as-is).
+    func stickerImageFileURL(id: UUID) -> URL {
+        stickerImageURL(id: id)
+    }
+
+    func saveStickerImageData(_ data: Data, id: UUID) {
+        try? data.write(to: stickerImageURL(id: id), options: .atomic)
+    }
+
     func deleteStickerImage(id: UUID) {
         try? fileManager.removeItem(at: stickerImageURL(id: id))
     }
@@ -751,9 +760,14 @@ final class DataPersistenceManager {
     func saveMemoryCanvas(_ canvas: MemoryCanvas) {
         var all = loadMemoryCanvases()
         all[canvas.memoryKey] = canvas
-        let list = Array(all.values)
-        guard let data = try? encoder.encode(list) else { return }
+        saveMemoryCanvases(Array(all.values))
+    }
+
+    /// Replaces every stored memory canvas (couple sync applies partner changes this way).
+    func saveMemoryCanvases(_ canvases: [MemoryCanvas]) {
+        guard let data = try? encoder.encode(canvases) else { return }
         try? data.write(to: memoryCanvasesFileURL)
+        CoupleSyncEngine.shared.localDidChange()
     }
 
     // MARK: - Prelude

@@ -15,6 +15,9 @@ enum CoupleSyncBootstrap {
         engine.register(CoupleProfileSyncResource())
         engine.register(MomentsSyncResource())
         engine.register(PolaroidsSyncResource())
+        // After moments: canvases and stickers point at moments.
+        engine.register(MemoryCanvasSyncResource())
+        engine.register(StickersSyncResource())
         engine.register(PlaylistSyncResource())
         engine.register(PetSyncResource())
         engine.register(PetRoomSyncResource())

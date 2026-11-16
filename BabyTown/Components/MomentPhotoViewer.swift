@@ -189,6 +189,15 @@ struct MomentPhotoViewer: View {
             reloadCanvasFromDisk()
             refreshStickerImages()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { notification in
+            // The partner's note or stickers on this page arrived. Don't pull the page out
+            // from under an edit in progress; it reloads on the next appearance instead.
+            guard let resources = notification.userInfo?["resources"] as? Set<String>,
+                  !resources.isDisjoint(with: ["memory-canvases", "profile-stickers"]),
+                  !isEditingStickers, !isComposingNote else { return }
+            reloadCanvasFromDisk()
+            refreshStickerImages()
+        }
     }
 
     // MARK: - Scrapbook layout
