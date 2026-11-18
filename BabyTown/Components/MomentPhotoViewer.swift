@@ -11,7 +11,10 @@ struct MomentPhotoViewer: View {
     var onEditCaption: ((UUID, String, String?) -> Void)? = nil
     var onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil
     var onRemovePhoto: ((DaySection, UUID) -> Void)? = nil
-    var onSyncMemoryPhotos: ((DaySection, Set<String>, Set<UUID>) async -> Void)? = nil
+    /// `@MainActor` is required on this async escaping callback. Without it, Swift can
+    /// corrupt the `DaySection` argument across the await boundary (EXC_BAD_ACCESS on
+    /// `section.moments.first` inside `HomeViewModel.syncMemoryPhotos`).
+    var onSyncMemoryPhotos: (@MainActor (DaySection, Set<String>, Set<UUID>) async -> Void)? = nil
     var onReloadMemoryMoments: (() -> [Moment])? = nil
     /// Prompt-memory scrapbook page: always show this prompt card (not founding-slot logic).
     var memoryPagePromptText: String? = nil
@@ -21,7 +24,7 @@ struct MomentPhotoViewer: View {
     var onEditPromptMemory: ((UUID, UUID, String, String?, Double?, Double?, Bool) -> Void)? = nil
     var onAddPromptPhotos: ((UUID, [UIImage]) -> Void)? = nil
     var onRemovePromptPhoto: ((UUID, UUID) -> Void)? = nil
-    var onSyncPromptMemoryPhotos: ((UUID, Set<String>, Set<UUID>) async -> Void)? = nil
+    var onSyncPromptMemoryPhotos: (@MainActor (UUID, Set<String>, Set<UUID>) async -> Void)? = nil
     var onReloadPromptMoments: (() -> [Moment])? = nil
 
     @State private var currentIndex: Int
@@ -38,6 +41,7 @@ struct MomentPhotoViewer: View {
     @State private var isCanvasDragActive = false
     @State private var metadataBottomY: CGFloat = 0
     @State private var pageContentHeight: CGFloat = 0
+    @State private var measuredCanvasWidth: CGFloat = 0
     @State private var showCaptionEditor = false
     @State private var showStickerPicker = false
     @State private var pendingNewStickerIDs: Set<UUID> = []
@@ -65,7 +69,7 @@ struct MomentPhotoViewer: View {
         onEditCaption: ((UUID, String, String?) -> Void)? = nil,
         onAddPhotos: ((DaySection, [UIImage]) -> Void)? = nil,
         onRemovePhoto: ((DaySection, UUID) -> Void)? = nil,
-        onSyncMemoryPhotos: ((DaySection, Set<String>, Set<UUID>) async -> Void)? = nil,
+        onSyncMemoryPhotos: (@MainActor (DaySection, Set<String>, Set<UUID>) async -> Void)? = nil,
         onReloadMemoryMoments: (() -> [Moment])? = nil,
         memoryPagePromptText: String? = nil,
         memoryPageImportantDate: MemoryPageImportantDateInfo? = nil,
@@ -73,7 +77,7 @@ struct MomentPhotoViewer: View {
         onEditPromptMemory: ((UUID, UUID, String, String?, Double?, Double?, Bool) -> Void)? = nil,
         onAddPromptPhotos: ((UUID, [UIImage]) -> Void)? = nil,
         onRemovePromptPhoto: ((UUID, UUID) -> Void)? = nil,
-        onSyncPromptMemoryPhotos: ((UUID, Set<String>, Set<UUID>) async -> Void)? = nil,
+        onSyncPromptMemoryPhotos: (@MainActor (UUID, Set<String>, Set<UUID>) async -> Void)? = nil,
         onReloadPromptMoments: (() -> [Moment])? = nil
     ) {
         self.moments = moments
@@ -293,6 +297,10 @@ struct MomentPhotoViewer: View {
                                 onCanvasDragActiveChanged: { isCanvasDragActive = $0 }
                             )
                             .frame(width: geo.size.width, height: geo.size.height)
+                            .onAppear { measuredCanvasWidth = geo.size.width }
+                            .onChange(of: geo.size.width) { _, width in
+                                measuredCanvasWidth = width
+                            }
                             .zIndex(3)
                         }
                     }
@@ -379,7 +387,7 @@ struct MomentPhotoViewer: View {
     }
 
     private var scrapbookCanvasWidth: CGFloat {
-        UIScreen.main.bounds.width
+        measuredCanvasWidth > 0 ? measuredCanvasWidth : 390
     }
 
     private func dismissNoteKeyboardIfNeeded() {
@@ -756,13 +764,13 @@ struct MomentPhotoViewer: View {
             },
             onSyncMemoryPhotos: { assetIds, orphanIds in
                 if let memoryId = promptMemoryId, let onSyncPromptMemoryPhotos {
-                    Task {
+                    Task { @MainActor in
                         await onSyncPromptMemoryPhotos(memoryId, assetIds, orphanIds)
                         reloadMemoryMoments()
                     }
                 } else {
                     let section = editingSection
-                    Task {
+                    Task { @MainActor in
                         await onSyncMemoryPhotos?(section, assetIds, orphanIds)
                         reloadMemoryMoments()
                     }
@@ -871,7 +879,7 @@ struct MomentPhotoViewer: View {
             existingNotes: canvas.displayedNotes,
             metadataBottomY: metadataBottomY,
             contentHeight: layoutContentHeight,
-            canvasWidth: UIScreen.main.bounds.width
+            canvasWidth: scrapbookCanvasWidth
         )
     }
 

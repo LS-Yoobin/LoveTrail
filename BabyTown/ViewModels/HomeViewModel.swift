@@ -827,14 +827,15 @@ final class HomeViewModel: ObservableObject {
 
         let existingAssetIds = Set(section.moments.compactMap(\.assetIdentifier))
 
-        for moment in section.moments {
+        // Batch removals into one `moments` write so `didSet` (persist + regroup) runs once.
+        let idsToRemove = Set(section.moments.compactMap { moment -> UUID? in
             if let assetId = moment.assetIdentifier {
-                if !selectedAssetIds.contains(assetId) {
-                    moments.removeAll { $0.id == moment.id }
-                }
-            } else if !selectedOrphanMomentIds.contains(moment.id) {
-                moments.removeAll { $0.id == moment.id }
+                return selectedAssetIds.contains(assetId) ? nil : moment.id
             }
+            return selectedOrphanMomentIds.contains(moment.id) ? nil : moment.id
+        })
+        if !idsToRemove.isEmpty {
+            moments.removeAll { idsToRemove.contains($0.id) }
         }
 
         let assetIdsToAdd = selectedAssetIds.subtracting(existingAssetIds)

@@ -64,21 +64,25 @@ final class MomentFactory {
         await withCheckedContinuation { continuation in
             let size = CGSize(width: 400, height: 400)
             let options = PHImageRequestOptions()
-            options.deliveryMode = .opportunistic
+            // `.highQualityFormat` delivers a single final callback, so the continuation
+            // is resumed exactly once (`.opportunistic` can fire twice → EXC_BAD_ACCESS).
+            options.deliveryMode = .highQualityFormat
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
 
+            var hasResumed = false
             imageManager.requestImage(
                 for: asset,
                 targetSize: size,
                 contentMode: .aspectFill,
                 options: options
             ) { image, info in
-                // With .opportunistic, skip the low-quality callback
                 let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
-                if !isDegraded {
-                    continuation.resume(returning: image)
-                }
+                let isCancelled = (info?[PHImageCancelledKey] as? Bool) ?? false
+                guard !isDegraded else { return }
+                guard !hasResumed else { return }
+                hasResumed = true
+                continuation.resume(returning: isCancelled ? nil : image)
             }
         }
     }
