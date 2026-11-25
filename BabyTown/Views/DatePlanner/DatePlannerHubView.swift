@@ -96,6 +96,12 @@ struct DatePlannerHubView: View {
             })
         }
         .onAppear { loadPlans() }
+        .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { notification in
+            // Only date plan changes: other resources' syncs must not reload plans, or
+            // in-memory edits not yet saved to disk would be replaced.
+            guard DatePlansSyncResource.didChangeDatePlans(notification) else { return }
+            reloadPlansAfterSync()
+        }
     }
 
     // MARK: - Tab bar
@@ -283,6 +289,14 @@ struct DatePlannerHubView: View {
     }
 
     // MARK: - Helpers
+
+    /// Picks up plans pulled by couple sync. Keeps the current selection and tab;
+    /// only re-selects when the selected plan no longer exists.
+    private func reloadPlansAfterSync() {
+        plans = DatePlanStore.shared.allPlans()
+        if let selectedPlanID, plans.contains(where: { $0.id == selectedPlanID }) { return }
+        selectedPlanID = plans.sorted { $0.createdAt > $1.createdAt }.first?.id
+    }
 
     private func loadPlans() {
         plans = DatePlanStore.shared.allPlans()
