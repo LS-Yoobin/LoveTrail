@@ -55,6 +55,20 @@ protocol CoupleSyncDocument: AnyObject {
     func applyRemote(_ dto: [String: Any])
 }
 
+/// Optional for a document whose server copy also holds fields this device never
+/// writes, e.g. the other partner's entry in the couple profile (BAB-147).
+///
+/// Those fields stay out of `localBody()` / `comparableBody(fromServer:)`, so they never
+/// cause a push. Instead the engine hands every successfully pulled DTO here, whether
+/// or not the rest of the document changed, is syncing for the first time, or has a
+/// local change queued.
+@MainActor
+protocol CoupleSyncServerOwnedFields: AnyObject {
+    /// Stores the server-owned fields. Returns `true` when local data changed, so
+    /// views refresh only then.
+    func applyServerOwnedFields(_ dto: [String: Any]) -> Bool
+}
+
 /// Optional media step for a resource (BAB-67 pipeline).
 ///
 /// Uploads run **before** change detection, so a record's body can include the

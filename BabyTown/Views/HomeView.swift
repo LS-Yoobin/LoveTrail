@@ -794,9 +794,12 @@ struct HomeView: View {
                     refreshCoupleSpaceCardMetadata()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .coupleSyncDidApplyRemoteChanges)) { notification in
                 refreshCoupleSpaceCardMetadata()
                 refreshGardenPatchState()
+                if DatePlansSyncResource.didChangeDatePlans(notification) {
+                    refreshUpcomingPlans()
+                }
             }
         }
     }

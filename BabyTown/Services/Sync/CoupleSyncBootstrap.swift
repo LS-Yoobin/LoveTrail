@@ -19,6 +19,10 @@ enum CoupleSyncBootstrap {
         engine.register(MemoryCanvasSyncResource())
         engine.register(StickersSyncResource())
         engine.register(PlaylistSyncResource())
+        // Off until the BAB-63 endpoint is verified against the BAB-54 contract.
+        if DatePlansSyncResource.isNetworkSyncEnabled {
+            engine.register(DatePlansSyncResource())
+        }
         engine.register(PetSyncResource())
         engine.register(PetRoomSyncResource())
         engine.register(PetTricksSyncResource())

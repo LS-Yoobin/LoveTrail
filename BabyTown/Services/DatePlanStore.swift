@@ -3,14 +3,24 @@ import Foundation
 final class DatePlanStore {
     static let shared = DatePlanStore()
 
+    private static let fileName = "date_plans.json"
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let fileManager = FileManager.default
     private let lastSelectedKey = "plannerLastSelectedPlanID"
 
+    /// `Documents/CovelaUserData/<scopeId>/date_plans.json`.
+    ///
+    /// Before storage became per account, every account on the device shared
+    /// `Documents/date_plans.json`. That legacy file is left exactly as it is and is not
+    /// read: nothing trustworthy says which account wrote each plan (`createdByUserID` is
+    /// copied from an email the user can edit), so moving it to any account could show
+    /// or upload another account's plans. This is also why the path is not
+    /// `CovelaUserScope.scopedItem(named:)`, which would move the legacy file into
+    /// whichever account opened it first.
     private var fileURL: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("date_plans.json")
+        CovelaUserScope.documentsDirectory.appendingPathComponent(Self.fileName)
     }
 
     private init() {}
@@ -51,7 +61,7 @@ final class DatePlanStore {
         var plans = allPlans()
         plans.append(plan)
         persist(plans)
-        Task { await syncToMongoDB(plan) }
+        notifySyncEngine()
     }
 
     func updatePlan(_ updated: DatePlan) {
@@ -59,7 +69,7 @@ final class DatePlanStore {
         guard let idx = plans.firstIndex(where: { $0.id == updated.id }) else { return }
         plans[idx] = updated
         persist(plans)
-        Task { await syncToMongoDB(updated) }
+        notifySyncEngine()
     }
 
     func deletePlan(id: UUID) {
@@ -69,22 +79,26 @@ final class DatePlanStore {
         if lastSelectedPlanID == id {
             setLastSelectedPlanID(nil)
         }
+        notifySyncEngine()
+    }
+
+    /// Saves plans written by `DatePlansSyncResource` from pulled server changes.
+    /// Does not notify the sync engine: these are not local edits.
+    func replacePlansFromSync(_ plans: [DatePlan]) {
+        persist(plans)
     }
 
     // MARK: - Persistence
 
     private func persist(_ plans: [DatePlan]) {
         guard let data = try? encoder.encode(plans) else { return }
-        try? data.write(to: fileURL)
+        try? data.write(to: fileURL, options: .atomic)
     }
 
-    // MARK: - Sync stubs
+    // MARK: - Sync
 
-    private func syncToMongoDB(_ plan: DatePlan) async {
-        // TODO: POST /date_plans with { coupleID, plan } — last-write-wins on updatedAt
-    }
-
-    func fetchPartnerChanges() async {
-        // TODO: GET /date_plans?coupleID=X — merge by updatedAt per plan id
+    private func notifySyncEngine() {
+        guard DatePlansSyncResource.isNetworkSyncEnabled else { return }
+        CoupleSyncEngine.shared.localDidChange()
     }
 }

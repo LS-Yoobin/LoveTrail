@@ -136,6 +136,11 @@ enum SyncMediaTransfer {
             // The file server answers `/public/...`; the API stores `public/...`. Use the
             // API's form so a record's path matches what comes back on the next pull.
             let path = try await upload()
+            // Never let a device path become a record's media key (BAB-147: the
+            // backend accepts `file://` values as they are).
+            if CovelaMediaPath.looksLikeLocalFilePath(path) {
+                throw CovelaMediaUploadError.invalidResponse
+            }
             return CovelaMediaPath.normalizePermanentPath(path) ?? path
         } catch CovelaMediaUploadError.network, CovelaMediaUploadError.notSignedIn {
             throw TransferError.offline
