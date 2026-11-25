@@ -609,6 +609,7 @@ struct PendingHomeView: View {
             let name = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
             DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
+            CoupleSyncEngine.shared.coupleDidPair()
             onPartnerJoined([], name)
         }
     }

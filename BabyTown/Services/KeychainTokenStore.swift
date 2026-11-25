@@ -27,6 +27,9 @@ enum KeychainTokenStore {
 
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         guard status == errSecSuccess else {
+            // Status code and system description only; never the session or token.
+            let message = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
+            print("[KeychainTokenStore] SecItemAdd failed: OSStatus \(status) (\(message))")
             throw AuthError.networkError("Could not save sign-in session.")
         }
     }

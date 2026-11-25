@@ -28,6 +28,7 @@ enum InviteJoinFlow {
             DataPersistenceManager.shared.setPartnerAccount(true)
             let captures = await PartnerGiftCaptureImporter.importCaptures(response.revealCaptures)
             DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
+            CoupleSyncEngine.shared.coupleDidPair()
             return .joined(captures: captures, revealerName: response.revealerName)
         } catch {
             return .failure(

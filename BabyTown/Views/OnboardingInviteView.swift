@@ -517,6 +517,7 @@ struct OnboardingInviteView: View {
             let revealerName = DataPersistenceManager.shared.loadPendingInvitePartnerName() ?? "Your partner"
             DataPersistenceManager.shared.clearPendingInviteState()
             DataPersistenceManager.shared.recordPreludeChapterIfNeeded()
+            CoupleSyncEngine.shared.coupleDidPair()
             // The inviter's poll never receives gift captures — only the invitee's accept-invite call does.
             onPartnerJoined([], revealerName)
         }

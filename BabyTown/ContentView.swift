@@ -70,6 +70,7 @@ struct ContentView: View {
         DataPersistenceManager.shared.saveCoupleProfile(profile)
         DataPersistenceManager.shared.clearPendingInviteState()
         DataPersistenceManager.shared.setOnboardingCompleted(true)
+        CoupleSyncEngine.shared.coupleDidPair()
         withAnimation(.easeInOut(duration: 0.4)) {
             screen = .home
         }

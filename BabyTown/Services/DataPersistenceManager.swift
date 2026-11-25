@@ -565,13 +565,34 @@ final class DataPersistenceManager {
         return profile
     }
 
+    /// `nil` means the user removed their photo. Only this call records that intent, so
+    /// couple sync sends `avatar_path: ""` for a real removal and never for a photo that
+    /// is merely missing (reinstall, cleared data) or not uploaded yet (BAB-147).
     func saveUserAvatar(_ image: UIImage?) {
-        defer { CoupleSyncEngine.shared.localDidChange() }
-        guard let image, let jpeg = image.jpegData(compressionQuality: 0.85) else {
+        guard let image else {
             try? fileManager.removeItem(at: userAvatarURL)
+            userDefaults.set(true, forKey: ownAvatarRemovalPendingKey)
+            CoupleSyncEngine.shared.localDidChange()
             return
         }
+        // An image that can't be encoded leaves the current photo as it is; it is not
+        // a removal.
+        guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
         try? jpeg.write(to: userAvatarURL)
+        userDefaults.removeObject(forKey: ownAvatarRemovalPendingKey)
+        CoupleSyncEngine.shared.localDidChange()
+    }
+
+    private let ownAvatarRemovalPendingKey = "ownAvatarRemovalPending"
+
+    /// The user removed their own photo and the server has not yet confirmed it has none.
+    var isOwnAvatarRemovalPending: Bool {
+        userDefaults.bool(forKey: ownAvatarRemovalPendingKey)
+    }
+
+    /// Called by couple sync once the server reports no photo for this user.
+    func clearOwnAvatarRemovalPending() {
+        userDefaults.removeObject(forKey: ownAvatarRemovalPendingKey)
     }
 
     func loadUserAvatar() -> UIImage? {
@@ -688,6 +709,11 @@ final class DataPersistenceManager {
 
     func saveOtherPartnerAvatarData(_ data: Data) {
         try? data.write(to: syncedPartnerAvatarURL, options: .atomic)
+    }
+
+    /// Called by couple sync when the partner removed their photo.
+    func removeOtherPartnerAvatar() {
+        try? fileManager.removeItem(at: syncedPartnerAvatarURL)
     }
 
     /// Photo for the partner's slot, as synced from the partner's own profile.

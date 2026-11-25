@@ -1,5 +1,27 @@
 import Foundation
 import Combine
+import os
+
+/// Step-by-step couple sync diagnostics (BAB-147), so a failed first profile sync shows
+/// where it stopped: gate → media upload → push (PATCH) → pull (GET) → apply.
+///
+/// Messages are built only from step names, resource keys, HTTP statuses, server
+/// reason codes, counts and booleans. Never pass ids, names, tokens, emails, media
+/// paths or URLs. Visible in Console.app / Xcode with subsystem `LS.Covela`, category
+/// `CoupleSync`; the last 100 events are also kept in memory (`recent`).
+enum CoupleSyncLog {
+    private static let logger = Logger(subsystem: "LS.Covela", category: "CoupleSync")
+    nonisolated(unsafe) private(set) static var recent: [String] = []
+    /// Total events logged so far (not capped like `recent`).
+    nonisolated(unsafe) private(set) static var eventCount = 0
+
+    static func event(_ message: String) {
+        logger.notice("\(message, privacy: .public)")
+        eventCount += 1
+        recent.append(message)
+        if recent.count > 100 { recent.removeFirst(recent.count - 100) }
+    }
+}
 
 extension Notification.Name {
     /// Posted on the main actor after pulled server changes were written to local
@@ -23,7 +45,7 @@ final class CoupleSyncEngine: ObservableObject {
     static let shared = CoupleSyncEngine()
 
     enum Trigger: String {
-        case launch, foreground, localChange, retry, silentPush, pullToRefresh, accountChange, backgroundRefresh, manual
+        case launch, foreground, localChange, retry, silentPush, pullToRefresh, accountChange, backgroundRefresh, manual, paired
     }
 
     enum Status: Equatable {
@@ -56,6 +78,16 @@ final class CoupleSyncEngine: ObservableObject {
     private var rerunRequested = false
     private var isApplyingRemote = false
     private var debounceTask: Task<Void, Never>?
+    /// Syncs started by the debounce, tracked only so an account change can cancel them.
+    private var debouncedSyncs: [UUID: Task<Void, Never>] = [:]
+    /// After a failed run, `localChange` triggers wait until the scheduled retry instead
+    /// of starting a new run every 1.5s (BAB-147 409 loop). Other triggers ignore it.
+    private var autoSyncNotBefore: Date?
+    /// Consecutive 409s per `resource/recordId` without a successful write in between.
+    private var conflictStreaks: [String: Int] = [:]
+    /// A write that keeps getting 409 after refetching is not retried in a tight loop:
+    /// the run stops and normal backoff applies.
+    static let maxConsecutiveConflicts = 3
     private var retryTask: Task<Void, Never>?
     private var consecutiveFailures = 0
     private var accountObserver: NSObjectProtocol?
@@ -101,8 +133,33 @@ final class CoupleSyncEngine: ObservableObject {
         debounceTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard !Task.isCancelled else { return }
-            await self?.sync(trigger: .localChange)
+            self?.startDebouncedSync()
         }
+    }
+
+    /// Runs the debounced sync as its own task. Cancelling `debounceTask` (every new
+    /// local save does) must only cancel the wait, never a run already talking to the
+    /// server: that cancelled its requests (NSURLError -999), ended the run "offline"
+    /// before the pull that refreshes `base_updated_at`, and the next run got 409 again,
+    /// in a loop (BAB-147). An account change still cancels it (`handleAccountChange`).
+    private func startDebouncedSync() {
+        let id = UUID()
+        debouncedSyncs[id] = Task { [weak self] in
+            await self?.sync(trigger: .localChange)
+            self?.debouncedSyncs[id] = nil
+        }
+    }
+
+    /// Call once this account has just joined a couple (invite accepted on either side,
+    /// or the server reported it already paired), after the local stage is saved.
+    /// Syncs now instead of waiting for the debounced save trigger; that pending trigger
+    /// is cancelled, and a run already in progress just schedules one follow-up run.
+    func coupleDidPair() {
+        debounceTask?.cancel()
+        debounceTask = nil
+        let stage = DataPersistenceManager.shared.loadCoupleProfile().relationshipStage
+        CoupleSyncLog.event("paired signedIn=\(AuthService.shared.isSignedIn) stage=\(stage.rawValue)")
+        Task { await sync(trigger: .paired) }
     }
 
     /// Runs a full detect → push → pull cycle. Safe to call repeatedly: a call made
@@ -111,12 +168,20 @@ final class CoupleSyncEngine: ObservableObject {
     @discardableResult
     func sync(trigger: Trigger) async -> Bool {
         guard isEnabled else {
+            if trigger == .paired {
+                CoupleSyncLog.event("sync skipped trigger=paired: not signed in or not officialCouple")
+            }
             status = AuthService.shared.isSignedIn ? .idle : .signedOut
             forgetCoupleIfNoLongerTogether()
             return false
         }
         if isRunning {
             rerunRequested = true
+            return false
+        }
+        if trigger == .localChange, let notBefore = autoSyncNotBefore, Date() < notBefore {
+            // The last run failed and a retry is scheduled; the change is picked up then.
+            CoupleSyncLog.event("sync deferred trigger=localChange: waiting for scheduled retry")
             return false
         }
 
@@ -131,8 +196,10 @@ final class CoupleSyncEngine: ObservableObject {
             succeeded = await runCycle()
         } while rerunRequested && succeeded
 
+        CoupleSyncLog.event("sync end trigger=\(trigger.rawValue) ok=\(succeeded) status=\(Self.describe(status))")
         if succeeded {
             consecutiveFailures = 0
+            autoSyncNotBefore = nil
             lastSyncedAt = Date()
             status = .idle
         } else if status == .notPaired {
@@ -174,8 +241,13 @@ final class CoupleSyncEngine: ObservableObject {
 
     private func handleAccountChange() {
         debounceTask?.cancel()
+        // A run for the previous account must not continue with the new one's data.
+        debouncedSyncs.values.forEach { $0.cancel() }
+        debouncedSyncs.removeAll()
         retryTask?.cancel()
         consecutiveFailures = 0
+        autoSyncNotBefore = nil
+        conflictStreaks.removeAll()
         stateScopeId = nil
         loadStateIfNeeded()
         Task { await sync(trigger: .accountChange) }
@@ -211,6 +283,7 @@ final class CoupleSyncEngine: ObservableObject {
             do {
                 try await handler.uploadPendingMedia()
             } catch {
+                CoupleSyncLog.event("media upload offline; cycle stopped before push")
                 status = .offline
                 return false
             }
@@ -367,11 +440,14 @@ final class CoupleSyncEngine: ObservableObject {
         do {
             response = try await api.send(method: method, path: path, body: body, token: token)
         } catch {
+            CoupleSyncLog.event("push \(entry.resource) \(method) offline")
             return .stop(.offline)
         }
+        CoupleSyncLog.event("push \(entry.resource) \(method) status=\(response.status) reason=\(response.failureReason ?? "-") attempt=\(entry.attempts + 1)")
 
         switch response.status {
         case 200..<300:
+            conflictStreaks["\(entry.resource)/\(entry.recordId)"] = nil
             state.removeOutboxEntry(entry.id)
             if let updatedAt = response.jsonObject()?["updated_at"] as? String {
                 state.serverUpdatedAt[entry.resource, default: [:]][entry.recordId] = updatedAt
@@ -391,7 +467,16 @@ final class CoupleSyncEngine: ObservableObject {
             // The partner changed this record after the version we edited. Their newer
             // version wins: drop our change and take theirs.
             state.removeOutboxEntry(entry.id)
-            return await refetch(entry, token: token)
+            let streakKey = "\(entry.resource)/\(entry.recordId)"
+            let streak = (conflictStreaks[streakKey] ?? 0) + 1
+            conflictStreaks[streakKey] = streak
+            let refetched = await refetch(entry, token: token)
+            if case .stop = refetched { return refetched }
+            if streak >= Self.maxConsecutiveConflicts {
+                CoupleSyncLog.event("push \(entry.resource) conflict \(streak)x in a row; backing off")
+                return .stop(.failed("Repeated conflict"))
+            }
+            return .ok
         case 401:
             return .stop(.signedOut)
         case 403:
@@ -428,6 +513,12 @@ final class CoupleSyncEngine: ObservableObject {
         if let collection = collections.first(where: { $0.key == entry.resource }) {
             apply([dto], to: collection, changed: &changed)
         } else if let document = documents.first(where: { $0.key == entry.resource }) {
+            // The refetched version is the new base. Without it, a run that stops before
+            // its pull (offline, cancelled) re-sends the stale base and gets 409 again.
+            if let updatedAt = dto["updated_at"] as? String {
+                state.serverUpdatedAt[document.key, default: [:]][CoupleSyncState.documentRecordId] = updatedAt
+            }
+            applyServerOwnedFields(dto, to: document)
             apply(dto, to: document)
         }
         notifyApplied(changed)
@@ -543,8 +634,10 @@ final class CoupleSyncEngine: ObservableObject {
         do {
             response = try await api.send(method: "GET", path: document.path, token: token)
         } catch {
+            CoupleSyncLog.event("pull \(document.key) offline")
             return .stop(.offline)
         }
+        CoupleSyncLog.event("pull \(document.key) status=\(response.status) firstSync=\(state.snapshots[document.key]?[CoupleSyncState.documentRecordId] == nil)")
         switch response.status {
         case 200..<300: break
         case 401: return .stop(.signedOut)
@@ -553,6 +646,8 @@ final class CoupleSyncEngine: ObservableObject {
         default: return .stop(.failed("Server error \(response.status)"))
         }
         guard let dto = response.jsonObject() else { return .ok }
+
+        applyServerOwnedFields(dto, to: document)
 
         // Proof that this phone really belongs to a couple on the server. Only then may a
         // later "couple dissolved" answer clear the Cove (see ArchiveService).
@@ -599,6 +694,27 @@ final class CoupleSyncEngine: ObservableObject {
         state.snapshots[document.key, default: [:]][CoupleSyncState.documentRecordId] = snapshot
     }
 
+    /// Server-owned fields (the partner's profile entry) are applied on every successful
+    /// pull, outside snapshot change detection, so they can never trigger a push.
+    private func applyServerOwnedFields(_ dto: [String: Any], to document: CoupleSyncDocument) {
+        guard let owned = document as? CoupleSyncServerOwnedFields else { return }
+        isApplyingRemote = true
+        let changed = owned.applyServerOwnedFields(dto)
+        isApplyingRemote = false
+        if changed { notifyApplied([document.key]) }
+    }
+
+    private static func describe(_ status: Status) -> String {
+        switch status {
+        case .idle: return "idle"
+        case .syncing: return "syncing"
+        case .offline: return "offline"
+        case .notPaired: return "notPaired"
+        case .signedOut: return "signedOut"
+        case .failed(let message): return "failed(\(message))"
+        }
+    }
+
     private func notifyApplied(_ resources: Set<String>) {
         guard !resources.isEmpty else { return }
         NotificationCenter.default.post(
@@ -610,10 +726,35 @@ final class CoupleSyncEngine: ObservableObject {
 
     // MARK: - Retry
 
+    /// Automatic retries after server errors (5xx, e.g. the backend's VersionError when
+    /// both partners PATCH the profile at once) stop after this many in a row. The
+    /// outbox is kept; the next launch, foreground, pull to refresh or local edit tries
+    /// again. Offline retries are not capped.
+    static let maxAutomaticServerErrorRetries = 6
+
+    /// 15s, 30s, 60s … capped at 10 minutes.
+    static func retryDelay(afterFailures failures: Int) -> TimeInterval {
+        min(600, 15 * pow(2, Double(min(max(failures, 1) - 1, 6))))
+    }
+
+    static func shouldRetryAutomatically(afterFailures failures: Int, isServerError: Bool) -> Bool {
+        !isServerError || failures <= maxAutomaticServerErrorRetries
+    }
+
     private func scheduleRetryIfNeeded() {
-        guard status == .offline || { if case .failed = status { return true } else { return false } }() else { return }
+        let isServerError: Bool = { if case .failed = status { return true } else { return false } }()
+        guard status == .offline || isServerError else { return }
         consecutiveFailures += 1
-        let delay = min(600, 15 * pow(2, Double(min(consecutiveFailures - 1, 6))))
+        guard Self.shouldRetryAutomatically(afterFailures: consecutiveFailures, isServerError: isServerError) else {
+            retryTask?.cancel()
+            retryTask = nil
+            autoSyncNotBefore = Date().addingTimeInterval(Self.retryDelay(afterFailures: consecutiveFailures))
+            CoupleSyncLog.event("auto retry stopped after \(consecutiveFailures - 1) server errors; outbox kept for the next trigger")
+            return
+        }
+        let delay = Self.retryDelay(afterFailures: consecutiveFailures)
+        autoSyncNotBefore = Date().addingTimeInterval(delay)
+        CoupleSyncLog.event("retry scheduled in \(Int(delay))s failures=\(consecutiveFailures)")
         retryTask?.cancel()
         retryTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
